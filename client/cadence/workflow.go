@@ -117,19 +117,6 @@ type Workflow interface {
 	Execute(ctx Context, input []byte) (result []byte, err error)
 }
 
-// ExecuteActivityParameters configuration parameters for scheduling an activity
-type ExecuteActivityParameters struct {
-	ActivityID                    *string // Users can choose IDs but our framework makes it optional to decrease the crust.
-	ActivityType                  ActivityType
-	TaskListName                  string
-	Input                         []byte
-	ScheduleToCloseTimeoutSeconds int32
-	ScheduleToStartTimeoutSeconds int32
-	StartToCloseTimeoutSeconds    int32
-	HeartbeatTimeoutSeconds       int32
-	WaitForCancellation           bool
-}
-
 // ExecuteActivity requests activity execution in the context of a workflow.
 //  - If the activity failed to complete then the error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.

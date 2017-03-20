@@ -74,17 +74,17 @@ func WithActivityTask(
 
 const activityOptionsContextKey = "activityOptions"
 
-func getActivityOptions(ctx Context) *ExecuteActivityParameters {
+func getActivityOptions(ctx Context) *executeActivityParameters {
 	eap := ctx.Value(activityOptionsContextKey)
 	if eap == nil {
 		return nil
 	}
-	return eap.(*ExecuteActivityParameters)
+	return eap.(*executeActivityParameters)
 }
 
 func setActivityParametersIfNotExist(ctx Context) Context {
 	if valCtx := getActivityOptions(ctx); valCtx == nil {
-		return WithValue(ctx, activityOptionsContextKey, &ExecuteActivityParameters{})
+		return WithValue(ctx, activityOptionsContextKey, &executeActivityParameters{})
 	}
 	return ctx
 }

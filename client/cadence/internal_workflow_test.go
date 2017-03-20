@@ -106,7 +106,7 @@ func TestSingleActivityWorkflow(t *testing.T) {
 	// TODO: Fix the tests to expose so mocking execute activity can inline complete the response.
 	ctx.On("Complete", []byte("Hello World!"), nil).Return().Once()
 	ctx.On("ExecuteActivity", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		parameters := args.Get(0).(ExecuteActivityParameters)
+		parameters := args.Get(0).(executeActivityParameters)
 		callback := args.Get(1).(resultHandler)
 		result := string(parameters.Input) + " World!"
 		cbProcessor.Add(callback, []byte(result), nil)
@@ -165,7 +165,7 @@ func TestSplitJoinActivityWorkflow(t *testing.T) {
 
 	// TODO: Fix the tests to expose so mocking execute activity can inline complete the response.
 	ctx.On("ExecuteActivity", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		parameters := args.Get(0).(ExecuteActivityParameters)
+		parameters := args.Get(0).(executeActivityParameters)
 		callback := args.Get(1).(resultHandler)
 		switch *parameters.ActivityID {
 		case "id1":

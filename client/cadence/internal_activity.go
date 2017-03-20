@@ -11,12 +11,25 @@ type (
 		activityID string
 	}
 
+	// executeActivityParameters configuration parameters for scheduling an activity
+	executeActivityParameters struct {
+		ActivityID                    *string // Users can choose IDs but our framework makes it optional to decrease the crust.
+		ActivityType                  ActivityType
+		TaskListName                  string
+		Input                         []byte
+		ScheduleToCloseTimeoutSeconds int32
+		ScheduleToStartTimeoutSeconds int32
+		StartToCloseTimeoutSeconds    int32
+		HeartbeatTimeoutSeconds       int32
+		WaitForCancellation           bool
+	}
+
 	// asyncActivityClient for requesting activity execution
 	asyncActivityClient interface {
 		// The ExecuteActivity schedules an activity with a callback handler.
 		// If the activity failed to complete the callback error would indicate the failure
 		// and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError
-		ExecuteActivity(parameters ExecuteActivityParameters, callback resultHandler) *activityInfo
+		ExecuteActivity(parameters executeActivityParameters, callback resultHandler) *activityInfo
 
 		// This only initiates cancel request for activity. if the activity is configured to not waitForCancellation then
 		// it would invoke the callback handler immediately with error code ActivityTaskCanceledError.

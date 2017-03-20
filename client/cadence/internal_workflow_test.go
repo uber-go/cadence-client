@@ -1,13 +1,16 @@
 package cadence
 
 import (
+	"context"
 	"testing"
 
+	"encoding/json"
 	"time"
 
-	"github.com/uber-go/cadence-client/common"
+	"fmt"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/uber-go/cadence-client/common"
 )
 
 type testContext struct {
@@ -404,4 +407,115 @@ func TestActivityCancelWorkflow(t *testing.T) {
 
 	cbProcessor.Close()
 	ctx.AssertExpectations(t)
+}
+
+//
+// A sample example of external workflow.
+//
+
+// Workflow Deciders and Activities.
+type greetingsWorkflow struct{}
+type getNameActivity struct{}
+type getGreetingActivity struct{}
+type sayGreetingActivity struct{}
+
+type sayGreetingActivityRequest struct {
+	Name     string
+	Greeting string
+}
+
+// Greetings Workflow Decider.
+func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
+	// Get Greeting.
+	greetResult, err := ExecuteActivity(ctx, ExecuteActivityParameters{
+		TaskListName: "exampleTaskList",
+		ActivityType: ActivityType{Name: "getGreetingActivity"},
+		Input:        input,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Get Name.
+	nameResult, err := ExecuteActivity(ctx, ExecuteActivityParameters{
+		TaskListName: "exampleTaskList",
+		ActivityType: ActivityType{Name: "getNameActivity"},
+		Input:        input,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Say Greeting.
+	request := &sayGreetingActivityRequest{Name: string(nameResult), Greeting: string(greetResult)}
+	sayGreetInput, err := json.Marshal(request)
+	if err != nil {
+		panic(fmt.Sprintf("Marshalling failed with error: %+v", err))
+	}
+	_, err = ExecuteActivity(ctx, ExecuteActivityParameters{
+		TaskListName: "exampleTaskList",
+		ActivityType: ActivityType{Name: "sayGreetingActivity"},
+		Input:        sayGreetInput,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+// Get Name Activity.
+func (g getNameActivity) Execute(ctx context.Context, input []byte) ([]byte, error) {
+	return []byte("World"), nil
+}
+
+func (g getNameActivity) ActivityType() ActivityType {
+	return ActivityType{Name: "getNameActivity"}
+}
+
+// Get Greeting Activity.
+func (ga getGreetingActivity) Execute(ctx context.Context, input []byte) ([]byte, error) {
+	return []byte("Hello"), nil
+}
+
+func (ga getGreetingActivity) ActivityType() ActivityType {
+	return ActivityType{Name: "getGreetingActivity"}
+}
+
+// Say Greeting Activity.
+func (ga sayGreetingActivity) Execute(ctx context.Context, input []byte) ([]byte, error) {
+	greeetingParams := &sayGreetingActivityRequest{}
+	err := json.Unmarshal(input, greeetingParams)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("Saying Final Greeting: ")
+	fmt.Printf("%s %s!\n", greeetingParams.Greeting, greeetingParams.Name)
+	return nil, nil
+}
+
+func (ga sayGreetingActivity) ActivityType() ActivityType {
+	return ActivityType{Name: "sayGreetingActivity"}
+}
+
+func TestExternalExampleWorkflow(t *testing.T) {
+	w := NewWorkflowDefinition(&greetingsWorkflow{})
+	ctx := &MockWorkflowEnvironment{}
+	workflowComplete := make(chan struct{})
+
+	cbProcessor := newAsyncTestCallbackProcessor()
+	cbProcessor.Process()
+
+	ctx.On("ExecuteActivity", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		callback := args.Get(1).(resultHandler)
+		cbProcessor.Add(callback, []byte("test"), nil)
+	}).Times(3)
+
+	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
+		workflowComplete <- struct{}{}
+	}).Once()
+
+	w.Execute(ctx, []byte(""))
+	<- workflowComplete
 }

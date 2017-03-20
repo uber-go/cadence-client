@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/uber-go/cadence-client/common"
 )
 
 type testContext struct {
@@ -77,12 +76,8 @@ type helloWorldActivityWorkflow struct {
 }
 
 func (w *helloWorldActivityWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	id := "id1"
-	parameters := ExecuteActivityParameters{
-		ActivityID: &id,
-		Input:      input,
-	}
-	result, err = ExecuteActivity(ctx, parameters)
+	ctx1 := NewActivityOptionsBuilder(ctx).SetActivityID("id1").Build()
+	result, err = ExecuteActivity(ctx1, ActivityType{}, input)
 	require.NoError(w.t, err)
 	return []byte(string(result)), nil
 }
@@ -133,22 +128,13 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	c1 := NewChannel(ctx)
 	c2 := NewChannel(ctx)
 	Go(ctx, func(ctx Context) {
-		id1 := "id1"
-		parameters := ExecuteActivityParameters{
-			ActivityID: &id1,
-			Input:      input,
-		}
-
-		result1, err1 = ExecuteActivity(ctx, parameters)
+		ctx1 := NewActivityOptionsBuilder(ctx).SetActivityID("id1").Build()
+		result1, err1 = ExecuteActivity(ctx1, ActivityType{}, nil)
 		c1.Send(ctx, true)
 	})
 	Go(ctx, func(ctx Context) {
-		id2 := "id2"
-		parameters := ExecuteActivityParameters{
-			ActivityID: &id2,
-			Input:      input,
-		}
-		result2, err2 = ExecuteActivity(ctx, parameters)
+		ctx2 := NewActivityOptionsBuilder(ctx).SetActivityID("id2").Build()
+		result2, err2 = ExecuteActivity(ctx2, ActivityType{}, nil)
 		if w.panic {
 			panic("simulated")
 		}
@@ -337,15 +323,15 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 	// Sync cancellation
 	ctx1, c1 := WithCancel(ctx)
 	defer c1()
-	id1 := "id1"
-	res1, err1 := ExecuteActivity(ctx1, ExecuteActivityParameters{ActivityID: common.StringPtr(id1)})
+	ctx1 = NewActivityOptionsBuilder(ctx1).SetActivityID("id1").Build()
+	res1, err1 := ExecuteActivity(ctx1, ActivityType{}, nil)
 	require.Equal(w.t, string(res1), "test")
 	require.NoError(w.t, err1)
 
 	// Async Cancellation (Callback completes before cancel)
 	ctx2, c2 := WithCancel(ctx)
-	id2 := "id2"
-	f := ExecuteActivityAsync(ctx2, ExecuteActivityParameters{ActivityID: common.StringPtr(id2)})
+	ctx2 = NewActivityOptionsBuilder(ctx2).SetActivityID("id2").Build()
+	f := ExecuteActivityAsync(ctx2, ActivityType{}, nil)
 	c2()
 	res2, err2 := f.Get(ctx)
 	require.NotNil(w.t, res2)
@@ -353,8 +339,8 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 
 	// Async Cancellation (Callback doesn't complete)
 	ctx3, c3 := WithCancel(ctx)
-	id3 := "id3"
-	f3 := ExecuteActivityAsync(ctx3, ExecuteActivityParameters{ActivityID: common.StringPtr(id3)})
+	ctx3 = NewActivityOptionsBuilder(ctx2).SetActivityID("id3").Build()
+	f3 := ExecuteActivityAsync(ctx3, ActivityType{}, nil)
 	c3()
 	res3, err3 := f3.Get(ctx)
 	require.Nil(w.t, res3)
@@ -427,21 +413,18 @@ type sayGreetingActivityRequest struct {
 // Greetings Workflow Decider.
 func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	// Get Greeting.
-	greetResult, err := ExecuteActivity(ctx, ExecuteActivityParameters{
-		TaskListName: "exampleTaskList",
-		ActivityType: ActivityType{Name: "getGreetingActivity"},
-		Input:        input,
-	})
+
+	ctx1 := NewActivityOptionsBuilder(ctx).SetTaskList("exampleTaskList").
+		SetScheduleToCloseTimeout(10).SetScheduleToStartTimeout(2).
+		Build()
+
+	greetResult, err := ExecuteActivity(ctx1, ActivityType{Name: "getGreetingActivity"}, input)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get Name.
-	nameResult, err := ExecuteActivity(ctx, ExecuteActivityParameters{
-		TaskListName: "exampleTaskList",
-		ActivityType: ActivityType{Name: "getNameActivity"},
-		Input:        input,
-	})
+	nameResult, err := ExecuteActivity(ctx1, ActivityType{Name: "getNameActivity"}, input)
 	if err != nil {
 		return nil, err
 	}
@@ -452,11 +435,7 @@ func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, er
 	if err != nil {
 		panic(fmt.Sprintf("Marshalling failed with error: %+v", err))
 	}
-	_, err = ExecuteActivity(ctx, ExecuteActivityParameters{
-		TaskListName: "exampleTaskList",
-		ActivityType: ActivityType{Name: "sayGreetingActivity"},
-		Input:        sayGreetInput,
-	})
+	_, err = ExecuteActivity(ctx1, ActivityType{Name: "sayGreetingActivity"}, sayGreetInput)
 	if err != nil {
 		return nil, err
 	}

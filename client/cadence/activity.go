@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/uber-go/cadence-client/.gen/go/shared"
+	"github.com/uber-go/cadence-client/common"
 )
 
 type (
@@ -69,4 +70,136 @@ func WithActivityTask(
 			RunID: *task.WorkflowExecution.RunId,
 			ID:    *task.WorkflowExecution.WorkflowId},
 	})
+}
+
+const activityOptionsContextKey = "activityOptions"
+
+func getActivityOptions(ctx Context) *ExecuteActivityParameters {
+	eap := ctx.Value(activityOptionsContextKey)
+	if eap == nil {
+		return nil
+	}
+	return eap.(*ExecuteActivityParameters)
+}
+
+func setActivityParametersIfNotExist(ctx Context) Context {
+	if valCtx := getActivityOptions(ctx); valCtx == nil {
+		return WithValue(ctx, activityOptionsContextKey, &ExecuteActivityParameters{})
+	}
+	return ctx
+}
+
+// ActivityOptionsBuilder stores all activity-specific parameters that will
+// be stored inside of a context.
+type ActivityOptionsBuilder struct {
+	parentCtx                     Context
+	activityID                    *string
+	taskListName                  string
+	scheduleToCloseTimeoutSeconds int32
+	scheduleToStartTimeoutSeconds int32
+	startToCloseTimeoutSeconds    int32
+	heartbeatTimeoutSeconds       int32
+	waitForCancellation           bool
+}
+
+// NewActivityOptionsBuilder returns a builder that can be used to create a Context.
+func NewActivityOptionsBuilder(ctx Context) *ActivityOptionsBuilder {
+	return &ActivityOptionsBuilder{parentCtx: ctx}
+}
+
+// SetTaskList sets the task list name for this Context.
+func (ab *ActivityOptionsBuilder) SetTaskList(name string) *ActivityOptionsBuilder {
+	ab.taskListName = name
+	return ab
+}
+
+// SetScheduleToCloseTimeout sets timeout for this Context.
+func (ab *ActivityOptionsBuilder) SetScheduleToCloseTimeout(timeout int32) *ActivityOptionsBuilder {
+	ab.scheduleToCloseTimeoutSeconds = timeout
+	return ab
+}
+
+// SetScheduleToStartTimeout sets timeout for this Context.
+func (ab *ActivityOptionsBuilder) SetScheduleToStartTimeout(timeout int32) *ActivityOptionsBuilder {
+	ab.scheduleToStartTimeoutSeconds = timeout
+	return ab
+}
+
+// SetStartToCloseTimeout sets timeout for this Context.
+func (ab *ActivityOptionsBuilder) SetStartToCloseTimeout(timeout int32) *ActivityOptionsBuilder {
+	ab.startToCloseTimeoutSeconds = timeout
+	return ab
+}
+
+// SetHeartbeatTimeout sets timeout for this Context.
+func (ab *ActivityOptionsBuilder) SetHeartbeatTimeout(timeout int32) *ActivityOptionsBuilder {
+	ab.heartbeatTimeoutSeconds = timeout
+	return ab
+}
+
+// SetWaitForCancellation sets timeout for this Context.
+func (ab *ActivityOptionsBuilder) SetWaitForCancellation(wait bool) *ActivityOptionsBuilder {
+	ab.waitForCancellation = wait
+	return ab
+}
+
+// activityID sets the activity task list ID for this Context.
+func (ab *ActivityOptionsBuilder) SetActivityID(activityID string) *ActivityOptionsBuilder {
+	ab.activityID = common.StringPtr(activityID)
+	return ab
+}
+
+// Build returns a Context that can be used to make calls.
+func (ab *ActivityOptionsBuilder) Build() Context {
+	ctx := setActivityParametersIfNotExist(ab.parentCtx)
+	getActivityOptions(ctx).TaskListName = ab.taskListName
+	getActivityOptions(ctx).ScheduleToCloseTimeoutSeconds = ab.scheduleToCloseTimeoutSeconds
+	getActivityOptions(ctx).StartToCloseTimeoutSeconds = ab.startToCloseTimeoutSeconds
+	getActivityOptions(ctx).ScheduleToStartTimeoutSeconds = ab.scheduleToStartTimeoutSeconds
+	getActivityOptions(ctx).HeartbeatTimeoutSeconds = ab.heartbeatTimeoutSeconds
+	getActivityOptions(ctx).WaitForCancellation = ab.waitForCancellation
+	getActivityOptions(ctx).ActivityID = ab.activityID
+	return ctx
+}
+
+// WithTaskList adds a task list to the context.
+func WithTaskList(ctx Context, name string) Context {
+	ctx1 := setActivityParametersIfNotExist(ctx)
+	getActivityOptions(ctx1).TaskListName = name
+	return ctx1
+}
+
+// WithScheduleToCloseTimeout adds a timeout to the context.
+func WithScheduleToCloseTimeout(ctx Context, timeout int32) Context {
+	ctx1 := setActivityParametersIfNotExist(ctx)
+	getActivityOptions(ctx1).ScheduleToCloseTimeoutSeconds = timeout
+	return ctx1
+}
+
+// WithScheduleToStartTimeout adds a timeout to the context.
+func WithScheduleToStartTimeout(ctx Context, timeout int32) Context {
+	ctx1 := setActivityParametersIfNotExist(ctx)
+	getActivityOptions(ctx1).ScheduleToStartTimeoutSeconds = timeout
+	return ctx1
+}
+
+// WithStartToCloseTimeout adds a timeout to the context.
+func WithStartToCloseTimeout(ctx Context, timeout int32) Context {
+	ctx1 := setActivityParametersIfNotExist(ctx)
+	getActivityOptions(ctx1).StartToCloseTimeoutSeconds = timeout
+	return ctx1
+}
+
+// WithHeartbeatTimeout adds a timeout to the context.
+func WithHeartbeatTimeout(ctx Context, timeout int32) Context {
+	ctx1 := setActivityParametersIfNotExist(ctx)
+	getActivityOptions(ctx1).HeartbeatTimeoutSeconds = timeout
+	return ctx1
+}
+
+// WithWaitForCancellation adds wait for the cacellation to the context.
+func WithWaitForCancellation(ctx Context, wait bool) Context {
+	ctx1 := setActivityParametersIfNotExist(ctx)
+	getActivityOptions(ctx1).WaitForCancellation = wait
+	return ctx1
 }

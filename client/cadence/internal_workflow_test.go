@@ -76,7 +76,7 @@ type helloWorldActivityWorkflow struct {
 }
 
 func (w *helloWorldActivityWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ctx1 := NewActivityOptionsBuilder(ctx).SetActivityID("id1").Build()
+	ctx1 := WithActivityOptions(ctx, GetActivityOptions().WithActivityID("id1"))
 	result, err = ExecuteActivity(ctx1, ActivityType{}, input)
 	require.NoError(w.t, err)
 	return []byte(string(result)), nil
@@ -128,12 +128,12 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	c1 := NewChannel(ctx)
 	c2 := NewChannel(ctx)
 	Go(ctx, func(ctx Context) {
-		ctx1 := NewActivityOptionsBuilder(ctx).SetActivityID("id1").Build()
+		ctx1 := WithActivityOptions(ctx, GetActivityOptions().WithActivityID("id1"))
 		result1, err1 = ExecuteActivity(ctx1, ActivityType{}, nil)
 		c1.Send(ctx, true)
 	})
 	Go(ctx, func(ctx Context) {
-		ctx2 := NewActivityOptionsBuilder(ctx).SetActivityID("id2").Build()
+		ctx2 := WithActivityOptions(ctx, GetActivityOptions().WithActivityID("id2"))
 		result2, err2 = ExecuteActivity(ctx2, ActivityType{}, nil)
 		if w.panic {
 			panic("simulated")
@@ -323,14 +323,14 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 	// Sync cancellation
 	ctx1, c1 := WithCancel(ctx)
 	defer c1()
-	ctx1 = NewActivityOptionsBuilder(ctx1).SetActivityID("id1").Build()
+	ctx1 = WithActivityOptions(ctx1, GetActivityOptions().WithActivityID("id1"))
 	res1, err1 := ExecuteActivity(ctx1, ActivityType{}, nil)
 	require.Equal(w.t, string(res1), "test")
 	require.NoError(w.t, err1)
 
 	// Async Cancellation (Callback completes before cancel)
 	ctx2, c2 := WithCancel(ctx)
-	ctx2 = NewActivityOptionsBuilder(ctx2).SetActivityID("id2").Build()
+	ctx2 = WithActivityOptions(ctx2, GetActivityOptions().WithActivityID("id2"))
 	f := ExecuteActivityAsync(ctx2, ActivityType{}, nil)
 	c2()
 	res2, err2 := f.Get(ctx)
@@ -339,7 +339,7 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 
 	// Async Cancellation (Callback doesn't complete)
 	ctx3, c3 := WithCancel(ctx)
-	ctx3 = NewActivityOptionsBuilder(ctx2).SetActivityID("id3").Build()
+	ctx3 = WithActivityOptions(ctx3, GetActivityOptions().WithActivityID("id3"))
 	f3 := ExecuteActivityAsync(ctx3, ActivityType{}, nil)
 	c3()
 	res3, err3 := f3.Get(ctx)
@@ -414,9 +414,8 @@ type sayGreetingActivityRequest struct {
 func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	// Get Greeting.
 
-	ctx1 := NewActivityOptionsBuilder(ctx).SetTaskList("exampleTaskList").
-		SetScheduleToCloseTimeout(10).SetScheduleToStartTimeout(2).
-		Build()
+	ctx1 := WithActivityOptions(ctx, GetActivityOptions().WithTaskList("exampleTaskList").
+			WithScheduleToCloseTimeout(10).WithScheduleToStartTimeout(2))
 
 	greetResult, err := ExecuteActivity(ctx1, ActivityType{Name: "getGreetingActivity"}, input)
 	if err != nil {

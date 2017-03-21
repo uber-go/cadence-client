@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/uber-go/cadence-client/.gen/go/shared"
-	"github.com/uber-go/cadence-client/common"
 )
 
 type (
@@ -72,94 +71,35 @@ func WithActivityTask(
 	})
 }
 
-const activityOptionsContextKey = "activityOptions"
-
-func getActivityOptions(ctx Context) *executeActivityParameters {
-	eap := ctx.Value(activityOptionsContextKey)
-	if eap == nil {
-		return nil
-	}
-	return eap.(*executeActivityParameters)
-}
-
-func setActivityParametersIfNotExist(ctx Context) Context {
-	if valCtx := getActivityOptions(ctx); valCtx == nil {
-		return WithValue(ctx, activityOptionsContextKey, &executeActivityParameters{})
-	}
-	return ctx
-}
-
-// ActivityOptionsBuilder stores all activity-specific parameters that will
+// ActivityOptions stores all activity-specific parameters that will
 // be stored inside of a context.
-type ActivityOptionsBuilder struct {
-	parentCtx                     Context
-	activityID                    *string
-	taskListName                  string
-	scheduleToCloseTimeoutSeconds int32
-	scheduleToStartTimeoutSeconds int32
-	startToCloseTimeoutSeconds    int32
-	heartbeatTimeoutSeconds       int32
-	waitForCancellation           bool
+type ActivityOptions interface {
+	WithTaskList(name string) ActivityOptions
+	WithScheduleToCloseTimeout(timeout int32) ActivityOptions
+	WithScheduleToStartTimeout(timeout int32) ActivityOptions
+	WithStartToCloseTimeout(timeout int32) ActivityOptions
+	WithHeartbeatTimeout(timeout int32) ActivityOptions
+	WithWaitForCancellation(wait bool) ActivityOptions
+	WithActivityID(activityID string) ActivityOptions
 }
 
-// NewActivityOptionsBuilder returns a builder that can be used to create a Context.
-func NewActivityOptionsBuilder(ctx Context) *ActivityOptionsBuilder {
-	return &ActivityOptionsBuilder{parentCtx: ctx}
+// GetActivityOptions returns a builder that can be used to create a Context.
+func GetActivityOptions() ActivityOptions {
+	return &activityOptions{}
 }
 
-// SetTaskList sets the task list name for this Context.
-func (ab *ActivityOptionsBuilder) SetTaskList(name string) *ActivityOptionsBuilder {
-	ab.taskListName = name
-	return ab
-}
-
-// SetScheduleToCloseTimeout sets timeout for this Context.
-func (ab *ActivityOptionsBuilder) SetScheduleToCloseTimeout(timeout int32) *ActivityOptionsBuilder {
-	ab.scheduleToCloseTimeoutSeconds = timeout
-	return ab
-}
-
-// SetScheduleToStartTimeout sets timeout for this Context.
-func (ab *ActivityOptionsBuilder) SetScheduleToStartTimeout(timeout int32) *ActivityOptionsBuilder {
-	ab.scheduleToStartTimeoutSeconds = timeout
-	return ab
-}
-
-// SetStartToCloseTimeout sets timeout for this Context.
-func (ab *ActivityOptionsBuilder) SetStartToCloseTimeout(timeout int32) *ActivityOptionsBuilder {
-	ab.startToCloseTimeoutSeconds = timeout
-	return ab
-}
-
-// SetHeartbeatTimeout sets timeout for this Context.
-func (ab *ActivityOptionsBuilder) SetHeartbeatTimeout(timeout int32) *ActivityOptionsBuilder {
-	ab.heartbeatTimeoutSeconds = timeout
-	return ab
-}
-
-// SetWaitForCancellation sets timeout for this Context.
-func (ab *ActivityOptionsBuilder) SetWaitForCancellation(wait bool) *ActivityOptionsBuilder {
-	ab.waitForCancellation = wait
-	return ab
-}
-
-// activityID sets the activity task list ID for this Context.
-func (ab *ActivityOptionsBuilder) SetActivityID(activityID string) *ActivityOptionsBuilder {
-	ab.activityID = common.StringPtr(activityID)
-	return ab
-}
-
-// Build returns a Context that can be used to make calls.
-func (ab *ActivityOptionsBuilder) Build() Context {
-	ctx := setActivityParametersIfNotExist(ab.parentCtx)
-	getActivityOptions(ctx).TaskListName = ab.taskListName
-	getActivityOptions(ctx).ScheduleToCloseTimeoutSeconds = ab.scheduleToCloseTimeoutSeconds
-	getActivityOptions(ctx).StartToCloseTimeoutSeconds = ab.startToCloseTimeoutSeconds
-	getActivityOptions(ctx).ScheduleToStartTimeoutSeconds = ab.scheduleToStartTimeoutSeconds
-	getActivityOptions(ctx).HeartbeatTimeoutSeconds = ab.heartbeatTimeoutSeconds
-	getActivityOptions(ctx).WaitForCancellation = ab.waitForCancellation
-	getActivityOptions(ctx).ActivityID = ab.activityID
-	return ctx
+// WithActivityOptions adds all options to the context.
+func WithActivityOptions(ctx Context, options ActivityOptions) Context {
+	ao := options.(*activityOptions)
+	ctx1 := setActivityParametersIfNotExist(ctx)
+	getActivityOptions(ctx1).TaskListName = ao.taskListName
+	getActivityOptions(ctx1).ScheduleToCloseTimeoutSeconds = ao.scheduleToCloseTimeoutSeconds
+	getActivityOptions(ctx1).StartToCloseTimeoutSeconds = ao.startToCloseTimeoutSeconds
+	getActivityOptions(ctx1).ScheduleToStartTimeoutSeconds = ao.scheduleToStartTimeoutSeconds
+	getActivityOptions(ctx1).HeartbeatTimeoutSeconds = ao.heartbeatTimeoutSeconds
+	getActivityOptions(ctx1).WaitForCancellation = ao.waitForCancellation
+	getActivityOptions(ctx1).ActivityID = ao.activityID
+	return ctx1
 }
 
 // WithTaskList adds a task list to the context.

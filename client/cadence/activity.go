@@ -80,7 +80,9 @@ type ActivityOptions interface {
 	WithStartToCloseTimeout(timeout int32) ActivityOptions
 	WithHeartbeatTimeout(timeout int32) ActivityOptions
 	WithWaitForCancellation(wait bool) ActivityOptions
-	WithActivityID(activityID string) ActivityOptions
+
+	// NOTE: We don't expose configuring Activity ID to the user, This is something will be done in future
+	// so they have end to end scenario of how to use this ID to complete and fail an activity(business use case).
 }
 
 // GetActivityOptions returns a builder that can be used to create a Context.

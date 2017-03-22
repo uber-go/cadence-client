@@ -1,14 +1,14 @@
 package cadence
 
 import (
+	"errors"
+	"github.com/pborman/uuid"
+	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/common/backoff"
 	"github.com/uber-go/cadence-client/common/metrics"
-	"errors"
-	"github.com/pborman/uuid"
-	"github.com/uber-common/bark"
 	"github.com/uber-go/tally"
 )
 
@@ -262,4 +262,29 @@ func getWorkflowDefinitionFactory(factory WorkflowFactory) workflowDefinitionFac
 		}
 		return NewWorkflowDefinition(wd), nil
 	}
+}
+
+// WorkerOptions stores all worker-specific parameters that will
+// be stored inside of a context.
+type WorkerOptions interface {
+	AddWorkflow(taskListName string, factory WorkflowFactory) WorkerOptions
+	AddActivity(taskListName string, activities []Activity) WorkerOptions
+	WithConcurrentPollSize(size int) WorkerOptions
+	WithConcurrentActivityExecutionSize(size int) WorkerOptions
+	WithIdentity(identity string) WorkerOptions
+	WithMetrics(metricsScope tally.Scope) WorkerOptions
+	WithLogger(logger bark.Logger) WorkerOptions
+}
+
+// GetActivityOptions returns a builder that can be used to create a Context.
+func GetWorkerOptions() WorkerOptions {
+	return &workerOptions{}
+}
+
+// NewWorker returns an instance of a worker to manage processing both workflows and activities.
+func NewWorker(
+	service m.TChanWorkflowService,
+	options WorkerOptions,
+) (worker Lifecycle) {
+	return newAggregatedWorker(service, options)
 }

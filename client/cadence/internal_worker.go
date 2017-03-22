@@ -3,10 +3,14 @@ package cadence
 // All code in this file is private to the package.
 
 import (
-	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
+	m "github.com/uber-go/cadence-client/.gen/go/cadence"
+	"github.com/uber-go/tally"
 )
+
+// Assert that structs do indeed implement the interfaces
+var _ WorkerOptions = (*workerOptions)(nil)
 
 type (
 	// WorkflowWorker wraps the code for hosting workflow types.
@@ -187,4 +191,77 @@ func (aw *activityWorker) Start() error {
 // Shutdown the worker.
 func (aw *activityWorker) Stop() {
 	aw.worker.Stop()
+}
+
+// workerOptions stores all worker-specific parameters that will
+// be stored inside of a context.
+type workerOptions struct {
+	// TODO
+}
+
+// AddWorkflow adds a task list name and list of workflow types associated with it.
+func (wo *workerOptions) AddWorkflow(taskListName string, factory WorkflowFactory) WorkerOptions {
+	// TODO:
+	return wo
+}
+
+// AddActivity adds a task list name and the list of activities associated with it.
+func (wo *workerOptions) AddActivity(taskListName string, activities []Activity) WorkerOptions {
+	// TODO:
+	return wo
+}
+
+// WithConcurrentPollSize is the total number of concurrent pollers that workers are going to use
+// This will be distributed equally among all the different task lists that are configured.
+func (wo *workerOptions) WithConcurrentPollSize(size int) WorkerOptions {
+	// TODO:
+	return wo
+}
+
+// WithConcurrentActivityExecutionSize is the total number of concurrent activity executions that activity
+// workers are going to use.
+// This will be distributed equally among all the different task lists that are configured for activities.
+func (wo *workerOptions) WithConcurrentActivityExecutionSize(size int) WorkerOptions {
+	// TODO:
+	return wo
+}
+
+// WithIdentity identifies the worker for debugging.
+func (wo *workerOptions) WithIdentity(identity string) WorkerOptions {
+	// TODO:
+	return wo
+}
+
+// WithMetrics is the metrics that the worker can use to report.
+func (wo *workerOptions) WithMetrics(metricsScope tally.Scope) WorkerOptions {
+	// TODO:
+	return wo
+}
+
+// WithLogger sets the logger for the framework.
+func (wo *workerOptions) WithLogger(logger bark.Logger) WorkerOptions {
+	// TODO:
+	return wo
+}
+
+// aggregatedWorker combines both workflowWorker and activityWorker worker lifecycle.
+type aggregatedWorker struct {
+	// TODO:
+}
+
+func (aw *aggregatedWorker) Start() error {
+	// TODO:
+	return nil
+}
+
+func (aw *aggregatedWorker) Stop() {
+	// TODO:
+}
+
+// aggregatedWorker returns an instance to manage the workers.
+func newAggregatedWorker(
+	service m.TChanWorkflowService,
+	options WorkerOptions,
+) (worker Lifecycle) {
+	return &aggregatedWorker{}
 }

@@ -349,6 +349,9 @@ func (c *channelImpl) Send(ctx Context, v interface{}) {
 			return
 		}
 		if len(c.blockedReceives) > 0 {
+			if len(c.blockedSends) > 0 {
+				panic("both blockedSends and blockedReceives are not empty")
+			}
 			blockedGet := c.blockedReceives[0]
 			c.blockedReceives = c.blockedReceives[1:]
 			blockedGet(v)

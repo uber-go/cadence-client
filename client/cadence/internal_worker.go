@@ -10,7 +10,8 @@ import (
 )
 
 // Assert that structs do indeed implement the interfaces
-var _ WorkerOptions = (*workerOptions)(nil)
+var _ taskHost = (*taskHostImpl)(nil)
+var _ HostOptions = (*hostOptions)(nil)
 
 type (
 	// WorkflowWorker wraps the code for hosting workflow types.
@@ -193,75 +194,92 @@ func (aw *activityWorker) Stop() {
 	aw.worker.Stop()
 }
 
-// workerOptions stores all worker-specific parameters that will
-// be stored inside of a context.
-type workerOptions struct {
+const hostEnvContextKey = "hostEnv"
+
+func getHostEnvironment(ctx Context) *taskHostImpl {
+	eap := ctx.Value(hostEnvContextKey)
+	if eap == nil {
+		return nil
+	}
+	return eap.(*taskHostImpl)
+}
+
+func setHostEnvironment(ctx Context, service m.TChanWorkflowService) Context {
+	if valCtx := getHostEnvironment(ctx); valCtx == nil {
+		return WithValue(ctx, hostEnvContextKey, &taskHostImpl{})
+	}
+	return ctx
+}
+
+// hostOptions stores all host-specific parameters that cadence can use to run the workflows
+// and activities and if they need any reate limiting.
+type hostOptions struct {
 	// TODO
 }
 
-// AddWorkflow adds a task list name and list of workflow types associated with it.
-func (wo *workerOptions) AddWorkflow(taskListName string, factory WorkflowFactory) WorkerOptions {
+// SetMaxConcurrentActivityExecutionSize sets the maximum concurrent activity executions this host can have.
+func (ho *hostOptions) SetMaxConcurrentActivityExecutionSize(size int) HostOptions {
 	// TODO:
-	return wo
+	return ho
 }
 
-// AddActivity adds a task list name and the list of activities associated with it.
-func (wo *workerOptions) AddActivity(taskListName string, activities []Activity) WorkerOptions {
+// SetActivityExecutionRate sets the rate limiting on number of activities that can be executed.
+func (ho *hostOptions) SetActivityExecutionRate(size int) HostOptions {
 	// TODO:
-	return wo
+	return ho
 }
 
-// WithConcurrentPollSize is the total number of concurrent pollers that workers are going to use
-// This will be distributed equally among all the different task lists that are configured.
-func (wo *workerOptions) WithConcurrentPollSize(size int) WorkerOptions {
+// SetIdentity identifies the host for debugging.
+func (ho *hostOptions) SetIdentity(identity string) HostOptions {
 	// TODO:
-	return wo
+	return ho
 }
 
-// WithConcurrentActivityExecutionSize is the total number of concurrent activity executions that activity
-// workers are going to use.
-// This will be distributed equally among all the different task lists that are configured for activities.
-func (wo *workerOptions) WithConcurrentActivityExecutionSize(size int) WorkerOptions {
+// SetMetrics is the metrics that the client can use to report.
+func (ho *hostOptions) SetMetrics(metricsScope tally.Scope) HostOptions {
 	// TODO:
-	return wo
+	return ho
 }
 
-// WithIdentity identifies the worker for debugging.
-func (wo *workerOptions) WithIdentity(identity string) WorkerOptions {
+// SetLogger sets the logger for the framework.
+func (ho *hostOptions) SetLogger(logger bark.Logger) HostOptions {
 	// TODO:
-	return wo
+	return ho
 }
 
-// WithMetrics is the metrics that the worker can use to report.
-func (wo *workerOptions) WithMetrics(metricsScope tally.Scope) WorkerOptions {
-	// TODO:
-	return wo
+// taskHost stores all worker-specific parameters that will
+// be stored inside of a context.
+type taskHost interface {
+	Lifecycle
+	RegisterWorkflow(taskListName string, factory WorkflowFactory)
+	RegisterActivity(taskListName string, activities []Activity, autoHeartBeat bool)
+	SetOptions(options hostOptions)
 }
 
-// WithLogger sets the logger for the framework.
-func (wo *workerOptions) WithLogger(logger bark.Logger) WorkerOptions {
-	// TODO:
-	return wo
-}
-
-// aggregatedWorker combines both workflowWorker and activityWorker worker lifecycle.
-type aggregatedWorker struct {
+// taskHostImpl implementation of taskHost
+type taskHostImpl struct {
 	// TODO:
 }
 
-func (aw *aggregatedWorker) Start() error {
+func (th *taskHostImpl) RegisterWorkflow(taskListName string, factory WorkflowFactory) {
+	// TODO:
+}
+
+func (th *taskHostImpl) RegisterActivity(taskListName string, activities []Activity, autoHeartBeat bool) {
+	// TODO:
+}
+
+func (th *taskHostImpl) SetOptions(options hostOptions) {
+	// TODO:
+}
+
+func (th *taskHostImpl) Start() error {
 	// TODO:
 	return nil
 }
 
-func (aw *aggregatedWorker) Stop() {
+func (th *taskHostImpl) Stop() {
 	// TODO:
 }
 
-// aggregatedWorker returns an instance to manage the workers.
-func newAggregatedWorker(
-	service m.TChanWorkflowService,
-	options WorkerOptions,
-) (worker Lifecycle) {
-	return &aggregatedWorker{}
-}
+

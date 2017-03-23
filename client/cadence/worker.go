@@ -264,27 +264,85 @@ func getWorkflowDefinitionFactory(factory WorkflowFactory) workflowDefinitionFac
 	}
 }
 
-// WorkerOptions stores all worker-specific parameters that will
-// be stored inside of a context.
-type WorkerOptions interface {
-	AddWorkflow(taskListName string, factory WorkflowFactory) WorkerOptions
-	AddActivity(taskListName string, activities []Activity) WorkerOptions
-	WithConcurrentPollSize(size int) WorkerOptions
-	WithConcurrentActivityExecutionSize(size int) WorkerOptions
-	WithIdentity(identity string) WorkerOptions
-	WithMetrics(metricsScope tally.Scope) WorkerOptions
-	WithLogger(logger bark.Logger) WorkerOptions
+// HostOptions stores all host-specific parameters that cadence can use to run workflows
+// and activities and if they need any rate limiting.
+type HostOptions interface {
+	// Optional: To set the maximum concurrent activity executions this host can have.
+	SetMaxConcurrentActivityExecutionSize(size int) HostOptions
+	// Optional: Sets the rate limiting on number of activities that can be executed.
+	// This can be used to protect down stream services from flooding.
+	SetActivityExecutionRate(requestPerSecond int) HostOptions
+	// Optional: Sets an identify that can be used to track this host for debugging.
+	SetIdentity(identity string) HostOptions
+	// Optional: Metrics to be reported.
+	SetMetrics(metricsScope tally.Scope) HostOptions
+	// Optional: Logger framework can use to log.
+	SetLogger(logger bark.Logger) HostOptions
 }
 
-// GetActivityOptions returns a builder that can be used to create a Context.
-func GetWorkerOptions() WorkerOptions {
-	return &workerOptions{}
+// NewHostOptions returns an instance of the HostOptions to configured for this client.
+func NewHostOptions() HostOptions {
+	return &hostOptions{}
 }
 
-// NewWorker returns an instance of a worker to manage processing both workflows and activities.
-func NewWorker(
+// NewHostContext returns an instance of a context on which various settings/registration
+// can be made for starting the cadence framework to host workflow's and activities.
+// service is an connection instance of the cadence server to talk to.
+func NewHostContext(
 	service m.TChanWorkflowService,
-	options WorkerOptions,
-) (worker Lifecycle) {
-	return newAggregatedWorker(service, options)
+) Context {
+	ctx := setHostEnvironment(background, service)
+	return ctx
+}
+
+// RegisterWorkflow - registers a task list and associated workflow definition withe the framework.
+// You can register more than workflow with a task list. You can also register multiple task lists.
+func RegisterWorkflow(
+	ctx Context,
+	taskListName string,
+	factory WorkflowFactory,
+) {
+	thImpl := getHostEnvironment(ctx)
+	thImpl.RegisterWorkflow(taskListName, factory)
+}
+
+// RegisterActivity - register a task list and associated activity implementation with the framework.
+// You can register more than activity with a task list. You can also register multiple task lists.
+func RegisterActivity(
+	ctx Context,
+	taskListName string,
+	activities []Activity,
+) {
+	thImpl := getHostEnvironment(ctx)
+	thImpl.RegisterActivity(taskListName, activities, false)
+}
+
+// RegisterActivityWithHeartBeat - register a task list and associated activity implementation with the framework
+// along with it the user can choose if the activity needs auto heart beating for those activities
+// by the framework.
+// You can register more than activity with a task list. You can also register multiple task lists.
+func RegisterActivityWithHeartBeat(
+	ctx Context,
+	taskListName string,
+	activities []Activity,
+	autoHeartBeat bool,
+) {
+	thImpl := getHostEnvironment(ctx)
+	thImpl.RegisterActivity(taskListName, activities, autoHeartBeat)
+}
+
+// Start - starts a cadence framework to process the workflow tasks and activity executions that
+// have been registered earlier.
+func Start(
+	ctx Context,
+	options HostOptions,
+) error {
+	thImpl := getHostEnvironment(ctx)
+	return thImpl.Start()
+}
+
+// Stop - stops cadence framework.
+func Stop(ctx Context) {
+	thImpl := getHostEnvironment(ctx)
+	thImpl.Stop()
 }

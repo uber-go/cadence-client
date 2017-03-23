@@ -92,13 +92,27 @@ func WithActivityOptions(ctx Context, options ActivityOptions) Context {
 	ao := options.(*activityOptions)
 	ctx1 := setActivityParametersIfNotExist(ctx)
 	eap := getActivityOptions(ctx1)
-	eap.TaskListName = ao.taskListName
-	eap.ScheduleToCloseTimeoutSeconds = ao.scheduleToCloseTimeoutSeconds
-	eap.StartToCloseTimeoutSeconds = ao.startToCloseTimeoutSeconds
-	eap.ScheduleToStartTimeoutSeconds = ao.scheduleToStartTimeoutSeconds
-	eap.HeartbeatTimeoutSeconds = ao.heartbeatTimeoutSeconds
-	eap.WaitForCancellation = ao.waitForCancellation
-	eap.ActivityID = ao.activityID
+	if ao.taskListName != nil {
+		eap.TaskListName = *ao.taskListName
+	}
+	if ao.scheduleToCloseTimeoutSeconds != nil {
+		eap.ScheduleToCloseTimeoutSeconds = *ao.scheduleToCloseTimeoutSeconds
+	}
+	if ao.startToCloseTimeoutSeconds != nil {
+		eap.StartToCloseTimeoutSeconds = *ao.startToCloseTimeoutSeconds
+	}
+	if ao.scheduleToStartTimeoutSeconds != nil {
+		eap.ScheduleToStartTimeoutSeconds = *ao.scheduleToStartTimeoutSeconds
+	}
+	if ao.heartbeatTimeoutSeconds != nil {
+		eap.HeartbeatTimeoutSeconds = *ao.heartbeatTimeoutSeconds
+	}
+	if ao.waitForCancellation != nil {
+		eap.WaitForCancellation = *ao.waitForCancellation
+	}
+	if ao.activityID != nil {
+		eap.ActivityID = ao.activityID
+	}
 	return ctx1
 }
 

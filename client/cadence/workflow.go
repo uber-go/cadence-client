@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	errActivityParamsBadRequest = errors.New("Bad request. Missing activity parameters through context. check ActivityOptions.")
+	errActivityParamsBadRequest = errors.New("Bad request. Missing activity parameters through context. Check ActivityOptions.")
 )
 
 // Channel must be used instead of native go channel by workflow code.
@@ -125,6 +125,9 @@ type Workflow interface {
 //					WithTaskList("exampleTaskList").
 //					WithScheduleToCloseTimeout(10).
 //					WithScheduleToStartTimeout(2))
+//			(or)
+//			ctx1 := WithTaskList(ctx, "exampleTaskList")
+//
 //  - If the activity failed to complete then the error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
@@ -169,6 +172,9 @@ func ExecuteActivity(ctx Context, activityType ActivityType, input []byte) (resu
 //					WithTaskList("exampleTaskList").
 //					WithScheduleToCloseTimeout(10).
 //					WithScheduleToStartTimeout(2))
+//			(or)
+//			ctx1 := WithTaskList(ctx, "exampleTaskList")
+//
 //  - If the activity failed to complete then the future get error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with

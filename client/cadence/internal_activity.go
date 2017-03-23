@@ -81,47 +81,47 @@ func setActivityParametersIfNotExist(ctx Context) Context {
 // be stored inside of a context.
 type activityOptions struct {
 	activityID                    *string
-	taskListName                  string
-	scheduleToCloseTimeoutSeconds int32
-	scheduleToStartTimeoutSeconds int32
-	startToCloseTimeoutSeconds    int32
-	heartbeatTimeoutSeconds       int32
-	waitForCancellation           bool
+	taskListName                  *string
+	scheduleToCloseTimeoutSeconds *int32
+	scheduleToStartTimeoutSeconds *int32
+	startToCloseTimeoutSeconds    *int32
+	heartbeatTimeoutSeconds       *int32
+	waitForCancellation           *bool
 }
 
 // WithTaskList sets the task list name for this Context.
 func (ab *activityOptions) WithTaskList(name string) ActivityOptions {
-	ab.taskListName = name
+	ab.taskListName = common.StringPtr(name)
 	return ab
 }
 
 // WithScheduleToCloseTimeout sets timeout for this Context.
 func (ab *activityOptions) WithScheduleToCloseTimeout(timeout int32) ActivityOptions {
-	ab.scheduleToCloseTimeoutSeconds = timeout
+	ab.scheduleToCloseTimeoutSeconds = common.Int32Ptr(timeout)
 	return ab
 }
 
 // WithScheduleToStartTimeout sets timeout for this Context.
 func (ab *activityOptions) WithScheduleToStartTimeout(timeout int32) ActivityOptions {
-	ab.scheduleToStartTimeoutSeconds = timeout
+	ab.scheduleToStartTimeoutSeconds = common.Int32Ptr(timeout)
 	return ab
 }
 
 // WithStartToCloseTimeout sets timeout for this Context.
 func (ab *activityOptions) WithStartToCloseTimeout(timeout int32) ActivityOptions {
-	ab.startToCloseTimeoutSeconds = timeout
+	ab.startToCloseTimeoutSeconds = common.Int32Ptr(timeout)
 	return ab
 }
 
 // WithHeartbeatTimeout sets timeout for this Context.
 func (ab *activityOptions) WithHeartbeatTimeout(timeout int32) ActivityOptions {
-	ab.heartbeatTimeoutSeconds = timeout
+	ab.heartbeatTimeoutSeconds = common.Int32Ptr(timeout)
 	return ab
 }
 
 // WithWaitForCancellation sets timeout for this Context.
 func (ab *activityOptions) WithWaitForCancellation(wait bool) ActivityOptions {
-	ab.waitForCancellation = wait
+	ab.waitForCancellation = &wait
 	return ab
 }
 

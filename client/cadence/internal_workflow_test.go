@@ -414,8 +414,10 @@ type sayGreetingActivityRequest struct {
 func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	// Get Greeting.
 
-	ctx1 := WithActivityOptions(ctx, GetActivityOptions().WithTaskList("exampleTaskList").
-			WithScheduleToCloseTimeout(10).WithScheduleToStartTimeout(2))
+	ctx1 := WithActivityOptions(ctx, GetActivityOptions().
+		WithTaskList("exampleTaskList").
+		WithScheduleToCloseTimeout(10).
+		WithScheduleToStartTimeout(2))
 
 	greetResult, err := ExecuteActivity(ctx1, ActivityType{Name: "getGreetingActivity"}, input)
 	if err != nil {
@@ -495,5 +497,5 @@ func TestExternalExampleWorkflow(t *testing.T) {
 	}).Once()
 
 	w.Execute(ctx, []byte(""))
-	<- workflowComplete
+	<-workflowComplete
 }

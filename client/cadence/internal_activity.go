@@ -126,7 +126,8 @@ func (ab *activityOptions) WithWaitForCancellation(wait bool) ActivityOptions {
 }
 
 // WithActivityID sets the activity task list ID for this Context.
-// NOTE: This is now used for internal testing(mocks).
+// NOTE: We don't expose configuring Activity ID to the user, This is something will be done in future
+// so they have end to end scenario of how to use this ID to complete and fail an activity(business use case).
 func (ab *activityOptions) WithActivityID(activityID string) ActivityOptions {
 	ab.activityID = common.StringPtr(activityID)
 	return ab

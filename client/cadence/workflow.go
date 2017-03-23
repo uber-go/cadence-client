@@ -1,13 +1,13 @@
 package cadence
 
 import (
+	"errors"
 	"fmt"
 	"time"
-	"errors"
 )
 
 var (
-	errActivityParamsBadRequest = errors.New("Bad request. Missing activity parameters")
+	errActivityParamsBadRequest = errors.New("Bad request. Missing activity parameters through context. check ActivityOptions.")
 )
 
 // Channel must be used instead of native go channel by workflow code.
@@ -118,6 +118,13 @@ type Workflow interface {
 }
 
 // ExecuteActivity requests activity execution in the context of a workflow.
+//  - Context can be used to pass the settings for this activity.
+// 	For example: task list that this need to be routed, timeouts that need to be configured.
+//	Use ActivityOptions to pass down the options.
+//			ctx1 := WithActivityOptions(ctx, GetActivityOptions().
+//					WithTaskList("exampleTaskList").
+//					WithScheduleToCloseTimeout(10).
+//					WithScheduleToStartTimeout(2))
 //  - If the activity failed to complete then the error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
@@ -155,6 +162,13 @@ func ExecuteActivity(ctx Context, activityType ActivityType, input []byte) (resu
 }
 
 // ExecuteActivityAsync requests activity execution in the context of a workflow.
+//  - Context can be used to pass the settings for this activity.
+// 	For example: task list that this need to be routed, timeouts that need to be configured.
+//	Use ActivityOptions to pass down the options.
+//			ctx1 := WithActivityOptions(ctx, GetActivityOptions().
+//					WithTaskList("exampleTaskList").
+//					WithScheduleToCloseTimeout(10).
+//					WithScheduleToStartTimeout(2))
 //  - If the activity failed to complete then the future get error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with

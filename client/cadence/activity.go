@@ -80,9 +80,6 @@ type ActivityOptions interface {
 	WithStartToCloseTimeout(timeout int32) ActivityOptions
 	WithHeartbeatTimeout(timeout int32) ActivityOptions
 	WithWaitForCancellation(wait bool) ActivityOptions
-
-	// NOTE: We don't expose configuring Activity ID to the user, This is something will be done in future
-	// so they have end to end scenario of how to use this ID to complete and fail an activity(business use case).
 }
 
 // GetActivityOptions returns a builder that can be used to create a Context.
@@ -94,13 +91,14 @@ func GetActivityOptions() ActivityOptions {
 func WithActivityOptions(ctx Context, options ActivityOptions) Context {
 	ao := options.(*activityOptions)
 	ctx1 := setActivityParametersIfNotExist(ctx)
-	getActivityOptions(ctx1).TaskListName = ao.taskListName
-	getActivityOptions(ctx1).ScheduleToCloseTimeoutSeconds = ao.scheduleToCloseTimeoutSeconds
-	getActivityOptions(ctx1).StartToCloseTimeoutSeconds = ao.startToCloseTimeoutSeconds
-	getActivityOptions(ctx1).ScheduleToStartTimeoutSeconds = ao.scheduleToStartTimeoutSeconds
-	getActivityOptions(ctx1).HeartbeatTimeoutSeconds = ao.heartbeatTimeoutSeconds
-	getActivityOptions(ctx1).WaitForCancellation = ao.waitForCancellation
-	getActivityOptions(ctx1).ActivityID = ao.activityID
+	eap := getActivityOptions(ctx1)
+	eap.TaskListName = ao.taskListName
+	eap.ScheduleToCloseTimeoutSeconds = ao.scheduleToCloseTimeoutSeconds
+	eap.StartToCloseTimeoutSeconds = ao.startToCloseTimeoutSeconds
+	eap.ScheduleToStartTimeoutSeconds = ao.scheduleToStartTimeoutSeconds
+	eap.HeartbeatTimeoutSeconds = ao.heartbeatTimeoutSeconds
+	eap.WaitForCancellation = ao.waitForCancellation
+	eap.ActivityID = ao.activityID
 	return ctx1
 }
 

@@ -7,19 +7,20 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"unicode"
 )
 
 const workflowEnvironmentContextKey = "workflowEnv"
 const workflowResultContextKey = "workflowResult"
 
-// Pointer to pointer to workflow result
-func getWorkflowResultPointerPointer(ctx Context) **workflowResult {
+// Pointer to workflow result
+func getWorkflowResultPointer(ctx Context) *workflowResult {
 	rpp := ctx.Value(workflowResultContextKey)
 	if rpp == nil {
-		panic("getWorkflowResultPointerPointer: Not a workflow context")
+		panic("getWorkflowResultPointer: Not a workflow context")
 	}
-	return rpp.(**workflowResult)
+	return rpp.(*workflowResult)
 }
 
 func getWorkflowEnvironment(ctx Context) workflowEnvironment {
@@ -36,8 +37,24 @@ type syncWorkflowDefinition struct {
 }
 
 type workflowResult struct {
+	sync.Mutex
 	workflowResult []byte
 	error          error
+	isResultSet    bool // Whether we have a result.
+}
+
+func (wr *workflowResult) Set(result []byte, err error) {
+	wr.Lock()
+	defer wr.Unlock()
+	wr.workflowResult = result
+	wr.error = err
+	wr.isResultSet = true
+}
+
+func (wr *workflowResult) Get() (hasResult bool, result []byte, err error) {
+	wr.Lock()
+	defer wr.Unlock()
+	return wr.isResultSet, wr.workflowResult, wr.error
 }
 
 type activityClient struct {
@@ -48,7 +65,7 @@ type activityClient struct {
 type futureImpl struct {
 	value   interface{}
 	err     error
-	ready   bool
+	ready   int32
 	channel Channel
 	chained []*futureImpl // Futures that are chained to this one
 }
@@ -58,23 +75,23 @@ func (f *futureImpl) Get(ctx Context) (interface{}, error) {
 	if more {
 		panic("not closed")
 	}
-	if !f.ready {
+	if !f.IsReady() {
 		panic("not ready")
 	}
 	return f.value, f.err
 }
 
 func (f *futureImpl) IsReady() bool {
-	return f.ready
+	return atomic.LoadInt32(&f.ready) == 1
 }
 
 func (f *futureImpl) Set(value interface{}, err error) {
-	if f.ready {
+	if f.IsReady() {
 		panic("already set")
 	}
 	f.value = value
 	f.err = err
-	f.ready = true
+	f.setReady()
 	f.channel.Close()
 	for _, ch := range f.chained {
 		ch.Set(f.value, f.err)
@@ -82,21 +99,21 @@ func (f *futureImpl) Set(value interface{}, err error) {
 }
 
 func (f *futureImpl) SetValue(value interface{}) {
-	if f.ready {
+	if f.IsReady() {
 		panic("already set")
 	}
 	f.Set(value, nil)
 }
 
 func (f *futureImpl) SetError(err error) {
-	if f.ready {
+	if f.IsReady() {
 		panic("already set")
 	}
 	f.Set(nil, err)
 }
 
 func (f *futureImpl) Chain(future Future) {
-	if f.ready {
+	if f.IsReady() {
 		panic("already set")
 	}
 	ch, ok := future.(*futureImpl)
@@ -109,20 +126,21 @@ func (f *futureImpl) Chain(future Future) {
 	}
 	f.value = ch.value
 	f.err = ch.err
-	f.ready = true
+	f.setReady()
 	return
+}
+
+func (f *futureImpl) setReady() {
+	atomic.StoreInt32(&f.ready, 1)
 }
 
 func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) {
 	ctx := WithValue(background, workflowEnvironmentContextKey, env)
-	var resultPtr *workflowResult
-	ctx = WithValue(ctx, workflowResultContextKey, &resultPtr)
+	ctx = WithValue(ctx, workflowResultContextKey, &workflowResult{})
 
 	d.dispatcher = newDispatcher(ctx, func(ctx Context) {
-		r := &workflowResult{}
-		r.workflowResult, r.error = d.workflow.Execute(ctx, input)
-		rpp := getWorkflowResultPointerPointer(ctx)
-		*rpp = r
+		workflowResult, workflowErr := d.workflow.Execute(ctx, input)
+		getWorkflowResultPointer(ctx).Set(workflowResult, workflowErr)
 	})
 	executeDispatcher(ctx, d.dispatcher)
 }
@@ -174,13 +192,13 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 		dispatcher.Close()
 		return
 	}
-	rp := *getWorkflowResultPointerPointer(ctx)
-	if rp == nil {
+	hasResult, workflowResult, workflowErr := getWorkflowResultPointer(ctx).Get()
+	if !hasResult {
 		// Result is not set, so workflow is still executing
 		return
 	}
 	// Cannot cast nil values from interface{} to interface
-	getWorkflowEnvironment(ctx).Complete(rp.workflowResult, rp.error)
+	getWorkflowEnvironment(ctx).Complete(workflowResult, workflowErr)
 	dispatcher.Close()
 }
 
@@ -200,6 +218,7 @@ type channelImpl struct {
 	blockedSends    []valueCallbackPair // puts waiting when buffer is full.
 	blockedReceives []func(interface{}) // receives waiting when no messages are available.
 	closed          bool                // true if channel is closed
+	mutex           sync.Mutex          // used to synchronize buffer
 }
 
 // Single case statement of the Select
@@ -234,6 +253,7 @@ type coroutineState struct {
 	keptBlocked  bool             // true indicates that coroutine didn't make any progress since the last yield unblocking
 	closed       bool             // indicates that owning coroutine has finished execution
 	panicError   PanicError       // non nil if coroutine had unhandled panic
+	mutex        sync.Mutex       // used to synchronize close and keptBlocked.
 }
 
 type panicError struct {
@@ -281,12 +301,17 @@ func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (v interface{}, more bool
 			state.unblocked()
 			return result, true
 		}
+
+		c.mutex.Lock()
 		if len(c.buffer) > 0 {
+			defer c.mutex.Unlock()
 			r := c.buffer[0]
 			c.buffer = c.buffer[1:]
 			state.unblocked()
 			return r, true
 		}
+		c.mutex.Unlock()
+
 		// Let the buffer drain before delivering closed
 		if c.closed {
 			return nil, false
@@ -318,11 +343,15 @@ func (c *channelImpl) ReceiveAsync() (v interface{}, ok bool) {
 }
 
 func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more bool) {
+	c.mutex.Lock()
 	if len(c.buffer) > 0 {
+		defer c.mutex.Unlock()
 		r := c.buffer[0]
 		c.buffer = c.buffer[1:]
 		return r, true, true
 	}
+	c.mutex.Unlock()
+
 	if c.closed {
 		return nil, false, false
 	}
@@ -358,11 +387,16 @@ func (c *channelImpl) Send(ctx Context, v interface{}) {
 			state.unblocked()
 			return
 		}
+
+		c.mutex.Lock()
 		if len(c.buffer) < c.size {
+			defer c.mutex.Unlock()
 			c.buffer = append(c.buffer, v)
 			state.unblocked()
 			return
 		}
+		c.mutex.Unlock()
+
 		if !appended {
 			c.blockedSends = append(c.blockedSends,
 				valueCallbackPair{value: v, callback: func() { valueConsumed = true }})
@@ -376,10 +410,15 @@ func (c *channelImpl) SendAsync(v interface{}) (ok bool) {
 	if c.closed {
 		panic("Closed channel")
 	}
+
+	c.mutex.Lock()
 	if len(c.buffer) < c.size {
+		defer c.mutex.Unlock()
 		c.buffer = append(c.buffer, v)
 		return true
 	}
+	c.mutex.Unlock()
+
 	if len(c.blockedReceives) > 0 {
 		blockedGet := c.blockedReceives[0]
 		c.blockedReceives = c.blockedReceives[1:]
@@ -398,6 +437,21 @@ func (c *channelImpl) Close() {
 	}
 }
 
+func getStackTrace(coroutineName, status string, stackDepth int) string {
+	stack := stackBuf[:runtime.Stack(stackBuf[:], false)]
+	rawStack := fmt.Sprintf("%s", strings.TrimRightFunc(string(stack), unicode.IsSpace))
+	if disableCleanStackTraces {
+		return rawStack
+	}
+	lines := strings.Split(rawStack, "\n")
+	// Omit top stackDepth frames + top status line.
+	// Omit bottom two frames which is wrapping of coroutine in a goroutine.
+	lines = lines[stackDepth*2+1 : len(lines)-4]
+	top := fmt.Sprintf("coroutine %s [%s]:", coroutineName, status)
+	lines = append([]string{top}, lines...)
+	return strings.Join(lines, "\n")
+}
+
 // initialYield called at the beginning of the coroutine execution
 // stackDepth is the depth of top of the stack to omit when stack trace is generated
 // to hide frames internal to the framework.
@@ -414,22 +468,14 @@ func (s *coroutineState) initialYield(stackDepth int, status string) {
 func (s *coroutineState) yield(status string) {
 	s.aboutToBlock <- true
 	s.initialYield(3, status) // omit three levels of stack. To adjust change to 0 and count the lines to remove.
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	s.keptBlocked = true
 }
 
-func getStackTrace(coroutineName, status string, stackDepth int) string {
-	stack := stackBuf[:runtime.Stack(stackBuf[:], false)]
-	rawStack := fmt.Sprintf("%s", strings.TrimRightFunc(string(stack), unicode.IsSpace))
-	if disableCleanStackTraces {
-		return rawStack
-	}
-	lines := strings.Split(rawStack, "\n")
-	// Omit top stackDepth frames + top status line.
-	// Omit bottom two frames which is wrapping of coroutine in a goroutine.
-	lines = lines[stackDepth*2+1 : len(lines)-4]
-	top := fmt.Sprintf("coroutine %s [%s]:", coroutineName, status)
-	lines = append([]string{top}, lines...)
-	return strings.Join(lines, "\n")
+func (s *coroutineState) isClosed() bool {
+	return s.closed
 }
 
 // unblocked is called by coroutine to indicate that since the last time yield was unblocked channel or select
@@ -446,6 +492,9 @@ func (s *coroutineState) call() {
 }
 
 func (s *coroutineState) close() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	s.closed = true
 	s.aboutToBlock <- true
 }
@@ -553,6 +602,8 @@ func (d *dispatcherImpl) newState(name string) *coroutineState {
 
 func (d *dispatcherImpl) ExecuteUntilAllBlocked() (err PanicError) {
 	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	if d.closed {
 		panic("dispatcher is closed")
 	}
@@ -560,7 +611,7 @@ func (d *dispatcherImpl) ExecuteUntilAllBlocked() (err PanicError) {
 		panic("call to ExecuteUntilAllBlocked (possibly from a coroutine) while it is already running")
 	}
 	d.executing = true
-	d.mutex.Unlock()
+
 	defer func() { d.executing = false }()
 	allBlocked := false
 	// Keep executing until at least one goroutine made some progress
@@ -570,13 +621,13 @@ func (d *dispatcherImpl) ExecuteUntilAllBlocked() (err PanicError) {
 		lastSequence := d.sequence
 		for i := 0; i < len(d.coroutines); i++ {
 			c := d.coroutines[i]
-			if !c.closed {
+			if !c.isClosed() {
 				// TODO: Support handling of panic in a coroutine by dispatcher.
 				// TODO: Dump all outstanding coroutines if one of them panics
 				c.call()
 			}
 			// c.call() can close the context so check again
-			if c.closed {
+			if c.isClosed() {
 				// remove the closed one from the slice
 				d.coroutines = append(d.coroutines[:i],
 					d.coroutines[i+1:]...)
@@ -609,7 +660,7 @@ func (d *dispatcherImpl) Close() {
 	d.mutex.Unlock()
 	for i := 0; i < len(d.coroutines); i++ {
 		c := d.coroutines[i]
-		if !c.closed {
+		if !c.isClosed() {
 			c.exit()
 		}
 	}

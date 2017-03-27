@@ -264,85 +264,65 @@ func getWorkflowDefinitionFactory(factory WorkflowFactory) workflowDefinitionFac
 	}
 }
 
-// HostOptions stores all host-specific parameters that cadence can use to run workflows
+// TaskOptions stores all options for tasks that cadence can use to run workflows
 // and activities and if they need any rate limiting.
-type HostOptions interface {
+type TaskOptions interface {
+	// Optional: Sets an identify that can be used to track this host for debugging.
+	SetIdentity(identity string) TaskOptions
+	// Optional: Metrics to be reported.
+	SetMetrics(metricsScope tally.Scope) TaskOptions
+	// Optional: Logger framework can use to log.
+	SetLogger(logger bark.Logger) TaskOptions
+}
+
+// NewTaskOptions returns an instance of the TaskOptions to configured for this client.
+func NewTaskOptions() TaskOptions {
+	return &taskOptions{}
+}
+
+// DecisionTask any decision task configuration limits.
+// Only one decision task per task list.
+type DecisionTask interface {
+	// Register a set of workflow types
+	RegisterWorkflow(factory WorkflowFactory) DecisionTask
+	// Set any tak options.
+	SetTaskOptions(options TaskOptions) DecisionTask
+}
+
+// NewDecisionTask creates an option how to process decision task list.
+func NewDecisionTask(taskListName string) DecisionTask {
+	return &decisionTaskImpl{}
+}
+
+// ActivityTask any activity task configuration limits.
+// Only one activity task per task list.
+type ActivityTask interface {
+	// Register a set of activities.
+	RegisterActivity(activities []Activity) ActivityTask
+	// Optional: Set any tak options.
+	SetTaskOptions(options TaskOptions) ActivityTask
 	// Optional: To set the maximum concurrent activity executions this host can have.
-	SetMaxConcurrentActivityExecutionSize(size int) HostOptions
+	SetMaxConcurrentActivityExecutionSize(size int) ActivityTask
 	// Optional: Sets the rate limiting on number of activities that can be executed.
 	// This can be used to protect down stream services from flooding.
-	SetActivityExecutionRate(requestPerSecond int) HostOptions
-	// Optional: Sets an identify that can be used to track this host for debugging.
-	SetIdentity(identity string) HostOptions
-	// Optional: Metrics to be reported.
-	SetMetrics(metricsScope tally.Scope) HostOptions
-	// Optional: Logger framework can use to log.
-	SetLogger(logger bark.Logger) HostOptions
+	SetActivityExecutionRate(requestPerSecond int) ActivityTask
+	// Optional: if the activities need auto heart beating for those activities
+	// by the framework
+	SetAutoHeartBeat(auto bool) ActivityTask
 }
 
-// NewHostOptions returns an instance of the HostOptions to configured for this client.
-func NewHostOptions() HostOptions {
-	return &hostOptions{}
-}
-
-// NewHostContext returns an instance of a context on which various settings/registration
-// can be made for starting the cadence framework to host workflow's and activities.
-// service is an connection instance of the cadence server to talk to.
-func NewHostContext(
-	service m.TChanWorkflowService,
-) Context {
-	ctx := setHostEnvironment(background, service)
-	return ctx
-}
-
-// RegisterWorkflow - registers a task list and associated workflow definition withe the framework.
-// You can register more than workflow with a task list. You can also register multiple task lists.
-func RegisterWorkflow(
-	ctx Context,
-	taskListName string,
-	factory WorkflowFactory,
-) {
-	thImpl := getHostEnvironment(ctx)
-	thImpl.RegisterWorkflow(taskListName, factory)
-}
-
-// RegisterActivity - register a task list and associated activity implementation with the framework.
-// You can register more than activity with a task list. You can also register multiple task lists.
-func RegisterActivity(
-	ctx Context,
-	taskListName string,
-	activities []Activity,
-) {
-	thImpl := getHostEnvironment(ctx)
-	thImpl.RegisterActivity(taskListName, activities, false)
-}
-
-// RegisterActivityWithHeartBeat - register a task list and associated activity implementation with the framework
-// along with it the user can choose if the activity needs auto heart beating for those activities
-// by the framework.
-// You can register more than activity with a task list. You can also register multiple task lists.
-func RegisterActivityWithHeartBeat(
-	ctx Context,
-	taskListName string,
-	activities []Activity,
-	autoHeartBeat bool,
-) {
-	thImpl := getHostEnvironment(ctx)
-	thImpl.RegisterActivity(taskListName, activities, autoHeartBeat)
+// NewActivityTask creates an option how to process activity task list.
+func NewActivityTask(taskListName string) ActivityTask {
+	return &activityTaskImpl{}
 }
 
 // Start - starts a cadence framework to process the workflow tasks and activity executions that
 // have been registered earlier.
 func Start(
-	ctx Context,
-	options HostOptions,
-) error {
-	thImpl := getHostEnvironment(ctx)
-	return thImpl.Start()
-}
-
-// Stop - stops cadence framework.
-func Stop(ctx Context) {
-	thImpl := getHostEnvironment(ctx)
-	thImpl.Stop()
+	service m.TChanWorkflowService,
+	dt []DecisionTask,
+	at []ActivityTask,
+) (Lifecycle, error) {
+	// TODO:
+	return nil, nil
 }

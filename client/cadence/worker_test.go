@@ -104,13 +104,14 @@ func TestCreateWorkersForSingleTaskList(t *testing.T) {
 		return testSampleWorkflow{}, nil
 	}
 
+	options := NewTaskOptions().SetLogger(logger)
+
 	// Register with cadence
-	ctx := NewHostContext(service)
-	RegisterWorkflow(ctx, "taskListWorkflow", workflowFactory)
-	RegisterActivity(ctx, "taskListActivity", []Activity{&testActivity{}})
+	dt := NewDecisionTask("taskListWorkflow").RegisterWorkflow(workflowFactory).SetTaskOptions(options)
+	at := NewActivityTask("taskListActivity").RegisterActivity([]Activity{&testActivity{}}).SetTaskOptions(options)
 
 	// Start Cadence.
-	err := Start(ctx, NewHostOptions().SetLogger(logger))
+	_, err := Start(service, []DecisionTask{dt}, []ActivityTask{at})
 	require.NoError(t, err)
 }
 
@@ -118,20 +119,20 @@ func TestCreateWorkersForManagingTwoTaskLists(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
 	logger := getLogger()
+	options := NewTaskOptions().SetLogger(logger)
 
 	workflowFactory := func(wt WorkflowType) (Workflow, error) {
 		return testSampleWorkflow{}, nil
 	}
 
 	// Register with cadence
-	ctx := NewHostContext(service)
-	RegisterWorkflow(ctx, "taskList1", workflowFactory)
-	RegisterWorkflow(ctx, "taskList2", workflowFactory)
-	RegisterActivity(ctx, "taskList-act-1", []Activity{&testActivity{}})
-	RegisterActivity(ctx, "taskList-act-2", []Activity{&testActivity2{}})
+	dt1 := NewDecisionTask("taskList1").RegisterWorkflow(workflowFactory).SetTaskOptions(options)
+	dt2 := NewDecisionTask("taskList2").RegisterWorkflow(workflowFactory).SetTaskOptions(options)
+	at1 := NewActivityTask("taskList-act-1").RegisterActivity([]Activity{&testActivity{}}).SetTaskOptions(options)
+	at2 := NewActivityTask("taskList-act-2").RegisterActivity([]Activity{&testActivity2{}}).SetTaskOptions(options)
 
 	// Start Cadence.
-	err := Start(ctx, NewHostOptions().SetLogger(logger))
+	_, err := Start(service, []DecisionTask{dt1, dt2}, []ActivityTask{at1, at2})
 	require.NoError(t, err)
 }
 
@@ -139,27 +140,29 @@ func TestCreateWorkerSeparatelyForWorkflowAndActivityWorker(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
 	logger := getLogger()
+	options := NewTaskOptions().SetLogger(logger)
 
 	workflowFactory := func(wt WorkflowType) (Workflow, error) {
 		return testSampleWorkflow{}, nil
 	}
 
 	// Register workflow with cadence
-	ctx1 := NewHostContext(service)
-	RegisterWorkflow(ctx1, "taskList1", workflowFactory)
-	RegisterWorkflow(ctx1, "taskList2", workflowFactory)
+	dt1 := NewDecisionTask("taskList1").RegisterWorkflow(workflowFactory).SetTaskOptions(options)
+	dt2 := NewDecisionTask("taskList2").RegisterWorkflow(workflowFactory).SetTaskOptions(options)
 
 	// Start Cadence hosting workflows.
-	err := Start(ctx1, NewHostOptions().SetIdentity("testID1").SetLogger(logger))
+	_, err := Start(service, []DecisionTask{dt1, dt2}, nil)
 	require.NoError(t, err)
 
-
 	// Register activities with cadence
-	ctx2 := NewHostContext(service)
-	RegisterActivity(ctx2, "taskList-act-1", []Activity{&testActivity{}})
-	RegisterActivityWithHeartBeat(ctx2, "taskList-act-2", []Activity{&testActivity2{}}, true)
+	at1 := NewActivityTask("taskList-act-1").RegisterActivity([]Activity{&testActivity{}}).SetTaskOptions(options)
+	at2 := NewActivityTask("taskList-act-2").RegisterActivity([]Activity{&testActivity2{}}).
+		SetTaskOptions(options).
+		SetAutoHeartBeat(true).
+		SetMaxConcurrentActivityExecutionSize(5).
+		SetActivityExecutionRate(100)
 
 	// Start Cadence hosting activites.
-	err = Start(ctx2, NewHostOptions().SetMaxConcurrentActivityExecutionSize(5).SetActivityExecutionRate(100).SetLogger(logger))
+	_, err = Start(service, nil, []ActivityTask{at1, at2})
 	require.NoError(t, err)
 }

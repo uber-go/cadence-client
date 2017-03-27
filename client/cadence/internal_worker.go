@@ -10,8 +10,9 @@ import (
 )
 
 // Assert that structs do indeed implement the interfaces
-var _ taskHost = (*taskHostImpl)(nil)
-var _ HostOptions = (*hostOptions)(nil)
+var _ TaskOptions = (*taskOptions)(nil)
+var _ DecisionTask = (*decisionTaskImpl)(nil)
+var _ ActivityTask = (*activityTaskImpl)(nil)
 
 type (
 	// WorkflowWorker wraps the code for hosting workflow types.
@@ -194,92 +195,76 @@ func (aw *activityWorker) Stop() {
 	aw.worker.Stop()
 }
 
-const hostEnvContextKey = "hostEnv"
-
-func getHostEnvironment(ctx Context) *taskHostImpl {
-	eap := ctx.Value(hostEnvContextKey)
-	if eap == nil {
-		return nil
-	}
-	return eap.(*taskHostImpl)
-}
-
-func setHostEnvironment(ctx Context, service m.TChanWorkflowService) Context {
-	if valCtx := getHostEnvironment(ctx); valCtx == nil {
-		return WithValue(ctx, hostEnvContextKey, &taskHostImpl{})
-	}
-	return ctx
-}
-
-// hostOptions stores all host-specific parameters that cadence can use to run the workflows
+// taskOptions stores all host-specific parameters that cadence can use to run the workflows
 // and activities and if they need any reate limiting.
-type hostOptions struct {
+type taskOptions struct {
 	// TODO
 }
 
-// SetMaxConcurrentActivityExecutionSize sets the maximum concurrent activity executions this host can have.
-func (ho *hostOptions) SetMaxConcurrentActivityExecutionSize(size int) HostOptions {
-	// TODO:
-	return ho
-}
-
-// SetActivityExecutionRate sets the rate limiting on number of activities that can be executed.
-func (ho *hostOptions) SetActivityExecutionRate(size int) HostOptions {
-	// TODO:
-	return ho
-}
-
 // SetIdentity identifies the host for debugging.
-func (ho *hostOptions) SetIdentity(identity string) HostOptions {
+func (to *taskOptions) SetIdentity(identity string) TaskOptions {
 	// TODO:
-	return ho
+	return to
 }
 
 // SetMetrics is the metrics that the client can use to report.
-func (ho *hostOptions) SetMetrics(metricsScope tally.Scope) HostOptions {
+func (to *taskOptions) SetMetrics(metricsScope tally.Scope) TaskOptions{
 	// TODO:
-	return ho
+	return to
 }
 
 // SetLogger sets the logger for the framework.
-func (ho *hostOptions) SetLogger(logger bark.Logger) HostOptions {
+func (to *taskOptions) SetLogger(logger bark.Logger) TaskOptions {
 	// TODO:
-	return ho
+	return to
 }
 
-// taskHost stores all worker-specific parameters that will
-// be stored inside of a context.
-type taskHost interface {
-	Lifecycle
-	RegisterWorkflow(taskListName string, factory WorkflowFactory)
-	RegisterActivity(taskListName string, activities []Activity, autoHeartBeat bool)
-	SetOptions(options hostOptions)
+type decisionTaskImpl struct {
 }
 
-// taskHostImpl implementation of taskHost
-type taskHostImpl struct {
+// Register a set of workflow types
+func (dt *decisionTaskImpl) RegisterWorkflow(factory WorkflowFactory) DecisionTask {
 	// TODO:
+	return dt
 }
 
-func (th *taskHostImpl) RegisterWorkflow(taskListName string, factory WorkflowFactory) {
+// Optional: Set any tak options.
+func (dt *decisionTaskImpl) SetTaskOptions(options TaskOptions) DecisionTask {
 	// TODO:
+	return dt
 }
 
-func (th *taskHostImpl) RegisterActivity(taskListName string, activities []Activity, autoHeartBeat bool) {
-	// TODO:
+
+type activityTaskImpl struct {
 }
 
-func (th *taskHostImpl) SetOptions(options hostOptions) {
+// Register a set of activities.
+func (at *activityTaskImpl) RegisterActivity(activities []Activity) ActivityTask {
 	// TODO:
+	return at
 }
 
-func (th *taskHostImpl) Start() error {
+// Optional: Set any tak options.
+func (at *activityTaskImpl) SetTaskOptions(options TaskOptions) ActivityTask {
 	// TODO:
-	return nil
+	return at
 }
 
-func (th *taskHostImpl) Stop() {
+// SetMaxConcurrentActivityExecutionSize sets the maximum concurrent activity executions this host can have.
+func (at *activityTaskImpl) SetMaxConcurrentActivityExecutionSize(size int) ActivityTask {
 	// TODO:
+	return at
+}
+
+// SetActivityExecutionRate sets the rate limiting on number of activities that can be executed.
+func (at *activityTaskImpl) SetActivityExecutionRate(size int) ActivityTask {
+	// TODO:
+	return at
+}
+
+func (at *activityTaskImpl) SetAutoHeartBeat(auto bool) ActivityTask {
+	// TODO:
+	return at
 }
 
 

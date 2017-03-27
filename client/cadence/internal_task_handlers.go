@@ -444,6 +444,11 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (i
 	}
 
 	output, err := activityImplementation.Execute(ctx, t.GetInput())
+	if err == ActivityResultPendingError {
+		// activity result is pending and will be completed asynchronously.
+		return nil, err
+	}
+
 	if err != nil {
 		reason, details := getErrorDetails(err)
 		responseFailure := &s.RespondActivityTaskFailedRequest{

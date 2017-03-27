@@ -1,8 +1,10 @@
 package cadence
 
 import (
-	"github.com/uber-go/cadence-client/.gen/go/shared"
+	"errors"
 	"fmt"
+
+	"github.com/uber-go/cadence-client/.gen/go/shared"
 )
 
 type (
@@ -37,6 +39,8 @@ var _ Error = (*errorImpl)(nil)
 var _ CanceledError = (*canceledError)(nil)
 var _ TimeoutError = (*timeoutError)(nil)
 var _ PanicError = (*panicError)(nil)
+
+var ActivityResultPendingError = errors.New("activity is not completed yet")
 
 // NewErrorWithDetails creates Error instance
 // Create standard error through errors.New or fmt.Errorf if no details are provided

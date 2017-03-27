@@ -1,14 +1,15 @@
 package cadence
 
 import (
+	"errors"
+
+	"github.com/pborman/uuid"
+	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/common/backoff"
 	"github.com/uber-go/cadence-client/common/metrics"
-	"errors"
-	"github.com/pborman/uuid"
-	"github.com/uber-common/bark"
 	"github.com/uber-go/tally"
 )
 
@@ -171,6 +172,44 @@ func (wc *WorkflowClient) GetHistory(workflowID string, runID string) (*s.Histor
 			return err1
 		}, serviceOperationRetryPolicy, isServiceTransientError)
 	return response.GetHistory(), err
+}
+
+func (wc *WorkflowClient) CompleteActivity(taskToken, result []byte, identity string) error {
+	responseComplete := &s.RespondActivityTaskCompletedRequest{
+		TaskToken: taskToken,
+		Result_:   result,
+		Identity:  common.StringPtr(identity)}
+
+	err := backoff.Retry(
+		func() error {
+			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+			defer cancel()
+
+			err1 := wc.workflowService.RespondActivityTaskCompleted(ctx, responseComplete)
+			return err1
+		}, serviceOperationRetryPolicy, isServiceTransientError)
+
+	return err
+}
+
+func (wc *WorkflowClient) CompleteActivityWithError(taskToken []byte, identity string, activityErr error) error {
+	reason, details := getErrorDetails(activityErr)
+	responseFailure := &s.RespondActivityTaskFailedRequest{
+		TaskToken: taskToken,
+		Reason:    common.StringPtr(reason),
+		Details:   details,
+		Identity:  common.StringPtr(identity)}
+
+	err := backoff.Retry(
+		func() error {
+			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+			defer cancel()
+
+			err1 := wc.workflowService.RespondActivityTaskFailed(ctx, responseFailure)
+			return err1
+		}, serviceOperationRetryPolicy, isServiceTransientError)
+
+	return err
 }
 
 // WorkflowReplayerOptions represents options for workflow replayer.

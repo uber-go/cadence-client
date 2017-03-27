@@ -16,7 +16,7 @@ type (
 	// throttle outgoing traffic in case downstream backend server rejects
 	// requests due to out-of-quota or server busy errors.
 	ConcurrentRetrier struct {
-		sync.Mutex
+		sync.Mutex           // TODO: May be a RW lock.
 		retrier      Retrier // Backoff retrier
 		failureCount int64   // Number of consecutive failures seen
 	}
@@ -31,14 +31,11 @@ func (c *ConcurrentRetrier) throttleInternal() time.Duration {
 	next := done
 
 	// Check if we have failure count.
-	failureCount := c.failureCount
-	if failureCount > 0 {
-		defer c.Unlock()
-		c.Lock()
-		if c.failureCount > 0 {
-			next = c.retrier.NextBackOff()
-		}
+	c.Lock()
+	if c.failureCount > 0 {
+		next = c.retrier.NextBackOff()
 	}
+	c.Unlock()
 
 	if next != done {
 		time.Sleep(next)

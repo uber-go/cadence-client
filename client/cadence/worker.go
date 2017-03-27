@@ -174,7 +174,10 @@ func (wc *WorkflowClient) GetHistory(workflowID string, runID string) (*s.Histor
 	return response.GetHistory(), err
 }
 
-func (wc *WorkflowClient) CompleteActivity(taskToken, result []byte, identity string) error {
+// CompleteActivity reports activity completed. Activity can return cadence.ActivityResultPendingError to indicate the
+// activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method should be
+// called when that activity is completed.
+func (wc *WorkflowClient) CompleteActivity(identity string, taskToken, result []byte) error {
 	responseComplete := &s.RespondActivityTaskCompletedRequest{
 		TaskToken: taskToken,
 		Result_:   result,
@@ -192,8 +195,30 @@ func (wc *WorkflowClient) CompleteActivity(taskToken, result []byte, identity st
 	return err
 }
 
-func (wc *WorkflowClient) CompleteActivityWithError(taskToken []byte, identity string, activityErr error) error {
+// CompleteActivityWithError reports activity failed. Activity can return cadence.ActivityResultPendingError to indicate
+// the activity is not completed when it's Execute method returns. In that case, this CompleteActivityWithError() method
+// should be called when that activity failed (completed with error). Pass in CanceledError to indicate the activity is
+// cancelled.
+func (wc *WorkflowClient) CompleteActivityWithError(identity string, taskToken []byte, activityErr error) error {
 	reason, details := getErrorDetails(activityErr)
+	if _, ok := activityErr.(CanceledError); ok {
+		responseCancel := &s.RespondActivityTaskCanceledRequest{
+			TaskToken: taskToken,
+			Details:   details,
+			Identity:  common.StringPtr(identity)}
+
+		err := backoff.Retry(
+			func() error {
+				ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+				defer cancel()
+
+				err1 := wc.workflowService.RespondActivityTaskCanceled(ctx, responseCancel)
+				return err1
+			}, serviceOperationRetryPolicy, isServiceTransientError)
+
+		return err
+	}
+
 	responseFailure := &s.RespondActivityTaskFailedRequest{
 		TaskToken: taskToken,
 		Reason:    common.StringPtr(reason),
@@ -210,6 +235,11 @@ func (wc *WorkflowClient) CompleteActivityWithError(taskToken []byte, identity s
 		}, serviceOperationRetryPolicy, isServiceTransientError)
 
 	return err
+}
+
+// RecordActivityHeartbeat records heartbeat for an activity.
+func (wc *WorkflowClient) RecordActivityHeartbeat(identity string, taskToken, details []byte) error {
+	return recordActivityHeartbeat(wc.workflowService, identity, taskToken, details)
 }
 
 // WorkflowReplayerOptions represents options for workflow replayer.

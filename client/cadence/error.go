@@ -40,7 +40,10 @@ var _ CanceledError = (*canceledError)(nil)
 var _ TimeoutError = (*timeoutError)(nil)
 var _ PanicError = (*panicError)(nil)
 
-var ActivityResultPendingError = errors.New("activity is not completed yet")
+// ActivityResultPendingError is returned from Activity's Execute method to indicate the activity is not completed when
+// Execute method returns. Activity will be completed asynchronously when WorkflowClient.CompleteActivity() or
+// WorkflowClient.CompleteActivityWithError() is called.
+var ActivityResultPendingError = errors.New("not error: activity is not completed yet, will call WorkflowClient.CompleteActivity() when it is completed")
 
 // NewErrorWithDetails creates Error instance
 // Create standard error through errors.New or fmt.Errorf if no details are provided

@@ -3,7 +3,6 @@ package cadence
 // All code in this file is private to the package.
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/uber-common/bark"
@@ -213,53 +212,70 @@ func (atp *activityTaskPoller) PollAndProcessSingleTask() error {
 
 	// Process the activity task.
 	result, err := atp.taskHandler.Execute(activityTask.task)
-	if err == ActivityResultPendingError {
-		// activity result is pending and will be completed asynchronously.
-		// nothing is wrong at this point.
+	reportErr := reportActivityComplete(atp.service, atp.identity, activityTask.task.TaskToken, result, err)
+	if reportErr != nil {
+		atp.logger.Debugf("reportActivityComplete: Failed with error: %+v", reportErr)
+	}
+
+	return reportErr
+}
+
+func reportActivityComplete(service m.TChanWorkflowService, identity string, taskToken, result []byte, err error) error {
+	request := convertActivityResultToRespondRequest(identity, taskToken, result, err)
+	if request == nil {
+		// nothing to report
 		return nil
 	}
 
-	if err != nil {
-		return err
-	}
-
-	// TODO: Handle Cancel of the activity after the thrift method is introduced.
-	switch result.(type) {
-	// Report success untill we succeed
-	case *s.RespondActivityTaskCompletedRequest:
-		err = backoff.Retry(
+	ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+	defer cancel()
+	var reportErr error = nil
+	switch request := request.(type) {
+	case *s.RespondActivityTaskCanceledRequest:
+		reportErr = backoff.Retry(
 			func() error {
-				ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
-				defer cancel()
-
-				err1 := atp.service.RespondActivityTaskCompleted(ctx, result.(*s.RespondActivityTaskCompletedRequest))
-				if err1 != nil {
-					atp.logger.Debugf("RespondActivityTaskCompleted: Failed with error: %+v", err1)
-				}
-				return err1
+				return service.RespondActivityTaskCanceled(ctx, request)
 			}, serviceOperationRetryPolicy, isServiceTransientError)
-
-		if err != nil {
-			return err
-		}
-		// Report failure untill we succeed
 	case *s.RespondActivityTaskFailedRequest:
-		err = backoff.Retry(
+		reportErr = backoff.Retry(
 			func() error {
-				ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
-				defer cancel()
-
-				err1 := atp.service.RespondActivityTaskFailed(ctx, result.(*s.RespondActivityTaskFailedRequest))
-				if err1 != nil {
-					atp.logger.Debugf("RespondActivityTaskFailed: Failed with error: %+v", err1)
-				}
-				return err1
+				return service.RespondActivityTaskFailed(ctx, request)
 			}, serviceOperationRetryPolicy, isServiceTransientError)
-		if err != nil {
-			return err
-		}
-	default:
-		panic(fmt.Errorf("Unhandled activity response type: %v", result))
+	case *s.RespondActivityTaskCompletedRequest:
+		reportErr = backoff.Retry(
+			func() error {
+				return service.RespondActivityTaskCompleted(ctx, request)
+			}, serviceOperationRetryPolicy, isServiceTransientError)
 	}
-	return nil
+
+	return reportErr
+}
+
+func convertActivityResultToRespondRequest(identity string, taskToken, result []byte, err error) interface{} {
+	if err == ActivityResultPendingError {
+		// activity result is pending and will be completed asynchronously.
+		// nothing to report at this point
+		return nil
+	}
+
+	if err == nil {
+		return &s.RespondActivityTaskCompletedRequest{
+			TaskToken: taskToken,
+			Result_:   result,
+			Identity:  common.StringPtr(identity)}
+	}
+
+	reason, details := getErrorDetails(err)
+	if _, ok := err.(CanceledError); ok {
+		return &s.RespondActivityTaskCanceledRequest{
+			TaskToken: taskToken,
+			Details:   details,
+			Identity:  common.StringPtr(identity)}
+	}
+
+	return &s.RespondActivityTaskFailedRequest{
+		TaskToken: taskToken,
+		Reason:    common.StringPtr(reason),
+		Details:   details,
+		Identity:  common.StringPtr(identity)}
 }

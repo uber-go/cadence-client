@@ -73,21 +73,10 @@ func newSampleActivityTaskHandler(activityRegistry map[m.ActivityType]*Activity)
 	return &sampleActivityTaskHandler{activityRegistry: activityRegistry}
 }
 
-func (ath sampleActivityTaskHandler) Execute(task *m.PollForActivityTaskResponse) (interface{}, error) {
+func (ath sampleActivityTaskHandler) Execute(task *m.PollForActivityTaskResponse) ([]byte, error) {
 	//activityImplementation := *ath.activityRegistry[*activityTask.task.ActivityType]
 	activityImplementation := &greeterActivity{}
-	result, err := activityImplementation.Execute(context.Background(), task.Input)
-	if err != nil {
-		reason := err.Error()
-		return &m.RespondActivityTaskFailedRequest{
-			TaskToken: task.TaskToken,
-			Reason:    &reason,
-		}, nil
-	}
-	return &m.RespondActivityTaskCompletedRequest{
-		TaskToken: task.TaskToken,
-		Result_:   result,
-	}, nil
+	return activityImplementation.Execute(context.Background(), task.Input)
 }
 
 // Test suite.
@@ -134,14 +123,17 @@ func (s *PollLayerInterfacesTestSuite) TestProcessActivityTaskInterface() {
 	// Execute activity task and respond to the service.
 	activationRegistry := make(map[m.ActivityType]*Activity)
 	taskHandler := newSampleActivityTaskHandler(activationRegistry)
-	request, err := taskHandler.Execute(response)
-	s.NoError(err)
-	switch request.(type) {
-	case m.RespondActivityTaskCompletedRequest:
-		err = service.RespondActivityTaskCompleted(ctx, request.(*m.RespondActivityTaskCompletedRequest))
+	result, err := taskHandler.Execute(response)
+	request := convertActivityResultToRespondRequest("", nil, result, err)
+
+	switch request := request.(type) {
+	case *m.RespondActivityTaskCompletedRequest:
 		s.NoError(err)
-	case m.RespondActivityTaskFailedRequest:
-		err = service.RespondActivityTaskFailed(ctx, request.(*m.RespondActivityTaskFailedRequest))
+		err = service.RespondActivityTaskCompleted(ctx, request)
+		s.NoError(err)
+	case *m.RespondActivityTaskFailedRequest:
+		s.Error(err)
+		err = service.RespondActivityTaskFailed(ctx, request)
 		s.NoError(err)
 	}
 }

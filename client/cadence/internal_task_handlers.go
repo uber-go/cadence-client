@@ -8,13 +8,12 @@ import (
 	"time"
 
 	"github.com/uber-common/bark"
-	"github.com/uber-go/tally"
-
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/common/backoff"
 	"github.com/uber-go/cadence-client/common/metrics"
+	"github.com/uber-go/tally"
 	"golang.org/x/net/context"
 )
 
@@ -28,12 +27,8 @@ type (
 
 	// ActivityTaskHandler represents activity task handlers.
 	ActivityTaskHandler interface {
-		// Execute the activity task
-		// The return interface{} can have three requests, use switch to find the type of it.
-		// - RespondActivityTaskCompletedRequest
-		// - RespondActivityTaskFailedRequest
-		// - RespondActivityTaskCancelRequest
-		Execute(task *s.PollForActivityTaskResponse) (interface{}, error)
+		// Execute the activity task, return result from activity
+		Execute(task *s.PollForActivityTaskResponse) ([]byte, error)
 	}
 
 	// workflowExecutionEventHandler process a single event.
@@ -410,7 +405,7 @@ func newServiceInvoker(taskToken []byte, identity string, service m.TChanWorkflo
 }
 
 // Execute executes an implementation of the activity.
-func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (interface{}, error) {
+func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) ([]byte, error) {
 	ath.logger.Debugf("[WorkflowID: %s] Execute Activity: %s",
 		t.GetWorkflowExecution().GetWorkflowId(), t.GetActivityType().GetName())
 
@@ -423,27 +418,7 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (i
 		return nil, fmt.Errorf("No implementation for activityType=%v", activityType.GetName())
 	}
 
-	output, err := activityImplementation.Execute(ctx, t.GetInput())
-	if err == ActivityResultPendingError {
-		// activity result is pending and will be completed asynchronously.
-		return nil, err
-	}
-
-	if err != nil {
-		reason, details := getErrorDetails(err)
-		responseFailure := &s.RespondActivityTaskFailedRequest{
-			TaskToken: t.TaskToken,
-			Reason:    common.StringPtr(reason),
-			Details:   details,
-			Identity:  common.StringPtr(ath.identity)}
-		return responseFailure, nil
-	}
-
-	responseComplete := &s.RespondActivityTaskCompletedRequest{
-		TaskToken: t.TaskToken,
-		Result_:   output,
-		Identity:  common.StringPtr(ath.identity)}
-	return responseComplete, nil
+	return activityImplementation.Execute(ctx, t.GetInput())
 }
 
 func createNewDecision(decisionType s.DecisionType) *s.Decision {

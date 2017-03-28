@@ -83,7 +83,13 @@ type ActivityOptions interface {
 	WithWaitForCancellation(wait bool) ActivityOptions
 }
 
-// NewActivityOptions returns a builder that can be used to create a Context.
+// NewActivityOptions returns an instance of activity options that can be used to specify
+// options for an activity through context.
+//			ctx1 := WithActivityOptions(ctx, NewActivityOptions().
+//					WithTaskList("exampleTaskList").
+//					WithScheduleToCloseTimeout(time.Second).
+//					WithScheduleToStartTimeout(time.Second).
+//					WithHeartbeatTimeout(0)
 func NewActivityOptions() ActivityOptions {
 	return &activityOptions{}
 }

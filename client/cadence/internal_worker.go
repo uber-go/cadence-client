@@ -10,8 +10,8 @@ import (
 )
 
 // Assert that structs do indeed implement the interfaces
-var _ TaskOptions = (*taskOptions)(nil)
-var _ DecisionTask = (*decisionTaskImpl)(nil)
+var _ WorkerOptions = (*workerOptions)(nil)
+var _ WorkflowTask = (*workflowTaskImpl)(nil)
 var _ ActivityTask = (*activityTaskImpl)(nil)
 
 type (
@@ -195,59 +195,60 @@ func (aw *activityWorker) Stop() {
 	aw.worker.Stop()
 }
 
-// taskOptions stores all host-specific parameters that cadence can use to run the workflows
-// and activities and if they need any reate limiting.
-type taskOptions struct {
+// workerOptions stores all host-specific parameters that cadence can use to run the workflows
+// and activities and if they need any rate limiting.
+type workerOptions struct {
 	// TODO
 }
 
 // SetIdentity identifies the host for debugging.
-func (to *taskOptions) SetIdentity(identity string) TaskOptions {
+func (wo *workerOptions) SetIdentity(identity string) WorkerOptions {
 	// TODO:
-	return to
+	return wo
 }
 
 // SetMetrics is the metrics that the client can use to report.
-func (to *taskOptions) SetMetrics(metricsScope tally.Scope) TaskOptions{
+func (wo *workerOptions) SetMetrics(metricsScope tally.Scope) WorkerOptions{
 	// TODO:
-	return to
+	return wo
 }
 
 // SetLogger sets the logger for the framework.
-func (to *taskOptions) SetLogger(logger bark.Logger) TaskOptions {
+func (wo *workerOptions) SetLogger(logger bark.Logger) WorkerOptions {
 	// TODO:
-	return to
+	return wo
 }
 
-type decisionTaskImpl struct {
+// taskHost stores all worker-specific parameters that will
+// be stored inside of a context.
+type taskHost interface {
+	RegisterWorkflow(taskListName string, factory WorkflowFactory)
+	RegisterActivity(taskListName string, activities []Activity)
 }
 
-// Register a set of workflow types
-func (dt *decisionTaskImpl) RegisterWorkflow(factory WorkflowFactory) DecisionTask {
+type taskHostImpl struct {
+}
+
+func (th *taskHostImpl) RegisterWorkflow(taskListName string, factory WorkflowFactory) {
 	// TODO:
-	return dt
 }
-
-// Optional: Set any tak options.
-func (dt *decisionTaskImpl) SetTaskOptions(options TaskOptions) DecisionTask {
+func (th *taskHostImpl) RegisterActivity(taskListName string, activities []Activity) {
 	// TODO:
-	return dt
 }
 
+var thImpl *taskHostImpl
+
+func getTaskHostEnvironment() taskHost {
+	if thImpl == nil {
+		thImpl = &taskHostImpl{}
+	}
+	return thImpl
+}
+
+type workflowTaskImpl struct {
+}
 
 type activityTaskImpl struct {
-}
-
-// Register a set of activities.
-func (at *activityTaskImpl) RegisterActivity(activities []Activity) ActivityTask {
-	// TODO:
-	return at
-}
-
-// Optional: Set any tak options.
-func (at *activityTaskImpl) SetTaskOptions(options TaskOptions) ActivityTask {
-	// TODO:
-	return at
 }
 
 // SetMaxConcurrentActivityExecutionSize sets the maximum concurrent activity executions this host can have.
@@ -265,6 +266,31 @@ func (at *activityTaskImpl) SetActivityExecutionRate(size int) ActivityTask {
 func (at *activityTaskImpl) SetAutoHeartBeat(auto bool) ActivityTask {
 	// TODO:
 	return at
+}
+
+
+// aggregatedWorker combines management of both workflowWorker and activityWorker worker lifecycle.
+type aggregatedWorker struct {
+	// TODO:
+}
+
+func (aw *aggregatedWorker) Start() error {
+	// TODO:
+	return nil
+}
+
+func (aw *aggregatedWorker) Stop() {
+	// TODO:
+}
+
+// aggregatedWorker returns an instance to manage the workers.
+func newAggregatedWorker(
+	service m.TChanWorkflowService,
+	workflowTasks []WorkflowTask,
+	activityTasks []ActivityTask,
+	options WorkerOptions,
+) (worker Lifecycle) {
+	return &aggregatedWorker{}
 }
 
 

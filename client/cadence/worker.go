@@ -264,43 +264,33 @@ func getWorkflowDefinitionFactory(factory WorkflowFactory) workflowDefinitionFac
 	}
 }
 
-// TaskOptions stores all options for tasks that cadence can use to run workflows
-// and activities and if they need any rate limiting.
-type TaskOptions interface {
+// WorkerOptions is to configure a worker instance, for example the logger or any specific metrics.
+type WorkerOptions interface {
 	// Optional: Sets an identify that can be used to track this host for debugging.
-	SetIdentity(identity string) TaskOptions
+	SetIdentity(identity string) WorkerOptions
 	// Optional: Metrics to be reported.
-	SetMetrics(metricsScope tally.Scope) TaskOptions
+	SetMetrics(metricsScope tally.Scope) WorkerOptions
 	// Optional: Logger framework can use to log.
-	SetLogger(logger bark.Logger) TaskOptions
+	SetLogger(logger bark.Logger) WorkerOptions
 }
 
-// NewTaskOptions returns an instance of the TaskOptions to configured for this client.
-func NewTaskOptions() TaskOptions {
-	return &taskOptions{}
+// NewWorkerOptions returns an instance of the WorkerOptions
+func NewWorkerOptions() WorkerOptions {
+	return &workerOptions{}
 }
 
-// DecisionTask any decision task configuration limits.
-// Only one decision task per task list.
-type DecisionTask interface {
-	// Register a set of workflow types
-	RegisterWorkflow(factory WorkflowFactory) DecisionTask
-	// Set any tak options.
-	SetTaskOptions(options TaskOptions) DecisionTask
+// WorkflowTask can be used by the client to configure any options about how to process a
+// workflow task list.
+type WorkflowTask interface {
 }
 
-// NewDecisionTask creates an option how to process decision task list.
-func NewDecisionTask(taskListName string) DecisionTask {
-	return &decisionTaskImpl{}
+// NewWorkflowTask creates an instance of workflow task.
+func NewWorkflowTask(taskListName string) WorkflowTask {
+	return &workflowTaskImpl{}
 }
 
-// ActivityTask any activity task configuration limits.
-// Only one activity task per task list.
+// ActivityTask can be used by the client to configure any activity task specific limits.
 type ActivityTask interface {
-	// Register a set of activities.
-	RegisterActivity(activities []Activity) ActivityTask
-	// Optional: Set any tak options.
-	SetTaskOptions(options TaskOptions) ActivityTask
 	// Optional: To set the maximum concurrent activity executions this host can have.
 	SetMaxConcurrentActivityExecutionSize(size int) ActivityTask
 	// Optional: Sets the rate limiting on number of activities that can be executed.
@@ -311,18 +301,38 @@ type ActivityTask interface {
 	SetAutoHeartBeat(auto bool) ActivityTask
 }
 
-// NewActivityTask creates an option how to process activity task list.
+// NewActivityTask creates how to process activity task list.
 func NewActivityTask(taskListName string) ActivityTask {
 	return &activityTaskImpl{}
 }
 
-// Start - starts a cadence framework to process the workflow tasks and activity executions that
-// have been registered earlier.
-func Start(
+// RegisterWorkflow - registers a task list and associated workflow definition withe the framework.
+// You can register more than workflow with a task list. You can also register multiple task lists.
+func RegisterWorkflow(
+	taskListName string,
+	factory WorkflowFactory,
+) {
+	thImpl := getTaskHostEnvironment()
+	thImpl.RegisterWorkflow(taskListName, factory)
+}
+
+// RegisterActivity - register a task list and associated activity implementation with the framework.
+// You can register more than activity with a task list. You can also register multiple task lists.
+func RegisterActivity(
+	taskListName string,
+	activities []Activity,
+) {
+	thImpl := getTaskHostEnvironment()
+	thImpl.RegisterActivity(taskListName, activities)
+}
+
+// NewWorker creates an instance of worker for managing workflow task list and activity task list.
+// We also can configure any worker specific options like logger, metrics, identity.
+func NewWorker(
 	service m.TChanWorkflowService,
-	dt []DecisionTask,
-	at []ActivityTask,
-) (Lifecycle, error) {
-	// TODO:
-	return nil, nil
+	workflowTasks []WorkflowTask,
+	activityTasks []ActivityTask,
+	options WorkerOptions,
+) Lifecycle {
+	return newAggregatedWorker(service, workflowTasks, activityTasks, options)
 }

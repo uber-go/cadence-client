@@ -174,9 +174,9 @@ func (wc *WorkflowClient) GetHistory(workflowID string, runID string) (*s.Histor
 	return response.GetHistory(), err
 }
 
-// CompleteActivity reports activity completed. Activity can return cadence.ActivityResultPendingError to indicate the
-// activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method should be
-// called when that activity is completed.
+// CompleteActivity reports activity completed. Activity Execute method can return cadence.ActivityResultPendingError to
+// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method
+// should be called when that activity is completed.
 func (wc *WorkflowClient) CompleteActivity(identity string, taskToken, result []byte) error {
 	responseComplete := &s.RespondActivityTaskCompletedRequest{
 		TaskToken: taskToken,
@@ -195,9 +195,9 @@ func (wc *WorkflowClient) CompleteActivity(identity string, taskToken, result []
 	return err
 }
 
-// CompleteActivityWithError reports activity failed. Activity can return cadence.ActivityResultPendingError to indicate
-// the activity is not completed when it's Execute method returns. In that case, this CompleteActivityWithError() method
-// should be called when that activity failed (completed with error). Pass in CanceledError to indicate the activity is
+// CompleteActivityWithError reports activity failed. Activity Execute method can return cadence.ActivityResultPendingError
+// to indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivityWithError()
+// method should be called when that activity failed (completed with error). Pass in CanceledError to indicate the activity is
 // cancelled.
 func (wc *WorkflowClient) CompleteActivityWithError(identity string, taskToken []byte, activityErr error) error {
 	reason, details := getErrorDetails(activityErr)

@@ -3,11 +3,15 @@ package cadence
 import (
 	"testing"
 
-	s "github.com/uber-go/cadence-client/.gen/go/shared"
-	"github.com/uber-go/cadence-client/common"
+	"errors"
+
 	log "github.com/Sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/uber-common/bark"
+	s "github.com/uber-go/cadence-client/.gen/go/shared"
+	"github.com/uber-go/cadence-client/common"
+	"github.com/uber-go/cadence-client/mocks"
 )
 
 func getLogger() bark.Logger {
@@ -69,4 +73,52 @@ func TestWorkflowReplayer(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, r.StackTrace())
 	require.Contains(t, r.StackTrace(), "cadence.ExecuteActivity")
+}
+
+func TestCompleteActivity(t *testing.T) {
+	mockService := new(mocks.TChanWorkflowService)
+	wfClient := NewWorkflowClient(mockService, nil)
+	var completedRequest, canceledRequest, failedRequest interface{}
+	mockService.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			completedRequest = args.Get(1).(*s.RespondActivityTaskCompletedRequest)
+		})
+	mockService.On("RespondActivityTaskCanceled", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			canceledRequest = args.Get(1).(*s.RespondActivityTaskCanceledRequest)
+		})
+	mockService.On("RespondActivityTaskFailed", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			failedRequest = args.Get(1).(*s.RespondActivityTaskFailedRequest)
+		})
+
+	testID1, testID2, testID3 := "testID1", "testID2", "testID3"
+	wfClient.CompleteActivity(testID1, nil, nil, nil)
+	require.NotNil(t, completedRequest)
+	require.Equal(t, testID1, *completedRequest.(*s.RespondActivityTaskCompletedRequest).Identity)
+
+	wfClient.CompleteActivity(testID2, nil, nil, NewCanceledError())
+	require.NotNil(t, canceledRequest)
+	require.Equal(t, testID2, *canceledRequest.(*s.RespondActivityTaskCanceledRequest).Identity)
+
+	wfClient.CompleteActivity(testID3, nil, nil, errors.New(""))
+	require.NotNil(t, failedRequest)
+	require.Equal(t, testID3, *failedRequest.(*s.RespondActivityTaskFailedRequest).Identity)
+}
+
+func TestRecordActivityHeartbeat(t *testing.T) {
+	mockService := new(mocks.TChanWorkflowService)
+	wfClient := NewWorkflowClient(mockService, nil)
+	var heartbeatRequest *s.RecordActivityTaskHeartbeatRequest
+	cancelRequested := false
+	heartbeatResponse := s.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
+	mockService.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).Return(&heartbeatResponse, nil).
+		Run(func(args mock.Arguments) {
+			heartbeatRequest = args.Get(1).(*s.RecordActivityTaskHeartbeatRequest)
+		})
+
+	testID := "testID"
+	wfClient.RecordActivityHeartbeat(testID, nil, nil)
+	require.NotNil(t, heartbeatRequest)
+	require.Equal(t, testID, *heartbeatRequest.Identity)
 }

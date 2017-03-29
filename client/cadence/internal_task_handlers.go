@@ -27,8 +27,12 @@ type (
 
 	// ActivityTaskHandler represents activity task handlers.
 	ActivityTaskHandler interface {
-		// Execute the activity task, return result from activity
-		Execute(task *s.PollForActivityTaskResponse) ([]byte, error)
+		// Execute the activity task
+		// The return interface{} can have three requests, use switch to find the type of it.
+		// - RespondActivityTaskCompletedRequest
+		// - RespondActivityTaskFailedRequest
+		// - RespondActivityTaskCancelRequest
+		Execute(task *s.PollForActivityTaskResponse) (interface{}, error)
 	}
 
 	// workflowExecutionEventHandler process a single event.
@@ -405,7 +409,7 @@ func newServiceInvoker(taskToken []byte, identity string, service m.TChanWorkflo
 }
 
 // Execute executes an implementation of the activity.
-func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) ([]byte, error) {
+func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (interface{}, error) {
 	ath.logger.Debugf("[WorkflowID: %s] Execute Activity: %s",
 		t.GetWorkflowExecution().GetWorkflowId(), t.GetActivityType().GetName())
 
@@ -418,7 +422,8 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) ([
 		return nil, fmt.Errorf("No implementation for activityType=%v", activityType.GetName())
 	}
 
-	return activityImplementation.Execute(ctx, t.GetInput())
+	output, err := activityImplementation.Execute(ctx, t.GetInput())
+	return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, output, err), nil
 }
 
 func createNewDecision(decisionType s.DecisionType) *s.Decision {

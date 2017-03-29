@@ -174,11 +174,14 @@ func (wc *WorkflowClient) GetHistory(workflowID string, runID string) (*s.Histor
 	return response.GetHistory(), err
 }
 
-// CompleteActivity reports activity completed. Activity can return cadence.ActivityResultPendingError to indicate the
-// activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method should be
-// called when that activity is completed.
+// CompleteActivity reports activity completed. Activity Execute method can return cadence.ActivityResultPendingError to
+// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method
+// should be called when that activity is completed with the actual result and error. If err is nil, activity task
+// completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,
+// activity task failed event will be reported.
 func (wc *WorkflowClient) CompleteActivity(identity string, taskToken, result []byte, err error) error {
-	return reportActivityComplete(wc.workflowService, identity, taskToken, result, err)
+	request := convertActivityResultToRespondRequest(identity, taskToken, result, err)
+	return reportActivityComplete(wc.workflowService, request)
 }
 
 // RecordActivityHeartbeat records heartbeat for an activity.

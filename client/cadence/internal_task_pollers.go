@@ -211,8 +211,12 @@ func (atp *activityTaskPoller) PollAndProcessSingleTask() error {
 	}()
 
 	// Process the activity task.
-	result, err := atp.taskHandler.Execute(activityTask.task)
-	reportErr := reportActivityComplete(atp.service, atp.identity, activityTask.task.TaskToken, result, err)
+	request, err := atp.taskHandler.Execute(activityTask.task)
+	if err != nil {
+		return err
+	}
+
+	reportErr := reportActivityComplete(atp.service, request)
 	if reportErr != nil {
 		atp.logger.Debugf("reportActivityComplete: Failed with error: %+v", reportErr)
 	}
@@ -220,8 +224,7 @@ func (atp *activityTaskPoller) PollAndProcessSingleTask() error {
 	return reportErr
 }
 
-func reportActivityComplete(service m.TChanWorkflowService, identity string, taskToken, result []byte, err error) error {
-	request := convertActivityResultToRespondRequest(identity, taskToken, result, err)
+func reportActivityComplete(service m.TChanWorkflowService, request interface{}) error {
 	if request == nil {
 		// nothing to report
 		return nil

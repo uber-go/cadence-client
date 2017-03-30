@@ -1,6 +1,7 @@
 package cadence
 
 import (
+	"context"
 	"errors"
 	"github.com/pborman/uuid"
 	"github.com/uber-common/bark"
@@ -264,8 +265,18 @@ func getWorkflowDefinitionFactory(factory WorkflowFactory) workflowDefinitionFac
 	}
 }
 
-// WorkerOptions is to configure a worker instance, for example the logger or any specific metrics.
+// WorkerOptions is to configure a worker instance,
+// for example (1) the logger or any specific metrics.
+// 	       (2) Whether to heart beat for activities automatically.
 type WorkerOptions interface {
+	// Optional: To set the maximum concurrent activity executions this host can have.
+	SetMaxConcurrentActivityExecutionSize(size int) WorkerOptions
+	// Optional: Sets the rate limiting on number of activities that can be executed.
+	// This can be used to protect down stream services from flooding.
+	SetActivityExecutionRate(requestPerSecond int) WorkerOptions
+	// Optional: if the activities need auto heart beating for those activities
+	// by the framework
+	SetAutoHeartBeat(auto bool) WorkerOptions
 	// Optional: Sets an identify that can be used to track this host for debugging.
 	SetIdentity(identity string) WorkerOptions
 	// Optional: Metrics to be reported.
@@ -274,65 +285,39 @@ type WorkerOptions interface {
 	SetLogger(logger bark.Logger) WorkerOptions
 }
 
-// NewWorkerOptions returns an instance of the WorkerOptions
+// NewWorkerOptions returns an instance of worker options to configure.
 func NewWorkerOptions() WorkerOptions {
 	return &workerOptions{}
 }
 
-// WorkflowTask can be used by the client to configure any options about how to process a
-// workflow task list.
-type WorkflowTask interface {
-}
-
-// NewWorkflowTask creates an instance of workflow task.
-func NewWorkflowTask(taskListName string) WorkflowTask {
-	return &workflowTaskImpl{}
-}
-
-// ActivityTask can be used by the client to configure any activity task specific limits.
-type ActivityTask interface {
-	// Optional: To set the maximum concurrent activity executions this host can have.
-	SetMaxConcurrentActivityExecutionSize(size int) ActivityTask
-	// Optional: Sets the rate limiting on number of activities that can be executed.
-	// This can be used to protect down stream services from flooding.
-	SetActivityExecutionRate(requestPerSecond int) ActivityTask
-	// Optional: if the activities need auto heart beating for those activities
-	// by the framework
-	SetAutoHeartBeat(auto bool) ActivityTask
-}
-
-// NewActivityTask creates how to process activity task list.
-func NewActivityTask(taskListName string) ActivityTask {
-	return &activityTaskImpl{}
-}
-
-// RegisterWorkflow - registers a task list and associated workflow definition withe the framework.
-// You can register more than workflow with a task list. You can also register multiple task lists.
+// RegisterWorkflow - registers a workflow functor with the framework.
+// You can register more than workflow functor.
+// A workflow takes a cadence context and input and returns a result and an error code.
 func RegisterWorkflow(
-	taskListName string,
-	factory WorkflowFactory,
+	workflowFunc func(ctx Context, input []byte) ([]byte, error),
 ) {
 	thImpl := getTaskHostEnvironment()
-	thImpl.RegisterWorkflow(taskListName, factory)
+	thImpl.RegisterWorkflow(workflowFunc)
 }
 
-// RegisterActivity - register a task list and associated activity implementation with the framework.
-// You can register more than activity with a task list. You can also register multiple task lists.
+// RegisterActivity - register a activity function with the framework.
+// You can register more than activity functor.
+// A workflow takes a context and input and returns a result and an error code.
 func RegisterActivity(
-	taskListName string,
-	activities []Activity,
+	activityFunc func(ctx context.Context, input []byte) ([]byte, error),
 ) {
 	thImpl := getTaskHostEnvironment()
-	thImpl.RegisterActivity(taskListName, activities)
+	thImpl.RegisterActivity(activityFunc)
 }
 
-// NewWorker creates an instance of worker for managing workflow task list and activity task list.
-// We also can configure any worker specific options like logger, metrics, identity.
+// NewWorker creates an instance of worker for managing workflow and activity executions.
+// service 	- thrift connection to the cadence server.
+// groupName 	- is the name you use to identify your client worker, where the tasks get dispatched.
+// options 	-  configure any worker specific options like logger, metrics, identity.
 func NewWorker(
 	service m.TChanWorkflowService,
-	workflowTasks []WorkflowTask,
-	activityTasks []ActivityTask,
+	groupName string,
 	options WorkerOptions,
 ) Lifecycle {
-	return newAggregatedWorker(service, workflowTasks, activityTasks, options)
+	return newAggregatedWorker(service, groupName, options)
 }

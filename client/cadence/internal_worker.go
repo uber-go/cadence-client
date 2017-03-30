@@ -3,16 +3,21 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"context"
 	"github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/uber-go/tally"
+	"runtime"
+	"reflect"
+	"errors"
+	"fmt"
 )
 
 // Assert that structs do indeed implement the interfaces
 var _ WorkerOptions = (*workerOptions)(nil)
-var _ WorkflowTask = (*workflowTaskImpl)(nil)
-var _ ActivityTask = (*activityTaskImpl)(nil)
+var _ Lifecycle = (*aggregatedWorker)(nil)
+var _ taskHost = (*taskHostImpl)(nil)
 
 type (
 	// WorkflowWorker wraps the code for hosting workflow types.
@@ -198,7 +203,29 @@ func (aw *activityWorker) Stop() {
 // workerOptions stores all host-specific parameters that cadence can use to run the workflows
 // and activities and if they need any rate limiting.
 type workerOptions struct {
-	// TODO
+	maxConcurrentActivityExecutionSize int
+	maxActivityExecutionRate int
+	autoHeartBeatForActivities bool
+	identity string
+	metricsScope tally.Scope
+	logger bark.Logger
+}
+
+// SetMaxConcurrentActivityExecutionSize sets the maximum concurrent activity executions this host can have.
+func (wo *workerOptions) SetMaxConcurrentActivityExecutionSize(size int) WorkerOptions {
+	// TODO:
+	return wo
+}
+
+// SetActivityExecutionRate sets the rate limiting on number of activities that can be executed.
+func (wo *workerOptions) SetActivityExecutionRate(size int) WorkerOptions {
+	// TODO:
+	return wo
+}
+
+func (wo *workerOptions) SetAutoHeartBeat(auto bool) WorkerOptions {
+	// TODO:
+	return wo
 }
 
 // SetIdentity identifies the host for debugging.
@@ -219,78 +246,133 @@ func (wo *workerOptions) SetLogger(logger bark.Logger) WorkerOptions {
 	return wo
 }
 
+type workerFunc func(ctx Context, input []byte) ([]byte, error)
+type activityFunc func(ctx context.Context, input []byte) ([]byte, error)
+
 // taskHost stores all worker-specific parameters that will
 // be stored inside of a context.
 type taskHost interface {
-	RegisterWorkflow(taskListName string, factory WorkflowFactory)
-	RegisterActivity(taskListName string, activities []Activity)
+	RegisterWorkflow(wf workerFunc)
+	RegisterActivity(af activityFunc)
 }
 
 type taskHostImpl struct {
+	workerFuncs []workerFunc
+	activityFuncs []activityFunc
 }
 
-func (th *taskHostImpl) RegisterWorkflow(taskListName string, factory WorkflowFactory) {
-	// TODO:
+func (th *taskHostImpl) RegisterWorkflow(wf workerFunc) {
+	th.workerFuncs = append(th.workerFuncs, wf)
 }
-func (th *taskHostImpl) RegisterActivity(taskListName string, activities []Activity) {
-	// TODO:
+
+func (th *taskHostImpl) RegisterActivity(af activityFunc) {
+	th.activityFuncs = append(th.activityFuncs, af)
 }
 
 var thImpl *taskHostImpl
-
 func getTaskHostEnvironment() taskHost {
 	if thImpl == nil {
-		thImpl = &taskHostImpl{}
+		thImpl = &taskHostImpl{
+			workerFuncs: []workerFunc{},
+			activityFuncs: []activityFunc{},
+		}
 	}
 	return thImpl
 }
 
-type workflowTaskImpl struct {
+// Wrapper to execute workflow functors.
+type workflowExecutor struct {
+	name string
+	f workerFunc
+}
+func (we *workflowExecutor) Execute(ctx Context, input []byte) (result []byte, err error) {
+	return we.f(ctx, input)
 }
 
-type activityTaskImpl struct {
+// Wrapper to execute activity functors.
+type activityExecutor struct {
+	name string
+	f activityFunc
 }
-
-// SetMaxConcurrentActivityExecutionSize sets the maximum concurrent activity executions this host can have.
-func (at *activityTaskImpl) SetMaxConcurrentActivityExecutionSize(size int) ActivityTask {
-	// TODO:
-	return at
+func (ae *activityExecutor) ActivityType() ActivityType {
+	return ActivityType{Name: ae.name}
 }
-
-// SetActivityExecutionRate sets the rate limiting on number of activities that can be executed.
-func (at *activityTaskImpl) SetActivityExecutionRate(size int) ActivityTask {
-	// TODO:
-	return at
+func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
+	return ae.f(ctx, input)
 }
-
-func (at *activityTaskImpl) SetAutoHeartBeat(auto bool) ActivityTask {
-	// TODO:
-	return at
-}
-
 
 // aggregatedWorker combines management of both workflowWorker and activityWorker worker lifecycle.
 type aggregatedWorker struct {
-	// TODO:
+	workflowWorker Lifecycle
+	activityWorker Lifecycle
 }
 
 func (aw *aggregatedWorker) Start() error {
 	// TODO:
+	//if err := aw.workflowWorker.Start(); err != nil {
+	//	return err
+	//}
+	//if err := aw.activityWorker.Start(); err != nil {
+	//	return err
+	//}
 	return nil
 }
 
 func (aw *aggregatedWorker) Stop() {
-	// TODO:
+	aw.workflowWorker.Stop()
+	aw.activityWorker.Stop()
 }
 
 // aggregatedWorker returns an instance to manage the workers.
 func newAggregatedWorker(
 	service m.TChanWorkflowService,
-	workflowTasks []WorkflowTask,
-	activityTasks []ActivityTask,
+	groupName string,
 	options WorkerOptions,
 ) (worker Lifecycle) {
-	return &aggregatedWorker{}
+	wOptions := options.(*workerOptions)
+	workerParams := WorkerExecutionParameters{
+		TaskList: groupName,
+		ConcurrentPollRoutineSize: 10,
+		Identity: wOptions.identity,
+		MetricsScope: wOptions.metricsScope,
+		Logger: wOptions.logger,
+	}
+
+	// workflow factory.
+	workflowNameToFunctor := make(map[string]workerFunc)
+	for _, wf := range thImpl.workerFuncs {
+		name := getFunctionName(wf)
+		workflowNameToFunctor[name] = wf
+	}
+	workflowFactory := func(wt WorkflowType) (Workflow, error) {
+		wf, ok := workflowNameToFunctor[wt.Name]
+		if !ok {
+			return nil, errors.New(fmt.Sprintf("Unable to find workflow type: %v", wt.Name))
+		}
+		return &workflowExecutor{name: wt.Name, f: wf}, nil
+	}
+	workflowWorker := NewWorkflowWorker(
+		workflowFactory,
+		service,
+		workerParams,
+	)
+
+	// activity types.
+	activityTypes := []Activity{}
+	for _, af := range thImpl.activityFuncs {
+		name := getFunctionName(af)
+		activityTypes = append(activityTypes, &activityExecutor{name: name, f: af})
+	}
+	activityWorker := NewActivityWorker(
+		activityTypes,
+		service,
+		workerParams,
+	)
+	return &aggregatedWorker{workflowWorker: workflowWorker, activityWorker: activityWorker}
+}
+
+func getFunctionName(i interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
 

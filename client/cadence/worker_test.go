@@ -75,27 +75,19 @@ func TestWorkflowReplayer(t *testing.T) {
 }
 
 // testSampleWorkflow
-type testSampleWorkflow struct {
-	t *testing.T
-}
-
-func (w testSampleWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
+func sampleWorkflowExecute(ctx Context, input []byte) (result []byte, err error) {
 	return nil, nil
 }
 
-// testActivity2
-type testActivity2 struct {
-	t *testing.T
-}
-
-func (t testActivity2) ActivityType() ActivityType {
-	return ActivityType{Name: "testActivity2"}
-}
-
-func (t testActivity2) Execute(ctx context.Context, input []byte) ([]byte, error) {
+// test activity1
+func testActivity1Execute(ctx context.Context, input []byte) ([]byte, error) {
 	return nil, nil
 }
 
+// test activity1
+func testActivity2Execute(ctx context.Context, input []byte) ([]byte, error) {
+	return nil, nil
+}
 
 func TestCreateWorkersForSingleTaskList(t *testing.T) {
 	// Create service endpoint
@@ -103,22 +95,16 @@ func TestCreateWorkersForSingleTaskList(t *testing.T) {
 	logger := getLogger()
 
 	// Simulate initialization
-	workflowFactory := func(wt WorkflowType) (Workflow, error) {
-		return testSampleWorkflow{}, nil
-	}
-	RegisterWorkflow("taskListWorkflow", workflowFactory)
-	RegisterActivity("taskListActivity", []Activity{&testActivity{}})
+	RegisterWorkflow(sampleWorkflowExecute)
+	RegisterActivity(testActivity1Execute)
 
 	// Configure task lists and worker
-	workflowTask := NewWorkflowTask("taskListWorkflow")
-	activityTask := NewActivityTask("taskListActivity").SetActivityExecutionRate(20)
 	workerOptions := NewWorkerOptions().SetLogger(logger)
 
 	// Start Worker.
 	worker := NewWorker(
 		service,
-		[]WorkflowTask{workflowTask},
-		[]ActivityTask{activityTask},
+		"testGroup",
 		workerOptions)
 	err := worker.Start()
 	require.NoError(t, err)
@@ -130,26 +116,17 @@ func TestCreateWorkersForManagingTwoTaskLists(t *testing.T) {
 	logger := getLogger()
 
 	// Simulate initialization
-	workflowFactory := func(wt WorkflowType) (Workflow, error) {
-		return testSampleWorkflow{}, nil
-	}
-	RegisterWorkflow("taskList1", workflowFactory)
-	RegisterWorkflow("taskList2", workflowFactory)
-	RegisterActivity("taskList-act-1", []Activity{&testActivity{}})
-	RegisterActivity("taskList-act-2", []Activity{&testActivity2{}})
+	RegisterWorkflow(sampleWorkflowExecute)
+	RegisterActivity(testActivity1Execute)
+	RegisterActivity(testActivity2Execute)
 
 	// Configure task lists and worker
-	wt1 := NewWorkflowTask("taskList1")
-	wt2 := NewWorkflowTask("taskList2")
-	at1 := NewActivityTask("taskList-act-1").SetActivityExecutionRate(20)
-	at2 := NewActivityTask("taskList-act-2").SetActivityExecutionRate(20)
-	workerOptions := NewWorkerOptions().SetLogger(logger)
+	workerOptions := NewWorkerOptions().SetLogger(logger).SetActivityExecutionRate(20)
 
 	// Start Worker.
 	worker := NewWorker(
 		service,
-		[]WorkflowTask{wt1, wt2},
-		[]ActivityTask{at1, at2},
+		"testGroupName2",
 		workerOptions)
 	err := worker.Start()
 	require.NoError(t, err)
@@ -161,37 +138,16 @@ func TestCreateWorkerSeparatelyForWorkflowAndActivityWorker(t *testing.T) {
 	logger := getLogger()
 
 	// Simulate initialization
-	workflowFactory := func(wt WorkflowType) (Workflow, error) {
-		return testSampleWorkflow{}, nil
-	}
-	RegisterWorkflow("taskList1", workflowFactory)
-	RegisterWorkflow("taskList2", workflowFactory)
-	RegisterActivity("taskList-act-1", []Activity{&testActivity{}})
-	RegisterActivity("taskList-act-2", []Activity{&testActivity2{}})
+	RegisterWorkflow(sampleWorkflowExecute)
 
-	// Configure task lists and worker
-	wt1 := NewWorkflowTask("taskList1")
-	wt2 := NewWorkflowTask("taskList2")
+	// Configure worker
 	workerOptions := NewWorkerOptions().SetLogger(logger)
 
 	// Start workflow Worker.
 	worker := NewWorker(
 		service,
-		[]WorkflowTask{wt1, wt2},
-		nil,
+		"testGroup",
 		workerOptions)
 	err := worker.Start()
-	require.NoError(t, err)
-
-	at1 := NewActivityTask("taskList-act-1").SetActivityExecutionRate(20)
-	at2 := NewActivityTask("taskList-act-2").SetActivityExecutionRate(20).SetAutoHeartBeat(true)
-
-	// Start activity Worker.
-	aWorker := NewWorker(
-		service,
-		nil,
-		[]ActivityTask{at1, at2},
-		workerOptions)
-	err = aWorker.Start()
 	require.NoError(t, err)
 }

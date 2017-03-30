@@ -69,6 +69,7 @@ type (
 		workflowExecution WorkflowExecution
 		workflowService   m.TChanWorkflowService
 		metricsScope      tally.Scope
+		identity          string
 	}
 )
 
@@ -100,8 +101,11 @@ func NewWorkflowWorker(
 }
 
 // NewWorkflowClient creates an instance of workflow client that users can start a workflow
-func NewWorkflowClient(service m.TChanWorkflowService, metricsScope tally.Scope) *WorkflowClient {
-	return &WorkflowClient{workflowService: service, metricsScope: metricsScope}
+func NewWorkflowClient(service m.TChanWorkflowService, metricsScope tally.Scope, identity string) *WorkflowClient {
+	if identity == "" {
+		identity = getWorkerIdentity("")
+	}
+	return &WorkflowClient{workflowService: service, metricsScope: metricsScope, identity: identity}
 }
 
 // StartWorkflowExecution starts a workflow execution
@@ -179,14 +183,14 @@ func (wc *WorkflowClient) GetHistory(workflowID string, runID string) (*s.Histor
 // should be called when that activity is completed with the actual result and error. If err is nil, activity task
 // completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,
 // activity task failed event will be reported.
-func (wc *WorkflowClient) CompleteActivity(identity string, taskToken, result []byte, err error) error {
-	request := convertActivityResultToRespondRequest(identity, taskToken, result, err)
+func (wc *WorkflowClient) CompleteActivity(taskToken, result []byte, err error) error {
+	request := convertActivityResultToRespondRequest(wc.identity, taskToken, result, err)
 	return reportActivityComplete(wc.workflowService, request)
 }
 
 // RecordActivityHeartbeat records heartbeat for an activity.
-func (wc *WorkflowClient) RecordActivityHeartbeat(identity string, taskToken, details []byte) error {
-	return recordActivityHeartbeat(wc.workflowService, identity, taskToken, details)
+func (wc *WorkflowClient) RecordActivityHeartbeat(taskToken, details []byte) error {
+	return recordActivityHeartbeat(wc.workflowService, wc.identity, taskToken, details)
 }
 
 // WorkflowReplayerOptions represents options for workflow replayer.

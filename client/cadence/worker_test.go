@@ -77,7 +77,7 @@ func TestWorkflowReplayer(t *testing.T) {
 
 func TestCompleteActivity(t *testing.T) {
 	mockService := new(mocks.TChanWorkflowService)
-	wfClient := NewWorkflowClient(mockService, nil)
+	wfClient := NewWorkflowClient(mockService, nil, "")
 	var completedRequest, canceledRequest, failedRequest interface{}
 	mockService.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
@@ -92,23 +92,19 @@ func TestCompleteActivity(t *testing.T) {
 			failedRequest = args.Get(1).(*s.RespondActivityTaskFailedRequest)
 		})
 
-	testID1, testID2, testID3 := "testID1", "testID2", "testID3"
-	wfClient.CompleteActivity(testID1, nil, nil, nil)
+	wfClient.CompleteActivity(nil, nil, nil)
 	require.NotNil(t, completedRequest)
-	require.Equal(t, testID1, *completedRequest.(*s.RespondActivityTaskCompletedRequest).Identity)
 
-	wfClient.CompleteActivity(testID2, nil, nil, NewCanceledError())
+	wfClient.CompleteActivity(nil, nil, NewCanceledError())
 	require.NotNil(t, canceledRequest)
-	require.Equal(t, testID2, *canceledRequest.(*s.RespondActivityTaskCanceledRequest).Identity)
 
-	wfClient.CompleteActivity(testID3, nil, nil, errors.New(""))
+	wfClient.CompleteActivity(nil, nil, errors.New(""))
 	require.NotNil(t, failedRequest)
-	require.Equal(t, testID3, *failedRequest.(*s.RespondActivityTaskFailedRequest).Identity)
 }
 
 func TestRecordActivityHeartbeat(t *testing.T) {
 	mockService := new(mocks.TChanWorkflowService)
-	wfClient := NewWorkflowClient(mockService, nil)
+	wfClient := NewWorkflowClient(mockService, nil, "")
 	var heartbeatRequest *s.RecordActivityTaskHeartbeatRequest
 	cancelRequested := false
 	heartbeatResponse := s.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
@@ -117,8 +113,6 @@ func TestRecordActivityHeartbeat(t *testing.T) {
 			heartbeatRequest = args.Get(1).(*s.RecordActivityTaskHeartbeatRequest)
 		})
 
-	testID := "testID"
-	wfClient.RecordActivityHeartbeat(testID, nil, nil)
+	wfClient.RecordActivityHeartbeat(nil, nil)
 	require.NotNil(t, heartbeatRequest)
-	require.Equal(t, testID, *heartbeatRequest.Identity)
 }

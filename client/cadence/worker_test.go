@@ -10,6 +10,7 @@ import (
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
+	"github.com/stretchr/testify/mock"
 )
 
 func getLogger() bark.Logger {
@@ -89,10 +90,16 @@ func testActivity2Execute(ctx context.Context, input []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func TestCreateWorkersForSingleTaskList(t *testing.T) {
+func TestCreateWorkersForSingleWorkflowAndActivity(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
 	logger := getLogger()
+
+	// mocks
+	service.On("PollForActivityTask", mock.Anything, mock.Anything).Return(&s.PollForActivityTaskResponse{}, nil)
+	service.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil)
+	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(&s.PollForDecisionTaskResponse{}, nil)
+	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 
 	// Simulate initialization
 	RegisterWorkflow(sampleWorkflowExecute)
@@ -108,12 +115,19 @@ func TestCreateWorkersForSingleTaskList(t *testing.T) {
 		workerOptions)
 	err := worker.Start()
 	require.NoError(t, err)
+	worker.Stop()
 }
 
-func TestCreateWorkersForManagingTwoTaskLists(t *testing.T) {
+func TestCreateWorkersForManagingMultipleActivities(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
 	logger := getLogger()
+
+	// mocks
+	service.On("PollForActivityTask", mock.Anything, mock.Anything).Return(&s.PollForActivityTaskResponse{}, nil)
+	service.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil)
+	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(&s.PollForDecisionTaskResponse{}, nil)
+	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 
 	// Simulate initialization
 	RegisterWorkflow(sampleWorkflowExecute)
@@ -130,12 +144,19 @@ func TestCreateWorkersForManagingTwoTaskLists(t *testing.T) {
 		workerOptions)
 	err := worker.Start()
 	require.NoError(t, err)
+	worker.Stop()
 }
 
-func TestCreateWorkerSeparatelyForWorkflowAndActivityWorker(t *testing.T) {
+func TestCreateWorkerForWorkflow(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
 	logger := getLogger()
+
+	setHostEnvironment(nil)
+
+	// mocks
+	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(&s.PollForDecisionTaskResponse{}, nil)
+	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 
 	// Simulate initialization
 	RegisterWorkflow(sampleWorkflowExecute)
@@ -150,4 +171,5 @@ func TestCreateWorkerSeparatelyForWorkflowAndActivityWorker(t *testing.T) {
 		workerOptions)
 	err := worker.Start()
 	require.NoError(t, err)
+	worker.Stop()
 }

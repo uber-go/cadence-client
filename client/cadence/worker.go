@@ -287,7 +287,7 @@ type WorkerOptions interface {
 
 // NewWorkerOptions returns an instance of worker options to configure.
 func NewWorkerOptions() WorkerOptions {
-	return &workerOptions{}
+	return newWorkerOptionsImpl()
 }
 
 // RegisterWorkflow - registers a workflow functor with the framework.
@@ -296,7 +296,7 @@ func NewWorkerOptions() WorkerOptions {
 func RegisterWorkflow(
 	workflowFunc func(ctx Context, input []byte) ([]byte, error),
 ) {
-	thImpl := getTaskHostEnvironment()
+	thImpl := getHostEnvironment()
 	thImpl.RegisterWorkflow(workflowFunc)
 }
 
@@ -306,7 +306,7 @@ func RegisterWorkflow(
 func RegisterActivity(
 	activityFunc func(ctx context.Context, input []byte) ([]byte, error),
 ) {
-	thImpl := getTaskHostEnvironment()
+	thImpl := getHostEnvironment()
 	thImpl.RegisterActivity(activityFunc)
 }
 

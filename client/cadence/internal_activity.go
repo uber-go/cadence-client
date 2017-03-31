@@ -4,9 +4,11 @@ package cadence
 
 import (
 	"errors"
-	"github.com/uber-go/cadence-client/common"
-	"golang.org/x/net/context"
 	"time"
+
+	"golang.org/x/net/context"
+
+	"github.com/uber-go/cadence-client/common"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -86,9 +88,6 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 	}
 	if p.StartToCloseTimeoutSeconds <= 0 {
 		return nil, errors.New("Missing or negative StartToCloseTimeoutSeconds")
-	}
-	if len(p.ActivityType.Name) == 0 {
-		return nil, errors.New("Missing activity name")
 	}
 	return p, nil
 }

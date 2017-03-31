@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	errActivityParamsBadRequest = errors.New("Bad request. Missing activity parameters through context. Check ActivityOptions.")
+	errActivityParamsBadRequest = errors.New("missing activity parameters through context, check ActivityOptions")
 )
 
 // Channel must be used instead of native go channel by workflow code.

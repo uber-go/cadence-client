@@ -8,9 +8,9 @@ import (
 
 	"github.com/uber-common/bark"
 
+	"errors"
 	m "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
-	"errors"
 )
 
 // Assert that structs do indeed implement the interfaces

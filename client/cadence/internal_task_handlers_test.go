@@ -111,7 +111,11 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 	taskList := "tl1"
 	testEvents := []*m.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{TaskList: &m.TaskList{Name: &taskList}}),
-		createTestEventActivityTaskScheduled(2, &m.ActivityTaskScheduledEventAttributes{ActivityId: common.StringPtr("0")}),
+		createTestEventActivityTaskScheduled(2, &m.ActivityTaskScheduledEventAttributes{
+			ActivityId:   common.StringPtr("0"),
+			ActivityType: &m.ActivityType{Name: common.StringPtr("Greeter_Activity")},
+			TaskList:     &m.TaskList{Name: &taskList},
+		}),
 		createTestEventActivityTaskStarted(3, &m.ActivityTaskStartedEventAttributes{}),
 		createTestEventActivityTaskCompleted(4, &m.ActivityTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
 	}

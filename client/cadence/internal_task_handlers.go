@@ -3,11 +3,12 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
-	"errors"
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
@@ -255,6 +256,8 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	defer eventHandler.Close()
 	reorderedHistory := newHistory(&workflowTask{task: task}, eventHandler.(*workflowExecutionEventHandlerImpl))
 	decisions := []*s.Decision{}
+	replayDecisions := []*s.Decision{}
+	respondEvents := []*s.HistoryEvent{}
 	unhandledDecision := false
 
 	startTime := time.Now()
@@ -271,6 +274,9 @@ ProcessEvents:
 			wth.logger.Debugf("ProcessEvent: Id=%d, EventType=%v", event.GetEventId(), event.GetEventType())
 
 			isInReplay := event.GetEventId() < reorderedHistory.LastNonReplayedID()
+			if isEventTypeRespondToDecision(event.GetEventType()) {
+				respondEvents = append(respondEvents, event)
+			}
 
 			// Any metrics.
 			wth.reportAnyMetrics(event, isInReplay)
@@ -289,9 +295,11 @@ ProcessEvents:
 				unhandledDecision = unhandled
 			}
 
-			if !isInReplay {
-				if eventDecisions != nil {
+			if eventDecisions != nil {
+				if !isInReplay {
 					decisions = append(decisions, eventDecisions...)
+				} else {
+					replayDecisions = append(replayDecisions, eventDecisions...)
 				}
 			}
 
@@ -303,10 +311,15 @@ ProcessEvents:
 		}
 	}
 
+	// check if decisions from reply matches to the history events
+	if !isReplayMatchHistory(replayDecisions, respondEvents) {
+		// TODO: handle this case.
+		wth.logger.Warn("nondeterministic workflow detected.")
+	}
+
 	eventDecisions := wth.completeWorkflow(isWorkflowCompleted, unhandledDecision, completionResult, failure)
 	if len(eventDecisions) > 0 {
 		decisions = append(decisions, eventDecisions...)
-
 		if wth.metricsScope != nil {
 			wth.metricsScope.Counter(metrics.WorkflowsCompletionTotalCounter).Inc(1)
 			elapsed := time.Now().Sub(startTime)
@@ -325,6 +338,135 @@ ProcessEvents:
 		stackTrace = eventHandler.StackTrace()
 	}
 	return taskCompletionRequest, stackTrace, nil
+}
+
+// for every decision, there is one EventType respond to that decision.
+func isEventTypeRespondToDecision(t s.EventType) bool {
+	switch t {
+	case s.EventType_ActivityTaskScheduled:
+		return true
+	case s.EventType_ActivityTaskCancelRequested:
+		return true
+	case s.EventType_TimerStarted:
+		return true
+	case s.EventType_TimerCanceled:
+		return true
+	case s.EventType_WorkflowExecutionCompleted:
+		return true
+	case s.EventType_WorkflowExecutionFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+func isReplayMatchHistory(replayDecisions []*s.Decision, historyEvents []*s.HistoryEvent) bool {
+	if len(historyEvents) > len(replayDecisions) {
+		return false
+	}
+
+	for i := 0; i < len(historyEvents); i++ {
+		e := historyEvents[i]
+		d := replayDecisions[i]
+		if !isDecisionMatchEvent(d, e) {
+			return false
+		}
+	}
+	return true
+}
+
+func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent) bool {
+	switch d.GetDecisionType() {
+	case s.DecisionType_ScheduleActivityTask:
+		if e.GetEventType() != s.EventType_ActivityTaskScheduled {
+			return false
+		}
+		eventAttributes := e.GetActivityTaskScheduledEventAttributes()
+		decisionAttributes := d.GetScheduleActivityTaskDecisionAttributes()
+
+		if eventAttributes.GetActivityId() != decisionAttributes.GetActivityId() ||
+			eventAttributes.GetActivityType().GetName() != decisionAttributes.GetActivityType().GetName() ||
+			eventAttributes.GetTaskList().GetName() != decisionAttributes.GetTaskList().GetName() ||
+			bytes.Compare(eventAttributes.GetInput(), decisionAttributes.GetInput()) != 0 ||
+			eventAttributes.GetHeartbeatTimeoutSeconds() != decisionAttributes.GetHeartbeatTimeoutSeconds() ||
+			eventAttributes.GetScheduleToCloseTimeoutSeconds() != decisionAttributes.GetScheduleToCloseTimeoutSeconds() ||
+			eventAttributes.GetScheduleToStartTimeoutSeconds() != decisionAttributes.GetScheduleToCloseTimeoutSeconds() ||
+			eventAttributes.GetStartToCloseTimeoutSeconds() != decisionAttributes.GetScheduleToStartTimeoutSeconds() {
+			return false
+		}
+
+		return true
+
+	case s.DecisionType_RequestCancelActivityTask:
+		if e.GetEventType() != s.EventType_ActivityTaskCancelRequested {
+			return false
+		}
+		eventAttributes := e.GetActivityTaskCancelRequestedEventAttributes()
+		decisionAttributes := d.GetRequestCancelActivityTaskDecisionAttributes()
+
+		if eventAttributes.GetActivityId() != decisionAttributes.GetActivityId() {
+			return false
+		}
+
+		return true
+
+	case s.DecisionType_StartTimer:
+		if e.GetEventType() != s.EventType_TimerStarted {
+			return false
+		}
+		eventAttributes := e.GetTimerStartedEventAttributes()
+		decisionAttributes := d.GetStartTimerDecisionAttributes()
+
+		if eventAttributes.GetTimerId() != decisionAttributes.GetTimerId() ||
+			eventAttributes.GetStartToFireTimeoutSeconds() != decisionAttributes.GetStartToFireTimeoutSeconds() {
+			return false
+		}
+
+		return true
+
+	case s.DecisionType_CancelTimer:
+		if e.GetEventType() != s.EventType_TimerCanceled {
+			return false
+		}
+		eventAttributes := e.GetTimerCanceledEventAttributes()
+		decisionAttributes := d.GetCancelTimerDecisionAttributes()
+
+		if eventAttributes.GetTimerId() != decisionAttributes.GetTimerId() {
+			return false
+		}
+
+		return true
+
+	case s.DecisionType_CompleteWorkflowExecution:
+		if e.GetEventType() != s.EventType_WorkflowExecutionCompleted {
+			return false
+		}
+		eventAttributes := e.GetWorkflowExecutionCompletedEventAttributes()
+		decisionAttributes := d.GetCompleteWorkflowExecutionDecisionAttributes()
+
+		if bytes.Compare(eventAttributes.GetResult_(), decisionAttributes.GetResult_()) != 0 {
+			return false
+		}
+
+		return true
+
+	case s.DecisionType_FailWorkflowExecution:
+		if e.GetEventType() != s.EventType_WorkflowExecutionFailed {
+			return false
+		}
+		eventAttributes := e.GetWorkflowExecutionFailedEventAttributes()
+		decisionAttributes := d.GetFailWorkflowExecutionDecisionAttributes()
+
+		if eventAttributes.GetReason() != decisionAttributes.GetReason() ||
+			bytes.Compare(eventAttributes.GetDetails(), decisionAttributes.GetDetails()) != 0 {
+			return false
+		}
+
+		return true
+
+	}
+
+	return false
 }
 
 func (wth *workflowTaskHandlerImpl) completeWorkflow(isWorkflowCompleted bool, unhandledDecision bool, completionResult []byte,

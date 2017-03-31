@@ -294,8 +294,8 @@ func NewWorkerOptions() WorkerOptions {
 // You can register more than workflow functor.
 // A workflow takes a cadence context and input and returns a result and an error code.
 func RegisterWorkflow(
-	workflowFunc func(ctx Context, input []byte) ([]byte, error),
-) {
+	workflowFunc interface{},
+) error {
 	thImpl := getHostEnvironment()
 	thImpl.RegisterWorkflow(workflowFunc)
 }
@@ -304,8 +304,8 @@ func RegisterWorkflow(
 // You can register more than activity functor.
 // A workflow takes a context and input and returns a result and an error code.
 func RegisterActivity(
-	activityFunc func(ctx context.Context, input []byte) ([]byte, error),
-) {
+	activityFunc interface{},
+) error {
 	thImpl := getHostEnvironment()
 	thImpl.RegisterActivity(activityFunc)
 }

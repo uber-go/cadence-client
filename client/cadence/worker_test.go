@@ -11,6 +11,7 @@ import (
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
 	"github.com/stretchr/testify/mock"
+	"fmt"
 )
 
 func getLogger() bark.Logger {
@@ -77,16 +78,18 @@ func TestWorkflowReplayer(t *testing.T) {
 
 // testSampleWorkflow
 func sampleWorkflowExecute(ctx Context, input []byte) (result []byte, err error) {
-	return nil, nil
+	ExecuteActivity(ctx, )
 }
 
 // test activity1
 func testActivity1Execute(ctx context.Context, input []byte) ([]byte, error) {
+	fmt.Println("Executing Activity1")
 	return nil, nil
 }
 
 // test activity1
 func testActivity2Execute(ctx context.Context, input []byte) ([]byte, error) {
+	fmt.Println("Executing Activity2")
 	return nil, nil
 }
 

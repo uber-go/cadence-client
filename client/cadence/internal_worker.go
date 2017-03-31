@@ -12,6 +12,7 @@ import (
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/uber-go/tally"
+	"sync"
 )
 
 const (
@@ -268,32 +269,122 @@ type activityFunc func(ctx context.Context, input []byte) ([]byte, error)
 // hostEnv stores all worker-specific parameters that will
 // be stored inside of a context.
 type hostEnv interface {
-	RegisterWorkflow(wf workerFunc)
-	RegisterActivity(af activityFunc)
+	RegisterWorkflow(wf interface{}) error
+	RegisterActivity(af interface{}) error
 }
 
 // hostEnvImpl is the implementation of hostEnv
 type hostEnvImpl struct {
-	workerFuncs   []workerFunc
-	activityFuncs []activityFunc
+	sync.Mutex
+	workerFuncMap   map[string]interface{}
+	activityFuncMap map[string]interface{}
 }
 
-func (th *hostEnvImpl) RegisterWorkflow(wf workerFunc) {
-	th.workerFuncs = append(th.workerFuncs, wf)
+func (th *hostEnvImpl) RegisterWorkflow(wf interface{}) error {
+	// Validate that it is a function
+	fnType := reflect.TypeOf(wf)
+	if err := th.validateFnFormat(fnType, true); err != nil {
+		return err
+	}
+	// Check if already registered
+	fnName := getFunctionName(wf)
+	if _, ok := th.getWorkflowFn(fnName); ok {
+		return nil
+	}
+	th.addWorkflowFn(fnName, wf)
+	return nil
 }
 
-func (th *hostEnvImpl) RegisterActivity(af activityFunc) {
-	th.activityFuncs = append(th.activityFuncs, af)
+func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
+	// Validate that it is a function
+	fnType := reflect.TypeOf(af)
+	if err := th.validateFnFormat(fnType, false); err != nil {
+		return err
+	}
+	// Check if already registered
+	fnName := getFunctionName(af)
+	if _, ok := th.getActivityFn(fnName); ok {
+		return nil
+	}
+	th.addActivityFn(fnName, af)
+	return nil
+}
+
+func (th *hostEnvImpl) addWorkflowFn(fnName string, wf interface{}) {
+	th.Lock()
+	defer th.Unlock()
+	th.workerFuncMap[fnName] = wf
+}
+
+func (th *hostEnvImpl) getWorkflowFn(fnName string) (interface{}, bool) {
+	th.Lock()
+	defer th.Unlock()
+	fn, ok := th.workerFuncMap[fnName]
+	return fn, ok
+}
+
+func (th *hostEnvImpl) lenWorkflowFns() int {
+	th.Lock()
+	defer th.Unlock()
+	return len(th.workerFuncMap)
+}
+
+func (th *hostEnvImpl) addActivityFn(fnName string, af interface{}) {
+	th.Lock()
+	defer th.Unlock()
+	th.activityFuncMap[fnName] = af
+}
+
+func (th *hostEnvImpl) getActivityFn(fnName string) (interface{}, bool) {
+	th.Lock()
+	defer th.Unlock()
+	fn, ok := th.activityFuncMap[fnName]
+	return fn, ok
+}
+
+// Validate function parameters.
+func (th *hostEnvImpl) validateFnFormat(fnType reflect.Type, isWorkflow bool) error {
+	if fnType.Kind() != reflect.Func {
+		return fmt.Errorf("expected a func as input but was %s", fnType.Kind())
+	}
+	if isWorkflow {
+		if fnType.NumIn() < 1 {
+			return fmt.Errorf(
+				"expected at least one argument of type cadence.Context in function, found %d input arguments",
+				fnType.NumIn(),
+			)
+		}
+		if !isWorkflowContext(fnType) {
+			return fmt.Errorf("expected first argument to be cadence.Context but found %s", fnType.In(0))
+		}
+	}
+
+	// Return values.
+	if fnType.NumOut() != 2 {
+		return fmt.Errorf(
+			"expected function to return result and error but found %d return values", fnType.NumOut(),
+		)
+	}
+	if !isByteResult(fnType.Out(0)) {
+		return fmt.Errorf(
+			"expected function first return value to return []byte but found %d", fnType.Out(0).Kind(),
+		)
+	}
+	if !isError(fnType.Out(1)) {
+		return fmt.Errorf(
+			"expected function second return value to return error but found %d", fnType.Out(1).Kind(),
+		)
+	}
+	return nil
 }
 
 // To hold the host registration details.
 var thImpl *hostEnvImpl
-
 func getHostEnvironment() hostEnv {
 	if thImpl == nil {
 		thImpl = &hostEnvImpl{
-			workerFuncs:   []workerFunc{},
-			activityFuncs: []activityFunc{},
+			workerFuncMap: make(map[string]interface{}),
+			activityFuncMap: make(map[string]interface{}),
 		}
 	}
 	return thImpl
@@ -306,24 +397,34 @@ func setHostEnvironment(t *hostEnvImpl) {
 // Wrapper to execute workflow functors.
 type workflowExecutor struct {
 	name string
-	f    workerFunc
+	fn   interface{}
 }
 
-func (we *workflowExecutor) Execute(ctx Context, input []byte) (result []byte, err error) {
-	return we.f(ctx, input)
+func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
+	targetArgs := []reflect.Value{}
+	targetArgs = append(targetArgs, reflect.ValueOf(ctx))
+	targetArgs = append(targetArgs, reflect.ValueOf(input))
+	fnValue := reflect.ValueOf(we.fn)
+	retValues := fnValue.Call(targetArgs)
+	return retValues[0].Interface().([]byte), retValues[1].Interface().(error)
 }
 
 // Wrapper to execute activity functors.
 type activityExecutor struct {
 	name string
-	f    activityFunc
+	fn   interface{}
 }
 
 func (ae *activityExecutor) ActivityType() ActivityType {
 	return ActivityType{Name: ae.name}
 }
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
-	return ae.f(ctx, input)
+	targetArgs := []reflect.Value{}
+	targetArgs = append(targetArgs, reflect.ValueOf(ctx))
+	targetArgs = append(targetArgs, reflect.ValueOf(input))
+	fnValue := reflect.ValueOf(ae.fn)
+	retValues := fnValue.Call(targetArgs)
+	return retValues[0].Interface().([]byte), retValues[1].Interface().(error)
 }
 
 // aggregatedWorker combines management of both workflowWorker and activityWorker worker lifecycle.
@@ -372,18 +473,13 @@ func newAggregatedWorker(
 
 	// workflow factory.
 	var workflowWorker Lifecycle
-	workflowNameToFunctor := make(map[string]workerFunc)
-	for _, wf := range thImpl.workerFuncs {
-		name := getFunctionName(wf)
-		workflowNameToFunctor[name] = wf
-	}
-	if len(workflowNameToFunctor) > 0 {
+	if thImpl.lenWorkflowFns() > 0 {
 		workflowFactory := func(wt WorkflowType) (Workflow, error) {
-			wf, ok := workflowNameToFunctor[wt.Name]
+			wf, ok := thImpl.getWorkflowFn(wt.Name)
 			if !ok {
 				return nil, fmt.Errorf("Unable to find workflow type: %v", wt.Name)
 			}
-			return &workflowExecutor{name: wt.Name, f: wf}, nil
+			return &workflowExecutor{name: wt.Name, fn: wf}, nil
 		}
 		workflowWorker = NewWorkflowWorker(
 			workflowFactory,
@@ -395,10 +491,13 @@ func newAggregatedWorker(
 	// activity types.
 	var activityWorker Lifecycle
 	activityTypes := []Activity{}
-	for _, af := range thImpl.activityFuncs {
-		name := getFunctionName(af)
-		activityTypes = append(activityTypes, &activityExecutor{name: name, f: af})
+
+	thImpl.Lock()
+	for name, af := range thImpl.activityFuncMap {
+		activityTypes = append(activityTypes, &activityExecutor{name: name, fn: af})
 	}
+	thImpl.Unlock()
+
 	if len(activityTypes) > 0 {
 		activityWorker = NewActivityWorker(
 			activityTypes,
@@ -407,6 +506,21 @@ func newAggregatedWorker(
 		)
 	}
 	return &aggregatedWorker{workflowWorker: workflowWorker, activityWorker: activityWorker}
+}
+
+func isWorkflowContext(inType reflect.Type) bool {
+	contextElem := reflect.TypeOf((*Context)(nil)).Elem()
+	return inType.Implements(contextElem)
+}
+
+func isByteResult(inType reflect.Type) bool {
+	contextElem := reflect.TypeOf([]byte(nil)).Elem()
+	return inType.Implements(contextElem)
+}
+
+func isError(inType reflect.Type) bool {
+	errorElem := reflect.TypeOf((*error)(nil)).Elem()
+	return inType.Implements(errorElem)
 }
 
 func getFunctionName(i interface{}) string {

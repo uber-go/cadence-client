@@ -171,7 +171,6 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 			nil,
 			NewErrorWithDetails(panicErr.Error(), []byte(panicErr.StackTrace())),
 		)
-		dispatcher.Close()
 		return
 	}
 	rp := *getWorkflowResultPointerPointer(ctx)
@@ -181,7 +180,6 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 	}
 	// Cannot cast nil values from interface{} to interface
 	getWorkflowEnvironment(ctx).Complete(rp.workflowResult, rp.error)
-	dispatcher.Close()
 }
 
 // For troubleshooting stack pretty printing only.
@@ -274,6 +272,7 @@ func (c *channelImpl) Receive(ctx Context) (v interface{}) {
 func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (v interface{}, more bool) {
 	state := getState(ctx)
 	hasResult := false
+	appended := false
 	var result interface{}
 	for {
 		if hasResult {
@@ -286,20 +285,27 @@ func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (v interface{}, more bool
 			state.unblocked()
 			return r, true
 		}
+		// Let the buffer drain before delivering closed
 		if c.closed {
 			return nil, false
 		}
 		if len(c.blockedSends) > 0 {
+			if len(c.blockedReceives) > 0 {
+				panic("both blockedSends and blockedReceives are not empty")
+			}
 			b := c.blockedSends[0]
 			c.blockedSends = c.blockedSends[1:]
 			b.callback()
 			state.unblocked()
 			return b.value, true
 		}
-		c.blockedReceives = append(c.blockedReceives, func(v interface{}) {
-			result = v
-			hasResult = true
-		})
+		if !appended {
+			c.blockedReceives = append(c.blockedReceives, func(v interface{}) {
+				result = v
+				hasResult = true
+			})
+			appended = true
+		}
 		state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
 	}
 }
@@ -330,6 +336,7 @@ func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more b
 func (c *channelImpl) Send(ctx Context, v interface{}) {
 	state := getState(ctx)
 	valueConsumed := false
+	appended := false
 	for {
 		// Check for closed in the loop as close can be called when send is blocked
 		if c.closed {
@@ -339,20 +346,26 @@ func (c *channelImpl) Send(ctx Context, v interface{}) {
 			state.unblocked()
 			return
 		}
-		if len(c.buffer) < c.size {
-			c.buffer = append(c.buffer, v)
-			state.unblocked()
-			return
-		}
 		if len(c.blockedReceives) > 0 {
+			if len(c.blockedSends) > 0 {
+				panic("both blockedSends and blockedReceives are not empty")
+			}
 			blockedGet := c.blockedReceives[0]
 			c.blockedReceives = c.blockedReceives[1:]
 			blockedGet(v)
 			state.unblocked()
 			return
 		}
-		c.blockedSends = append(c.blockedSends,
-			valueCallbackPair{value: v, callback: func() { valueConsumed = true }})
+		if len(c.buffer) < c.size {
+			c.buffer = append(c.buffer, v)
+			state.unblocked()
+			return
+		}
+		if !appended {
+			c.blockedSends = append(c.blockedSends,
+				valueCallbackPair{value: v, callback: func() { valueConsumed = true }})
+			appended = true
+		}
 		state.yield(fmt.Sprintf("blocked on %s.Send", c.name))
 	}
 }
@@ -590,6 +603,10 @@ func (d *dispatcherImpl) IsDone() bool {
 
 func (d *dispatcherImpl) Close() {
 	d.mutex.Lock()
+	if d.closed {
+		d.mutex.Unlock()
+		return
+	}
 	d.closed = true
 	d.mutex.Unlock()
 	for i := 0; i < len(d.coroutines); i++ {

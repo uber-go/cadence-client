@@ -1,8 +1,8 @@
 package cadence
 
 import (
-	"context"
 	"errors"
+
 	"github.com/pborman/uuid"
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
@@ -69,6 +69,7 @@ type (
 		workflowExecution WorkflowExecution
 		workflowService   m.TChanWorkflowService
 		metricsScope      tally.Scope
+		identity          string
 	}
 )
 
@@ -100,8 +101,11 @@ func NewWorkflowWorker(
 }
 
 // NewWorkflowClient creates an instance of workflow client that users can start a workflow
-func NewWorkflowClient(service m.TChanWorkflowService, metricsScope tally.Scope) *WorkflowClient {
-	return &WorkflowClient{workflowService: service, metricsScope: metricsScope}
+func NewWorkflowClient(service m.TChanWorkflowService, metricsScope tally.Scope, identity string) *WorkflowClient {
+	if identity == "" {
+		identity = getWorkerIdentity("")
+	}
+	return &WorkflowClient{workflowService: service, metricsScope: metricsScope, identity: identity}
 }
 
 // StartWorkflowExecution starts a workflow execution
@@ -172,6 +176,21 @@ func (wc *WorkflowClient) GetHistory(workflowID string, runID string) (*s.Histor
 			return err1
 		}, serviceOperationRetryPolicy, isServiceTransientError)
 	return response.GetHistory(), err
+}
+
+// CompleteActivity reports activity completed. Activity Execute method can return cadence.ActivityResultPendingError to
+// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method
+// should be called when that activity is completed with the actual result and error. If err is nil, activity task
+// completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,
+// activity task failed event will be reported.
+func (wc *WorkflowClient) CompleteActivity(taskToken, result []byte, err error) error {
+	request := convertActivityResultToRespondRequest(wc.identity, taskToken, result, err)
+	return reportActivityComplete(wc.workflowService, request)
+}
+
+// RecordActivityHeartbeat records heartbeat for an activity.
+func (wc *WorkflowClient) RecordActivityHeartbeat(taskToken, details []byte) error {
+	return recordActivityHeartbeat(wc.workflowService, wc.identity, taskToken, details)
 }
 
 // WorkflowReplayerOptions represents options for workflow replayer.
@@ -297,7 +316,7 @@ func RegisterWorkflow(
 	workflowFunc interface{},
 ) error {
 	thImpl := getHostEnvironment()
-	thImpl.RegisterWorkflow(workflowFunc)
+	return thImpl.RegisterWorkflow(workflowFunc)
 }
 
 // RegisterActivity - register a activity function with the framework.
@@ -307,7 +326,7 @@ func RegisterActivity(
 	activityFunc interface{},
 ) error {
 	thImpl := getHostEnvironment()
-	thImpl.RegisterActivity(activityFunc)
+	return thImpl.RegisterActivity(activityFunc)
 }
 
 // NewWorker creates an instance of worker for managing workflow and activity executions.

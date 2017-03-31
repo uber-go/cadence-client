@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"sync"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/uber-go/tally"
-	"sync"
 )
 
 const (
@@ -365,7 +365,7 @@ func (th *hostEnvImpl) validateFnFormat(fnType reflect.Type, isWorkflow bool) er
 			"expected function to return result and error but found %d return values", fnType.NumOut(),
 		)
 	}
-	if !isByteResult(fnType.Out(0)) {
+	if !isValidResultType(fnType.Out(0)) {
 		return fmt.Errorf(
 			"expected function first return value to return []byte but found %d", fnType.Out(0).Kind(),
 		)
@@ -380,10 +380,11 @@ func (th *hostEnvImpl) validateFnFormat(fnType reflect.Type, isWorkflow bool) er
 
 // To hold the host registration details.
 var thImpl *hostEnvImpl
+
 func getHostEnvironment() hostEnv {
 	if thImpl == nil {
 		thImpl = &hostEnvImpl{
-			workerFuncMap: make(map[string]interface{}),
+			workerFuncMap:   make(map[string]interface{}),
 			activityFuncMap: make(map[string]interface{}),
 		}
 	}
@@ -513,9 +514,8 @@ func isWorkflowContext(inType reflect.Type) bool {
 	return inType.Implements(contextElem)
 }
 
-func isByteResult(inType reflect.Type) bool {
-	contextElem := reflect.TypeOf([]byte(nil)).Elem()
-	return inType.Implements(contextElem)
+func isValidResultType(inType reflect.Type) bool {
+	return inType == reflect.TypeOf([]byte(nil))
 }
 
 func isError(inType reflect.Type) bool {

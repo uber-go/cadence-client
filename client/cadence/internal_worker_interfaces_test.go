@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"testing"
 
-	m "github.com/uber-go/cadence-client/.gen/go/shared"
-	"github.com/uber-go/cadence-client/mocks"
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-common/bark"
+	m "github.com/uber-go/cadence-client/.gen/go/shared"
+	"github.com/uber-go/cadence-client/mocks"
 )
 
 var (
@@ -50,7 +50,7 @@ func (wf helloWorldWorkflow) Close() {
 
 func (wf helloWorldWorkflow) Execute(env workflowEnvironment, input []byte) {
 	activityName := "Greeter_Activity"
-	activityParameters := ExecuteActivityParameters{
+	activityParameters := executeActivityParameters{
 		TaskListName: "taskList",
 		ActivityType: ActivityType{activityName},
 		Input:        nil,
@@ -137,7 +137,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 		ExecutionStartToCloseTimeoutSeconds:    10,
 		DecisionTaskStartToCloseTimeoutSeconds: 10,
 	}
-	workflowClient := NewWorkflowClient(service, nil)
+	workflowClient := NewWorkflowClient(service, nil, "")
 	wfExecution, err := workflowClient.StartWorkflowExecution(workflowOptions)
 	s.NoError(err)
 	fmt.Printf("Started workflow: %v \n", wfExecution)

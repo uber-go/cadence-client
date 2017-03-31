@@ -1,8 +1,13 @@
 package cadence
 
 import (
+	"errors"
 	"fmt"
 	"time"
+)
+
+var (
+	errActivityParamsBadRequest = errors.New("missing activity parameters through context, check ActivityOptions")
 )
 
 // Channel must be used instead of native go channel by workflow code.
@@ -112,28 +117,33 @@ type Workflow interface {
 	Execute(ctx Context, input []byte) (result []byte, err error)
 }
 
-// ExecuteActivityParameters configuration parameters for scheduling an activity
-type ExecuteActivityParameters struct {
-	ActivityID                    *string // Users can choose IDs but our framework makes it optional to decrease the crust.
-	ActivityType                  ActivityType
-	TaskListName                  string
-	Input                         []byte
-	ScheduleToCloseTimeoutSeconds int32
-	ScheduleToStartTimeoutSeconds int32
-	StartToCloseTimeoutSeconds    int32
-	HeartbeatTimeoutSeconds       int32
-	WaitForCancellation           bool
-}
-
 // ExecuteActivity requests activity execution in the context of a workflow.
+//  - Context can be used to pass the settings for this activity.
+// 	For example: task list that this need to be routed, timeouts that need to be configured.
+//	Use ActivityOptions to pass down the options.
+//			ctx1 := WithActivityOptions(ctx, NewActivityOptions().
+//					WithTaskList("exampleTaskList").
+//					WithScheduleToCloseTimeout(time.Second).
+//					WithScheduleToStartTimeout(time.Second).
+//					WithHeartbeatTimeout(0)
+//			(or)
+//			ctx1 := WithTaskList(ctx, "exampleTaskList")
+//
 //  - If the activity failed to complete then the error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-func ExecuteActivity(ctx Context, parameters ExecuteActivityParameters) (result []byte, err error) {
+func ExecuteActivity(ctx Context, activityType ActivityType, input []byte) (result []byte, err error) {
+	parameters, err := getValidatedActivityOptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	parameters.ActivityType = activityType
+	parameters.Input = input
+
 	channelName := fmt.Sprintf("\"activity %v\"", parameters.ActivityID)
 	resultChannel := NewNamedBufferedChannel(ctx, channelName, 1)
-	a := getWorkflowEnvironment(ctx).ExecuteActivity(parameters, func(r []byte, e error) {
+	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
 		result = r
 		err = e
 		ok := resultChannel.SendAsync(true)
@@ -155,13 +165,33 @@ func ExecuteActivity(ctx Context, parameters ExecuteActivityParameters) (result 
 }
 
 // ExecuteActivityAsync requests activity execution in the context of a workflow.
+//  - Context can be used to pass the settings for this activity.
+// 	For example: task list that this need to be routed, timeouts that need to be configured.
+//	Use ActivityOptions to pass down the options.
+//			ctx1 := WithActivityOptions(ctx, NewActivityOptions().
+//					WithTaskList("exampleTaskList").
+//					WithScheduleToCloseTimeout(time.Second).
+//					WithScheduleToStartTimeout(time.Second).
+//					WithHeartbeatTimeout(0)
+//			(or)
+//			ctx1 := WithTaskList(ctx, "exampleTaskList")
+//
 //  - If the activity failed to complete then the future get error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-func ExecuteActivityAsync(ctx Context, parameters ExecuteActivityParameters) Future {
+func ExecuteActivityAsync(ctx Context, activityType ActivityType, input []byte) Future {
 	future, settable := NewFuture(ctx)
-	a := getWorkflowEnvironment(ctx).ExecuteActivity(parameters, func(r []byte, e error) {
+	parameters := getActivityOptions(ctx)
+	parameters, err := getValidatedActivityOptions(ctx)
+	if err != nil {
+		settable.Set(nil, err)
+		return future
+	}
+	parameters.ActivityType = activityType
+	parameters.Input = input
+
+	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
 		settable.Set(r, e)
 		executeDispatcher(ctx, getDispatcher(ctx))
 	})
@@ -174,6 +204,52 @@ func ExecuteActivityAsync(ctx Context, parameters ExecuteActivityParameters) Fut
 		}
 	})
 	return future
+}
+
+// ExecuteActivityFn requests activity execution in the context of a workflow with a functor
+// that is registered with RegisterActivity().
+//
+//  - Context can be used to pass the settings for this activity.
+// 	For example: task list that this need to be routed, timeouts that need to be configured.
+//	Use ActivityOptions to pass down the options.
+//			ctx1 := WithActivityOptions(ctx, NewActivityOptions().
+//					WithTaskList("exampleTaskList").
+//					WithScheduleToCloseTimeout(time.Second).
+//					WithScheduleToStartTimeout(time.Second).
+//					WithHeartbeatTimeout(0)
+//			(or)
+//			ctx1 := WithTaskList(ctx, "exampleTaskList")
+//
+//  - If the activity failed to complete then the error would indicate the failure
+// and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
+//  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
+// error ActivityTaskCanceledError.
+func ExecuteActivityFn(ctx Context, activityFn interface{}, input []byte) (result []byte, err error) {
+	fnName := getFunctionName(activityFn)
+	return ExecuteActivity(ctx, ActivityType{Name: fnName}, input)
+}
+
+// ExecuteActivityAsyncFn requests activity execution in the context of a workflow with a functor
+// that is registered with RegisterActivity().
+//
+//  - Context can be used to pass the settings for this activity.
+// 	For example: task list that this need to be routed, timeouts that need to be configured.
+//	Use ActivityOptions to pass down the options.
+//			ctx1 := WithActivityOptions(ctx, NewActivityOptions().
+//					WithTaskList("exampleTaskList").
+//					WithScheduleToCloseTimeout(time.Second).
+//					WithScheduleToStartTimeout(time.Second).
+//					WithHeartbeatTimeout(0)
+//			(or)
+//			ctx1 := WithTaskList(ctx, "exampleTaskList")
+//
+//  - If the activity failed to complete then the future get error would indicate the failure
+// and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
+//  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
+// error ActivityTaskCanceledError.
+func ExecuteActivityAsyncFn(ctx Context, activityFunc interface{}, input []byte) Future {
+	fnName := getFunctionName(activityFunc)
+	return ExecuteActivityAsync(ctx, ActivityType{Name: fnName}, input)
 }
 
 // WorkflowInfo information about currently executing workflow

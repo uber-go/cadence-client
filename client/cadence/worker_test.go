@@ -2,16 +2,18 @@ package cadence
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/uber-common/bark"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
-	"github.com/stretchr/testify/mock"
-	"fmt"
 )
 
 func getLogger() bark.Logger {
@@ -28,9 +30,11 @@ type testReplayWorkflow struct {
 }
 
 func (w testReplayWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	r, err := ExecuteActivity(ctx, ExecuteActivityParameters{
-		ActivityType: ActivityType{Name: "testActivity"},
-		TaskListName: "testTaskList"})
+	ctx = WithTaskList(ctx, "testTaskList")
+	ctx = WithScheduleToStartTimeout(ctx, time.Second)
+	ctx = WithScheduleToCloseTimeout(ctx, time.Second)
+	ctx = WithStartToCloseTimeout(ctx, time.Second)
+	r, err := ExecuteActivity(ctx, ActivityType{Name: "testActivity"}, nil)
 	return r, err
 }
 
@@ -78,7 +82,9 @@ func TestWorkflowReplayer(t *testing.T) {
 
 // testSampleWorkflow
 func sampleWorkflowExecute(ctx Context, input []byte) (result []byte, err error) {
-	ExecuteActivity(ctx, )
+	ExecuteActivityFn(ctx, testActivity1Execute, input)
+	ExecuteActivityFn(ctx, testActivity2Execute, input)
+	return nil, nil
 }
 
 // test activity1
@@ -175,4 +181,46 @@ func TestCreateWorkerForWorkflow(t *testing.T) {
 	err := worker.Start()
 	require.NoError(t, err)
 	worker.Stop()
+}
+
+func TestCompleteActivity(t *testing.T) {
+	mockService := new(mocks.TChanWorkflowService)
+	wfClient := NewWorkflowClient(mockService, nil, "")
+	var completedRequest, canceledRequest, failedRequest interface{}
+	mockService.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			completedRequest = args.Get(1).(*s.RespondActivityTaskCompletedRequest)
+		})
+	mockService.On("RespondActivityTaskCanceled", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			canceledRequest = args.Get(1).(*s.RespondActivityTaskCanceledRequest)
+		})
+	mockService.On("RespondActivityTaskFailed", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			failedRequest = args.Get(1).(*s.RespondActivityTaskFailedRequest)
+		})
+
+	wfClient.CompleteActivity(nil, nil, nil)
+	require.NotNil(t, completedRequest)
+
+	wfClient.CompleteActivity(nil, nil, NewCanceledError())
+	require.NotNil(t, canceledRequest)
+
+	wfClient.CompleteActivity(nil, nil, errors.New(""))
+	require.NotNil(t, failedRequest)
+}
+
+func TestRecordActivityHeartbeat(t *testing.T) {
+	mockService := new(mocks.TChanWorkflowService)
+	wfClient := NewWorkflowClient(mockService, nil, "")
+	var heartbeatRequest *s.RecordActivityTaskHeartbeatRequest
+	cancelRequested := false
+	heartbeatResponse := s.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
+	mockService.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).Return(&heartbeatResponse, nil).
+		Run(func(args mock.Arguments) {
+			heartbeatRequest = args.Get(1).(*s.RecordActivityTaskHeartbeatRequest)
+		})
+
+	wfClient.RecordActivityHeartbeat(nil, nil)
+	require.NotNil(t, heartbeatRequest)
 }

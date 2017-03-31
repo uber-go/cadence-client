@@ -3,9 +3,10 @@ package cadence
 // All code in this file is private to the package.
 
 import (
-	"time"
-	"golang.org/x/net/context"
+	"errors"
 	"github.com/uber-go/cadence-client/common"
+	"golang.org/x/net/context"
+	"time"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -71,6 +72,27 @@ func getActivityOptions(ctx Context) *executeActivityParameters {
 	return eap.(*executeActivityParameters)
 }
 
+func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error) {
+	p := getActivityOptions(ctx)
+	if p == nil {
+		// We need task list as a compulsory parameter. This can be removed after registration
+		return nil, errActivityParamsBadRequest
+	}
+	if p.ScheduleToStartTimeoutSeconds <= 0 {
+		return nil, errors.New("Missing or negative ScheduleToStartTimeoutSeconds")
+	}
+	if p.ScheduleToCloseTimeoutSeconds <= 0 {
+		return nil, errors.New("Missing or negative ScheduleToCloseTimeoutSeconds")
+	}
+	if p.StartToCloseTimeoutSeconds <= 0 {
+		return nil, errors.New("Missing or negative StartToCloseTimeoutSeconds")
+	}
+	if len(p.ActivityType.Name) == 0 {
+		return nil, errors.New("Missing activity name")
+	}
+	return p, nil
+}
+
 func setActivityParametersIfNotExist(ctx Context) Context {
 	if valCtx := getActivityOptions(ctx); valCtx == nil {
 		return WithValue(ctx, activityOptionsContextKey, &executeActivityParameters{})
@@ -133,4 +155,3 @@ func (ab *activityOptions) WithActivityID(activityID string) ActivityOptions {
 	ab.activityID = common.StringPtr(activityID)
 	return ab
 }
-

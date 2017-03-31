@@ -134,10 +134,9 @@ type Workflow interface {
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
 func ExecuteActivity(ctx Context, activityType ActivityType, input []byte) (result []byte, err error) {
-	parameters := getActivityOptions(ctx)
-	if parameters == nil {
-		// We need task list as a compulsory parameter. This can be removed after registration
-		return nil, errActivityParamsBadRequest
+	parameters, err := getValidatedActivityOptions(ctx)
+	if err != nil {
+		return nil, err
 	}
 	parameters.ActivityType = activityType
 	parameters.Input = input
@@ -184,9 +183,9 @@ func ExecuteActivity(ctx Context, activityType ActivityType, input []byte) (resu
 func ExecuteActivityAsync(ctx Context, activityType ActivityType, input []byte) Future {
 	future, settable := NewFuture(ctx)
 	parameters := getActivityOptions(ctx)
-	if parameters == nil {
-		// We need task list as a compulsory parameter. This can be removed after registration
-		settable.Set(nil, errActivityParamsBadRequest)
+	parameters, err := getValidatedActivityOptions(ctx)
+	if err != nil {
+		settable.Set(nil, err)
 		return future
 	}
 	parameters.ActivityType = activityType

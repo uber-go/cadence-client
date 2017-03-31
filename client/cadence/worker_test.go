@@ -83,7 +83,7 @@ func TestWorkflowReplayer(t *testing.T) {
 // testSampleWorkflow
 func sampleWorkflowExecute(ctx Context, input []byte) (result []byte, err error) {
 	ExecuteActivityFn(ctx, testActivity1Execute, input)
-	ExecuteActivityFn(ctx, testActivity2Execute, input)
+	ExecuteActivityFn(ctx, testActivity2Execute, 2, "test", true)
 	return nil, nil
 }
 
@@ -94,7 +94,7 @@ func testActivity1Execute(ctx context.Context, input []byte) ([]byte, error) {
 }
 
 // test activity1
-func testActivity2Execute(ctx context.Context, input []byte) ([]byte, error) {
+func testActivity2Execute(ctx context.Context, arg1 int, arg2 string, arg3 bool) ([]byte, error) {
 	fmt.Println("Executing Activity2")
 	return nil, nil
 }

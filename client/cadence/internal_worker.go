@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"sync"
 
+	"bytes"
+	"encoding/gob"
 	"github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
@@ -278,6 +280,7 @@ type hostEnvImpl struct {
 	sync.Mutex
 	workerFuncMap   map[string]interface{}
 	activityFuncMap map[string]interface{}
+	encoding        gobEncoding
 }
 
 func (th *hostEnvImpl) RegisterWorkflow(wf interface{}) error {
@@ -289,6 +292,10 @@ func (th *hostEnvImpl) RegisterWorkflow(wf interface{}) error {
 	// Check if already registered
 	fnName := getFunctionName(wf)
 	if _, ok := th.getWorkflowFn(fnName); ok {
+		return nil
+	}
+	// Register args with encoding.
+	if err := th.registerEncodingTypes(fnType); err != nil {
 		return nil
 	}
 	th.addWorkflowFn(fnName, wf)
@@ -304,6 +311,10 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	// Check if already registered
 	fnName := getFunctionName(af)
 	if _, ok := th.getActivityFn(fnName); ok {
+		return nil
+	}
+	// Register args with encoding.
+	if err := th.registerEncodingTypes(fnType); err != nil {
 		return nil
 	}
 	th.addActivityFn(fnName, af)
@@ -340,6 +351,22 @@ func (th *hostEnvImpl) getActivityFn(fnName string) (interface{}, bool) {
 	defer th.Unlock()
 	fn, ok := th.activityFuncMap[fnName]
 	return fn, ok
+}
+
+// register all the types with encoder.
+func (th *hostEnvImpl) registerEncodingTypes(fnType reflect.Type) error {
+	for i := 0; i < fnType.NumIn(); i++ {
+		argType := fnType.In(i)
+		// Interfaces cannot be registered, their implementations should be
+		// https://golang.org/pkg/encoding/gob/#Register
+		if argType.Kind() != reflect.Interface {
+			arg := reflect.Zero(argType).Interface()
+			if err := th.encoding.Register(arg); err != nil {
+				return fmt.Errorf("unable to register the message for encoding: %v", err)
+			}
+		}
+	}
+	return nil
 }
 
 // Validate function parameters.
@@ -382,10 +409,12 @@ func (th *hostEnvImpl) validateFnFormat(fnType reflect.Type, isWorkflow bool) er
 var thImpl *hostEnvImpl
 
 func getHostEnvironment() hostEnv {
+	// TODO: Make it singleton.
 	if thImpl == nil {
 		thImpl = &hostEnvImpl{
 			workerFuncMap:   make(map[string]interface{}),
 			activityFuncMap: make(map[string]interface{}),
+			encoding: gobEncoding{},
 		}
 	}
 	return thImpl
@@ -395,6 +424,12 @@ func setHostEnvironment(t *hostEnvImpl) {
 	thImpl = t
 }
 
+// fnSignature represents a function and its arguments
+type fnSignature struct {
+	FnName string
+	Args   []interface{}
+}
+
 // Wrapper to execute workflow functors.
 type workflowExecutor struct {
 	name string
@@ -402,9 +437,20 @@ type workflowExecutor struct {
 }
 
 func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
+	var fs fnSignature
+	if err := thImpl.encoding.Unmarshal(input, &fs); err != nil {
+		return nil, fmt.Errorf(
+			"Unable to decode the workflow input bytes for the functor with error: %v for functor name: %v",
+			err, we.name)
+	}
+
 	targetArgs := []reflect.Value{}
 	targetArgs = append(targetArgs, reflect.ValueOf(ctx))
-	targetArgs = append(targetArgs, reflect.ValueOf(input))
+	for _, arg := range fs.Args {
+		targetArgs = append(targetArgs, reflect.ValueOf(arg))
+	}
+
+	// Invoke the workflow with arguments.
 	fnValue := reflect.ValueOf(we.fn)
 	retValues := fnValue.Call(targetArgs)
 	return retValues[0].Interface().([]byte), retValues[1].Interface().(error)
@@ -420,9 +466,20 @@ func (ae *activityExecutor) ActivityType() ActivityType {
 	return ActivityType{Name: ae.name}
 }
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
+	var fs fnSignature
+	if err := thImpl.encoding.Unmarshal(input, &fs); err != nil {
+		return nil, fmt.Errorf(
+			"Unable to decode the activity input bytes for the functor with error: %v for functor name: %v",
+			err, ae.name)
+	}
+
 	targetArgs := []reflect.Value{}
 	targetArgs = append(targetArgs, reflect.ValueOf(ctx))
-	targetArgs = append(targetArgs, reflect.ValueOf(input))
+	for _, arg := range fs.Args {
+		targetArgs = append(targetArgs, reflect.ValueOf(arg))
+	}
+
+	// Invoke the activity with arguments.
 	fnValue := reflect.ValueOf(ae.fn)
 	retValues := fnValue.Call(targetArgs)
 	return retValues[0].Interface().([]byte), retValues[1].Interface().(error)
@@ -529,4 +586,39 @@ func getFunctionName(i interface{}) string {
 
 func isInterfaceNil(i interface{}) bool {
 	return i == nil || reflect.ValueOf(i).IsNil()
+}
+
+// Encoding is capable of encoding and decoding objects
+type Encoding interface {
+	Marshal(interface{}) ([]byte, error)
+	Unmarshal([]byte, interface{}) error
+}
+
+// gobEncoding encapsulates gob encoding and decoding
+type gobEncoding struct {
+}
+
+// Register implements the Encoding interface
+func (g gobEncoding) Register(obj interface{}) error {
+	gob.Register(obj)
+	return nil
+}
+
+// Marshal encodes an object into bytes
+func (g gobEncoding) Marshal(obj interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(obj); err != nil {
+		return nil, fmt.Errorf("unable to encode with gob: %v", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// Unmarshal decodes a byte array into the passed in object
+func (g gobEncoding) Unmarshal(data []byte, obj interface{}) error {
+	dec := gob.NewDecoder(bytes.NewBuffer(data))
+	if err := dec.Decode(obj); err != nil {
+		return fmt.Errorf("unable to decode with gob: %v", err)
+	}
+	return nil
 }

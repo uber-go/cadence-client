@@ -224,8 +224,13 @@ func ExecuteActivityAsync(ctx Context, activityType ActivityType, input []byte) 
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-func ExecuteActivityFn(ctx Context, activityFn interface{}, input []byte) (result []byte, err error) {
+func ExecuteActivityFn(ctx Context, activityFn interface{}, args ...interface{}) (result []byte, err error) {
 	fnName := getFunctionName(activityFn)
+	s := fnSignature{FnName: fnName, Args: args}
+	input, err := thImpl.encoding.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
 	return ExecuteActivity(ctx, ActivityType{Name: fnName}, input)
 }
 
@@ -247,8 +252,15 @@ func ExecuteActivityFn(ctx Context, activityFn interface{}, input []byte) (resul
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-func ExecuteActivityAsyncFn(ctx Context, activityFunc interface{}, input []byte) Future {
+func ExecuteActivityAsyncFn(ctx Context, activityFunc interface{}, args ...interface{}) Future {
 	fnName := getFunctionName(activityFunc)
+	s := fnSignature{FnName: fnName, Args: args}
+	input, err := thImpl.encoding.Marshal(s)
+	if err != nil {
+		future, settable := NewFuture(ctx)
+		settable.Set(nil, err)
+		return future
+	}
 	return ExecuteActivityAsync(ctx, ActivityType{Name: fnName}, input)
 }
 

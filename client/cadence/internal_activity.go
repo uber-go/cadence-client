@@ -81,13 +81,13 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 		return nil, errActivityParamsBadRequest
 	}
 	if p.ScheduleToStartTimeoutSeconds <= 0 {
-		return nil, errors.New("Missing or negative ScheduleToStartTimeoutSeconds")
+		return nil, errors.New("missing or negative ScheduleToStartTimeoutSeconds")
 	}
 	if p.ScheduleToCloseTimeoutSeconds <= 0 {
-		return nil, errors.New("Missing or negative ScheduleToCloseTimeoutSeconds")
+		return nil, errors.New("missing or negative ScheduleToCloseTimeoutSeconds")
 	}
 	if p.StartToCloseTimeoutSeconds <= 0 {
-		return nil, errors.New("Missing or negative StartToCloseTimeoutSeconds")
+		return nil, errors.New("missing or negative StartToCloseTimeoutSeconds")
 	}
 	return p, nil
 }

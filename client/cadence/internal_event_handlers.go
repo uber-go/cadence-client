@@ -3,12 +3,11 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/uber-common/bark"
-
-	"errors"
 	m "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 )

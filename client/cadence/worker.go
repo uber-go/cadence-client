@@ -109,7 +109,15 @@ func NewWorkflowClient(service m.TChanWorkflowService, metricsScope tally.Scope,
 }
 
 // StartWorkflowExecution starts a workflow execution
-func (wc *WorkflowClient) StartWorkflowExecution(options StartWorkflowOptions) (*WorkflowExecution, error) {
+// The user can use this to start using a functor like.
+// Either by
+//     StartWorkflowExecution(options)
+//      (or)
+//     StartWorkflowExecution(options, workflowExecuteFn, arg1, arg2 ...)
+func (wc *WorkflowClient) StartWorkflowExecution(
+	options StartWorkflowOptions,
+	args ...interface{},
+) (*WorkflowExecution, error) {
 	// Get an identity.
 	identity := options.Identity
 	if identity == "" {
@@ -120,12 +128,30 @@ func (wc *WorkflowClient) StartWorkflowExecution(options StartWorkflowOptions) (
 		workflowID = uuid.NewRandom().String()
 	}
 
+	var workflowType WorkflowType
+	var input []byte
+	var err error
+
+	if len(args) > 0 {
+		if err := validateFunctionArgs(args[0], args[1:]); err != nil {
+			return nil, err
+		}
+		input, err = marshalFunctionArgs(args[0], args[1])
+		if err != nil {
+			return nil, err
+		}
+		workflowType.Name = getFunctionName(args[0])
+	} else {
+		workflowType = options.Type
+		input = options.Input
+	}
+
 	startRequest := &s.StartWorkflowExecutionRequest{
 		RequestId:    common.StringPtr(uuid.New()),
 		WorkflowId:   common.StringPtr(workflowID),
-		WorkflowType: workflowTypePtr(options.Type),
+		WorkflowType: workflowTypePtr(workflowType),
 		TaskList:     common.TaskListPtr(s.TaskList{Name: common.StringPtr(options.TaskList)}),
-		Input:        options.Input,
+		Input:        input,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(options.ExecutionStartToCloseTimeoutSeconds),
 		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(options.DecisionTaskStartToCloseTimeoutSeconds),
 		Identity:                            common.StringPtr(identity)}
@@ -133,7 +159,7 @@ func (wc *WorkflowClient) StartWorkflowExecution(options StartWorkflowOptions) (
 	var response *s.StartWorkflowExecutionResponse
 
 	// Start creating workflow request.
-	err := backoff.Retry(
+	err = backoff.Retry(
 		func() error {
 			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
 			defer cancel()

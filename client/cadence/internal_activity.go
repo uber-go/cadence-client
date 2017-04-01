@@ -8,7 +8,9 @@ import (
 
 	"golang.org/x/net/context"
 
+	"fmt"
 	"github.com/uber-go/cadence-client/common"
+	"reflect"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -90,6 +92,67 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 		return nil, errors.New("missing or negative StartToCloseTimeoutSeconds")
 	}
 	return p, nil
+}
+
+func marshalFunctionArgs(f interface{}, args ...interface{}) ([]byte, error) {
+	fnName := getFunctionName(f)
+	s := fnSignature{FnName: fnName, Args: args}
+	input, err := getHostEnvironment().Encoder().Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return input, nil
+}
+
+func validateFunctionArgs(f interface{}, args ...interface{}) error {
+	fType := reflect.TypeOf(f)
+	if fType.Kind() != reflect.Func {
+		return fmt.Errorf("Provided type: %v is not a function type", f)
+	}
+	fnName := getFunctionName(f)
+	// Validate provided args match with function order match.
+	if fType.NumIn() != len(args) {
+		return fmt.Errorf(
+			"expected %d function: %v args but found %v",
+			fType.NumIn(), fnName, len(args))
+	}
+	for i := 0; i < fType.NumIn(); i++ {
+		argType := reflect.TypeOf(args[i])
+		if !argType.AssignableTo(fType.In(i)) {
+			return fmt.Errorf(
+				"cannot assign function argument: %d from type: %s to type: %s",
+				i+1, argType, fType.In(i),
+			)
+		}
+	}
+
+	return nil
+}
+
+func getValidatedActivityFunction(f interface{}, args ...interface{}) (ActivityType, []byte, error) {
+	var activityType ActivityType
+
+	fType := reflect.TypeOf(f)
+	switch fType.Kind() {
+	case reflect.String:
+		activityType.Name = reflect.ValueOf(f).String()
+
+	case reflect.Func:
+		if err := validateFunctionArgs(f, args); err != nil {
+			return activityType, nil, err
+		}
+		fnName := getFunctionName(f)
+		activityType.Name = fnName
+	default:
+		return activityType, nil, fmt.Errorf(
+			"Invalid type 'f' parameter provided, it can be either functor (or) name of the activity type: %v", f)
+	}
+
+	input, err := marshalFunctionArgs(f, args)
+	if err != nil {
+		return activityType, nil, err
+	}
+	return activityType, input, nil
 }
 
 func setActivityParametersIfNotExist(ctx Context) Context {

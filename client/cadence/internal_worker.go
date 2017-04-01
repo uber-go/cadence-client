@@ -273,6 +273,8 @@ type activityFunc func(ctx context.Context, input []byte) ([]byte, error)
 type hostEnv interface {
 	RegisterWorkflow(wf interface{}) error
 	RegisterActivity(af interface{}) error
+	// TODO: This encoder should be pluggable.
+	Encoder() Encoding
 }
 
 // hostEnvImpl is the implementation of hostEnv
@@ -321,6 +323,10 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	return nil
 }
 
+func (th *hostEnvImpl) Encoder() Encoding {
+	return th.encoding
+}
+
 func (th *hostEnvImpl) addWorkflowFn(fnName string, wf interface{}) {
 	th.Lock()
 	defer th.Unlock()
@@ -361,7 +367,7 @@ func (th *hostEnvImpl) registerEncodingTypes(fnType reflect.Type) error {
 		// https://golang.org/pkg/encoding/gob/#Register
 		if argType.Kind() != reflect.Interface {
 			arg := reflect.Zero(argType).Interface()
-			if err := th.encoding.Register(arg); err != nil {
+			if err := th.Encoder().Register(arg); err != nil {
 				return fmt.Errorf("unable to register the message for encoding: %v", err)
 			}
 		}
@@ -414,8 +420,11 @@ func getHostEnvironment() hostEnv {
 		thImpl = &hostEnvImpl{
 			workerFuncMap:   make(map[string]interface{}),
 			activityFuncMap: make(map[string]interface{}),
-			encoding: gobEncoding{},
+			encoding:        gobEncoding{},
 		}
+		// TODO: Find a better way to register.
+		fn := fnSignature{}
+		thImpl.encoding.Register(fn.Args)
 	}
 	return thImpl
 }
@@ -438,7 +447,7 @@ type workflowExecutor struct {
 
 func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
 	var fs fnSignature
-	if err := thImpl.encoding.Unmarshal(input, &fs); err != nil {
+	if err := getHostEnvironment().Encoder().Unmarshal(input, &fs); err != nil {
 		return nil, fmt.Errorf(
 			"Unable to decode the workflow input bytes for the functor with error: %v for functor name: %v",
 			err, we.name)
@@ -467,7 +476,7 @@ func (ae *activityExecutor) ActivityType() ActivityType {
 }
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
 	var fs fnSignature
-	if err := thImpl.encoding.Unmarshal(input, &fs); err != nil {
+	if err := getHostEnvironment().Encoder().Unmarshal(input, &fs); err != nil {
 		return nil, fmt.Errorf(
 			"Unable to decode the activity input bytes for the functor with error: %v for functor name: %v",
 			err, ae.name)
@@ -590,6 +599,7 @@ func isInterfaceNil(i interface{}) bool {
 
 // Encoding is capable of encoding and decoding objects
 type Encoding interface {
+	Register(obj interface{}) error
 	Marshal(interface{}) ([]byte, error)
 	Unmarshal([]byte, interface{}) error
 }

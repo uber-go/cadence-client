@@ -14,15 +14,16 @@ import (
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
+	"reflect"
 )
 
 func getLogger() bark.Logger {
 	formatter := &log.TextFormatter{}
 	formatter.FullTimestamp = true
-	log.SetFormatter(formatter)
-	log.SetLevel(log.DebugLevel)
-	return bark.NewLoggerFromLogrus(log.New())
-
+	log1 := log.New()
+	log1.Level = log.DebugLevel
+	log1.Formatter = formatter
+	return bark.NewLoggerFromLogrus(log1)
 }
 
 type testReplayWorkflow struct {
@@ -34,7 +35,8 @@ func (w testReplayWorkflow) Execute(ctx Context, input []byte) (result []byte, e
 	ctx = WithScheduleToStartTimeout(ctx, time.Second)
 	ctx = WithScheduleToCloseTimeout(ctx, time.Second)
 	ctx = WithStartToCloseTimeout(ctx, time.Second)
-	r, err := ExecuteActivity(ctx, ActivityType{Name: "testActivity"}, nil)
+	r, err := ExecuteActivity(ctx, "testActivity", []byte("test"))
+	require.NoError(w.t, err, err.Error())
 	return r, err
 }
 
@@ -69,22 +71,22 @@ func TestWorkflowReplayer(t *testing.T) {
 	options := WorkflowReplayerOptions{
 		Execution: WorkflowExecution{ID: "testID", RunID: "testRunID"},
 		Type:      WorkflowType{Name: "testWorkflow"},
-		Factory:   func(workflowType WorkflowType) (Workflow, error) { return testReplayWorkflow{}, nil },
+		Factory:   func(workflowType WorkflowType) (Workflow, error) { return testReplayWorkflow{t: t}, nil },
 		History:   &s.History{Events: testEvents},
 	}
 
 	r := NewWorkflowReplayer(options, logger)
 	err := r.Process(true)
 	require.NoError(t, err)
-	require.NotEmpty(t, r.StackTrace())
+	require.NotEmpty(t, r.StackTrace(), r.StackTrace())
 	require.Contains(t, r.StackTrace(), "cadence.ExecuteActivity")
 }
 
 // testSampleWorkflow
 func sampleWorkflowExecute(ctx Context, input []byte) (result []byte, err error) {
-	ExecuteActivityFn(ctx, testActivity1Execute, input)
-	ExecuteActivityFn(ctx, testActivity2Execute, 2, "test", true)
-	return nil, nil
+	ExecuteActivity(ctx, testActivity1Execute, input)
+	ExecuteActivity(ctx, testActivity2Execute, 2, "test", true)
+	return []byte("Done"), nil
 }
 
 // test activity1
@@ -93,7 +95,7 @@ func testActivity1Execute(ctx context.Context, input []byte) ([]byte, error) {
 	return nil, nil
 }
 
-// test activity1
+// test activity2
 func testActivity2Execute(ctx context.Context, arg1 int, arg2 string, arg3 bool) ([]byte, error) {
 	fmt.Println("Executing Activity2")
 	return nil, nil
@@ -223,4 +225,64 @@ func TestRecordActivityHeartbeat(t *testing.T) {
 
 	wfClient.RecordActivityHeartbeat(nil, nil)
 	require.NotNil(t, heartbeatRequest)
+}
+
+func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string {
+	s := fnSignature{FnName: getFunctionName(f), Args: args}
+	input, err := getHostEnvironment().Encoder().Marshal(s)
+	require.NoError(t, err, err)
+	require.NotNil(t, input)
+
+	var s2 fnSignature
+	err = getHostEnvironment().Encoder().Unmarshal(input, &s2)
+	require.NoError(t, err, err)
+
+	targetArgs := []reflect.Value{}
+	for _, arg := range s2.Args {
+		targetArgs = append(targetArgs, reflect.ValueOf(arg))
+	}
+	fnValue := reflect.ValueOf(f)
+	retValues := fnValue.Call(targetArgs)
+	return retValues[0].Interface().(string)
+}
+
+func testEncodeWithName(t *testing.T, args ...interface{}) {
+	s := fnSignature{FnName: "test", Args: args}
+	input, err := getHostEnvironment().Encoder().Marshal(s)
+	require.NoError(t, err, err)
+	require.NotNil(t, input)
+
+	var s2 fnSignature
+	err = getHostEnvironment().Encoder().Unmarshal(input, &s2)
+	require.NoError(t, err, err)
+
+	require.Equal(t, s.FnName, s2.FnName)
+	require.Equal(t, len(s.Args), len(s2.Args))
+	require.Equal(t, s.Args, s2.Args)
+}
+
+func TestEncoder(t *testing.T) {
+	testEncodeWithName(t, 2, 3)
+	testEncodeWithName(t, nil)
+	testEncodeWithName(t)
+
+	getHostEnvironment().Encoder().Register(new(emptyCtx))
+	// Two param functor.
+	f1 := func(ctx Context, r []byte) string {
+		return "result"
+	}
+	r1 := testEncodeFunction(t, f1, new(emptyCtx), []byte("test"))
+	require.Equal(t, r1, "result")
+	// No parameters.
+	f2 := func() string {
+		return "empty-result"
+	}
+	r2 := testEncodeFunction(t, f2)
+	require.Equal(t, r2, "empty-result")
+	// Nil parameter.
+	f3 := func(r []byte) string {
+		return "nil-result"
+	}
+	r3 := testEncodeFunction(t, f3, []byte(""))
+	require.Equal(t, r3, "nil-result")
 }

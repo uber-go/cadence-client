@@ -56,7 +56,6 @@ type (
 	// StartWorkflowOptions configuration parameters for starting a workflow
 	StartWorkflowOptions struct {
 		ID                                     string
-		Type                                   WorkflowType
 		TaskList                               string
 		Input                                  []byte
 		ExecutionStartToCloseTimeoutSeconds    int32
@@ -111,11 +110,12 @@ func NewWorkflowClient(service m.TChanWorkflowService, metricsScope tally.Scope,
 // StartWorkflowExecution starts a workflow execution
 // The user can use this to start using a functor like.
 // Either by
-//     StartWorkflowExecution(options)
+//     StartWorkflowExecution(options, "workflowTypeName")
 //      (or)
 //     StartWorkflowExecution(options, workflowExecuteFn, arg1, arg2 ...)
 func (wc *WorkflowClient) StartWorkflowExecution(
 	options StartWorkflowOptions,
+	workflowFunc interface{},
 	args ...interface{},
 ) (*WorkflowExecution, error) {
 	// Get an identity.
@@ -128,23 +128,10 @@ func (wc *WorkflowClient) StartWorkflowExecution(
 		workflowID = uuid.NewRandom().String()
 	}
 
-	var workflowType WorkflowType
-	var input []byte
-	var err error
-
-	if len(args) > 0 {
-		if err := validateFunctionArgs(args[0], args[1:]); err != nil {
-			return nil, err
-		}
-		fnName := getFunctionName(args[0])
-		input, err = marshalFunctionArgs(fnName, args[1])
-		if err != nil {
-			return nil, err
-		}
-		workflowType.Name = fnName
-	} else {
-		workflowType = options.Type
-		input = options.Input
+	// Validate type and its arguments.
+	workflowType, input, err := getValidatedWorkerFunction(workflowFunc, args)
+	if err != nil {
+		return nil, err
 	}
 
 	startRequest := &s.StartWorkflowExecutionRequest{

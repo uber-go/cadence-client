@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+	"reflect"
 )
 
 const workflowEnvironmentContextKey = "workflowEnv"
@@ -708,3 +709,30 @@ func (s *selectorImpl) Select(ctx Context) {
 func NewWorkflowDefinition(workflow Workflow) workflowDefinition {
 	return &syncWorkflowDefinition{workflow: workflow}
 }
+
+func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (WorkflowType, []byte, error) {
+	fnName := ""
+	fType := reflect.TypeOf(workflowFunc)
+	switch fType.Kind() {
+	case reflect.String:
+		fnName = reflect.ValueOf(workflowFunc).String()
+
+	case reflect.Func:
+		if err := validateFunctionArgs(workflowFunc, args); err != nil {
+			return WorkflowType{}, nil, err
+		}
+		fnName = getFunctionName(workflowFunc)
+
+	default:
+		return WorkflowType{}, nil, fmt.Errorf(
+			"Invalid type 'workflowFunc' parameter provided, it can be either worker function (or) name of the worker type: %v",
+			workflowFunc)
+	}
+
+	input, err := marshalFunctionArgs(fnName, args)
+	if err != nil {
+		return WorkflowType{}, nil, err
+	}
+	return WorkflowType{Name: fnName}, input, nil
+}
+

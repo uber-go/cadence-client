@@ -103,24 +103,33 @@ func marshalFunctionArgs(fnName string, args ...interface{}) ([]byte, error) {
 	return input, nil
 }
 
-func validateFunctionArgs(f interface{}, args ...interface{}) error {
+func validateFunctionArgs(f interface{}, args []interface{}) error {
 	fType := reflect.TypeOf(f)
 	if fType.Kind() != reflect.Func {
 		return fmt.Errorf("Provided type: %v is not a function type", f)
 	}
 	fnName := getFunctionName(f)
-	// Validate provided args match with function order match.
-	if fType.NumIn() != len(args) {
-		return fmt.Errorf(
-			"expected %d function: %v args but found %v",
-			fType.NumIn(), fnName, len(args))
+
+	fnArgIndex := 0
+	// Skip Context function argument.
+	if fType.NumIn() > 0 && (isWorkflowContext(fType.In(0)) || isActivityContext(fType.In(0))) {
+		fnArgIndex++
 	}
-	for i := 0; i < fType.NumIn(); i++ {
+
+	// Validate provided args match with function order match.
+	if fType.NumIn()-fnArgIndex != len(args) {
+		return fmt.Errorf(
+			"expected %d args for function: %v but found %v",
+			fType.NumIn()-fnArgIndex, fnName, len(args))
+	}
+
+	for i := 0; fnArgIndex < fType.NumIn(); fnArgIndex, i = fnArgIndex+1, i+1 {
+		fnArgType := fType.In(fnArgIndex)
 		argType := reflect.TypeOf(args[i])
-		if !argType.AssignableTo(fType.In(i)) {
+		if !argType.AssignableTo(fnArgType) {
 			return fmt.Errorf(
 				"cannot assign function argument: %d from type: %s to type: %s",
-				i+1, argType, fType.In(i),
+				fnArgIndex+1, argType, fnArgType,
 			)
 		}
 	}
@@ -128,7 +137,7 @@ func validateFunctionArgs(f interface{}, args ...interface{}) error {
 	return nil
 }
 
-func getValidatedActivityFunction(f interface{}, args ...interface{}) (ActivityType, []byte, error) {
+func getValidatedActivityFunction(f interface{}, args []interface{}) (ActivityType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(f)
 	switch fType.Kind() {
@@ -151,6 +160,11 @@ func getValidatedActivityFunction(f interface{}, args ...interface{}) (ActivityT
 		return ActivityType{}, nil, err
 	}
 	return ActivityType{Name: fnName}, input, nil
+}
+
+func isActivityContext(inType reflect.Type) bool {
+	contextElem := reflect.TypeOf((*context.Context)(nil)).Elem()
+	return inType.Implements(contextElem)
 }
 
 func setActivityParametersIfNotExist(ctx Context) Context {

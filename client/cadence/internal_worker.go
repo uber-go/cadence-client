@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	defaultConcurrentPollRoutineSize          = 10
-	defaultMaxConcurrentActivityExecutionSize = 10
-	defaultMaxActivityExecutionRate           = 10
+	defaultConcurrentPollRoutineSize          = 1
+	defaultMaxConcurrentActivityExecutionSize = 10000  // Large execution size(unlimited)
+	defaultMaxActivityExecutionRate           = 100000 // Large execution rate(100K per sec)
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -214,10 +214,11 @@ func (aw *activityWorker) Stop() {
 type workerOptions struct {
 	maxConcurrentActivityExecutionSize int
 	maxActivityExecutionRate           int
-	autoHeartBeatForActivities         bool
-	identity                           string
-	metricsScope                       tally.Scope
-	logger                             bark.Logger
+	// TODO: Move heart beating to per activity options when they are exposed.
+	autoHeartBeatForActivities bool
+	identity                   string
+	metricsScope               tally.Scope
+	logger                     bark.Logger
 }
 
 // newWorkerOptionsImpl creates an instance of worker options with default values.
@@ -392,20 +393,23 @@ func (th *hostEnvImpl) validateFnFormat(fnType reflect.Type, isWorkflow bool) er
 		}
 	}
 
-	// Return values.
-	if fnType.NumOut() != 2 {
+	// Return values
+	// We expect either
+	// 	<result>, error
+	//	(or) just error
+	if fnType.NumOut() < 1 || fnType.NumOut() > 2 {
 		return fmt.Errorf(
 			"expected function to return result and error but found %d return values", fnType.NumOut(),
 		)
 	}
-	if !isValidResultType(fnType.Out(0)) {
+	if fnType.NumOut() > 1 && !isValidResultType(fnType.Out(0)) {
 		return fmt.Errorf(
-			"expected function first return value to return []byte but found %d", fnType.Out(0).Kind(),
+			"expected function first return value to return valid type but found: %v", fnType.Out(0).Kind(),
 		)
 	}
-	if !isError(fnType.Out(1)) {
+	if !isError(fnType.Out(fnType.NumOut() - 1)) {
 		return fmt.Errorf(
-			"expected function second return value to return error but found %d", fnType.Out(1).Kind(),
+			"expected function second return value to return error but found %v", fnType.Out(fnType.NumOut()-1).Kind(),
 		)
 	}
 	return nil
@@ -449,12 +453,12 @@ func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
 	var fs fnSignature
 	if err := getHostEnvironment().Encoder().Unmarshal(input, &fs); err != nil {
 		return nil, fmt.Errorf(
-			"Unable to decode the workflow input bytes for the functor with error: %v for functor name: %v",
+			"Unable to decode the workflow function input bytes with error: %v, function name: %v",
 			err, we.name)
 	}
 
-	targetArgs := []reflect.Value{}
-	targetArgs = append(targetArgs, reflect.ValueOf(ctx))
+	targetArgs := []reflect.Value{reflect.ValueOf(ctx)}
+	// rest of the parameters.
 	for _, arg := range fs.Args {
 		targetArgs = append(targetArgs, reflect.ValueOf(arg))
 	}
@@ -474,16 +478,22 @@ type activityExecutor struct {
 func (ae *activityExecutor) ActivityType() ActivityType {
 	return ActivityType{Name: ae.name}
 }
+
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
 	var fs fnSignature
 	if err := getHostEnvironment().Encoder().Unmarshal(input, &fs); err != nil {
 		return nil, fmt.Errorf(
-			"Unable to decode the activity input bytes for the functor with error: %v for functor name: %v",
+			"Unable to decode the activity function input bytes with error: %v for function name: %v",
 			err, ae.name)
 	}
 
 	targetArgs := []reflect.Value{}
-	targetArgs = append(targetArgs, reflect.ValueOf(ctx))
+	// activities optionally might not take context.
+	fnType := reflect.TypeOf(ae.fn)
+	if fnType.NumIn() > 0 && isActivityContext(fnType.In(0)) {
+		targetArgs = append(targetArgs, reflect.ValueOf(ctx))
+	}
+	// rest of the parameters.
 	for _, arg := range fs.Args {
 		targetArgs = append(targetArgs, reflect.ValueOf(arg))
 	}
@@ -491,6 +501,7 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 	// Invoke the activity with arguments.
 	fnValue := reflect.ValueOf(ae.fn)
 	retValues := fnValue.Call(targetArgs)
+
 	return retValues[0].Interface().([]byte), retValues[1].Interface().(error)
 }
 
@@ -576,12 +587,18 @@ func newAggregatedWorker(
 }
 
 func isWorkflowContext(inType reflect.Type) bool {
-	contextElem := reflect.TypeOf((*Context)(nil)).Elem()
-	return inType.Implements(contextElem)
+	// NOTE: We don't expect any one to derive from workflow context.
+	return inType == reflect.TypeOf((*Context)(nil))
 }
 
 func isValidResultType(inType reflect.Type) bool {
-	return inType == reflect.TypeOf([]byte(nil))
+	// https://golang.org/pkg/reflect/#Kind
+	switch inType.Kind() {
+	case reflect.Func, reflect.Chan, reflect.Ptr, reflect.UnsafePointer:
+		return false
+	}
+
+	return true
 }
 
 func isError(inType reflect.Type) bool {
@@ -632,3 +649,4 @@ func (g gobEncoding) Unmarshal(data []byte, obj interface{}) error {
 	}
 	return nil
 }
+

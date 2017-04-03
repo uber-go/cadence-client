@@ -303,10 +303,12 @@ func getWorkflowDefinitionFactory(factory WorkflowFactory) workflowDefinitionFac
 // 	       (2) Whether to heart beat for activities automatically.
 type WorkerOptions interface {
 	// Optional: To set the maximum concurrent activity executions this host can have.
+	// default: defaultMaxConcurrentActivityExecutionSize(10k)
 	SetMaxConcurrentActivityExecutionSize(size int) WorkerOptions
 	// Optional: Sets the rate limiting on number of activities that can be executed.
 	// This can be used to protect down stream services from flooding.
-	SetActivityExecutionRate(requestPerSecond int) WorkerOptions
+	// default: defaultMaxActivityExecutionRate(100k)
+	SetMaxActivityExecutionRate(requestPerSecond float32) WorkerOptions
 	// Optional: if the activities need auto heart beating for those activities
 	// by the framework
 	SetAutoHeartBeat(auto bool) WorkerOptions
@@ -323,9 +325,12 @@ func NewWorkerOptions() WorkerOptions {
 	return newWorkerOptionsImpl()
 }
 
-// RegisterWorkflow - registers a workflow functor with the framework.
-// You can register more than workflow functor.
-// A workflow takes a cadence context and input and returns a result and an error code.
+// RegisterWorkflow - registers a workflow function with the framework.
+// A workflow takes a cadence context and input and returns a result, an error code (or) just error.
+// Examples:
+//	func sampleWorkflow(ctx cadence.Context, input []byte) (result []byte, err error)
+//	func sampleWorkflow(ctx cadence.Context, int arg1, string arg2) (result []byte, err error)
+//	func sampleWorkflow(ctx cadence.Context) (result []byte, err error)
 func RegisterWorkflow(
 	workflowFunc interface{},
 ) error {
@@ -334,8 +339,13 @@ func RegisterWorkflow(
 }
 
 // RegisterActivity - register a activity function with the framework.
-// You can register more than activity functor.
-// A workflow takes a context and input and returns a result and an error code.
+// A activity takes a context and input and returns a result, error code (or) just error.
+// Examples:
+//	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
+//	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result []byte, err error)
+//	func sampleActivity(ctx context.Context) (err error)
+//	func sampleActivity() (result string, err error)
+//	func sampleActivity(arg1 bool) (result int, err error)
 func RegisterActivity(
 	activityFunc interface{},
 ) error {
@@ -345,7 +355,8 @@ func RegisterActivity(
 
 // NewWorker creates an instance of worker for managing workflow and activity executions.
 // service 	- thrift connection to the cadence server.
-// groupName 	- is the name you use to identify your client worker, where the tasks get dispatched.
+// groupName 	- is the name you use to identify your client worker, also
+// 		  identifies group of workflow and activity implementations that are hosted by a single worker process.
 // options 	-  configure any worker specific options like logger, metrics, identity.
 func NewWorker(
 	service m.TChanWorkflowService,

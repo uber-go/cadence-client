@@ -128,11 +128,13 @@ type Workflow interface {
 //					WithHeartbeatTimeout(0)
 //			(or)
 //			ctx1 := WithTaskList(ctx, "exampleTaskList")
-//
+//  - f - Either a function name (or) a function that is getting scheduled.
+//  - args - The arguments that need to be passed to the function represented by 'f'.
 //  - If the activity failed to complete then the error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
+// - result - Result the activity returns it can be strongly typed.
 func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result interface{}, err error) {
 	// Validate type and its arguments.
 	activityType, input, err := getValidatedActivityFunction(f, args)
@@ -184,11 +186,13 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result in
 //					WithHeartbeatTimeout(0)
 //			(or)
 //			ctx1 := WithTaskList(ctx, "exampleTaskList")
-//
+//  - f - Either a function name (or) a function that is getting scheduled.
+//  - args - The arguments that need to be passed to the function represented by 'f'.
 //  - If the activity failed to complete then the future get error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
+// - result - Result the activity returns it can be strongly typed.
 func ExecuteActivityAsync(ctx Context, f interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.
 	future, settable := NewFuture(ctx)

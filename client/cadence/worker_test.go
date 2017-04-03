@@ -147,7 +147,7 @@ func TestCreateWorkersForManagingMultipleActivities(t *testing.T) {
 	RegisterActivity(testActivityMultipleArgs)
 
 	// Configure worker options.
-	workerOptions := NewWorkerOptions().SetLogger(logger).SetActivityExecutionRate(20)
+	workerOptions := NewWorkerOptions().SetLogger(logger).SetMaxActivityExecutionRate(20)
 
 	// Start Worker.
 	worker := NewWorker(

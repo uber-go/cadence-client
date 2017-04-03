@@ -213,7 +213,7 @@ func (aw *activityWorker) Stop() {
 // and activities and if they need any rate limiting.
 type workerOptions struct {
 	maxConcurrentActivityExecutionSize int
-	maxActivityExecutionRate           int
+	maxActivityExecutionRate           float32
 	// TODO: Move heart beating to per activity options when they are exposed.
 	autoHeartBeatForActivities bool
 	identity                   string
@@ -237,9 +237,9 @@ func (wo *workerOptions) SetMaxConcurrentActivityExecutionSize(size int) WorkerO
 	return wo
 }
 
-// SetActivityExecutionRate sets the rate limiting on number of activities that can be executed.
-func (wo *workerOptions) SetActivityExecutionRate(size int) WorkerOptions {
-	wo.maxActivityExecutionRate = size
+// SetMaxActivityExecutionRate sets the rate limiting on number of activities that can be executed.
+func (wo *workerOptions) SetMaxActivityExecutionRate(requestPerSecond float32) WorkerOptions {
+	wo.maxActivityExecutionRate = requestPerSecond
 	return wo
 }
 

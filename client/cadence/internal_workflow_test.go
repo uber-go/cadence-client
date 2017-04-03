@@ -78,12 +78,12 @@ func (w *helloWorldActivityWorkflow) Execute(ctx Context, input []byte) (result 
 		WithStartToCloseTimeout(5 * time.Second).
 		WithScheduleToCloseTimeout(10 * time.Second))
 	ctx1 := WithActivityOptions(ctx, NewActivityOptions().(*activityOptions).WithActivityID("id1"))
-	result, err = ExecuteActivity(ctx1, "testAct", input)
+	r1, err := ExecuteActivity(ctx1, "testAct", input)
 	if err != nil {
 		fmt.Printf("Error: %v \n", err.Error())
 	}
 	require.NoError(w.t, err)
-	return []byte(string(result)), nil
+	return r1.([]byte), nil
 }
 
 type resultHandlerMatcher struct {
@@ -131,7 +131,7 @@ type splitJoinActivityWorkflow struct {
 }
 
 func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	var result1, result2 []byte
+	var result1, result2 interface{}
 	var err1, err2 error
 
 	ctx = WithActivityOptions(ctx, NewActivityOptions().
@@ -168,7 +168,7 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	require.NoError(w.t, err1)
 	require.NoError(w.t, err2)
 
-	return []byte(string(result1) + string(result2)), nil
+	return []byte(string(result1.([]byte)) + string(result2.([]byte))), nil
 }
 
 func TestSplitJoinActivityWorkflow(t *testing.T) {
@@ -348,7 +348,7 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 	ctx1 = WithActivityOptions(ctx1, NewActivityOptions().(*activityOptions).WithActivityID("id1"))
 	res1, err1 := ExecuteActivity(ctx1, "testAct")
 	require.NoError(w.t, err1, err1)
-	require.Equal(w.t, string(res1), "test")
+	require.Equal(w.t, string(res1.([]byte)), "test")
 
 	// Async Cancellation (Callback completes before cancel)
 	ctx2, c2 := WithCancel(ctx)
@@ -448,7 +448,7 @@ func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, er
 	}
 
 	// Say Greeting.
-	request := &sayGreetingActivityRequest{Name: string(nameResult), Greeting: string(greetResult)}
+	request := &sayGreetingActivityRequest{Name: string(nameResult.([]byte)), Greeting: string(greetResult.([]byte))}
 	sayGreetInput, err := json.Marshal(request)
 	if err != nil {
 		panic(fmt.Sprintf("Marshalling failed with error: %+v", err))

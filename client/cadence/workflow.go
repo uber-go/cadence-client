@@ -133,7 +133,7 @@ type Workflow interface {
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result []byte, err error) {
+func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result interface{}, err error) {
 	// Validate type and its arguments.
 	activityType, input, err := getValidatedActivityFunction(f, args)
 	if err != nil {
@@ -150,7 +150,10 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result []
 	channelName := fmt.Sprintf("\"activity %v\"", parameters.ActivityID)
 	resultChannel := NewNamedBufferedChannel(ctx, channelName, 1)
 	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
-		result = r
+		var serializeErr error
+		if result, serializeErr = deSerializeFunctionResult(f, r); serializeErr != nil {
+			e = serializeErr
+		}
 		err = e
 		ok := resultChannel.SendAsync(true)
 		if !ok {
@@ -205,7 +208,11 @@ func ExecuteActivityAsync(ctx Context, f interface{}, args ...interface{}) Futur
 	parameters.Input = input
 
 	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
-		settable.Set(r, e)
+		result, serializeErr := deSerializeFunctionResult(f, r)
+		if serializeErr != nil {
+			e = serializeErr
+		}
+		settable.Set(result, e)
 		executeDispatcher(ctx, getDispatcher(ctx))
 	})
 	Go(ctx, func(ctx Context) {

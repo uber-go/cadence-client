@@ -443,7 +443,7 @@ type fnSignature struct {
 	Args   []interface{}
 }
 
-// Wrapper to execute workflow functors.
+// Wrapper to execute workflow functions.
 type workflowExecutor struct {
 	name string
 	fn   interface{}
@@ -466,10 +466,10 @@ func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
 	// Invoke the workflow with arguments.
 	fnValue := reflect.ValueOf(we.fn)
 	retValues := fnValue.Call(targetArgs)
-	return retValues[0].Interface().([]byte), retValues[1].Interface().(error)
+	return validateFunctionAndGetResults(we.fn, retValues)
 }
 
-// Wrapper to execute activity functors.
+// Wrapper to execute activity functions.
 type activityExecutor struct {
 	name string
 	fn   interface{}
@@ -501,8 +501,7 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 	// Invoke the activity with arguments.
 	fnValue := reflect.ValueOf(ae.fn)
 	retValues := fnValue.Call(targetArgs)
-
-	return retValues[0].Interface().([]byte), retValues[1].Interface().(error)
+	return validateFunctionAndGetResults(ae.fn, retValues)
 }
 
 // aggregatedWorker combines management of both workflowWorker and activityWorker worker lifecycle.
@@ -519,6 +518,8 @@ func (aw *aggregatedWorker) Start() error {
 	}
 	if !isInterfaceNil(aw.activityWorker) {
 		if err := aw.activityWorker.Start(); err != nil {
+			// stop workflow worker.
+			aw.workflowWorker.Stop()
 			return err
 		}
 	}
@@ -649,4 +650,3 @@ func (g gobEncoding) Unmarshal(data []byte, obj interface{}) error {
 	}
 	return nil
 }
-

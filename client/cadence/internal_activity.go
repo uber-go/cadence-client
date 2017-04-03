@@ -167,6 +167,62 @@ func isActivityContext(inType reflect.Type) bool {
 	return inType.Implements(contextElem)
 }
 
+type fnReturnSignature struct {
+	Ret interface{}
+}
+
+func validateFunctionAndGetResults(f interface{}, values []reflect.Value) (result []byte, err error) {
+	fnName := getFunctionName(f)
+	resultSize := len(values)
+
+	if resultSize < 1 || resultSize > 2 {
+		return nil, fmt.Errorf(
+			"The function: %v execution returned %d results where as it is expecting to return either error (or) result, error",
+			fnName, resultSize)
+	}
+	result = nil
+	err = nil
+
+	// Parse result
+	if resultSize > 1 {
+		r := values[0].Interface()
+		if err := getHostEnvironment().Encoder().Register(r); err != nil {
+			return nil, err
+		}
+		fr := fnReturnSignature{Ret: r}
+		result, err = getHostEnvironment().Encoder().Marshal(fr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Parse error.
+	if v, ok := values[resultSize-1].Interface().(error); ok {
+		err = v
+	}
+	return result, err
+}
+
+func deSerializeFunctionResult(f interface{}, result []byte) (interface{}, error) {
+	fnType := reflect.TypeOf(f)
+
+	switch fnType.Kind() {
+	case reflect.Func:
+		// We already validated that it either have (result, error) (or) just error.
+		if fnType.NumOut() <= 1 {
+			return nil, nil
+		} else if fnType.NumOut() == 2 {
+			var fr fnReturnSignature
+			if err := getHostEnvironment().Encoder().Unmarshal(result, &fr); err != nil {
+				return nil, err
+			}
+			return fr.Ret, nil
+		}
+	}
+	// For everything we return result.
+	return result, nil
+}
+
 func setActivityParametersIfNotExist(ctx Context) Context {
 	if valCtx := getActivityOptions(ctx); valCtx == nil {
 		return WithValue(ctx, activityOptionsContextKey, &executeActivityParameters{})

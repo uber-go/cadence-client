@@ -15,6 +15,7 @@ import (
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
 	"reflect"
+	"strings"
 )
 
 func getLogger() bark.Logger {
@@ -37,7 +38,7 @@ func (w testReplayWorkflow) Execute(ctx Context, input []byte) (result []byte, e
 	ctx = WithStartToCloseTimeout(ctx, time.Second)
 	r, err := ExecuteActivity(ctx, "testActivity", []byte("test"))
 	require.NoError(w.t, err, err.Error())
-	return r, err
+	return r.([]byte), err
 }
 
 type testActivity struct {
@@ -318,6 +319,18 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	_, err = ExecuteActivity(ctx, testActivityNoArgsAndNoResult)
 	require.NoError(w.t, err, err)
 
+	r, err := ExecuteActivity(ctx, testActivityReturnByteArray)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, []byte("testActivity"), r.([]byte))
+
+	rInt, err := ExecuteActivity(ctx, testActivityReturnInt)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, 5, rInt.(int))
+
+	rString, err := ExecuteActivity(ctx, testActivityReturnString)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, "testActivity", rString.(string))
+
 	// By names.
 	_, err = ExecuteActivity(ctx, "testActivityByteArgs", input)
 	require.NoError(w.t, err, err)
@@ -360,6 +373,21 @@ func testActivityNoArgsAndNoResult() {
 	return
 }
 
+// test testActivityReturnByteArray
+func testActivityReturnByteArray() ([]byte, error) {
+	return []byte("testActivity"), nil
+}
+
+// testActivityReturnInt
+func testActivityReturnInt() (int, error) {
+	return 5, nil
+}
+
+// testActivityReturnString
+func testActivityReturnString() (string, error) {
+	return "testActivity", nil
+}
+
 func TestVariousActivitySchedulingOption(t *testing.T) {
 	w := NewWorkflowDefinition(&activitiesCallingOptionsWorkflow{t:t})
 	ctx := &MockWorkflowEnvironment{}
@@ -368,9 +396,20 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 	cbProcessor := newAsyncTestCallbackProcessor()
 
 	ctx.On("ExecuteActivity", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		params := args.Get(0).(executeActivityParameters)
+		var r []byte
+		if strings.Contains(params.ActivityType.Name, "testActivityReturnByteArray") {
+			r = testGetEncodedeResult([]byte("testActivity"))
+		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnInt"){
+			r = testGetEncodedeResult(5)
+		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnString"){
+			r = testGetEncodedeResult("testActivity")
+		} else {
+			r = testGetEncodedeResult([]byte("test"))
+		}
 		callback := args.Get(1).(resultHandler)
-		cbProcessor.Add(callback, []byte("test"), nil)
-	}).Times(12)
+		cbProcessor.Add(callback, r, nil)
+	}).Times(15)
 
 	ctx.On("Complete", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
 		if args.Get(1) != nil {
@@ -385,4 +424,16 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 	c := cbProcessor.ProcessOrWait(workflowComplete)
 	require.True(t, c, "Workflow failed to complete")
 	ctx.AssertExpectations(t)
+}
+
+func testGetEncodedeResult(r interface{}) []byte {
+	if err := getHostEnvironment().Encoder().Register(r); err != nil {
+		panic("Failed to register")
+	}
+	fr := fnReturnSignature{Ret: r}
+	result, err := getHostEnvironment().Encoder().Marshal(fr)
+	if err != nil {
+		panic("Failed to Marshal")
+	}
+	return result
 }

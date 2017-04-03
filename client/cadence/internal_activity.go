@@ -94,8 +94,7 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 	return p, nil
 }
 
-func marshalFunctionArgs(f interface{}, args ...interface{}) ([]byte, error) {
-	fnName := getFunctionName(f)
+func marshalFunctionArgs(fnName string, args ...interface{}) ([]byte, error) {
 	s := fnSignature{FnName: fnName, Args: args}
 	input, err := getHostEnvironment().Encoder().Marshal(s)
 	if err != nil {
@@ -130,29 +129,28 @@ func validateFunctionArgs(f interface{}, args ...interface{}) error {
 }
 
 func getValidatedActivityFunction(f interface{}, args ...interface{}) (ActivityType, []byte, error) {
-	var activityType ActivityType
-
+	fnName := ""
 	fType := reflect.TypeOf(f)
 	switch fType.Kind() {
 	case reflect.String:
-		activityType.Name = reflect.ValueOf(f).String()
+		fnName = reflect.ValueOf(f).String()
 
 	case reflect.Func:
 		if err := validateFunctionArgs(f, args); err != nil {
-			return activityType, nil, err
+			return ActivityType{}, nil, err
 		}
-		fnName := getFunctionName(f)
-		activityType.Name = fnName
+		fnName = getFunctionName(f)
+
 	default:
-		return activityType, nil, fmt.Errorf(
-			"Invalid type 'f' parameter provided, it can be either functor (or) name of the activity type: %v", f)
+		return ActivityType{}, nil, fmt.Errorf(
+			"Invalid type 'f' parameter provided, it can be either activity function (or) name of the activity: %v", f)
 	}
 
-	input, err := marshalFunctionArgs(f, args)
+	input, err := marshalFunctionArgs(fnName, args)
 	if err != nil {
-		return activityType, nil, err
+		return ActivityType{}, nil, err
 	}
-	return activityType, input, nil
+	return ActivityType{Name: fnName}, input, nil
 }
 
 func setActivityParametersIfNotExist(ctx Context) Context {

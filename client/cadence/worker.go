@@ -136,11 +136,12 @@ func (wc *WorkflowClient) StartWorkflowExecution(
 		if err := validateFunctionArgs(args[0], args[1:]); err != nil {
 			return nil, err
 		}
-		input, err = marshalFunctionArgs(args[0], args[1])
+		fnName := getFunctionName(args[0])
+		input, err = marshalFunctionArgs(fnName, args[1])
 		if err != nil {
 			return nil, err
 		}
-		workflowType.Name = getFunctionName(args[0])
+		workflowType.Name = fnName
 	} else {
 		workflowType = options.Type
 		input = options.Input

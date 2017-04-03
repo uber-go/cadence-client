@@ -84,19 +84,19 @@ func TestWorkflowReplayer(t *testing.T) {
 
 // testSampleWorkflow
 func sampleWorkflowExecute(ctx Context, input []byte) (result []byte, err error) {
-	ExecuteActivity(ctx, testActivity1Execute, input)
-	ExecuteActivity(ctx, testActivity2Execute, 2, "test", true)
+	ExecuteActivity(ctx, testActivityByteArgs, input)
+	ExecuteActivity(ctx, testActivityMultipleArgs, 2, "test", true)
 	return []byte("Done"), nil
 }
 
 // test activity1
-func testActivity1Execute(ctx context.Context, input []byte) ([]byte, error) {
+func testActivityByteArgs(ctx context.Context, input []byte) ([]byte, error) {
 	fmt.Println("Executing Activity1")
 	return nil, nil
 }
 
-// test activity2
-func testActivity2Execute(ctx context.Context, arg1 int, arg2 string, arg3 bool) ([]byte, error) {
+// test testActivityMultipleArgs
+func testActivityMultipleArgs(ctx context.Context, arg1 int, arg2 string, arg3 bool) ([]byte, error) {
 	fmt.Println("Executing Activity2")
 	return nil, nil
 }
@@ -114,9 +114,9 @@ func TestCreateWorkersForSingleWorkflowAndActivity(t *testing.T) {
 
 	// Simulate initialization
 	RegisterWorkflow(sampleWorkflowExecute)
-	RegisterActivity(testActivity1Execute)
+	RegisterActivity(testActivityByteArgs)
 
-	// Configure task lists and worker
+	// Configure worker options.
 	workerOptions := NewWorkerOptions().SetLogger(logger)
 
 	// Start Worker.
@@ -142,10 +142,10 @@ func TestCreateWorkersForManagingMultipleActivities(t *testing.T) {
 
 	// Simulate initialization
 	RegisterWorkflow(sampleWorkflowExecute)
-	RegisterActivity(testActivity1Execute)
-	RegisterActivity(testActivity2Execute)
+	RegisterActivity(testActivityByteArgs)
+	RegisterActivity(testActivityMultipleArgs)
 
-	// Configure task lists and worker
+	// Configure worker options.
 	workerOptions := NewWorkerOptions().SetLogger(logger).SetActivityExecutionRate(20)
 
 	// Start Worker.
@@ -285,4 +285,104 @@ func TestEncoder(t *testing.T) {
 	}
 	r3 := testEncodeFunction(t, f3, []byte(""))
 	require.Equal(t, r3, "nil-result")
+}
+
+type activitiesCallingOptionsWorkflow struct{
+	t *testing.T
+}
+
+func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
+	ctx = WithActivityOptions(ctx, NewActivityOptions().
+		WithTaskList("exampleTaskList").
+		WithScheduleToStartTimeout(10 * time.Second).
+		WithStartToCloseTimeout(5 * time.Second).
+		WithScheduleToCloseTimeout(10*time.Second))
+
+	// By functions.
+	_, err = ExecuteActivity(ctx, testActivityByteArgs, input)
+	fmt.Printf("activitiesCallingOptionsWorkflow: %v \n", err)
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, testActivityMultipleArgs, 2, "test", true)
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, testActivityNoResult, 2, "test")
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, testActivityNoContextArg, 2, "test")
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, testActivityNoError, 2, "test")
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, testActivityNoArgsAndNoResult)
+	require.NoError(w.t, err, err)
+
+	// By names.
+	_, err = ExecuteActivity(ctx, "testActivityByteArgs", input)
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, "testActivityMultipleArgs", 2, "test", true)
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, "testActivityNoResult", 2, "test")
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, "testActivityNoContextArg", 2, "test")
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, "testActivityNoError", 2, "test")
+	require.NoError(w.t, err, err)
+
+	_, err = ExecuteActivity(ctx, "testActivityNoArgsAndNoResult")
+	require.NoError(w.t, err, err)
+
+	return []byte("Done"), nil
+}
+
+// test testActivityNoResult
+func testActivityNoResult(ctx context.Context, arg1 int, arg2 string) (error) {
+	return nil
+}
+
+// test testActivityNoContextArg
+func testActivityNoContextArg(arg1 int, arg2 string) (error) {
+	return nil
+}
+
+// test testActivityNoError
+func testActivityNoError(arg1 int, arg2 string) {
+	return
+}
+
+// test testActivityNoError
+func testActivityNoArgsAndNoResult() {
+	return
+}
+
+func TestVariousActivitySchedulingOption(t *testing.T) {
+	w := NewWorkflowDefinition(&activitiesCallingOptionsWorkflow{t:t})
+	ctx := &MockWorkflowEnvironment{}
+	workflowComplete := make(chan struct{}, 1)
+
+	cbProcessor := newAsyncTestCallbackProcessor()
+
+	ctx.On("ExecuteActivity", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		callback := args.Get(1).(resultHandler)
+		cbProcessor.Add(callback, []byte("test"), nil)
+	}).Times(12)
+
+	ctx.On("Complete", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
+		if args.Get(1) != nil {
+			err := args.Get(1).(Error)
+			fmt.Printf("Error: %v, Stack: %v \n", err.Reason(), string(err.Details()))
+		}
+		workflowComplete <- struct{}{}
+	}).Once()
+
+	w.Execute(ctx, []byte(""))
+
+	c := cbProcessor.ProcessOrWait(workflowComplete)
+	require.True(t, c, "Workflow failed to complete")
+	ctx.AssertExpectations(t)
 }

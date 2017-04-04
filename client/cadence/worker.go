@@ -305,18 +305,27 @@ type WorkerOptions interface {
 	// Optional: To set the maximum concurrent activity executions this host can have.
 	// default: defaultMaxConcurrentActivityExecutionSize(10k)
 	SetMaxConcurrentActivityExecutionSize(size int) WorkerOptions
+
 	// Optional: Sets the rate limiting on number of activities that can be executed.
 	// This can be used to protect down stream services from flooding.
 	// default: defaultMaxActivityExecutionRate(100k)
 	SetMaxActivityExecutionRate(requestPerSecond float32) WorkerOptions
+
 	// Optional: if the activities need auto heart beating for those activities
 	// by the framework
+	// default: false not to heartbeat.
 	SetAutoHeartBeat(auto bool) WorkerOptions
+
 	// Optional: Sets an identify that can be used to track this host for debugging.
+	// default: default identity that include hostname, groupName and process ID.
 	SetIdentity(identity string) WorkerOptions
+
 	// Optional: Metrics to be reported.
+	// default: no metrics.
 	SetMetrics(metricsScope tally.Scope) WorkerOptions
+
 	// Optional: Logger framework can use to log.
+	// default: default logger provided.
 	SetLogger(logger bark.Logger) WorkerOptions
 }
 
@@ -329,7 +338,7 @@ func NewWorkerOptions() WorkerOptions {
 // A workflow takes a cadence context and input and returns a result, an error code (or) just error.
 // Examples:
 //	func sampleWorkflow(ctx cadence.Context, input []byte) (result []byte, err error)
-//	func sampleWorkflow(ctx cadence.Context, int arg1, string arg2) (result []byte, err error)
+//	func sampleWorkflow(ctx cadence.Context, arg1 int, arg2 string) (result []byte, err error)
 //	func sampleWorkflow(ctx cadence.Context) (result []byte, err error)
 func RegisterWorkflow(
 	workflowFunc interface{},
@@ -346,6 +355,7 @@ func RegisterWorkflow(
 //	func sampleActivity(ctx context.Context) (err error)
 //	func sampleActivity() (result string, err error)
 //	func sampleActivity(arg1 bool) (result int, err error)
+//	func sampleActivity(arg1 bool) (err error)
 func RegisterActivity(
 	activityFunc interface{},
 ) error {

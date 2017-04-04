@@ -598,7 +598,7 @@ func isValidResultType(inType reflect.Type) bool {
 	case reflect.Func, reflect.Chan, reflect.UnsafePointer:
 		return false
 	}
-	
+
 	return true
 }
 

@@ -454,11 +454,22 @@ func testWorkflowReturnInt(ctx Context) (result int, err error) {
 	return 5, nil
 }
 
-func testWorkflowReturnStruct(ctx Context, arg1 int) (result string, err error) {
+func testWorkflowReturnString(ctx Context, arg1 int) (result string, err error) {
 	return "Done", nil
 }
 
-func TestRegisterWorkflowTypes(t *testing.T) {
+type testWorkflowResult struct {
+}
+
+func testWorkflowReturnStruct(ctx Context, arg1 int) (result testWorkflowResult, err error) {
+	return testWorkflowResult{}, nil
+}
+
+func testWorkflowReturnStructPtr(ctx Context, arg1 int) (result *testWorkflowResult, err error) {
+	return &testWorkflowResult{}, nil
+}
+
+func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	err := RegisterWorkflow(testWorkflowSample)
 	require.NoError(t, err)
 	err = RegisterWorkflow(testWorkflowMultipleArgs)
@@ -467,6 +478,10 @@ func TestRegisterWorkflowTypes(t *testing.T) {
 	require.NoError(t, err)
 	err = RegisterWorkflow(testWorkflowReturnInt)
 	require.NoError(t, err)
+	err = RegisterWorkflow(testWorkflowReturnString)
+	require.NoError(t, err)
 	err = RegisterWorkflow(testWorkflowReturnStruct)
+	require.NoError(t, err)
+	err = RegisterWorkflow(testWorkflowReturnStructPtr)
 	require.NoError(t, err)
 }

@@ -126,15 +126,16 @@ type Workflow interface {
 //					WithScheduleToCloseTimeout(time.Second).
 //					WithScheduleToStartTimeout(time.Second).
 //					WithHeartbeatTimeout(0)
-//			(or)
+//			or
 //			ctx1 := WithTaskList(ctx, "exampleTaskList")
-//  - f - Either a function name (or) a function that is getting scheduled.
+//  - f - Either a activity name or a function that is getting scheduled.
 //  - args - The arguments that need to be passed to the function represented by 'f'.
 //  - If the activity failed to complete then the error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-// - result - Result the activity returns it can be strongly typed.
+// - result - Result the activity returns it can be strongly typed, if there is no result the activity returns
+//      then it will be nil, indicating no result.
 func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result interface{}, err error) {
 	// Validate type and its arguments.
 	activityType, input, err := getValidatedActivityFunction(f, args)
@@ -146,7 +147,7 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result in
 	if err != nil {
 		return nil, err
 	}
-	parameters.ActivityType = activityType
+	parameters.ActivityType = *activityType
 	parameters.Input = input
 
 	channelName := fmt.Sprintf("\"activity %v\"", parameters.ActivityID)
@@ -184,15 +185,16 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result in
 //					WithScheduleToCloseTimeout(time.Second).
 //					WithScheduleToStartTimeout(time.Second).
 //					WithHeartbeatTimeout(0)
-//			(or)
+//			or
 //			ctx1 := WithTaskList(ctx, "exampleTaskList")
-//  - f - Either a function name (or) a function that is getting scheduled.
+//  - f - Either a activity name or a function that is getting scheduled.
 //  - args - The arguments that need to be passed to the function represented by 'f'.
 //  - If the activity failed to complete then the future get error would indicate the failure
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-// - result - Result the activity returns it can be strongly typed.
+// - result - Result the activity returns it can be strongly typed, if there is no result the activity returns
+//      then it will be nil, indicating no result.
 func ExecuteActivityAsync(ctx Context, f interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.
 	future, settable := NewFuture(ctx)
@@ -208,7 +210,7 @@ func ExecuteActivityAsync(ctx Context, f interface{}, args ...interface{}) Futur
 		settable.Set(nil, err)
 		return future
 	}
-	parameters.ActivityType = activityType
+	parameters.ActivityType = *activityType
 	parameters.Input = input
 
 	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {

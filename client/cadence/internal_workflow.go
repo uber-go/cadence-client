@@ -710,7 +710,7 @@ func NewWorkflowDefinition(workflow Workflow) workflowDefinition {
 	return &syncWorkflowDefinition{workflow: workflow}
 }
 
-func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (WorkflowType, []byte, error) {
+func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*WorkflowType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(workflowFunc)
 	switch fType.Kind() {
@@ -718,21 +718,21 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (W
 		fnName = reflect.ValueOf(workflowFunc).String()
 
 	case reflect.Func:
-		if err := validateFunctionArgs(workflowFunc, args); err != nil {
-			return WorkflowType{}, nil, err
+		if err := validateFunctionArgs(workflowFunc, args, true); err != nil {
+			return nil, nil, err
 		}
 		fnName = getFunctionName(workflowFunc)
 
 	default:
-		return WorkflowType{}, nil, fmt.Errorf(
-			"Invalid type 'workflowFunc' parameter provided, it can be either worker function (or) name of the worker type: %v",
+		return nil, nil, fmt.Errorf(
+			"Invalid type 'workflowFunc' parameter provided, it can be either worker function or name of the worker type: %v",
 			workflowFunc)
 	}
 
 	input, err := marshalFunctionArgs(fnName, args)
 	if err != nil {
-		return WorkflowType{}, nil, err
+		return nil, nil, err
 	}
-	return WorkflowType{Name: fnName}, input, nil
+	return &WorkflowType{Name: fnName}, input, nil
 }
 

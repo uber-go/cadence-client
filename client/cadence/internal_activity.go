@@ -103,7 +103,7 @@ func marshalFunctionArgs(fnName string, args ...interface{}) ([]byte, error) {
 	return input, nil
 }
 
-func validateFunctionArgs(f interface{}, args []interface{}) error {
+func validateFunctionArgs(f interface{}, args []interface{}, isWorkflow bool) error {
 	fType := reflect.TypeOf(f)
 	if fType.Kind() != reflect.Func {
 		return fmt.Errorf("Provided type: %v is not a function type", f)
@@ -112,8 +112,13 @@ func validateFunctionArgs(f interface{}, args []interface{}) error {
 
 	fnArgIndex := 0
 	// Skip Context function argument.
-	if fType.NumIn() > 0 && (isWorkflowContext(fType.In(0)) || isActivityContext(fType.In(0))) {
-		fnArgIndex++
+	if fType.NumIn() > 0 {
+		if isWorkflow && isWorkflowContext(fType.In(0)) {
+			fnArgIndex++
+		}
+		if !isWorkflow && isActivityContext(fType.In(0)) {
+			fnArgIndex++
+		}
 	}
 
 	// Validate provided args match with function order match.
@@ -137,7 +142,7 @@ func validateFunctionArgs(f interface{}, args []interface{}) error {
 	return nil
 }
 
-func getValidatedActivityFunction(f interface{}, args []interface{}) (ActivityType, []byte, error) {
+func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(f)
 	switch fType.Kind() {
@@ -145,21 +150,21 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (ActivityTy
 		fnName = reflect.ValueOf(f).String()
 
 	case reflect.Func:
-		if err := validateFunctionArgs(f, args); err != nil {
-			return ActivityType{}, nil, err
+		if err := validateFunctionArgs(f, args, false); err != nil {
+			return nil, nil, err
 		}
 		fnName = getFunctionName(f)
 
 	default:
-		return ActivityType{}, nil, fmt.Errorf(
-			"Invalid type 'f' parameter provided, it can be either activity function (or) name of the activity: %v", f)
+		return nil, nil, fmt.Errorf(
+			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
 	}
 
 	input, err := marshalFunctionArgs(fnName, args)
 	if err != nil {
-		return ActivityType{}, nil, err
+		return nil, nil, err
 	}
-	return ActivityType{Name: fnName}, input, nil
+	return &ActivityType{Name: fnName}, input, nil
 }
 
 func isActivityContext(inType reflect.Type) bool {
@@ -171,17 +176,18 @@ type fnReturnSignature struct {
 	Ret interface{}
 }
 
-func validateFunctionAndGetResults(f interface{}, values []reflect.Value) (result []byte, err error) {
+func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byte, error) {
 	fnName := getFunctionName(f)
 	resultSize := len(values)
 
 	if resultSize < 1 || resultSize > 2 {
 		return nil, fmt.Errorf(
-			"The function: %v execution returned %d results where as it is expecting to return either error (or) result, error",
+			"The function: %v signature return %d results, it is expecting to return either error or (result, error)",
 			fnName, resultSize)
 	}
-	result = nil
-	err = nil
+
+	var result []byte
+	var err error
 
 	// Parse result
 	if resultSize > 1 {
@@ -197,10 +203,13 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) (resul
 	}
 
 	// Parse error.
-	if v, ok := values[resultSize-1].Interface().(error); ok {
-		err = v
+	errValue, ok := values[resultSize-1].Interface().(error)
+	if !ok {
+		return nil, fmt.Errorf(
+			"Failed to parse error result as it is not of error interface: %v",
+			values[resultSize-1].Interface())
 	}
-	return result, err
+	return result, errValue
 }
 
 func deSerializeFunctionResult(f interface{}, result []byte) (interface{}, error) {

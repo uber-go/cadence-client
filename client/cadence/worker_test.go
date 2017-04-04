@@ -437,3 +437,36 @@ func testGetEncodedeResult(r interface{}) []byte {
 	}
 	return result
 }
+
+func testWorkflowSample(ctx Context, input []byte) (result []byte, err error) {
+	return nil, nil
+}
+
+func testWorkflowMultipleArgs(ctx Context, arg1 int, arg2 string, arg3 bool) (result []byte, err error) {
+	return nil, nil
+}
+
+func testWorkflowNoArgs(ctx Context) (result []byte, err error) {
+	return nil, nil
+}
+
+func testWorkflowReturnInt(ctx Context) (result int, err error) {
+	return 5, nil
+}
+
+func testWorkflowReturnStruct(ctx Context, arg1 int) (result string, err error) {
+	return "Done", nil
+}
+
+func TestRegisterWorkflowTypes(t *testing.T) {
+	err := RegisterWorkflow(testWorkflowSample)
+	require.NoError(t, err)
+	err = RegisterWorkflow(testWorkflowMultipleArgs)
+	require.NoError(t, err)
+	err = RegisterWorkflow(testWorkflowNoArgs)
+	require.NoError(t, err)
+	err = RegisterWorkflow(testWorkflowReturnInt)
+	require.NoError(t, err)
+	err = RegisterWorkflow(testWorkflowReturnStruct)
+	require.NoError(t, err)
+}

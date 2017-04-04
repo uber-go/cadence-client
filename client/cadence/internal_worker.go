@@ -388,7 +388,7 @@ func (th *hostEnvImpl) validateFnFormat(fnType reflect.Type, isWorkflow bool) er
 				fnType.NumIn(),
 			)
 		}
-		if !isWorkflowContext(fnType) {
+		if !isWorkflowContext(fnType.In(0)) {
 			return fmt.Errorf("expected first argument to be cadence.Context but found %s", fnType.In(0))
 		}
 	}
@@ -399,7 +399,7 @@ func (th *hostEnvImpl) validateFnFormat(fnType reflect.Type, isWorkflow bool) er
 	//	(or) just error
 	if fnType.NumOut() < 1 || fnType.NumOut() > 2 {
 		return fmt.Errorf(
-			"expected function to return result and error but found %d return values", fnType.NumOut(),
+			"expected function to return result, error or just error, but found %d return values", fnType.NumOut(),
 		)
 	}
 	if fnType.NumOut() > 1 && !isValidResultType(fnType.Out(0)) {
@@ -589,16 +589,16 @@ func newAggregatedWorker(
 
 func isWorkflowContext(inType reflect.Type) bool {
 	// NOTE: We don't expect any one to derive from workflow context.
-	return inType == reflect.TypeOf((*Context)(nil))
+	return inType == reflect.TypeOf((*Context)(nil)).Elem()
 }
 
 func isValidResultType(inType reflect.Type) bool {
 	// https://golang.org/pkg/reflect/#Kind
 	switch inType.Kind() {
-	case reflect.Func, reflect.Chan, reflect.Ptr, reflect.UnsafePointer:
+	case reflect.Func, reflect.Chan, reflect.UnsafePointer:
 		return false
 	}
-
+	
 	return true
 }
 

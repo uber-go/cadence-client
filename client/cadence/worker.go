@@ -137,7 +137,7 @@ func (wc *WorkflowClient) StartWorkflowExecution(
 	startRequest := &s.StartWorkflowExecutionRequest{
 		RequestId:    common.StringPtr(uuid.New()),
 		WorkflowId:   common.StringPtr(workflowID),
-		WorkflowType: workflowTypePtr(workflowType),
+		WorkflowType: workflowTypePtr(*workflowType),
 		TaskList:     common.TaskListPtr(s.TaskList{Name: common.StringPtr(options.TaskList)}),
 		Input:        input,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(options.ExecutionStartToCloseTimeoutSeconds),
@@ -335,11 +335,14 @@ func NewWorkerOptions() WorkerOptions {
 }
 
 // RegisterWorkflow - registers a workflow function with the framework.
-// A workflow takes a cadence context and input and returns a result, an error code (or) just error.
+// A workflow takes a cadence context and input and returns a result, an error code or just error.
 // Examples:
 //	func sampleWorkflow(ctx cadence.Context, input []byte) (result []byte, err error)
 //	func sampleWorkflow(ctx cadence.Context, arg1 int, arg2 string) (result []byte, err error)
 //	func sampleWorkflow(ctx cadence.Context) (result []byte, err error)
+//	func sampleWorkflow(ctx cadence.Context, arg1 int) (result string, err error)
+// We support serializing all primitive types, structures, ... except channels, functions, variadic, unsafe pointer.
+// 	we can add support later if needed.
 func RegisterWorkflow(
 	workflowFunc interface{},
 ) error {
@@ -348,14 +351,16 @@ func RegisterWorkflow(
 }
 
 // RegisterActivity - register a activity function with the framework.
-// A activity takes a context and input and returns a result, error code (or) just error.
+// A activity takes a context and input and returns a result, error code or just error.
 // Examples:
 //	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
-//	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result []byte, err error)
+//	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error)
 //	func sampleActivity(ctx context.Context) (err error)
 //	func sampleActivity() (result string, err error)
 //	func sampleActivity(arg1 bool) (result int, err error)
 //	func sampleActivity(arg1 bool) (err error)
+// We support serializing all primitive types, structures, ... except channels, functions, variadic, unsafe pointer.
+// 	we can add support later if needed.
 func RegisterActivity(
 	activityFunc interface{},
 ) error {

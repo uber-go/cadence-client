@@ -134,7 +134,7 @@ type Workflow interface {
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-// - result - Result the activity returns it can be strongly typed, if there is no result the activity returns
+// - result - Result the activity returns, if there is no result the activity returns
 //      then it will be nil, indicating no result.
 func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result interface{}, err error) {
 	// Validate type and its arguments.
@@ -193,7 +193,7 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result in
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-// - result - Result the activity returns it can be strongly typed, if there is no result the activity returns
+// - result - Result the activity returns, if there is no result the activity returns
 //      then it will be nil, indicating no result.
 func ExecuteActivityAsync(ctx Context, f interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.

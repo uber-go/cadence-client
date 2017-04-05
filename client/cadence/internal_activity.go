@@ -182,7 +182,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 
 	if resultSize < 1 || resultSize > 2 {
 		return nil, fmt.Errorf(
-			"The function: %v signature return %d results, it is expecting to return either error or (result, error)",
+			"The function: %v signature returns %d results, it is expecting to return either error or (result, error)",
 			fnName, resultSize)
 	}
 

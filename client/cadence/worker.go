@@ -348,14 +348,13 @@ func NewWorkerOptions() WorkerOptions {
 }
 
 // RegisterWorkflow - registers a workflow function with the framework.
-// A workflow takes a cadence context and input and returns a result, an error code or just error.
+// A workflow takes a cadence context and input and returns a (result, error) or just error.
 // Examples:
 //	func sampleWorkflow(ctx cadence.Context, input []byte) (result []byte, err error)
 //	func sampleWorkflow(ctx cadence.Context, arg1 int, arg2 string) (result []byte, err error)
 //	func sampleWorkflow(ctx cadence.Context) (result []byte, err error)
 //	func sampleWorkflow(ctx cadence.Context, arg1 int) (result string, err error)
-// We support serializing all primitive types, structures, ... except channels, functions, variadic, unsafe pointer.
-// 	we can add support later if needed.
+// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 func RegisterWorkflow(
 	workflowFunc interface{},
 ) error {
@@ -364,7 +363,7 @@ func RegisterWorkflow(
 }
 
 // RegisterActivity - register a activity function with the framework.
-// A activity takes a context and input and returns a result, error code or just error.
+// A activity takes a context and input and returns a (result, error) or just error.
 // Examples:
 //	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
 //	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error)
@@ -372,8 +371,7 @@ func RegisterWorkflow(
 //	func sampleActivity() (result string, err error)
 //	func sampleActivity(arg1 bool) (result int, err error)
 //	func sampleActivity(arg1 bool) (err error)
-// We support serializing all primitive types, structures, ... except channels, functions, variadic, unsafe pointer.
-// 	we can add support later if needed.
+// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 func RegisterActivity(
 	activityFunc interface{},
 ) error {

@@ -57,7 +57,6 @@ type (
 	StartWorkflowOptions struct {
 		ID                                     string
 		TaskList                               string
-		Input                                  []byte
 		ExecutionStartToCloseTimeoutSeconds    int32
 		DecisionTaskStartToCloseTimeoutSeconds int32
 		Identity                               string
@@ -110,9 +109,9 @@ func NewWorkflowClient(service m.TChanWorkflowService, metricsScope tally.Scope,
 // StartWorkflowExecution starts a workflow execution
 // The user can use this to start using a functor like.
 // Either by
-//     StartWorkflowExecution(options, "workflowTypeName")
-//      (or)
-//     StartWorkflowExecution(options, workflowExecuteFn, arg1, arg2 ...)
+//     StartWorkflowExecution(options, "workflowTypeName", input)
+//     or
+//     StartWorkflowExecution(options, workflowExecuteFn, arg1, arg2, arg3)
 func (wc *WorkflowClient) StartWorkflowExecution(
 	options StartWorkflowOptions,
 	workflowFunc interface{},
@@ -210,9 +209,8 @@ func (wc *WorkflowClient) RecordActivityHeartbeat(taskToken, details []byte) err
 // WorkflowReplayerOptions represents options for workflow replayer.
 type WorkflowReplayerOptions struct {
 	Execution WorkflowExecution
-	Type      WorkflowType
-	Factory   WorkflowFactory
 	History   *s.History
+	logger bark.Logger
 }
 
 // WorkflowReplayer replays a given state of workflow execution.
@@ -225,17 +223,24 @@ type WorkflowReplayer struct {
 }
 
 // NewWorkflowReplayer creates an instance of WorkflowReplayer
-func NewWorkflowReplayer(o WorkflowReplayerOptions, logger bark.Logger) *WorkflowReplayer {
+func NewWorkflowReplayer(
+	options WorkflowReplayerOptions,
+	workferFunc interface{},
+) *WorkflowReplayer {
+	fnName := getFunctionName(workferFunc)
+	workflowFactory := func(wt WorkflowType) (Workflow, error) {
+		return &workflowExecutor{name: fnName, fn: workferFunc}, nil
+	}
 	workflowTask := &s.PollForDecisionTaskResponse{
 		TaskToken: []byte("replayer-token"),
-		History:   o.History,
+		History:   options.History,
 		WorkflowExecution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr(o.Execution.ID),
-			RunId:      common.StringPtr(o.Execution.RunID),
+			WorkflowId: common.StringPtr(options.Execution.ID),
+			RunId:      common.StringPtr(options.Execution.RunID),
 		},
-		WorkflowType: &s.WorkflowType{Name: common.StringPtr(o.Type.Name)},
+		WorkflowType: &s.WorkflowType{Name: common.StringPtr(fnName)},
 	}
-	return NewWorkflowReplayerForPoll(workflowTask, o.Factory, logger)
+	return NewWorkflowReplayerForPoll(workflowTask, workflowFactory, options.logger)
 }
 
 // NewWorkflowReplayerForPoll creates an instance of WorkflowReplayer from decision poll response

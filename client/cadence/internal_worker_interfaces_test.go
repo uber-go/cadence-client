@@ -133,7 +133,6 @@ func (s *InterfacesTestSuite) TestInterface() {
 	workflowOptions := StartWorkflowOptions{
 		ID:       "HelloWorld_Workflow",
 		TaskList: "testTaskList",
-		Input:    nil,
 		ExecutionStartToCloseTimeoutSeconds:    10,
 		DecisionTaskStartToCloseTimeoutSeconds: 10,
 	}

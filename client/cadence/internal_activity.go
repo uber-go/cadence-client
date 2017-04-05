@@ -94,7 +94,7 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 	return p, nil
 }
 
-func marshalFunctionArgs(fnName string, args ...interface{}) ([]byte, error) {
+func marshalFunctionArgs(fnName string, args []interface{}) ([]byte, error) {
 	s := fnSignature{FnName: fnName, Args: args}
 	input, err := getHostEnvironment().Encoder().Marshal(s)
 	if err != nil {

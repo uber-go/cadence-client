@@ -27,30 +27,22 @@ func getLogger() bark.Logger {
 	return bark.NewLoggerFromLogrus(log1)
 }
 
-type testReplayWorkflow struct {
-	t *testing.T
+func testReplayWorkflow(ctx Context) error {
+	ctx = WithActivityOptions(ctx, NewActivityOptions().
+		WithTaskList("testTaskList").
+		WithScheduleToStartTimeout(time.Second).
+		WithStartToCloseTimeout(time.Second).
+		WithScheduleToCloseTimeout(time.Second))
+	_, err := ExecuteActivity(ctx, "testActivity")
+	if err != nil {
+		getLogger().Errorf("Activity failed with error: %v", err)
+		panic("Failed workflow")
+	}
+	return err
 }
 
-func (w testReplayWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ctx = WithTaskList(ctx, "testTaskList")
-	ctx = WithScheduleToStartTimeout(ctx, time.Second)
-	ctx = WithScheduleToCloseTimeout(ctx, time.Second)
-	ctx = WithStartToCloseTimeout(ctx, time.Second)
-	r, err := ExecuteActivity(ctx, "testActivity", []byte("test"))
-	require.NoError(w.t, err, err.Error())
-	return r.([]byte), err
-}
-
-type testActivity struct {
-	t *testing.T
-}
-
-func (t testActivity) ActivityType() ActivityType {
-	return ActivityType{Name: "testActivity"}
-}
-
-func (t testActivity) Execute(ctx context.Context, input []byte) ([]byte, error) {
-	return nil, nil
+func testActivity(ctx context.Context) error {
+	return nil
 }
 
 func TestWorkflowReplayer(t *testing.T) {
@@ -59,6 +51,7 @@ func TestWorkflowReplayer(t *testing.T) {
 	testEvents := []*s.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
 			TaskList: &s.TaskList{Name: common.StringPtr(taskList)},
+			Input: testEncodeFunctionArgs(testReplayWorkflow),
 		}),
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
@@ -71,12 +64,11 @@ func TestWorkflowReplayer(t *testing.T) {
 
 	options := WorkflowReplayerOptions{
 		Execution: WorkflowExecution{ID: "testID", RunID: "testRunID"},
-		Type:      WorkflowType{Name: "testWorkflow"},
-		Factory:   func(workflowType WorkflowType) (Workflow, error) { return testReplayWorkflow{t: t}, nil },
 		History:   &s.History{Events: testEvents},
+		logger:    logger,
 	}
 
-	r := NewWorkflowReplayer(options, logger)
+	r := NewWorkflowReplayer(options, testReplayWorkflow)
 	err := r.Process(true)
 	require.NoError(t, err)
 	require.NotEmpty(t, r.StackTrace(), r.StackTrace())
@@ -288,15 +280,15 @@ func TestEncoder(t *testing.T) {
 	require.Equal(t, r3, "nil-result")
 }
 
-type activitiesCallingOptionsWorkflow struct{
+type activitiesCallingOptionsWorkflow struct {
 	t *testing.T
 }
 
 func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	ctx = WithActivityOptions(ctx, NewActivityOptions().
 		WithTaskList("exampleTaskList").
-		WithScheduleToStartTimeout(10 * time.Second).
-		WithStartToCloseTimeout(5 * time.Second).
+		WithScheduleToStartTimeout(10*time.Second).
+		WithStartToCloseTimeout(5*time.Second).
 		WithScheduleToCloseTimeout(10*time.Second))
 
 	// By functions.
@@ -354,12 +346,12 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 }
 
 // test testActivityNoResult
-func testActivityNoResult(ctx context.Context, arg1 int, arg2 string) (error) {
+func testActivityNoResult(ctx context.Context, arg1 int, arg2 string) error {
 	return nil
 }
 
 // test testActivityNoContextArg
-func testActivityNoContextArg(arg1 int, arg2 string) (error) {
+func testActivityNoContextArg(arg1 int, arg2 string) error {
 	return nil
 }
 
@@ -389,7 +381,7 @@ func testActivityReturnString() (string, error) {
 }
 
 func TestVariousActivitySchedulingOption(t *testing.T) {
-	w := NewWorkflowDefinition(&activitiesCallingOptionsWorkflow{t:t})
+	w := NewWorkflowDefinition(&activitiesCallingOptionsWorkflow{t: t})
 	ctx := &MockWorkflowEnvironment{}
 	workflowComplete := make(chan struct{}, 1)
 
@@ -399,13 +391,13 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 		params := args.Get(0).(executeActivityParameters)
 		var r []byte
 		if strings.Contains(params.ActivityType.Name, "testActivityReturnByteArray") {
-			r = testGetEncodedeResult([]byte("testActivity"))
-		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnInt"){
-			r = testGetEncodedeResult(5)
-		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnString"){
-			r = testGetEncodedeResult("testActivity")
+			r = testEncodeFunctionResult([]byte("testActivity"))
+		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnInt") {
+			r = testEncodeFunctionResult(5)
+		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnString") {
+			r = testEncodeFunctionResult("testActivity")
 		} else {
-			r = testGetEncodedeResult([]byte("test"))
+			r = testEncodeFunctionResult([]byte("test"))
 		}
 		callback := args.Get(1).(resultHandler)
 		cbProcessor.Add(callback, r, nil)
@@ -424,18 +416,6 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 	c := cbProcessor.ProcessOrWait(workflowComplete)
 	require.True(t, c, "Workflow failed to complete")
 	ctx.AssertExpectations(t)
-}
-
-func testGetEncodedeResult(r interface{}) []byte {
-	if err := getHostEnvironment().Encoder().Register(r); err != nil {
-		panic("Failed to register")
-	}
-	fr := fnReturnSignature{Ret: r}
-	result, err := getHostEnvironment().Encoder().Marshal(fr)
-	if err != nil {
-		panic("Failed to Marshal")
-	}
-	return result
 }
 
 func testWorkflowSample(ctx Context, input []byte) (result []byte, err error) {
@@ -484,4 +464,35 @@ func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	require.NoError(t, err)
 	err = RegisterWorkflow(testWorkflowReturnStructPtr)
 	require.NoError(t, err)
+}
+
+// Encode function result.
+func testEncodeFunctionResult(r interface{}) []byte {
+	if err := getHostEnvironment().Encoder().Register(r); err != nil {
+		fmt.Println(err)
+		panic("Failed to register")
+	}
+	fr := fnReturnSignature{Ret: r}
+	result, err := getHostEnvironment().Encoder().Marshal(fr)
+	if err != nil {
+		fmt.Println(err)
+		panic("Failed to Marshal")
+	}
+	return result
+}
+
+// Encode function args
+func testEncodeFunctionArgs(workflowFunc interface{}, args ...interface{}) []byte {
+	err := getHostEnvironment().RegisterFnType(reflect.TypeOf(workflowFunc))
+	if err != nil {
+		fmt.Println(err)
+		panic("Failed to register function types")
+	}
+	fnName := getFunctionName(workflowFunc)
+	input, err := marshalFunctionArgs(fnName, args)
+	if err != nil {
+		fmt.Println(err)
+		panic("Failed to encode arguments")
+	}
+	return input
 }

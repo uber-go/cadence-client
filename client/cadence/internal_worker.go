@@ -297,8 +297,9 @@ type activityFunc func(ctx context.Context, input []byte) ([]byte, error)
 type hostEnv interface {
 	RegisterWorkflow(wf interface{}) error
 	RegisterActivity(af interface{}) error
-	// TODO: This encoder should be pluggable.
+	// TODO: (Siva) This encoder should be pluggable.
 	Encoder() Encoding
+	RegisterFnType(fnType reflect.Type) error
 }
 
 // hostEnvImpl is the implementation of hostEnv
@@ -347,8 +348,14 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	return nil
 }
 
+// Get the encoder.
 func (th *hostEnvImpl) Encoder() Encoding {
 	return th.encoding
+}
+
+// Register all function args and return types with encoder.
+func (th *hostEnvImpl) RegisterFnType(fnType reflect.Type) error {
+	return th.registerEncodingTypes(fnType)
 }
 
 func (th *hostEnvImpl) addWorkflowFn(fnName string, wf interface{}) {
@@ -385,6 +392,7 @@ func (th *hostEnvImpl) getActivityFn(fnName string) (interface{}, bool) {
 
 // register all the types with encoder.
 func (th *hostEnvImpl) registerEncodingTypes(fnType reflect.Type) error {
+	// Register arguments.
 	for i := 0; i < fnType.NumIn(); i++ {
 		argType := fnType.In(i)
 		// Interfaces cannot be registered, their implementations should be
@@ -396,6 +404,21 @@ func (th *hostEnvImpl) registerEncodingTypes(fnType reflect.Type) error {
 			}
 		}
 	}
+	// Register return types.
+	// TODO: (Siva) We need register all concrete implementations of error, Either
+	// through pre-registry (or) at the time conversion.
+	for i := 0; i < fnType.NumOut(); i++ {
+		argType := fnType.Out(i)
+		// Interfaces cannot be registered, their implementations should be
+		// https://golang.org/pkg/encoding/gob/#Register
+		if argType.Kind() != reflect.Interface {
+			arg := reflect.Zero(argType).Interface()
+			if err := th.Encoder().Register(arg); err != nil {
+				return fmt.Errorf("unable to register the message for encoding: %v", err)
+			}
+		}
+	}
+
 	return nil
 }
 

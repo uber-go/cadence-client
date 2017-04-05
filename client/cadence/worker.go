@@ -327,11 +327,19 @@ type WorkerOptions interface {
 	// Optional: Logger framework can use to log.
 	// default: default logger provided.
 	SetLogger(logger bark.Logger) WorkerOptions
+
+	// Optional: Disable running workflow workers.
+	// default: false
+	SetDisableWorkflowWorker(disable bool) WorkerOptions
+
+	// Optional: Disable running activity workers.
+	// default: false
+	SetDisableActivityWorker(disable bool) WorkerOptions
 }
 
 // NewWorkerOptions returns an instance of worker options to configure.
 func NewWorkerOptions() WorkerOptions {
-	return newWorkerOptionsImpl()
+	return NewWorkerOptionsInternal(nil)
 }
 
 // RegisterWorkflow - registers a workflow function with the framework.

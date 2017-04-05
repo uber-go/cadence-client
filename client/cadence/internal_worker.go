@@ -15,6 +15,7 @@ import (
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/uber-go/tally"
+	"strconv"
 )
 
 const (
@@ -219,14 +220,18 @@ type workerOptions struct {
 	identity                   string
 	metricsScope               tally.Scope
 	logger                     bark.Logger
+	disableWorkflowWorker      bool
+	disableActivityWorker      bool
+	testTags                   map[string]map[string]string
 }
 
-// newWorkerOptionsImpl creates an instance of worker options with default values.
-func newWorkerOptionsImpl() *workerOptions {
+// NewWorkerOptionsInternal creates an instance of worker options with default values.
+func NewWorkerOptionsInternal(testTags map[string]map[string]string) *workerOptions {
 	return &workerOptions{
 		maxConcurrentActivityExecutionSize: defaultMaxConcurrentActivityExecutionSize,
 		maxActivityExecutionRate:           defaultMaxActivityExecutionRate,
 		autoHeartBeatForActivities:         false,
+		testTags:                           testTags,
 		// Defaults for metrics, identity, logger is filled in by the WorkflowWorker APIs.
 	}
 }
@@ -263,6 +268,24 @@ func (wo *workerOptions) SetMetrics(metricsScope tally.Scope) WorkerOptions {
 // SetLogger sets the logger for the framework.
 func (wo *workerOptions) SetLogger(logger bark.Logger) WorkerOptions {
 	wo.logger = logger
+	return wo
+}
+
+// SetDisableWorkflowWorker disables running workflow workers.
+func (wo *workerOptions) SetDisableWorkflowWorker(disable bool) WorkerOptions {
+	wo.disableWorkflowWorker = disable
+	return wo
+}
+
+// SetDisableActivityWorker disables running activity workers.
+func (wo *workerOptions) SetDisableActivityWorker(disable bool) WorkerOptions {
+	wo.disableActivityWorker = disable
+	return wo
+}
+
+// SetTestTags test tags for worker.
+func (wo *workerOptions) SetTestTags(tags map[string]map[string]string) WorkerOptions {
+	wo.testTags = tags
 	return wo
 }
 
@@ -550,9 +573,11 @@ func newAggregatedWorker(
 		Logger:                    wOptions.logger,
 	}
 
+	processTestTags(wOptions, &workerParams)
+
 	// workflow factory.
 	var workflowWorker Lifecycle
-	if thImpl.lenWorkflowFns() > 0 {
+	if !wOptions.disableWorkflowWorker && thImpl.lenWorkflowFns() > 0 {
 		workflowFactory := func(wt WorkflowType) (Workflow, error) {
 			wf, ok := thImpl.getWorkflowFn(wt.Name)
 			if !ok {
@@ -560,31 +585,57 @@ func newAggregatedWorker(
 			}
 			return &workflowExecutor{name: wt.Name, fn: wf}, nil
 		}
-		workflowWorker = NewWorkflowWorker(
-			workflowFactory,
-			service,
-			workerParams,
-		)
+		if wOptions.testTags != nil && len(wOptions.testTags) > 0 {
+			workflowWorker = NewWorkflowWorkerWithPressurePoints(
+				workflowFactory,
+				service,
+				workerParams,
+				wOptions.testTags,
+			)
+		} else {
+			workflowWorker = NewWorkflowWorker(
+				workflowFactory,
+				service,
+				workerParams,
+			)
+		}
 	}
 
 	// activity types.
 	var activityWorker Lifecycle
 	activityTypes := []Activity{}
 
-	thImpl.Lock()
-	for name, af := range thImpl.activityFuncMap {
-		activityTypes = append(activityTypes, &activityExecutor{name: name, fn: af})
-	}
-	thImpl.Unlock()
+	if !wOptions.disableActivityWorker {
+		thImpl.Lock()
+		for name, af := range thImpl.activityFuncMap {
+			activityTypes = append(activityTypes, &activityExecutor{name: name, fn: af})
+		}
+		thImpl.Unlock()
 
-	if len(activityTypes) > 0 {
-		activityWorker = NewActivityWorker(
-			activityTypes,
-			service,
-			workerParams,
-		)
+		if len(activityTypes) > 0 {
+			activityWorker = NewActivityWorker(
+				activityTypes,
+				service,
+				workerParams,
+			)
+		}
 	}
 	return &aggregatedWorker{workflowWorker: workflowWorker, activityWorker: activityWorker}
+}
+
+func processTestTags(wOptions *workerOptions, ep *WorkerExecutionParameters) {
+	if wOptions.testTags != nil {
+		if paramsOverride, ok := wOptions.testTags[WorkerOptionsConfig]; ok {
+			for key, val := range paramsOverride {
+				switch key {
+				case WorkerOptionsConfigConcurrentPollRoutineSize:
+					if size, err := strconv.Atoi(val); err == nil {
+						ep.ConcurrentPollRoutineSize = size
+					}
+				}
+			}
+		}
+	}
 }
 
 func isWorkflowContext(inType reflect.Type) bool {

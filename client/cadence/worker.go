@@ -210,7 +210,7 @@ func (wc *WorkflowClient) RecordActivityHeartbeat(taskToken, details []byte) err
 type WorkflowReplayerOptions struct {
 	Execution WorkflowExecution
 	History   *s.History
-	logger bark.Logger
+	Logger bark.Logger
 }
 
 // WorkflowReplayer replays a given state of workflow execution.
@@ -240,7 +240,7 @@ func NewWorkflowReplayer(
 		},
 		WorkflowType: &s.WorkflowType{Name: common.StringPtr(fnName)},
 	}
-	return NewWorkflowReplayerForPoll(workflowTask, workflowFactory, options.logger)
+	return NewWorkflowReplayerForPoll(workflowTask, workflowFactory, options.Logger)
 }
 
 // NewWorkflowReplayerForPoll creates an instance of WorkflowReplayer from decision poll response

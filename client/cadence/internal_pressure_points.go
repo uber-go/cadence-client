@@ -15,14 +15,14 @@ import (
 
 // PressurePoints
 const (
-	PressurePointTypeDecisionTaskStartTimeout    = "decision-task-start-timeout"
-	PressurePointTypeDecisionTaskCompleted       = "decision-task-complete"
-	PressurePointTypeActivityTaskScheduleTimeout = "activity-task-schedule-timeout"
-	PressurePointTypeActivityTaskStartTimeout    = "activity-task-start-timeout"
-	PressurePointConfigProbability               = "probability"
-	PressurePointConfigSleep                     = "sleep"
-	WorkerOptionsConfig                          = "worker-options"
-	WorkerOptionsConfigConcurrentPollRoutineSize = "ConcurrentPollRoutineSize"
+	pressurePointTypeDecisionTaskStartTimeout    = "decision-task-start-timeout"
+	pressurePointTypeDecisionTaskCompleted       = "decision-task-complete"
+	pressurePointTypeActivityTaskScheduleTimeout = "activity-task-schedule-timeout"
+	pressurePointTypeActivityTaskStartTimeout    = "activity-task-start-timeout"
+	pressurePointConfigProbability               = "probability"
+	pressurePointConfigSleep                     = "sleep"
+	workerOptionsConfig                          = "worker-options"
+	workerOptionsConfigConcurrentPollRoutineSize = "ConcurrentPollRoutineSize"
 )
 
 type (
@@ -48,7 +48,7 @@ func newWorkflowWorkerWithPressurePoints(
 			if err != nil {
 				return nil, err
 			}
-			return NewWorkflowDefinition(wd), nil
+			return newWorkflowDefinition(wd), nil
 		},
 		service,
 		params,
@@ -58,7 +58,7 @@ func newWorkflowWorkerWithPressurePoints(
 func (p *pressurePointMgrImpl) Execute(pressurePointName string) error {
 	if config, ok := p.config[pressurePointName]; ok {
 		// If probability is configured.
-		if value, ok2 := config[PressurePointConfigProbability]; ok2 {
+		if value, ok2 := config[pressurePointConfigProbability]; ok2 {
 			if probablity, err := strconv.Atoi(value); err == nil {
 				if rand.Int31n(100) < int32(probablity) {
 					// Drop the task.
@@ -67,7 +67,7 @@ func (p *pressurePointMgrImpl) Execute(pressurePointName string) error {
 					return fmt.Errorf("pressurepoint configured")
 				}
 			}
-		} else if value, ok3 := config[PressurePointConfigSleep]; ok3 {
+		} else if value, ok3 := config[pressurePointConfigSleep]; ok3 {
 			if timeout, err := strconv.Atoi(value); err == nil {
 				if timeout > 0 {
 					p.logger.Debugf("Execute: PressurePointName: %s, Sleep for: %d.",

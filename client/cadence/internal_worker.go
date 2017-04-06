@@ -90,16 +90,6 @@ type (
 	}
 )
 
-// NewWorkflowTaskWorker returns an instance of a workflow task handler worker.
-// To be used by framework level code that requires access to the original workflow task.
-func NewWorkflowTaskWorker(
-	taskHandler WorkflowTaskHandler,
-	service m.TChanWorkflowService,
-	params workerExecutionParameters,
-) (worker Worker) {
-	return newWorkflowTaskWorkerInternal(taskHandler, service, params)
-}
-
 // newWorkflowWorker returns an instance of the workflow worker.
 func newWorkflowWorker(
 	factory workflowDefinitionFactory,
@@ -195,38 +185,6 @@ func newActivityWorker(
 	return NewActivityTaskWorker(taskHandler, service, params)
 }
 
-// NewActivityTaskWorker returns instance of an activity task handler worker.
-// To be used by framework level code that requires access to the original workflow task.
-func NewActivityTaskWorker(
-	taskHandler ActivityTaskHandler,
-	service m.TChanWorkflowService,
-	params workerExecutionParameters,
-) Worker {
-	ensureRequiredParams(&params)
-
-	poller := newActivityTaskPoller(
-		taskHandler,
-		service,
-		params,
-	)
-	worker := newBaseWorker(baseWorkerOptions{
-		routineCount:    params.ConcurrentPollRoutineSize,
-		taskPoller:      poller,
-		workflowService: service,
-		identity:        params.Identity,
-		workerType:      "ActivityWorker"},
-		params.Logger)
-
-	return &activityWorker{
-		executionParameters: params,
-		activityRegistry:    make(map[string]Activity),
-		workflowService:     service,
-		worker:              worker,
-		poller:              poller,
-		identity:            params.Identity,
-	}
-}
-
 // Start the worker.
 func (aw *activityWorker) Start() error {
 	aw.worker.Start()
@@ -251,17 +209,6 @@ type workerOptions struct {
 	disableWorkflowWorker      bool
 	disableActivityWorker      bool
 	testTags                   map[string]map[string]string
-}
-
-// NewWorkerOptionsInternal creates an instance of worker options with default values.
-func NewWorkerOptionsInternal(testTags map[string]map[string]string) WorkerOptions {
-	return &workerOptions{
-		maxConcurrentActivityExecutionSize: defaultMaxConcurrentActivityExecutionSize,
-		maxActivityExecutionRate:           defaultMaxActivityExecutionRate,
-		autoHeartBeatForActivities:         false,
-		testTags:                           testTags,
-		// Defaults for metrics, identity, logger is filled in by the WorkflowWorker APIs.
-	}
 }
 
 // SetMaxConcurrentActivityExecutionSize sets the maximum concurrent activity executions this host can have.
@@ -705,10 +652,10 @@ func newRegisteredWorkflowFactory() workflowFactory {
 
 func processTestTags(wOptions *workerOptions, ep *workerExecutionParameters) {
 	if wOptions.testTags != nil {
-		if paramsOverride, ok := wOptions.testTags[WorkerOptionsConfig]; ok {
+		if paramsOverride, ok := wOptions.testTags[workerOptionsConfig]; ok {
 			for key, val := range paramsOverride {
 				switch key {
-				case WorkerOptionsConfigConcurrentPollRoutineSize:
+				case workerOptionsConfigConcurrentPollRoutineSize:
 					if size, err := strconv.Atoi(val); err == nil {
 						ep.ConcurrentPollRoutineSize = size
 					}
@@ -788,6 +735,6 @@ func getWorkflowDefinitionFactory(factory workflowFactory) workflowDefinitionFac
 		if err != nil {
 			return nil, err
 		}
-		return NewWorkflowDefinition(wd), nil
+		return newWorkflowDefinition(wd), nil
 	}
 }

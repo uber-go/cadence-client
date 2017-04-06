@@ -182,7 +182,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 	task := createWorkflowTask(testEvents, 0)
 
 	pressurePoints := make(map[string]map[string]string)
-	pressurePoints[PressurePointTypeActivityTaskScheduleTimeout] = map[string]string{PressurePointConfigProbability: "100"}
+	pressurePoints[pressurePointTypeActivityTaskScheduleTimeout] = map[string]string{pressurePointConfigProbability: "100"}
 	ppMgr := &pressurePointMgrImpl{config: pressurePoints, logger: s.logger}
 
 	params := workerExecutionParameters{

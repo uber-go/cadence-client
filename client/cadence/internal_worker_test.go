@@ -361,8 +361,8 @@ func testActivityReturnString() (string, error) {
 }
 
 func TestVariousActivitySchedulingOption(t *testing.T) {
-	w := NewWorkflowDefinition(&activitiesCallingOptionsWorkflow{t: t})
-	ctx := &MockWorkflowEnvironment{}
+	w := newWorkflowDefinition(&activitiesCallingOptionsWorkflow{t: t})
+	ctx := &mockWorkflowEnvironment{}
 	workflowComplete := make(chan struct{}, 1)
 
 	cbProcessor := newAsyncTestCallbackProcessor()

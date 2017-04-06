@@ -62,8 +62,8 @@ func (w *helloWorldWorklfow) Execute(ctx Context, input []byte) (result []byte, 
 }
 
 func TestHelloWorldWorkflow(t *testing.T) {
-	w := NewWorkflowDefinition(&helloWorldWorklfow{t: t})
-	ctx := &MockWorkflowEnvironment{}
+	w := newWorkflowDefinition(&helloWorldWorklfow{t: t})
+	ctx := &mockWorkflowEnvironment{}
 	ctx.On("Complete", []byte("Hello World!"), nil).Return().Once()
 	w.Execute(ctx, []byte("Hello"))
 }
@@ -100,8 +100,8 @@ func (m *resultHandlerMatcher) String() string {
 }
 
 func TestSingleActivityWorkflow(t *testing.T) {
-	w := NewWorkflowDefinition(&helloWorldActivityWorkflow{t: t})
-	ctx := &MockWorkflowEnvironment{}
+	w := newWorkflowDefinition(&helloWorldActivityWorkflow{t: t})
+	ctx := &mockWorkflowEnvironment{}
 	workflowComplete := make(chan struct{}, 1)
 
 	// Process timer callbacks.
@@ -172,8 +172,8 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 }
 
 func TestSplitJoinActivityWorkflow(t *testing.T) {
-	w := NewWorkflowDefinition(&splitJoinActivityWorkflow{t: t})
-	ctx := &MockWorkflowEnvironment{}
+	w := newWorkflowDefinition(&splitJoinActivityWorkflow{t: t})
+	ctx := &mockWorkflowEnvironment{}
 	workflowComplete := make(chan struct{}, 1)
 
 	// Process timer callbacks.
@@ -202,8 +202,8 @@ func TestSplitJoinActivityWorkflow(t *testing.T) {
 }
 
 func TestWorkflowPanic(t *testing.T) {
-	w := NewWorkflowDefinition(&splitJoinActivityWorkflow{t: t, panic: true})
-	ctx := &MockWorkflowEnvironment{}
+	w := newWorkflowDefinition(&splitJoinActivityWorkflow{t: t, panic: true})
+	ctx := &mockWorkflowEnvironment{}
 	workflowComplete := make(chan struct{}, 1)
 
 	// Process timer callbacks.
@@ -238,8 +238,8 @@ func (w *testClockWorkflow) Execute(ctx Context, input []byte) (result []byte, e
 }
 
 func TestClockWorkflow(t *testing.T) {
-	w := NewWorkflowDefinition(&testClockWorkflow{t: t})
-	ctx := &MockWorkflowEnvironment{}
+	w := newWorkflowDefinition(&testClockWorkflow{t: t})
+	ctx := &mockWorkflowEnvironment{}
 
 	ctx.On("Now").Return(time.Now()).Once()
 	ctx.On("Complete", []byte("workflow-completed"), nil).Return().Once()
@@ -294,8 +294,8 @@ func (w *testTimerWorkflow) Execute(ctx Context, input []byte) (result []byte, e
 }
 
 func TestTimerWorkflow(t *testing.T) {
-	w := NewWorkflowDefinition(&testTimerWorkflow{t: t})
-	ctx := &MockWorkflowEnvironment{}
+	w := newWorkflowDefinition(&testTimerWorkflow{t: t})
+	ctx := &mockWorkflowEnvironment{}
 	workflowComplete := make(chan struct{}, 1)
 
 	// Process timer callbacks.
@@ -372,8 +372,8 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 }
 
 func TestActivityCancelWorkflow(t *testing.T) {
-	w := NewWorkflowDefinition(&testActivityCancelWorkflow{t: t})
-	ctx := &MockWorkflowEnvironment{}
+	w := newWorkflowDefinition(&testActivityCancelWorkflow{t: t})
+	ctx := &mockWorkflowEnvironment{}
 	workflowComplete := make(chan struct{}, 1)
 
 	cbProcessor := newAsyncTestCallbackProcessor()
@@ -462,8 +462,8 @@ func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, er
 }
 
 func TestExternalExampleWorkflow(t *testing.T) {
-	w := NewWorkflowDefinition(&greetingsWorkflow{})
-	ctx := &MockWorkflowEnvironment{}
+	w := newWorkflowDefinition(&greetingsWorkflow{})
+	ctx := &mockWorkflowEnvironment{}
 	workflowComplete := make(chan struct{}, 1)
 
 	cbProcessor := newAsyncTestCallbackProcessor()

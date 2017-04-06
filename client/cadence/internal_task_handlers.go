@@ -19,22 +19,6 @@ import (
 
 // interfaces
 type (
-	// WorkflowTaskHandler represents workflow task handlers.
-	WorkflowTaskHandler interface {
-		// Process the workflow task
-		ProcessWorkflowTask(task *s.PollForDecisionTaskResponse, emitStack bool) (response *s.RespondDecisionTaskCompletedRequest, stackTrace string, err error)
-	}
-
-	// ActivityTaskHandler represents activity task handlers.
-	ActivityTaskHandler interface {
-		// Execute the activity task
-		// The return interface{} can have three requests, use switch to find the type of it.
-		// - RespondActivityTaskCompletedRequest
-		// - RespondActivityTaskFailedRequest
-		// - RespondActivityTaskCancelRequest
-		Execute(task *s.PollForActivityTaskResponse) (interface{}, error)
-	}
-
 	// workflowExecutionEventHandler process a single event.
 	workflowExecutionEventHandler interface {
 		// Process a single event and return the assosciated decisions.
@@ -357,13 +341,13 @@ func (wth *workflowTaskHandlerImpl) executeAnyPressurePoints(event *s.HistoryEve
 	if wth.ppMgr != nil && !reflect.ValueOf(wth.ppMgr).IsNil() && !isInReplay {
 		switch event.GetEventType() {
 		case s.EventType_DecisionTaskStarted:
-			return wth.ppMgr.Execute(PressurePointTypeDecisionTaskStartTimeout)
+			return wth.ppMgr.Execute(pressurePointTypeDecisionTaskStartTimeout)
 		case s.EventType_ActivityTaskScheduled:
-			return wth.ppMgr.Execute(PressurePointTypeActivityTaskScheduleTimeout)
+			return wth.ppMgr.Execute(pressurePointTypeActivityTaskScheduleTimeout)
 		case s.EventType_ActivityTaskStarted:
-			return wth.ppMgr.Execute(PressurePointTypeActivityTaskStartTimeout)
+			return wth.ppMgr.Execute(pressurePointTypeActivityTaskStartTimeout)
 		case s.EventType_DecisionTaskCompleted:
-			return wth.ppMgr.Execute(PressurePointTypeDecisionTaskCompleted)
+			return wth.ppMgr.Execute(pressurePointTypeDecisionTaskCompleted)
 		}
 	}
 	return nil

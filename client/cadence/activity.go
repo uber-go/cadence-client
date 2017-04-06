@@ -28,6 +28,23 @@ type (
 	}
 )
 
+// RegisterActivity - register a activity function with the framework.
+// A activity takes a context and input and returns a (result, error) or just error.
+// Examples:
+//	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
+//	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error)
+//	func sampleActivity(ctx context.Context) (err error)
+//	func sampleActivity() (result string, err error)
+//	func sampleActivity(arg1 bool) (result int, err error)
+//	func sampleActivity(arg1 bool) (err error)
+// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
+func RegisterActivity(
+	activityFunc interface{},
+) error {
+	thImpl := getHostEnvironment()
+	return thImpl.RegisterActivity(activityFunc)
+}
+
 // GetActivityInfo returns information about currently executing activity.
 func GetActivityInfo(ctx context.Context) ActivityInfo {
 	env := getActivityEnv(ctx)

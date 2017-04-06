@@ -41,7 +41,7 @@ func newWorkflowWorkerWithPressurePoints(
 	factory workflowFactory,
 	service m.TChanWorkflowService,
 	params workerExecutionParameters,
-	pressurePoints map[string]map[string]string) (worker Lifecycle) {
+	pressurePoints map[string]map[string]string) (worker Worker) {
 	return newWorkflowWorker(
 		func(workflowType WorkflowType) (workflowDefinition, error) {
 			wd, err := factory(workflowType)

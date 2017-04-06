@@ -7,9 +7,8 @@ import (
 )
 
 type (
-	// Lifecycle represents objects that can be started and stopped.
-	// Both activity and workflow workers implement this interface.
-	Lifecycle interface {
+	// Worker represents objects that can be started and stopped.
+	Worker interface {
 		Stop()
 		Start() error
 	}
@@ -17,6 +16,7 @@ type (
 	// WorkerOptions is to configure a worker instance,
 	// for example (1) the logger or any specific metrics.
 	// 	       (2) Whether to heart beat for activities automatically.
+	// Use NewWorkerOptions function to create an instance.
 	WorkerOptions interface {
 		// Optional: To set the maximum concurrent activity executions this host can have.
 		// default: defaultMaxConcurrentActivityExecutionSize(10k)
@@ -59,23 +59,6 @@ func NewWorkerOptions() WorkerOptions {
 	return NewWorkerOptionsInternal(nil)
 }
 
-// RegisterActivity - register a activity function with the framework.
-// A activity takes a context and input and returns a (result, error) or just error.
-// Examples:
-//	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
-//	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error)
-//	func sampleActivity(ctx context.Context) (err error)
-//	func sampleActivity() (result string, err error)
-//	func sampleActivity(arg1 bool) (result int, err error)
-//	func sampleActivity(arg1 bool) (err error)
-// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
-func RegisterActivity(
-	activityFunc interface{},
-) error {
-	thImpl := getHostEnvironment()
-	return thImpl.RegisterActivity(activityFunc)
-}
-
 // NewWorker creates an instance of worker for managing workflow and activity executions.
 // service 	- thrift connection to the cadence server.
 // groupName 	- is the name you use to identify your client worker, also
@@ -85,6 +68,6 @@ func NewWorker(
 	service m.TChanWorkflowService,
 	groupName string,
 	options WorkerOptions,
-) Lifecycle {
+) Worker {
 	return newAggregatedWorker(service, groupName, options)
 }

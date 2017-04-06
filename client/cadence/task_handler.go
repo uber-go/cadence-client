@@ -67,4 +67,3 @@ func (wr *DecisionTaskHandler) StackTrace() string {
 func (wr *DecisionTaskHandler) Decisions() *s.RespondDecisionTaskCompletedRequest {
 	return wr.decisions
 }
-

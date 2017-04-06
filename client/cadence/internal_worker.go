@@ -27,7 +27,7 @@ const (
 
 // Assert that structs do indeed implement the interfaces
 var _ WorkerOptions = (*workerOptions)(nil)
-var _ Lifecycle = (*aggregatedWorker)(nil)
+var _ Worker = (*aggregatedWorker)(nil)
 var _ hostEnv = (*hostEnvImpl)(nil)
 
 type (
@@ -96,7 +96,7 @@ func NewWorkflowTaskWorker(
 	taskHandler WorkflowTaskHandler,
 	service m.TChanWorkflowService,
 	params workerExecutionParameters,
-) (worker Lifecycle) {
+) (worker Worker) {
 	return newWorkflowTaskWorkerInternal(taskHandler, service, params)
 }
 
@@ -106,7 +106,7 @@ func newWorkflowWorker(
 	service m.TChanWorkflowService,
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
-) Lifecycle {
+) Worker {
 	return newWorkflowWorkerInternal(factory, service, params, ppMgr, nil)
 }
 
@@ -127,7 +127,7 @@ func newWorkflowWorkerInternal(
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
 	overrides *workerOverrides,
-) Lifecycle {
+) Worker {
 	// Get a workflow task handler.
 	ensureRequiredParams(&params)
 	var taskHandler WorkflowTaskHandler
@@ -143,7 +143,7 @@ func newWorkflowTaskWorkerInternal(
 	taskHandler WorkflowTaskHandler,
 	service m.TChanWorkflowService,
 	params workerExecutionParameters,
-) Lifecycle {
+) Worker {
 	ensureRequiredParams(&params)
 	poller := newWorkflowTaskPoller(
 		taskHandler,
@@ -183,7 +183,7 @@ func newActivityWorker(
 	service m.TChanWorkflowService,
 	params workerExecutionParameters,
 	overrides *workerOverrides,
-) Lifecycle {
+) Worker {
 	ensureRequiredParams(&params)
 	// Get a activity task handler.
 	var taskHandler ActivityTaskHandler
@@ -201,7 +201,7 @@ func NewActivityTaskWorker(
 	taskHandler ActivityTaskHandler,
 	service m.TChanWorkflowService,
 	params workerExecutionParameters,
-) Lifecycle {
+) Worker {
 	ensureRequiredParams(&params)
 
 	poller := newActivityTaskPoller(
@@ -600,8 +600,8 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 
 // aggregatedWorker combines management of both workflowWorker and activityWorker worker lifecycle.
 type aggregatedWorker struct {
-	workflowWorker Lifecycle
-	activityWorker Lifecycle
+	workflowWorker Worker
+	activityWorker Worker
 }
 
 func (aw *aggregatedWorker) Start() error {
@@ -634,7 +634,7 @@ func newAggregatedWorker(
 	service m.TChanWorkflowService,
 	groupName string,
 	options WorkerOptions,
-) (worker Lifecycle) {
+) (worker Worker) {
 	wOptions := options.(*workerOptions)
 	workerParams := workerExecutionParameters{
 		TaskList:                  groupName,
@@ -647,7 +647,7 @@ func newAggregatedWorker(
 	processTestTags(wOptions, &workerParams)
 
 	// workflow factory.
-	var workflowWorker Lifecycle
+	var workflowWorker Worker
 	if !wOptions.disableWorkflowWorker && thImpl.lenWorkflowFns() > 0 {
 		workflowFactory := newRegisteredWorkflowFactory()
 		if wOptions.testTags != nil && len(wOptions.testTags) > 0 {
@@ -667,7 +667,7 @@ func newAggregatedWorker(
 	}
 
 	// activity types.
-	var activityWorker Lifecycle
+	var activityWorker Worker
 
 	if !wOptions.disableActivityWorker {
 		activityTypes := getRegisteredActivities()

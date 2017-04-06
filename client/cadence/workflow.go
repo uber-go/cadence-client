@@ -62,6 +62,21 @@ type (
 	}
 )
 
+// RegisterWorkflow - registers a workflow function with the framework.
+// A workflow takes a cadence context and input and returns a (result, error) or just error.
+// Examples:
+//	func sampleWorkflow(ctx cadence.Context, input []byte) (result []byte, err error)
+//	func sampleWorkflow(ctx cadence.Context, arg1 int, arg2 string) (result []byte, err error)
+//	func sampleWorkflow(ctx cadence.Context) (result []byte, err error)
+//	func sampleWorkflow(ctx cadence.Context, arg1 int) (result string, err error)
+// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
+func RegisterWorkflow(
+	workflowFunc interface{},
+) error {
+	thImpl := getHostEnvironment()
+	return thImpl.RegisterWorkflow(workflowFunc)
+}
+
 // NewChannel create new Channel instance
 func NewChannel(ctx Context) Channel {
 	state := getState(ctx)
@@ -292,19 +307,4 @@ func Sleep(ctx Context, d time.Duration) (err error) {
 	t := NewTimer(ctx, d)
 	_, err = t.Get(ctx)
 	return
-}
-
-// RegisterWorkflow - registers a workflow function with the framework.
-// A workflow takes a cadence context and input and returns a (result, error) or just error.
-// Examples:
-//	func sampleWorkflow(ctx cadence.Context, input []byte) (result []byte, err error)
-//	func sampleWorkflow(ctx cadence.Context, arg1 int, arg2 string) (result []byte, err error)
-//	func sampleWorkflow(ctx cadence.Context) (result []byte, err error)
-//	func sampleWorkflow(ctx cadence.Context, arg1 int) (result string, err error)
-// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
-func RegisterWorkflow(
-	workflowFunc interface{},
-) error {
-	thImpl := getHostEnvironment()
-	return thImpl.RegisterWorkflow(workflowFunc)
 }

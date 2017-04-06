@@ -74,9 +74,9 @@ type helloWorldActivityWorkflow struct {
 
 func (w *helloWorldActivityWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithScheduleToStartTimeout(10 * time.Second).
-		WithStartToCloseTimeout(5 * time.Second).
-		WithScheduleToCloseTimeout(10 * time.Second))
+		WithScheduleToStartTimeout(10*time.Second).
+		WithStartToCloseTimeout(5*time.Second).
+		WithScheduleToCloseTimeout(10*time.Second))
 	ctx1 := WithActivityOptions(ctx, NewActivityOptions().(*activityOptions).WithActivityID("id1"))
 	r1, err := ExecuteActivity(ctx1, "testAct", input)
 	if err != nil {
@@ -135,9 +135,9 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	var err1, err2 error
 
 	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithScheduleToStartTimeout(10 * time.Second).
-		WithStartToCloseTimeout(5 * time.Second).
-		WithScheduleToCloseTimeout(10 * time.Second))
+		WithScheduleToStartTimeout(10*time.Second).
+		WithStartToCloseTimeout(5*time.Second).
+		WithScheduleToCloseTimeout(10*time.Second))
 
 	c1 := NewChannel(ctx)
 	c2 := NewChannel(ctx)
@@ -338,9 +338,9 @@ type testActivityCancelWorkflow struct {
 
 func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithScheduleToStartTimeout(10 * time.Second).
-		WithStartToCloseTimeout(5 * time.Second).
-		WithScheduleToCloseTimeout(10 * time.Second))
+		WithScheduleToStartTimeout(10*time.Second).
+		WithStartToCloseTimeout(5*time.Second).
+		WithScheduleToCloseTimeout(10*time.Second))
 
 	// Sync cancellation
 	ctx1, c1 := WithCancel(ctx)
@@ -432,9 +432,9 @@ func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, er
 
 	ctx1 := WithActivityOptions(ctx, NewActivityOptions().
 		WithTaskList("exampleTaskList").
-		WithScheduleToStartTimeout(10 * time.Second).
-		WithStartToCloseTimeout(5 * time.Second).
-		WithScheduleToCloseTimeout(10 * time.Second))
+		WithScheduleToStartTimeout(10*time.Second).
+		WithStartToCloseTimeout(5*time.Second).
+		WithScheduleToCloseTimeout(10*time.Second))
 
 	greetResult, err := ExecuteActivity(ctx1, "getGreetingActivity", input)
 	if err != nil {

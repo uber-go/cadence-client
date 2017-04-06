@@ -16,6 +16,7 @@ import (
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/uber-go/tally"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -30,11 +31,17 @@ var _ Lifecycle = (*aggregatedWorker)(nil)
 var _ hostEnv = (*hostEnvImpl)(nil)
 
 type (
+
+	// WorkflowFactory function is used to create a workflow implementation object.
+	// It is needed as a workflow objbect is created on every decision.
+	// To start a workflow instance use NewWorkflowClient(...).StartWorkflowExecution(...)
+	workflowFactory func(workflowType WorkflowType) (workflow, error)
+
 	// WorkflowWorker wraps the code for hosting workflow types.
 	// And worker is mapped 1:1 with task list. If the user want's to poll multiple
 	// task list names they might have to manage 'n' workers for 'n' task lists.
 	workflowWorker struct {
-		executionParameters WorkerExecutionParameters
+		executionParameters workerExecutionParameters
 		workflowService     m.TChanWorkflowService
 		poller              taskPoller // taskPoller to poll the tasks.
 		worker              *baseWorker
@@ -47,7 +54,7 @@ type (
 	// ActivityWorker wraps the code for hosting activity types.
 	// TODO: Worker doing heartbeating automatically while activity task is running
 	activityWorker struct {
-		executionParameters WorkerExecutionParameters
+		executionParameters workerExecutionParameters
 		activityRegistry    activityRegistry
 		workflowService     m.TChanWorkflowService
 		poller              *activityTaskPoller
@@ -60,6 +67,27 @@ type (
 		workflowTaskHander  WorkflowTaskHandler
 		activityTaskHandler ActivityTaskHandler
 	}
+
+	// workerExecutionParameters defines worker configure/execution options.
+	workerExecutionParameters struct {
+		// Task list name to poll.
+		TaskList string
+
+		// Defines how many concurrent poll requests for the task list by this worker.
+		ConcurrentPollRoutineSize int
+
+		// Defines how many executions for task list by this worker.
+		// TODO: In future we want to separate the activity executions as they take longer than polls.
+		// ConcurrentExecutionRoutineSize int
+
+		// User can provide an identity for the debuggability. If not provided the framework has
+		// a default option.
+		Identity string
+
+		MetricsScope tally.Scope
+
+		Logger bark.Logger
+	}
 )
 
 // NewWorkflowTaskWorker returns an instance of a workflow task handler worker.
@@ -67,7 +95,7 @@ type (
 func NewWorkflowTaskWorker(
 	taskHandler WorkflowTaskHandler,
 	service m.TChanWorkflowService,
-	params WorkerExecutionParameters,
+	params workerExecutionParameters,
 ) (worker Lifecycle) {
 	return newWorkflowTaskWorkerInternal(taskHandler, service, params)
 }
@@ -76,13 +104,13 @@ func NewWorkflowTaskWorker(
 func newWorkflowWorker(
 	factory workflowDefinitionFactory,
 	service m.TChanWorkflowService,
-	params WorkerExecutionParameters,
+	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
 ) Lifecycle {
 	return newWorkflowWorkerInternal(factory, service, params, ppMgr, nil)
 }
 
-func ensureRequiredParams(params *WorkerExecutionParameters) {
+func ensureRequiredParams(params *workerExecutionParameters) {
 	if params.Identity == "" {
 		params.Identity = getWorkerIdentity(params.TaskList)
 	}
@@ -96,7 +124,7 @@ func ensureRequiredParams(params *WorkerExecutionParameters) {
 func newWorkflowWorkerInternal(
 	factory workflowDefinitionFactory,
 	service m.TChanWorkflowService,
-	params WorkerExecutionParameters,
+	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
 	overrides *workerOverrides,
 ) Lifecycle {
@@ -114,7 +142,7 @@ func newWorkflowWorkerInternal(
 func newWorkflowTaskWorkerInternal(
 	taskHandler WorkflowTaskHandler,
 	service m.TChanWorkflowService,
-	params WorkerExecutionParameters,
+	params workerExecutionParameters,
 ) Lifecycle {
 	ensureRequiredParams(&params)
 	poller := newWorkflowTaskPoller(
@@ -150,10 +178,10 @@ func (ww *workflowWorker) Stop() {
 	ww.worker.Stop()
 }
 
-func newActivityWorkerInternal(
+func newActivityWorker(
 	activities []Activity,
 	service m.TChanWorkflowService,
-	params WorkerExecutionParameters,
+	params workerExecutionParameters,
 	overrides *workerOverrides,
 ) Lifecycle {
 	ensureRequiredParams(&params)
@@ -172,7 +200,7 @@ func newActivityWorkerInternal(
 func NewActivityTaskWorker(
 	taskHandler ActivityTaskHandler,
 	service m.TChanWorkflowService,
-	params WorkerExecutionParameters,
+	params workerExecutionParameters,
 ) Lifecycle {
 	ensureRequiredParams(&params)
 
@@ -226,7 +254,7 @@ type workerOptions struct {
 }
 
 // NewWorkerOptionsInternal creates an instance of worker options with default values.
-func NewWorkerOptionsInternal(testTags map[string]map[string]string) *workerOptions {
+func NewWorkerOptionsInternal(testTags map[string]map[string]string) WorkerOptions {
 	return &workerOptions{
 		maxConcurrentActivityExecutionSize: defaultMaxConcurrentActivityExecutionSize,
 		maxActivityExecutionRate:           defaultMaxActivityExecutionRate,
@@ -305,7 +333,7 @@ type hostEnv interface {
 // hostEnvImpl is the implementation of hostEnv
 type hostEnvImpl struct {
 	sync.Mutex
-	workerFuncMap   map[string]interface{}
+	workflowFuncMap map[string]interface{}
 	activityFuncMap map[string]interface{}
 	encoding        gobEncoding
 }
@@ -361,20 +389,30 @@ func (th *hostEnvImpl) RegisterFnType(fnType reflect.Type) error {
 func (th *hostEnvImpl) addWorkflowFn(fnName string, wf interface{}) {
 	th.Lock()
 	defer th.Unlock()
-	th.workerFuncMap[fnName] = wf
+	th.workflowFuncMap[fnName] = wf
 }
 
 func (th *hostEnvImpl) getWorkflowFn(fnName string) (interface{}, bool) {
 	th.Lock()
 	defer th.Unlock()
-	fn, ok := th.workerFuncMap[fnName]
+	fn, ok := th.workflowFuncMap[fnName]
 	return fn, ok
+}
+
+func (th *hostEnvImpl) getRegisteredWorkflowTypes() []string {
+	th.Lock()
+	defer th.Unlock()
+	var r []string
+	for t := range th.workflowFuncMap {
+		r = append(r, t)
+	}
+	return r
 }
 
 func (th *hostEnvImpl) lenWorkflowFns() int {
 	th.Lock()
 	defer th.Unlock()
-	return len(th.workerFuncMap)
+	return len(th.workflowFuncMap)
 }
 
 func (th *hostEnvImpl) addActivityFn(fnName string, af interface{}) {
@@ -388,6 +426,16 @@ func (th *hostEnvImpl) getActivityFn(fnName string) (interface{}, bool) {
 	defer th.Unlock()
 	fn, ok := th.activityFuncMap[fnName]
 	return fn, ok
+}
+
+func (th *hostEnvImpl) getRegisteredActivityTypes() []string {
+	th.Lock()
+	defer th.Unlock()
+	var r []string
+	for t := range th.activityFuncMap {
+		r = append(r, t)
+	}
+	return r
 }
 
 // register all the types with encoder.
@@ -468,7 +516,7 @@ func getHostEnvironment() hostEnv {
 	// TODO: Make it singleton.
 	if thImpl == nil {
 		thImpl = &hostEnvImpl{
-			workerFuncMap:   make(map[string]interface{}),
+			workflowFuncMap: make(map[string]interface{}),
 			activityFuncMap: make(map[string]interface{}),
 			encoding:        gobEncoding{},
 		}
@@ -588,7 +636,7 @@ func newAggregatedWorker(
 	options WorkerOptions,
 ) (worker Lifecycle) {
 	wOptions := options.(*workerOptions)
-	workerParams := WorkerExecutionParameters{
+	workerParams := workerExecutionParameters{
 		TaskList:                  groupName,
 		ConcurrentPollRoutineSize: defaultConcurrentPollRoutineSize,
 		Identity:                  wOptions.identity,
@@ -601,52 +649,63 @@ func newAggregatedWorker(
 	// workflow factory.
 	var workflowWorker Lifecycle
 	if !wOptions.disableWorkflowWorker && thImpl.lenWorkflowFns() > 0 {
-		workflowFactory := func(wt WorkflowType) (Workflow, error) {
-			wf, ok := thImpl.getWorkflowFn(wt.Name)
-			if !ok {
-				return nil, fmt.Errorf("Unable to find workflow type: %v", wt.Name)
-			}
-			return &workflowExecutor{name: wt.Name, fn: wf}, nil
-		}
+		workflowFactory := newRegisteredWorkflowFactory()
 		if wOptions.testTags != nil && len(wOptions.testTags) > 0 {
-			workflowWorker = NewWorkflowWorkerWithPressurePoints(
+			workflowWorker = newWorkflowWorkerWithPressurePoints(
 				workflowFactory,
 				service,
 				workerParams,
 				wOptions.testTags,
 			)
 		} else {
-			workflowWorker = NewWorkflowWorker(
-				workflowFactory,
+			workflowWorker = newWorkflowWorker(
+				getWorkflowDefinitionFactory(workflowFactory),
 				service,
 				workerParams,
-			)
+				nil)
 		}
 	}
 
 	// activity types.
 	var activityWorker Lifecycle
-	activityTypes := []Activity{}
 
 	if !wOptions.disableActivityWorker {
-		thImpl.Lock()
-		for name, af := range thImpl.activityFuncMap {
-			activityTypes = append(activityTypes, &activityExecutor{name: name, fn: af})
-		}
-		thImpl.Unlock()
-
+		activityTypes := getRegisteredActivities()
 		if len(activityTypes) > 0 {
-			activityWorker = NewActivityWorker(
+			activityWorker = newActivityWorker(
 				activityTypes,
 				service,
 				workerParams,
+				nil,
 			)
 		}
 	}
 	return &aggregatedWorker{workflowWorker: workflowWorker, activityWorker: activityWorker}
 }
 
-func processTestTags(wOptions *workerOptions, ep *WorkerExecutionParameters) {
+func newRegisteredWorkflowFactory() workflowFactory {
+	return func(wt WorkflowType) (workflow, error) {
+		wf, ok := thImpl.getWorkflowFn(wt.Name)
+		if !ok {
+			supported := strings.Join(thImpl.getRegisteredWorkflowTypes(), ", ")
+			return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
+		}
+		return &workflowExecutor{name: wt.Name, fn: wf}, nil
+	}
+}
+
+func getRegisteredActivities() []Activity {
+	result := []Activity{}
+
+	thImpl.Lock()
+	for name, af := range thImpl.activityFuncMap {
+		result = append(result, &activityExecutor{name: name, fn: af})
+	}
+	thImpl.Unlock()
+	return result
+}
+
+func processTestTags(wOptions *workerOptions, ep *workerExecutionParameters) {
 	if wOptions.testTags != nil {
 		if paramsOverride, ok := wOptions.testTags[WorkerOptionsConfig]; ok {
 			for key, val := range paramsOverride {
@@ -723,4 +782,14 @@ func (g gobEncoding) Unmarshal(data []byte, obj interface{}) error {
 		return fmt.Errorf("unable to decode with gob: %v", err)
 	}
 	return nil
+}
+
+func getWorkflowDefinitionFactory(factory workflowFactory) workflowDefinitionFactory {
+	return func(workflowType WorkflowType) (workflowDefinition, error) {
+		wd, err := factory(workflowType)
+		if err != nil {
+			return nil, err
+		}
+		return NewWorkflowDefinition(wd), nil
+	}
 }

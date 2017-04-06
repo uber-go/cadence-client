@@ -91,7 +91,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
 		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{}),
 	}
 	task := createWorkflowTask(testEvents, 0)
-	params := WorkerExecutionParameters{
+	params := workerExecutionParameters{
 		TaskList: "taskListName",
 		Identity: "test-id-1",
 		Logger:   s.logger,
@@ -114,7 +114,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 		createTestEventActivityTaskCompleted(4, &m.ActivityTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
 	}
 	task := createWorkflowTask(testEvents, 0)
-	params := WorkerExecutionParameters{
+	params := workerExecutionParameters{
 		TaskList: "taskListName",
 		Identity: "test-id-1",
 		Logger:   s.logger,
@@ -153,7 +153,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityTask() {
 		return &helloWorldWorkflow{cancelActivity: true}, nil
 	}
 
-	params := WorkerExecutionParameters{
+	params := workerExecutionParameters{
 		TaskList: "taskListName",
 		Identity: "test-id-1",
 		Logger:   s.logger,
@@ -185,7 +185,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 	pressurePoints[PressurePointTypeActivityTaskScheduleTimeout] = map[string]string{PressurePointConfigProbability: "100"}
 	ppMgr := &pressurePointMgrImpl{config: pressurePoints, logger: s.logger}
 
-	params := WorkerExecutionParameters{
+	params := workerExecutionParameters{
 		TaskList: "taskListName",
 		Identity: "test-id-1",
 		Logger:   s.logger,

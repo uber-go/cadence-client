@@ -36,11 +36,11 @@ type (
 	}
 )
 
-// NewWorkflowWorkerWithPressurePoints returns an instance of a workflow worker.
-func NewWorkflowWorkerWithPressurePoints(
-	factory WorkflowFactory,
+// newWorkflowWorkerWithPressurePoints returns an instance of a workflow worker.
+func newWorkflowWorkerWithPressurePoints(
+	factory workflowFactory,
 	service m.TChanWorkflowService,
-	params WorkerExecutionParameters,
+	params workerExecutionParameters,
 	pressurePoints map[string]map[string]string) (worker Lifecycle) {
 	return newWorkflowWorker(
 		func(workflowType WorkflowType) (workflowDefinition, error) {

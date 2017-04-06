@@ -96,7 +96,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 	logger := bark.NewLoggerFromLogrus(log.New())
 
 	// Workflow execution parameters.
-	workflowExecutionParameters := WorkerExecutionParameters{
+	workflowExecutionParameters := workerExecutionParameters{
 		TaskList:                  "testTaskList",
 		ConcurrentPollRoutineSize: 4,
 		Logger: logger,
@@ -118,14 +118,14 @@ func (s *InterfacesTestSuite) TestInterface() {
 	workflowWorker.Start()
 
 	// Create activity execution parameters.
-	activityExecutionParameters := WorkerExecutionParameters{
+	activityExecutionParameters := workerExecutionParameters{
 		TaskList:                  "testTaskList",
 		ConcurrentPollRoutineSize: 10,
 		Logger: logger,
 	}
 
 	// Register activity instances and launch the worker.
-	activityWorker := NewActivityWorker([]Activity{&greeterActivity{}}, service, activityExecutionParameters)
+	activityWorker := newActivityWorker([]Activity{&greeterActivity{}}, service, activityExecutionParameters, nil)
 	defer activityWorker.Stop()
 	activityWorker.Start()
 

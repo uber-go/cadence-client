@@ -18,6 +18,12 @@ import (
 	"strings"
 )
 
+func init() {
+	RegisterWorkflow(testReplayWorkflow)
+
+	RegisterActivity(testActivity)
+}
+
 func getLogger() bark.Logger {
 	formatter := &log.TextFormatter{}
 	formatter.FullTimestamp = true
@@ -45,13 +51,13 @@ func testActivity(ctx context.Context) error {
 	return nil
 }
 
-func TestWorkflowReplayer(t *testing.T) {
+func TestDecisionTaskHandler(t *testing.T) {
 	logger := getLogger()
 	taskList := "taskList1"
 	testEvents := []*s.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
 			TaskList: &s.TaskList{Name: common.StringPtr(taskList)},
-			Input: testEncodeFunctionArgs(testReplayWorkflow),
+			Input:    testEncodeFunctionArgs(testReplayWorkflow),
 		}),
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
@@ -62,13 +68,17 @@ func TestWorkflowReplayer(t *testing.T) {
 		createTestEventActivityTaskStarted(3, &s.ActivityTaskStartedEventAttributes{}),
 	}
 
-	options := WorkflowReplayerOptions{
-		Execution: WorkflowExecution{ID: "testID", RunID: "testRunID"},
-		History:   &s.History{Events: testEvents},
-		Logger:    logger,
+	workflowType := "github.com/uber-go/cadence-client/client/cadence.testReplayWorkflow"
+	workflowID := "testID"
+	runID := "testRunID"
+
+	task := &s.PollForDecisionTaskResponse{
+		WorkflowExecution: &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
+		WorkflowType:      &s.WorkflowType{Name: &workflowType},
+		History:           &s.History{Events: testEvents},
 	}
 
-	r := NewWorkflowReplayer(options, testReplayWorkflow)
+	r := NewDecisionTaskHandler(task, logger)
 	err := r.Process(true)
 	require.NoError(t, err)
 	require.NotEmpty(t, r.StackTrace(), r.StackTrace())

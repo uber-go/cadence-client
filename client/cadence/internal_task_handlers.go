@@ -212,7 +212,7 @@ OrderEvents:
 
 // newWorkflowTaskHandler returns an implementation of workflow task handler.
 func newWorkflowTaskHandler(factory workflowDefinitionFactory,
-	params WorkerExecutionParameters, ppMgr pressurePointMgr) WorkflowTaskHandler {
+	params workerExecutionParameters, ppMgr pressurePointMgr) WorkflowTaskHandler {
 	return &workflowTaskHandlerImpl{
 		taskListName:       params.TaskList,
 		identity:           params.Identity,
@@ -223,7 +223,10 @@ func newWorkflowTaskHandler(factory workflowDefinitionFactory,
 }
 
 // ProcessWorkflowTask processes each all the events of the workflow task.
-func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(task *s.PollForDecisionTaskResponse, emitStack bool) (result *s.RespondDecisionTaskCompletedRequest, stackTrace string, err error) {
+func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
+	task *s.PollForDecisionTaskResponse,
+	emitStack bool,
+) (result *s.RespondDecisionTaskCompletedRequest, stackTrace string, err error) {
 	if task == nil {
 		return nil, "", fmt.Errorf("nil workflowtask provided")
 	}
@@ -376,7 +379,7 @@ func (wth *workflowTaskHandlerImpl) reportAnyMetrics(event *s.HistoryEvent, isIn
 }
 
 func newActivityTaskHandler(activities []Activity,
-	service m.TChanWorkflowService, params WorkerExecutionParameters) ActivityTaskHandler {
+	service m.TChanWorkflowService, params workerExecutionParameters) ActivityTaskHandler {
 	implementations := make(map[ActivityType]Activity)
 	for _, a := range activities {
 		implementations[a.ActivityType()] = a

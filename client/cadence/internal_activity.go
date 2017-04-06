@@ -187,10 +187,10 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	}
 
 	var result []byte
-	var err error
 
 	// Parse result
-	if resultSize > 1 {
+	if resultSize > 1 && !values[0].IsNil() {
+		var err error
 		r := values[0].Interface()
 		if err := getHostEnvironment().Encoder().Register(r); err != nil {
 			return nil, err
@@ -203,11 +203,17 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	}
 
 	// Parse error.
-	errValue, ok := values[resultSize-1].Interface().(error)
+	errReflectVal := values[resultSize-1]
+
+	if errReflectVal.IsNil() {
+		return result, nil
+	}
+
+	errValue, ok := errReflectVal.Interface().(error)
 	if !ok {
 		return nil, fmt.Errorf(
 			"Failed to parse error result as it is not of error interface: %v",
-			values[resultSize-1].Interface())
+			errReflectVal.Interface())
 	}
 	return result, errValue
 }

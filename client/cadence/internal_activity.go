@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/uber-go/cadence-client/common"
 	"reflect"
+	"strings"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -149,6 +150,18 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityT
 	case reflect.String:
 		fnName = reflect.ValueOf(f).String()
 
+		if strings.HasPrefix(fnName, "class:") {
+			// Special case where the activity provided can be class.
+			// we support only one argument in that case.
+			if len(args) != 1 || !isTypeByteArray(reflect.TypeOf(args[0]))  {
+				return nil, nil, fmt.Errorf(
+					"Invalid type 'f' parameter provided, for class type activity names onlye []byte input is supported: %v", f)
+			}
+			activityType := &ActivityType{Name: strings.TrimPrefix(fnName, "class:")}
+			input := args[0].([]byte)
+			return activityType, input, nil
+		}
+
 	case reflect.Func:
 		if err := validateFunctionArgs(f, args, false); err != nil {
 			return nil, nil, err
@@ -170,6 +183,10 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityT
 func isActivityContext(inType reflect.Type) bool {
 	contextElem := reflect.TypeOf((*context.Context)(nil)).Elem()
 	return inType.Implements(contextElem)
+}
+
+func isTypeByteArray(inType reflect.Type) bool {
+	return inType == reflect.TypeOf([]byte(nil))
 }
 
 type fnReturnSignature struct {

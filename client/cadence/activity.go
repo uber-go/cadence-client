@@ -38,11 +38,13 @@ type (
 //	func sampleActivity(arg1 bool) (result int, err error)
 //	func sampleActivity(arg1 bool) (err error)
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
-func RegisterActivity(
-	activityFunc interface{},
-) error {
+// This method calls panic if activityFunc doesn't comply with the expected format.
+func RegisterActivity(activityFunc interface{}) {
 	thImpl := getHostEnvironment()
-	return thImpl.RegisterActivity(activityFunc)
+	err := thImpl.RegisterActivity(activityFunc)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // GetActivityInfo returns information about currently executing activity.

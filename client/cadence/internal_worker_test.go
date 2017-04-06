@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,14 +16,15 @@ import (
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
-	"reflect"
-	"strings"
 )
 
 func init() {
+	RegisterWorkflow(sampleWorkflowExecute)
 	RegisterWorkflow(testReplayWorkflow)
 
 	RegisterActivity(testActivity)
+	RegisterActivity(testActivityByteArgs)
+	RegisterActivity(testActivityMultipleArgs)
 }
 
 func getLogger() bark.Logger {
@@ -104,49 +107,41 @@ func testActivityMultipleArgs(ctx context.Context, arg1 int, arg2 string, arg3 b
 	return nil, nil
 }
 
-func TestCreateWorkersForSingleWorkflowAndActivity(t *testing.T) {
+func TestCreateWorker(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
 	logger := getLogger()
 
-	// mocks
-	service.On("PollForActivityTask", mock.Anything, mock.Anything).Return(&s.PollForActivityTaskResponse{}, nil)
-	service.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil)
-	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(&s.PollForDecisionTaskResponse{}, nil)
-	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
-
-	// Simulate initialization
-	RegisterWorkflow(sampleWorkflowExecute)
-	RegisterActivity(testActivityByteArgs)
-
-	// Configure worker options.
-	workerOptions := NewWorkerOptions().SetLogger(logger)
-
-	// Start Worker.
-	worker := NewWorker(
-		service,
-		"testGroup",
-		workerOptions)
-	err := worker.Start()
+	workflowID := "w1"
+	runID := "r1"
+	activityType := "github.com/uber-go/cadence-client/client/cadence.testActivity"
+	workflowType := "github.com/uber-go/cadence-client/client/cadence.sampleWorkflowExecute"
+	activityID := "a1"
+	var startedEventID int64 = 10
+	input, err := marshalFunctionArgs(activityType, []interface{}{})
 	require.NoError(t, err)
-	worker.Stop()
-}
 
-func TestCreateWorkersForManagingMultipleActivities(t *testing.T) {
-	// Create service endpoint
-	service := new(mocks.TChanWorkflowService)
-	logger := getLogger()
-
+	activityTask := &s.PollForActivityTaskResponse{
+		TaskToken:         []byte("taskToken1"),
+		WorkflowExecution: &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
+		ActivityType:      &s.ActivityType{Name: &activityType},
+		StartedEventId:    &startedEventID,
+		Input:             input,
+		ActivityId:        &activityID,
+	}
+	decisionTask := &s.PollForDecisionTaskResponse{
+		TaskToken:              []byte("taskToken1"),
+		WorkflowExecution:      &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
+		WorkflowType:           &s.WorkflowType{Name: &workflowType},
+		StartedEventId:         &startedEventID,
+		PreviousStartedEventId: &startedEventID,
+		History:                &s.History{},
+	}
 	// mocks
-	service.On("PollForActivityTask", mock.Anything, mock.Anything).Return(&s.PollForActivityTaskResponse{}, nil)
+	service.On("PollForActivityTask", mock.Anything, mock.Anything).Return(activityTask, nil)
 	service.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil)
-	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(&s.PollForDecisionTaskResponse{}, nil)
+	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(decisionTask, nil)
 	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
-
-	// Simulate initialization
-	RegisterWorkflow(sampleWorkflowExecute)
-	RegisterActivity(testActivityByteArgs)
-	RegisterActivity(testActivityMultipleArgs)
 
 	// Configure worker options.
 	workerOptions := NewWorkerOptions().SetLogger(logger).SetMaxActivityExecutionRate(20)
@@ -156,36 +151,11 @@ func TestCreateWorkersForManagingMultipleActivities(t *testing.T) {
 		service,
 		"testGroupName2",
 		workerOptions)
-	err := worker.Start()
+	err = worker.Start()
 	require.NoError(t, err)
+	time.Sleep(time.Millisecond * 200)
 	worker.Stop()
-}
-
-func TestCreateWorkerForWorkflow(t *testing.T) {
-	// Create service endpoint
-	service := new(mocks.TChanWorkflowService)
-	logger := getLogger()
-
-	setHostEnvironment(nil)
-
-	// mocks
-	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(&s.PollForDecisionTaskResponse{}, nil)
-	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
-
-	// Simulate initialization
-	RegisterWorkflow(sampleWorkflowExecute)
-
-	// Configure worker
-	workerOptions := NewWorkerOptions().SetLogger(logger)
-
-	// Start workflow Worker.
-	worker := NewWorker(
-		service,
-		"testGroup",
-		workerOptions)
-	err := worker.Start()
-	require.NoError(t, err)
-	worker.Stop()
+	service.AssertExpectations(t)
 }
 
 func TestCompleteActivity(t *testing.T) {
@@ -460,18 +430,12 @@ func testWorkflowReturnStructPtr(ctx Context, arg1 int) (result *testWorkflowRes
 }
 
 func TestRegisterVariousWorkflowTypes(t *testing.T) {
-	err := RegisterWorkflow(testWorkflowSample)
-	require.NoError(t, err)
-	err = RegisterWorkflow(testWorkflowMultipleArgs)
-	require.NoError(t, err)
-	err = RegisterWorkflow(testWorkflowNoArgs)
-	require.NoError(t, err)
-	err = RegisterWorkflow(testWorkflowReturnInt)
-	require.NoError(t, err)
-	err = RegisterWorkflow(testWorkflowReturnString)
-	require.NoError(t, err)
-	err = RegisterWorkflow(testWorkflowReturnStruct)
-	require.NoError(t, err)
+	RegisterWorkflow(testWorkflowSample)
+	RegisterWorkflow(testWorkflowMultipleArgs)
+	RegisterWorkflow(testWorkflowNoArgs)
+	RegisterWorkflow(testWorkflowReturnInt)
+	RegisterWorkflow(testWorkflowReturnString)
+	RegisterWorkflow(testWorkflowReturnStruct)
 	// TODO: Gob doesn't resolve pointers to full package hence conflicts with out pointer registration
 	//err = RegisterWorkflow(testWorkflowReturnStructPtr)
 	//require.NoError(t, err)

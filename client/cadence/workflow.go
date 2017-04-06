@@ -70,11 +70,13 @@ type (
 //	func sampleWorkflow(ctx cadence.Context) (result []byte, err error)
 //	func sampleWorkflow(ctx cadence.Context, arg1 int) (result string, err error)
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
-func RegisterWorkflow(
-	workflowFunc interface{},
-) error {
+// This method calls panic if workflowFunc doesn't comply with the expected format.
+func RegisterWorkflow(workflowFunc interface{}) {
 	thImpl := getHostEnvironment()
-	return thImpl.RegisterWorkflow(workflowFunc)
+	err := thImpl.RegisterWorkflow(workflowFunc)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // NewChannel create new Channel instance

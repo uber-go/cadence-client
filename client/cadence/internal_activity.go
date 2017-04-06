@@ -203,13 +203,17 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	}
 
 	// Parse error.
-	errValue, ok := values[resultSize-1].Interface().(error)
+	errValue := values[resultSize-1]
+	if errValue.IsNil() {
+		return result, nil
+	}
+	errInterface, ok := errValue.Interface().(error)
 	if !ok {
 		return nil, fmt.Errorf(
 			"Failed to parse error result as it is not of error interface: %v",
 			values[resultSize-1].Interface())
 	}
-	return result, errValue
+	return result, errInterface
 }
 
 func deSerializeFunctionResult(f interface{}, result []byte) (interface{}, error) {

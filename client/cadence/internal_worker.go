@@ -3,20 +3,20 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"fmt"
 	"reflect"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 
-	"bytes"
-	"encoding/gob"
 	"github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/uber-go/tally"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -326,7 +326,7 @@ type hostEnv interface {
 	RegisterWorkflow(wf interface{}) error
 	RegisterActivity(af interface{}) error
 	// TODO: (Siva) This encoder should be pluggable.
-	Encoder() Encoding
+	Encoder() encoding
 	RegisterFnType(fnType reflect.Type) error
 }
 
@@ -347,11 +347,11 @@ func (th *hostEnvImpl) RegisterWorkflow(wf interface{}) error {
 	// Check if already registered
 	fnName := getFunctionName(wf)
 	if _, ok := th.getWorkflowFn(fnName); ok {
-		return nil
+		return fmt.Errorf("Workflow type \"%v\" is already registered", fnName)
 	}
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
-		return nil
+		return err
 	}
 	th.addWorkflowFn(fnName, wf)
 	return nil
@@ -366,18 +366,18 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	// Check if already registered
 	fnName := getFunctionName(af)
 	if _, ok := th.getActivityFn(fnName); ok {
-		return nil
+		return fmt.Errorf("Activity type \"%v\" is already registered", fnName)
 	}
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
-		return nil
+		return err
 	}
 	th.addActivityFn(fnName, af)
 	return nil
 }
 
 // Get the encoder.
-func (th *hostEnvImpl) Encoder() Encoding {
+func (th *hostEnvImpl) Encoder() encoding {
 	return th.encoding
 }
 
@@ -509,12 +509,23 @@ func (th *hostEnvImpl) validateFnFormat(fnType reflect.Type, isWorkflow bool) er
 	return nil
 }
 
-// To hold the host registration details.
+func (th *hostEnvImpl) getRegisteredActivities() []Activity {
+	result := []Activity{}
+	th.Lock()
+	for name, af := range thImpl.activityFuncMap {
+		result = append(result, &activityExecutor{name: name, fn: af})
+	}
+	th.Unlock()
+	return result
+}
+
+var once sync.Once
+
+// Singleton to hold the host registration details.
 var thImpl *hostEnvImpl
 
-func getHostEnvironment() hostEnv {
-	// TODO: Make it singleton.
-	if thImpl == nil {
+func getHostEnvironment() *hostEnvImpl {
+	once.Do(func() {
 		thImpl = &hostEnvImpl{
 			workflowFuncMap: make(map[string]interface{}),
 			activityFuncMap: make(map[string]interface{}),
@@ -523,12 +534,8 @@ func getHostEnvironment() hostEnv {
 		// TODO: Find a better way to register.
 		fn := fnSignature{}
 		thImpl.encoding.Register(fn.Args)
-	}
+	})
 	return thImpl
-}
-
-func setHostEnvironment(t *hostEnvImpl) {
-	thImpl = t
 }
 
 // fnSignature represents a function and its arguments
@@ -646,9 +653,10 @@ func newAggregatedWorker(
 
 	processTestTags(wOptions, &workerParams)
 
+	env := getHostEnvironment()
 	// workflow factory.
 	var workflowWorker Worker
-	if !wOptions.disableWorkflowWorker && thImpl.lenWorkflowFns() > 0 {
+	if !wOptions.disableWorkflowWorker && env.lenWorkflowFns() > 0 {
 		workflowFactory := newRegisteredWorkflowFactory()
 		if wOptions.testTags != nil && len(wOptions.testTags) > 0 {
 			workflowWorker = newWorkflowWorkerWithPressurePoints(
@@ -670,7 +678,7 @@ func newAggregatedWorker(
 	var activityWorker Worker
 
 	if !wOptions.disableActivityWorker {
-		activityTypes := getRegisteredActivities()
+		activityTypes := env.getRegisteredActivities()
 		if len(activityTypes) > 0 {
 			activityWorker = newActivityWorker(
 				activityTypes,
@@ -685,24 +693,14 @@ func newAggregatedWorker(
 
 func newRegisteredWorkflowFactory() workflowFactory {
 	return func(wt WorkflowType) (workflow, error) {
-		wf, ok := thImpl.getWorkflowFn(wt.Name)
+		env := getHostEnvironment()
+		wf, ok := env.getWorkflowFn(wt.Name)
 		if !ok {
-			supported := strings.Join(thImpl.getRegisteredWorkflowTypes(), ", ")
+			supported := strings.Join(env.getRegisteredWorkflowTypes(), ", ")
 			return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
 		}
 		return &workflowExecutor{name: wt.Name, fn: wf}, nil
 	}
-}
-
-func getRegisteredActivities() []Activity {
-	result := []Activity{}
-
-	thImpl.Lock()
-	for name, af := range thImpl.activityFuncMap {
-		result = append(result, &activityExecutor{name: name, fn: af})
-	}
-	thImpl.Unlock()
-	return result
 }
 
 func processTestTags(wOptions *workerOptions, ep *workerExecutionParameters) {
@@ -748,8 +746,8 @@ func isInterfaceNil(i interface{}) bool {
 	return i == nil || reflect.ValueOf(i).IsNil()
 }
 
-// Encoding is capable of encoding and decoding objects
-type Encoding interface {
+// encoding is capable of encoding and decoding objects
+type encoding interface {
 	Register(obj interface{}) error
 	Marshal(interface{}) ([]byte, error)
 	Unmarshal([]byte, interface{}) error
@@ -759,7 +757,7 @@ type Encoding interface {
 type gobEncoding struct {
 }
 
-// Register implements the Encoding interface
+// Register implements the encoding interface
 func (g gobEncoding) Register(obj interface{}) error {
 	gob.Register(obj)
 	return nil

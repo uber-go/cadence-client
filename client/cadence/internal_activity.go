@@ -3,20 +3,22 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"reflect"
 	"time"
 
-	"golang.org/x/net/context"
-
-	"fmt"
 	"github.com/uber-go/cadence-client/common"
-	"reflect"
 )
 
-// Assert that structs do indeed implement the interfaces
-var _ ActivityOptions = (*activityOptions)(nil)
-
 type (
+	// activity is an interface of an activity implementation.
+	activity interface {
+		Execute(ctx context.Context, input []byte) ([]byte, error)
+		ActivityType() ActivityType
+	}
+
 	activityInfo struct {
 		activityID string
 	}
@@ -54,9 +56,25 @@ type (
 		activityType      ActivityType
 		serviceInvoker    ServiceInvoker
 	}
+
+	// activityOptions stores all activity-specific parameters that will
+	// be stored inside of a context.
+	activityOptions struct {
+		activityID                    *string
+		taskListName                  *string
+		scheduleToCloseTimeoutSeconds *int32
+		scheduleToStartTimeoutSeconds *int32
+		startToCloseTimeoutSeconds    *int32
+		heartbeatTimeoutSeconds       *int32
+		waitForCancellation           *bool
+	}
 )
 
+// Assert that structs do indeed implement the interfaces
+var _ ActivityOptions = (*activityOptions)(nil)
+
 const activityEnvContextKey = "activityEnv"
+const activityOptionsContextKey = "activityOptions"
 
 func getActivityEnv(ctx context.Context) *activityEnvironment {
 	env := ctx.Value(activityEnvContextKey)
@@ -65,8 +83,6 @@ func getActivityEnv(ctx context.Context) *activityEnvironment {
 	}
 	return env.(*activityEnvironment)
 }
-
-const activityOptionsContextKey = "activityOptions"
 
 func getActivityOptions(ctx Context) *executeActivityParameters {
 	eap := ctx.Value(activityOptionsContextKey)
@@ -243,18 +259,6 @@ func setActivityParametersIfNotExist(ctx Context) Context {
 	return ctx
 }
 
-// activityOptions stores all activity-specific parameters that will
-// be stored inside of a context.
-type activityOptions struct {
-	activityID                    *string
-	taskListName                  *string
-	scheduleToCloseTimeoutSeconds *int32
-	scheduleToStartTimeoutSeconds *int32
-	startToCloseTimeoutSeconds    *int32
-	heartbeatTimeoutSeconds       *int32
-	waitForCancellation           *bool
-}
-
 // WithTaskList sets the task list name for this Context.
 func (ab *activityOptions) WithTaskList(name string) ActivityOptions {
 	ab.taskListName = common.StringPtr(name)
@@ -292,7 +296,7 @@ func (ab *activityOptions) WithWaitForCancellation(wait bool) ActivityOptions {
 }
 
 // WithActivityID sets the activity task list ID for this Context.
-// NOTE: We don't expose configuring Activity ID to the user, This is something will be done in future
+// NOTE: We don't expose configuring activity ID to the user, This is something will be done in future
 // so they have end to end scenario of how to use this ID to complete and fail an activity(business use case).
 func (ab *activityOptions) WithActivityID(activityID string) ActivityOptions {
 	ab.activityID = common.StringPtr(activityID)

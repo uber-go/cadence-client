@@ -62,7 +62,7 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 		Logger: logger,
 	}
 	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler(nil)}
-	activityWorker := newActivityWorker([]Activity{&greeterActivity{}}, service, executionParameters, overrides)
+	activityWorker := newActivityWorker([]activity{&greeterActivity{}}, service, executionParameters, overrides)
 	activityWorker.Start()
 	activityWorker.Stop()
 }

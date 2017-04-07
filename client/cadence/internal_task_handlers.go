@@ -55,7 +55,7 @@ type (
 	activityTaskHandlerImpl struct {
 		taskListName    string
 		identity        string
-		implementations map[ActivityType]Activity
+		implementations map[ActivityType]activity
 		service         m.TChanWorkflowService
 		metricsScope    tally.Scope
 		logger          bark.Logger
@@ -377,9 +377,9 @@ func (wth *workflowTaskHandlerImpl) reportAnyMetrics(event *s.HistoryEvent, isIn
 	}
 }
 
-func newActivityTaskHandler(activities []Activity,
+func newActivityTaskHandler(activities []activity,
 	service m.TChanWorkflowService, params workerExecutionParameters) ActivityTaskHandler {
-	implementations := make(map[ActivityType]Activity)
+	implementations := make(map[ActivityType]activity)
 	for _, a := range activities {
 		implementations[a.ActivityType()] = a
 	}
@@ -412,7 +412,7 @@ func newServiceInvoker(taskToken []byte, identity string, service m.TChanWorkflo
 
 // Execute executes an implementation of the activity.
 func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (interface{}, error) {
-	ath.logger.Debugf("[WorkflowID: %s] Execute Activity: %s",
+	ath.logger.Debugf("[WorkflowID: %s] Execute activity: %s",
 		t.GetWorkflowExecution().GetWorkflowId(), t.GetActivityType().GetName())
 
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service)

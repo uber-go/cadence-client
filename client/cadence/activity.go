@@ -13,12 +13,6 @@ type (
 		Name string
 	}
 
-	// Activity is an interface of an activity implementation.
-	Activity interface {
-		Execute(ctx context.Context, input []byte) ([]byte, error)
-		ActivityType() ActivityType
-	}
-
 	// ActivityInfo contains information about currently executing activity.
 	ActivityInfo struct {
 		TaskToken         []byte
@@ -65,7 +59,7 @@ func RecordActivityHeartbeat(ctx context.Context, details []byte) error {
 	return env.serviceInvoker.Heartbeat(details)
 }
 
-// ServiceInvoker abstracts calls to the Cadence service from an Activity implementation.
+// ServiceInvoker abstracts calls to the Cadence service from an activity implementation.
 // Implement to unit test activities.
 type ServiceInvoker interface {
 	// Returns ActivityTaskCanceledError if activity is cancelled

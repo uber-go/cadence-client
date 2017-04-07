@@ -49,7 +49,7 @@ type (
 	}
 
 	// activityRegistry collection of activity implementations
-	activityRegistry map[string]Activity
+	activityRegistry map[string]activity
 
 	// ActivityWorker wraps the code for hosting activity types.
 	// TODO: Worker doing heartbeating automatically while activity task is running
@@ -169,7 +169,7 @@ func (ww *workflowWorker) Stop() {
 }
 
 func newActivityWorker(
-	activities []Activity,
+	activities []activity,
 	service m.TChanWorkflowService,
 	params workerExecutionParameters,
 	overrides *workerOverrides,
@@ -205,7 +205,7 @@ func newActivityTaskWorker(
 
 	return &activityWorker{
 		executionParameters: workerParams,
-		activityRegistry:    make(map[string]Activity),
+		activityRegistry:    make(map[string]activity),
 		workflowService:     service,
 		worker:              base,
 		poller:              poller,
@@ -341,7 +341,7 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	// Check if already registered
 	fnName := getFunctionName(af)
 	if _, ok := th.getActivityFn(fnName); ok {
-		return fmt.Errorf("Activity type \"%v\" is already registered", fnName)
+		return fmt.Errorf("activity type \"%v\" is already registered", fnName)
 	}
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
@@ -484,8 +484,8 @@ func (th *hostEnvImpl) validateFnFormat(fnType reflect.Type, isWorkflow bool) er
 	return nil
 }
 
-func (th *hostEnvImpl) getRegisteredActivities() []Activity {
-	result := []Activity{}
+func (th *hostEnvImpl) getRegisteredActivities() []activity {
+	result := []activity{}
 	th.Lock()
 	for name, af := range thImpl.activityFuncMap {
 		result = append(result, &activityExecutor{name: name, fn: af})

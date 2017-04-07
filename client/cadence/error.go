@@ -8,7 +8,7 @@ import (
 )
 
 type (
-	// Error to return from Workflow and Activity implementations.
+	// Error to return from Workflow and activity implementations.
 	Error interface {
 		error
 		Reason() string
@@ -40,8 +40,8 @@ var _ CanceledError = (*canceledError)(nil)
 var _ TimeoutError = (*timeoutError)(nil)
 var _ PanicError = (*panicError)(nil)
 
-// ErrActivityResultPending is returned from Activity's Execute method to indicate the activity is not completed when
-// Execute method returns. Activity will be completed asynchronously when Client.CompleteActivity() is called.
+// ErrActivityResultPending is returned from activity's Execute method to indicate the activity is not completed when
+// Execute method returns. activity will be completed asynchronously when Client.CompleteActivity() is called.
 var ErrActivityResultPending = errors.New("not error: do not autocomplete, " +
 	"using Client.CompleteActivity() to complete")
 

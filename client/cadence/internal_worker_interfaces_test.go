@@ -25,7 +25,7 @@ type (
 		cancelActivity bool
 	}
 
-	// Greeter Activity
+	// Greeter activity
 	greeterActivity struct {
 	}
 
@@ -125,7 +125,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 	}
 
 	// Register activity instances and launch the worker.
-	activityWorker := newActivityWorker([]Activity{&greeterActivity{}}, service, activityExecutionParameters, nil)
+	activityWorker := newActivityWorker([]activity{&greeterActivity{}}, service, activityExecutionParameters, nil)
 	defer activityWorker.Stop()
 	activityWorker.Start()
 

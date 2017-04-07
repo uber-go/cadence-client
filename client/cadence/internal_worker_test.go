@@ -44,7 +44,7 @@ func testReplayWorkflow(ctx Context) error {
 		WithScheduleToCloseTimeout(time.Second))
 	_, err := ExecuteActivity(ctx, "testActivity")
 	if err != nil {
-		getLogger().Errorf("Activity failed with error: %v", err)
+		getLogger().Errorf("activity failed with error: %v", err)
 		panic("Failed workflow")
 	}
 	return err

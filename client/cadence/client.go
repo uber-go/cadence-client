@@ -22,7 +22,7 @@ type (
 		GetWorkflowHistory(workflowID string, runID string) (*s.History, error)
 
 		// CompleteActivity reports activity completed.
-		// Activity Execute method can return cadence.ErrActivityResultPending to
+		// activity Execute method can return cadence.ErrActivityResultPending to
 		// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method
 		// should be called when that activity is completed with the actual result and error. If err is nil, activity task
 		// completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,

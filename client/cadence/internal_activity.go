@@ -211,7 +211,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	if !ok {
 		return nil, fmt.Errorf(
 			"Failed to parse error result as it is not of error interface: %v",
-			values[resultSize-1].Interface())
+			errValue)
 	}
 	return result, errInterface
 }

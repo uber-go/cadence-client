@@ -81,7 +81,7 @@ func TestDecisionTaskHandler(t *testing.T) {
 		History:           &s.History{Events: testEvents},
 	}
 
-	r := NewWorkflowTaskHandler(logger)
+	r := NewWorkflowTaskHandler("identity", logger)
 	_, stackTrace, err := r.ProcessWorkflowTask(task, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, stackTrace, stackTrace)

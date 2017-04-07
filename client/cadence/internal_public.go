@@ -87,9 +87,9 @@ func NewActivityTaskWorker(
 // NewWorkflowTaskHandler creates an instance of a WorkflowTaskHandler from a decision poll response
 // using workflow functions registered through RegisterWorkflow
 // To be used to replay a workflow in a debugger.
-func NewWorkflowTaskHandler(logger bark.Logger) WorkflowTaskHandler {
+func NewWorkflowTaskHandler(identity string, logger bark.Logger) WorkflowTaskHandler {
 	params := workerExecutionParameters{
-		Identity: "localTaskHandler",
+		Identity: identity,
 		Logger:   logger,
 	}
 	return newWorkflowTaskHandler(
@@ -102,9 +102,9 @@ func NewWorkflowTaskHandler(logger bark.Logger) WorkflowTaskHandler {
 // using activity functions registered through RegisterActivity. service parameter is used for
 // heartbeating from activity implementation.
 // To be used to invoke registered functions for debugging purposes.
-func NewActivityTaskHandler(service m.TChanWorkflowService, logger bark.Logger) ActivityTaskHandler {
+func NewActivityTaskHandler(service m.TChanWorkflowService, identity string, logger bark.Logger) ActivityTaskHandler {
 	params := workerExecutionParameters{
-		Identity: "localTaskHandler",
+		Identity: identity,
 		Logger:   logger,
 	}
 	return newActivityTaskHandler(

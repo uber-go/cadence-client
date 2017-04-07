@@ -20,13 +20,13 @@ type (
 	}
 )
 
-// StartWorkflowExecution starts a workflow execution
+// StartWorkflow starts a workflow execution
 // The user can use this to start using a functor like.
 // Either by
-//     StartWorkflowExecution(options, "workflowTypeName", input)
+//     StartWorkflow(options, "workflowTypeName", input)
 //     or
-//     StartWorkflowExecution(options, workflowExecuteFn, arg1, arg2, arg3)
-func (wc *workflowClient) StartWorkflowExecution(
+//     StartWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+func (wc *workflowClient) StartWorkflow(
 	options StartWorkflowOptions,
 	workflowFunc interface{},
 	args ...interface{},
@@ -79,8 +79,8 @@ func (wc *workflowClient) StartWorkflowExecution(
 	return executionInfo, nil
 }
 
-// GetHistory gets history of a particular workflow.
-func (wc *workflowClient) GetHistory(workflowID string, runID string) (*s.History, error) {
+// GetWorkflowHistory gets history of a particular workflow.
+func (wc *workflowClient) GetWorkflowHistory(workflowID string, runID string) (*s.History, error) {
 	request := &s.GetWorkflowExecutionHistoryRequest{
 		Execution: &s.WorkflowExecution{
 			WorkflowId: common.StringPtr(workflowID),
@@ -100,7 +100,7 @@ func (wc *workflowClient) GetHistory(workflowID string, runID string) (*s.Histor
 	return response.GetHistory(), err
 }
 
-// CompleteActivity reports activity completed. Activity Execute method can return cadence.ActivityResultPendingError to
+// CompleteActivity reports activity completed. Activity Execute method can return cadence.ErrActivityResultPending to
 // indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method
 // should be called when that activity is completed with the actual result and error. If err is nil, activity task
 // completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,

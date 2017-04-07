@@ -167,7 +167,7 @@ func TestCreateWorker(t *testing.T) {
 
 func TestCompleteActivity(t *testing.T) {
 	mockService := new(mocks.TChanWorkflowService)
-	wfClient := NewWorkflowClient(mockService, nil)
+	wfClient := NewClient(mockService, nil)
 	var completedRequest, canceledRequest, failedRequest interface{}
 	mockService.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
@@ -194,7 +194,7 @@ func TestCompleteActivity(t *testing.T) {
 
 func TestRecordActivityHeartbeat(t *testing.T) {
 	mockService := new(mocks.TChanWorkflowService)
-	wfClient := NewWorkflowClient(mockService, nil)
+	wfClient := NewClient(mockService, nil)
 	var heartbeatRequest *s.RecordActivityTaskHeartbeatRequest
 	cancelRequested := false
 	heartbeatResponse := s.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}

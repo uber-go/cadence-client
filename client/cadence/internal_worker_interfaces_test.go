@@ -136,8 +136,8 @@ func (s *InterfacesTestSuite) TestInterface() {
 		ExecutionStartToCloseTimeoutSeconds:    10,
 		DecisionTaskStartToCloseTimeoutSeconds: 10,
 	}
-	workflowClient := NewWorkflowClient(service, nil)
-	wfExecution, err := workflowClient.StartWorkflowExecution(workflowOptions, "workflowType")
+	workflowClient := NewClient(service, nil)
+	wfExecution, err := workflowClient.StartWorkflow(workflowOptions, "workflowType")
 	s.NoError(err)
 	fmt.Printf("Started workflow: %v \n", wfExecution)
 }

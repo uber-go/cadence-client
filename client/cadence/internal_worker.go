@@ -34,7 +34,7 @@ type (
 
 	// WorkflowFactory function is used to create a workflow implementation object.
 	// It is needed as a workflow objbect is created on every decision.
-	// To start a workflow instance use NewWorkflowClient(...).StartWorkflowExecution(...)
+	// To start a workflow instance use NewClient(...).StartWorkflow(...)
 	workflowFactory func(workflowType WorkflowType) (workflow, error)
 
 	// WorkflowWorker wraps the code for hosting workflow types.

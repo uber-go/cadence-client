@@ -255,7 +255,7 @@ func reportActivityComplete(service m.TChanWorkflowService, request interface{})
 }
 
 func convertActivityResultToRespondRequest(identity string, taskToken, result []byte, err error) interface{} {
-	if err == ActivityResultPendingError {
+	if err == ErrActivityResultPending {
 		// activity result is pending and will be completed asynchronously.
 		// nothing to report at this point
 		return nil

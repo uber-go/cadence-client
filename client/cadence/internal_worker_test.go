@@ -38,7 +38,7 @@ func init() {
 	RegisterActivity(testActivityMultipleArgs)
 }
 
-func TestRegistrationListener(t *testing.T) {
+func TestActivityRegistrationListener(t *testing.T) {
 	require.Equal(t, 3, len(registeredActivities))
 	expectedActivities := []string{
 		"github.com/uber-go/cadence-client/client/cadence.testActivity",
@@ -49,6 +49,19 @@ func TestRegistrationListener(t *testing.T) {
 	expected := strings.Join(expectedActivities, ",")
 	sort.Strings(registeredActivities)
 	registered := strings.Join(registeredActivities, ",")
+	require.Equal(t, expected, registered)
+}
+
+func TestWorkflowRegistrationListener(t *testing.T) {
+	require.Equal(t, 2, len(registeredWorkflows))
+	expectedWorkflows := []string{
+		"github.com/uber-go/cadence-client/client/cadence.sampleWorkflowExecute",
+		"github.com/uber-go/cadence-client/client/cadence.testReplayWorkflow",
+	}
+	sort.Strings(expectedWorkflows)
+	expected := strings.Join(expectedWorkflows, ",")
+	sort.Strings(registeredWorkflows)
+	registered := strings.Join(registeredWorkflows, ",")
 	require.Equal(t, expected, registered)
 }
 

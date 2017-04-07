@@ -97,3 +97,18 @@ func NewWorkflowTaskHandler(logger bark.Logger) WorkflowTaskHandler {
 		params,
 		nil)
 }
+
+// NewActivityTaskHandler creates an instance of a WorkflowTaskHandler from a decision poll response
+// using activity functions registered through RegisterActivity. service parameter is used for
+// heartbeating from activity implementation.
+// To be used to invoke registered functions for debugging purposes.
+func NewActivityTaskHandler(service m.TChanWorkflowService, logger bark.Logger) ActivityTaskHandler {
+	params := workerExecutionParameters{
+		Identity: "localTaskHandler",
+		Logger:   logger,
+	}
+	return newActivityTaskHandler(
+		getHostEnvironment().getRegisteredActivities(),
+		service,
+		params)
+}

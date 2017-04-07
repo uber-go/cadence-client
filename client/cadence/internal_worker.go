@@ -308,9 +308,47 @@ type hostEnv interface {
 // hostEnvImpl is the implementation of hostEnv
 type hostEnvImpl struct {
 	sync.Mutex
-	workflowFuncMap map[string]interface{}
-	activityFuncMap map[string]interface{}
-	encoding        gobEncoding
+	workflowFuncMap               map[string]interface{}
+	activityFuncMap               map[string]interface{}
+	encoding                      gobEncoding
+	activityRegistrationListeners []func(activityName string, activity interface{})
+	workflowRegistrationListeners []func(activityName string, workflow interface{})
+}
+
+func (th *hostEnvImpl) AddWorkflowRegistrationListener(listener func(workflowName string, workflow interface{})) {
+	// As this function as well as registrations are called from init
+	// the order is not defined. So this code deals with registration before listener is
+	// registered as well as ones that come after.
+	// This is also the reason that listener cannot reject registration as it can be applied
+	// to already registered functions.
+	th.Lock()
+	funcMapCopy := make(map[string]interface{}) // used to call listener outside of the lock.
+	for w, f := range th.workflowFuncMap {
+		funcMapCopy[w] = f
+	}
+	th.workflowRegistrationListeners = append(th.workflowRegistrationListeners, listener)
+	defer th.Unlock()
+	for w, f := range funcMapCopy {
+		listener(w, f)
+	}
+}
+
+func (th *hostEnvImpl) AddActivityRegistrationListener(listener func(activityName string, activity interface{})) {
+	// As this function as well as registrations are called from init
+	// the order is not defined. So this code deals with registration before listener is
+	// registered as well as ones that come after.
+	// This is also the reason that listener cannot reject registration as it can be applied
+	// to already registered functions.
+	th.Lock()
+	funcMapCopy := make(map[string]interface{}) // used to call listener outside of the lock.
+	for w, f := range th.activityFuncMap {
+		funcMapCopy[w] = f
+	}
+	th.activityRegistrationListeners = append(th.activityRegistrationListeners, listener)
+	defer th.Unlock()
+	for w, f := range funcMapCopy {
+		listener(w, f)
+	}
 }
 
 func (th *hostEnvImpl) RegisterWorkflow(wf interface{}) error {
@@ -327,6 +365,9 @@ func (th *hostEnvImpl) RegisterWorkflow(wf interface{}) error {
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
+	}
+	for _, l := range th.workflowRegistrationListeners {
+		l(fnName, wf)
 	}
 	th.addWorkflowFn(fnName, wf)
 	return nil
@@ -346,6 +387,9 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
+	}
+	for _, l := range th.activityRegistrationListeners {
+		l(fnName, af)
 	}
 	th.addActivityFn(fnName, af)
 	return nil

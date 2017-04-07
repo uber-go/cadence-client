@@ -16,15 +16,40 @@ import (
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
+	"sort"
 )
+
+// Used to test registration listeners
+var registeredActivities []string
+var registeredWorkflows []string
 
 func init() {
 	RegisterWorkflow(sampleWorkflowExecute)
+	AddWorkflowRegistrationListener(func(workflowName string, workflow interface{}) {
+		registeredWorkflows = append(registeredWorkflows, workflowName)
+	})
 	RegisterWorkflow(testReplayWorkflow)
 
 	RegisterActivity(testActivity)
 	RegisterActivity(testActivityByteArgs)
+	AddActivityRegistrationListener(func(activityName string, activity interface{}) {
+		registeredActivities = append(registeredActivities, activityName)
+	})
 	RegisterActivity(testActivityMultipleArgs)
+}
+
+func TestRegistrationListener(t *testing.T) {
+	require.Equal(t, 3, len(registeredActivities))
+	expectedActivities := []string{
+		"github.com/uber-go/cadence-client/client/cadence.testActivity",
+		"github.com/uber-go/cadence-client/client/cadence.testActivityByteArgs",
+		"github.com/uber-go/cadence-client/client/cadence.testActivityMultipleArgs",
+	}
+	sort.Strings(expectedActivities)
+	expected := strings.Join(expectedActivities, ",")
+	sort.Strings(registeredActivities)
+	registered := strings.Join(registeredActivities, ",")
+	require.Equal(t, expected, registered)
 }
 
 func getLogger() bark.Logger {

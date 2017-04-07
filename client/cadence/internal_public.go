@@ -112,3 +112,17 @@ func NewActivityTaskHandler(service m.TChanWorkflowService, identity string, log
 		service,
 		params)
 }
+
+// AddWorkflowRegistrationListener adds listener that is called for each RegisterWorkflow call.
+// This function guarantees that listener is called for each registration even if it itself is called
+// from init()
+func AddWorkflowRegistrationListener(listener func(activityName string, workflow interface{})) {
+	getHostEnvironment().AddWorkflowRegistrationListener(listener)
+}
+
+// AddActivityRegistrationListener adds listener that is called for each RegisterActivity call.
+// This function guarantees that listener is called for each registration even if it itself is called
+// from init()
+func AddActivityRegistrationListener(listener func(activityName string, activity interface{})) {
+	getHostEnvironment().AddActivityRegistrationListener(listener)
+}

@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"time"
 
+	"errors"
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
@@ -43,12 +44,11 @@ type (
 type (
 	// workflowTaskHandlerImpl is the implementation of WorkflowTaskHandler
 	workflowTaskHandlerImpl struct {
-		taskListName       string
-		identity           string
 		workflowDefFactory workflowDefinitionFactory
 		metricsScope       tally.Scope
 		ppMgr              pressurePointMgr
 		logger             bark.Logger
+		identity           string
 	}
 
 	// activityTaskHandlerImpl is the implementation of ActivityTaskHandler
@@ -198,12 +198,11 @@ OrderEvents:
 func newWorkflowTaskHandler(factory workflowDefinitionFactory,
 	params workerExecutionParameters, ppMgr pressurePointMgr) WorkflowTaskHandler {
 	return &workflowTaskHandlerImpl{
-		taskListName:       params.TaskList,
-		identity:           params.Identity,
 		workflowDefFactory: factory,
 		logger:             params.Logger,
 		ppMgr:              ppMgr,
-		metricsScope:       params.MetricsScope}
+		metricsScope:       params.MetricsScope,
+		identity:           params.Identity}
 }
 
 // ProcessWorkflowTask processes each all the events of the workflow task.
@@ -212,7 +211,23 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	emitStack bool,
 ) (result *s.RespondDecisionTaskCompletedRequest, stackTrace string, err error) {
 	if task == nil {
-		return nil, "", fmt.Errorf("nil workflowtask provided")
+		return nil, "", errors.New("nil workflowtask provided")
+	}
+	h := task.GetHistory()
+	if h == nil || len(h.Events) == 0 {
+		return nil, "", errors.New("nil or empty history")
+	}
+	event := h.Events[0]
+	if h == nil {
+		return nil, "", errors.New("nil first history event")
+	}
+	attributes := event.GetWorkflowExecutionStartedEventAttributes()
+	if attributes == nil {
+		return nil, "", errors.New("first history event is not WorkflowExecutionStarted")
+	}
+	taskList := attributes.GetTaskList()
+	if taskList == nil {
+		return nil, "", errors.New("nil TaskList in WorkflowExecutionStarted event")
 	}
 
 	wth.logger.Debugf("Processing New Workflow Task: Type=%s, PreviousStartedEventId=%d",
@@ -221,7 +236,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	// Setup workflow Info
 	workflowInfo := &WorkflowInfo{
 		WorkflowType: flowWorkflowTypeFrom(*task.WorkflowType),
-		TaskListName: wth.taskListName,
+		TaskListName: taskList.GetName(),
 		// workflowExecution
 	}
 
@@ -238,7 +253,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	eventHandler := newWorkflowExecutionEventHandler(
 		workflowInfo, wth.workflowDefFactory, completeHandler, wth.logger)
 	defer eventHandler.Close()
-	history := newHistory(&workflowTask{task: task}, eventHandler.(*workflowExecutionEventHandlerImpl))
+	reorderedHistory := newHistory(&workflowTask{task: task}, eventHandler.(*workflowExecutionEventHandlerImpl))
 	decisions := []*s.Decision{}
 	unhandledDecision := false
 
@@ -247,7 +262,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	// Process events
 ProcessEvents:
 	for {
-		reorderedEvents := history.NextEvents()
+		reorderedEvents := reorderedHistory.NextEvents()
 		if len(reorderedEvents) == 0 {
 			break ProcessEvents
 		}
@@ -255,7 +270,7 @@ ProcessEvents:
 		for _, event := range reorderedEvents {
 			wth.logger.Debugf("ProcessEvent: Id=%d, EventType=%v", event.GetEventId(), event.GetEventType())
 
-			isInReplay := event.GetEventId() < history.LastNonReplayedID()
+			isInReplay := event.GetEventId() < reorderedHistory.LastNonReplayedID()
 
 			// Any metrics.
 			wth.reportAnyMetrics(event, isInReplay)

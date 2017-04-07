@@ -81,11 +81,11 @@ func TestDecisionTaskHandler(t *testing.T) {
 		History:           &s.History{Events: testEvents},
 	}
 
-	r := NewDecisionTaskHandler(task, logger)
-	err := r.Process(true)
+	r := NewWorkflowTaskHandler(logger)
+	_, stackTrace, err := r.ProcessWorkflowTask(task, true)
 	require.NoError(t, err)
-	require.NotEmpty(t, r.StackTrace(), r.StackTrace())
-	require.Contains(t, r.StackTrace(), "cadence.ExecuteActivity")
+	require.NotEmpty(t, stackTrace, stackTrace)
+	require.Contains(t, stackTrace, "cadence.ExecuteActivity")
 }
 
 // testSampleWorkflow
@@ -117,6 +117,7 @@ func TestCreateWorker(t *testing.T) {
 	activityType := "github.com/uber-go/cadence-client/client/cadence.testActivity"
 	workflowType := "github.com/uber-go/cadence-client/client/cadence.sampleWorkflowExecute"
 	activityID := "a1"
+	taskList := "tl1"
 	var startedEventID int64 = 10
 	input, err := marshalFunctionArgs(activityType, []interface{}{})
 	require.NoError(t, err)
@@ -135,7 +136,13 @@ func TestCreateWorker(t *testing.T) {
 		WorkflowType:           &s.WorkflowType{Name: &workflowType},
 		StartedEventId:         &startedEventID,
 		PreviousStartedEventId: &startedEventID,
-		History:                &s.History{},
+		History: &s.History{
+			Events: []*s.HistoryEvent{
+				{WorkflowExecutionStartedEventAttributes: &s.WorkflowExecutionStartedEventAttributes{
+					TaskList: &s.TaskList{Name: &taskList},
+				}},
+			},
+		},
 	}
 	// mocks
 	service.On("PollForActivityTask", mock.Anything, mock.Anything).Return(activityTask, nil)

@@ -87,12 +87,13 @@ func createWorkflowTask(events []*m.HistoryEvent, previousStartEventID int64) *m
 }
 
 func (s *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
+	taskList := "tl1"
 	testEvents := []*m.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{}),
+		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{TaskList: &m.TaskList{Name: &taskList}}),
 	}
 	task := createWorkflowTask(testEvents, 0)
 	params := workerExecutionParameters{
-		TaskList: "taskListName",
+		TaskList: taskList,
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
@@ -107,15 +108,16 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
 
 func (s *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 	// Schedule an activity and see if we complete workflow.
+	taskList := "tl1"
 	testEvents := []*m.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{}),
+		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{TaskList: &m.TaskList{Name: &taskList}}),
 		createTestEventActivityTaskScheduled(2, &m.ActivityTaskScheduledEventAttributes{ActivityId: common.StringPtr("0")}),
 		createTestEventActivityTaskStarted(3, &m.ActivityTaskStartedEventAttributes{}),
 		createTestEventActivityTaskCompleted(4, &m.ActivityTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
 	}
 	task := createWorkflowTask(testEvents, 0)
 	params := workerExecutionParameters{
-		TaskList: "taskListName",
+		TaskList: taskList,
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
@@ -142,8 +144,9 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 
 func (s *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityTask() {
 	// Schedule an activity and see if we complete workflow.
+	taskList := "tl1"
 	testEvents := []*m.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{}),
+		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{TaskList: &m.TaskList{Name: &taskList}}),
 		createTestEventDecisionTaskScheduled(2, &m.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
 	}
@@ -154,7 +157,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityTask() {
 	}
 
 	params := workerExecutionParameters{
-		TaskList: "taskListName",
+		TaskList: taskList,
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
@@ -175,8 +178,9 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityTask() {
 
 func (s *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 	// Schedule a decision activity and see if we complete workflow.
+	taskList := "tl1"
 	testEvents := []*m.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{}),
+		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{TaskList: &m.TaskList{Name: &taskList}}),
 		createTestEventActivityTaskScheduled(2, &m.ActivityTaskScheduledEventAttributes{ActivityId: common.StringPtr("0")}),
 	}
 	task := createWorkflowTask(testEvents, 0)
@@ -186,7 +190,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 	ppMgr := &pressurePointMgrImpl{config: pressurePoints, logger: s.logger}
 
 	params := workerExecutionParameters{
-		TaskList: "taskListName",
+		TaskList: taskList,
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}

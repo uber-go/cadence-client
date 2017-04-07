@@ -182,7 +182,35 @@ func newActivityWorker(
 	} else {
 		taskHandler = newActivityTaskHandler(activities, service, params)
 	}
-	return NewActivityTaskWorker(taskHandler, service, params)
+	return newActivityTaskWorker(taskHandler, service, params)
+}
+
+func newActivityTaskWorker(
+	taskHandler ActivityTaskHandler,
+	service m.TChanWorkflowService,
+	workerParams workerExecutionParameters) (worker Worker) {
+
+	poller := newActivityTaskPoller(
+		taskHandler,
+		service,
+		workerParams,
+	)
+	base := newBaseWorker(baseWorkerOptions{
+		routineCount:    workerParams.ConcurrentPollRoutineSize,
+		taskPoller:      poller,
+		workflowService: service,
+		identity:        workerParams.Identity,
+		workerType:      "ActivityWorker"},
+		workerParams.Logger)
+
+	return &activityWorker{
+		executionParameters: workerParams,
+		activityRegistry:    make(map[string]Activity),
+		workflowService:     service,
+		worker:              base,
+		poller:              poller,
+		identity:            workerParams.Identity,
+	}
 }
 
 // Start the worker.

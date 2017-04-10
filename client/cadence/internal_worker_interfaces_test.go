@@ -57,6 +57,7 @@ func (wf helloWorldWorkflow) Execute(env workflowEnvironment, input []byte) {
 	}
 	a := env.ExecuteActivity(activityParameters, func(result []byte, err error) {
 		if err != nil {
+			_, err := isExecuteDispatchOnError(err)
 			if _, ok := err.(CanceledError); !ok {
 				env.Complete(nil, err)
 				return

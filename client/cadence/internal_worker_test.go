@@ -72,7 +72,7 @@ func getLogger() bark.Logger {
 	formatter := &log.TextFormatter{}
 	formatter.FullTimestamp = true
 	log1 := log.New()
-	log1.Level = log.DebugLevel
+	//log1.Level = log.DebugLevel
 	log1.Formatter = formatter
 	return bark.NewLoggerFromLogrus(log1)
 }

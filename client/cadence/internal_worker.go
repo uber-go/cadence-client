@@ -308,11 +308,11 @@ type hostEnv interface {
 // hostEnvImpl is the implementation of hostEnv
 type hostEnvImpl struct {
 	sync.Mutex
-	workflowFuncMap               map[string]interface{}
-	activityFuncMap               map[string]interface{}
-	encoding                      gobEncoding
-	activityRegistrationListeners []func(activityName string, workflow interface{}) (string, interface{})
-	workflowRegistrationListeners []func(activityName string, workflow interface{}) (string, interface{})
+	workflowFuncMap                  map[string]interface{}
+	activityFuncMap                  map[string]interface{}
+	encoding                         gobEncoding
+	activityRegistrationInterceptors []func(name string, workflow interface{}) (string, interface{})
+	workflowRegistrationInterceptors []func(name string, workflow interface{}) (string, interface{})
 }
 
 func (th *hostEnvImpl) AddWorkflowRegistrationInterceptor(
@@ -324,7 +324,7 @@ func (th *hostEnvImpl) AddWorkflowRegistrationInterceptor(
 	// to already registered functions.
 	th.Lock()
 	funcMapCopy := th.workflowFuncMap // used to call listener outside of the lock.
-	th.workflowRegistrationListeners = append(th.workflowRegistrationListeners, i)
+	th.workflowRegistrationInterceptors = append(th.workflowRegistrationInterceptors, i)
 	th.workflowFuncMap = make(map[string]interface{}) // clear map
 	th.Unlock()
 	for w, f := range funcMapCopy {
@@ -344,7 +344,7 @@ func (th *hostEnvImpl) AddActivityRegistrationInterceptor(
 	// to already registered functions.
 	th.Lock()
 	funcMapCopy := th.activityFuncMap // used to call listener outside of the lock.
-	th.activityRegistrationListeners = append(th.activityRegistrationListeners, i)
+	th.activityRegistrationInterceptors = append(th.activityRegistrationInterceptors, i)
 	th.activityFuncMap = make(map[string]interface{}) // clear map
 	th.Unlock()
 	for w, f := range funcMapCopy {
@@ -370,7 +370,7 @@ func (th *hostEnvImpl) RegisterWorkflow(wf interface{}) error {
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
-	for _, l := range th.workflowRegistrationListeners {
+	for _, l := range th.workflowRegistrationInterceptors {
 		l(fnName, wf)
 	}
 	th.addWorkflowFn(fnName, wf)
@@ -392,7 +392,7 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
-	for _, l := range th.activityRegistrationListeners {
+	for _, l := range th.activityRegistrationInterceptors {
 		l(fnName, af)
 	}
 	th.addActivityFn(fnName, af)

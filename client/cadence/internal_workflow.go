@@ -745,3 +745,11 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*
 	}
 	return &WorkflowType{Name: fnName}, input, nil
 }
+
+func isExecuteDispatchOnError(e error) (bool, error) {
+	if e != nil && e == errCancelInternal {
+		// We would like to avoid calling dispatch again as we are wrapping up on cancel handler.
+		return false, NewCanceledError()
+	}
+	return true, e
+}

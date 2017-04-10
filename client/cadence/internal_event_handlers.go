@@ -16,6 +16,12 @@ import (
 var _ workflowEnvironment = (*workflowEnvironmentImpl)(nil)
 var _ workflowExecutionEventHandler = (*workflowExecutionEventHandlerImpl)(nil)
 
+var (
+	// This error code is only for our sync and async layer interaction.
+	// While replaying an event we would like to avoid calling dispatcher again.
+	errCancelInternal = errors.New("Cancelling the activity/timer as a result of request made by sync layer.")
+)
+
 type (
 	// completionHandler Handler to indicate completion result
 	completionHandler func(result []byte, err error)
@@ -126,7 +132,7 @@ func (wc *workflowEnvironmentImpl) RequestCancelActivity(activityID string) {
 	wc.executeDecisions = append(wc.executeDecisions, decision)
 
 	if wait, ok := wc.waitForCancelRequestActivities[activityID]; ok && !wait {
-		handler(nil, NewCanceledError())
+		handler(nil, errCancelInternal)
 	}
 	wc.logger.Debugf("RequestCancelActivity: %v.", requestCancelAttr.GetActivityId())
 }
@@ -175,7 +181,7 @@ func (wc *workflowEnvironmentImpl) RequestCancelTimer(timerID string) {
 
 	wc.executeDecisions = append(wc.executeDecisions, decision)
 
-	handler(nil, NewCanceledError())
+	handler(nil, errCancelInternal)
 	delete(wc.scheduledTimers, timerID)
 
 	wc.logger.Debugf("RequestCancelTimer: %v.", timerID)

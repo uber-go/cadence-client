@@ -25,15 +25,18 @@ var registeredWorkflows []string
 
 func init() {
 	RegisterWorkflow(sampleWorkflowExecute)
-	AddWorkflowRegistrationListener(func(workflowName string, workflow interface{}) {
+	AddWorkflowRegistrationInterceptor(func(workflowName string, workflow interface{}) (string, interface{}) {
 		registeredWorkflows = append(registeredWorkflows, workflowName)
+		return workflowName, workflow
 	})
 	RegisterWorkflow(testReplayWorkflow)
 
 	RegisterActivity(testActivity)
 	RegisterActivity(testActivityByteArgs)
-	AddActivityRegistrationListener(func(activityName string, activity interface{}) {
+	AddActivityRegistrationInterceptor(func(activityName string, activity interface{}) (string, interface{}) {
 		registeredActivities = append(registeredActivities, activityName)
+		return activityName, activity
+
 	})
 	RegisterActivity(testActivityMultipleArgs)
 }

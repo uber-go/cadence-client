@@ -311,43 +311,47 @@ type hostEnvImpl struct {
 	workflowFuncMap               map[string]interface{}
 	activityFuncMap               map[string]interface{}
 	encoding                      gobEncoding
-	activityRegistrationListeners []func(activityName string, activity interface{})
-	workflowRegistrationListeners []func(activityName string, workflow interface{})
+	activityRegistrationListeners []func(activityName string, workflow interface{}) (string, interface{})
+	workflowRegistrationListeners []func(activityName string, workflow interface{}) (string, interface{})
 }
 
-func (th *hostEnvImpl) AddWorkflowRegistrationListener(listener func(workflowName string, workflow interface{})) {
+func (th *hostEnvImpl) AddWorkflowRegistrationInterceptor(
+	i func(name string, workflow interface{}) (string, interface{})) {
 	// As this function as well as registrations are called from init
 	// the order is not defined. So this code deals with registration before listener is
 	// registered as well as ones that come after.
 	// This is also the reason that listener cannot reject registration as it can be applied
 	// to already registered functions.
 	th.Lock()
-	funcMapCopy := make(map[string]interface{}) // used to call listener outside of the lock.
-	for w, f := range th.workflowFuncMap {
-		funcMapCopy[w] = f
-	}
-	th.workflowRegistrationListeners = append(th.workflowRegistrationListeners, listener)
-	defer th.Unlock()
+	funcMapCopy := th.workflowFuncMap // used to call listener outside of the lock.
+	th.workflowRegistrationListeners = append(th.workflowRegistrationListeners, i)
+	th.workflowFuncMap = make(map[string]interface{}) // clear map
+	th.Unlock()
 	for w, f := range funcMapCopy {
-		listener(w, f)
+		intw, intf := i(w, f)
+		th.Lock()
+		th.workflowFuncMap[intw] = intf
+		th.Unlock()
 	}
 }
 
-func (th *hostEnvImpl) AddActivityRegistrationListener(listener func(activityName string, activity interface{})) {
+func (th *hostEnvImpl) AddActivityRegistrationInterceptor(
+	i func(name string, activity interface{}) (string, interface{})) {
 	// As this function as well as registrations are called from init
 	// the order is not defined. So this code deals with registration before listener is
 	// registered as well as ones that come after.
 	// This is also the reason that listener cannot reject registration as it can be applied
 	// to already registered functions.
 	th.Lock()
-	funcMapCopy := make(map[string]interface{}) // used to call listener outside of the lock.
-	for w, f := range th.activityFuncMap {
-		funcMapCopy[w] = f
-	}
-	th.activityRegistrationListeners = append(th.activityRegistrationListeners, listener)
-	defer th.Unlock()
+	funcMapCopy := th.activityFuncMap // used to call listener outside of the lock.
+	th.activityRegistrationListeners = append(th.activityRegistrationListeners, i)
+	th.activityFuncMap = make(map[string]interface{}) // clear map
+	th.Unlock()
 	for w, f := range funcMapCopy {
-		listener(w, f)
+		intw, intf := i(w, f)
+		th.Lock()
+		th.activityFuncMap[intw] = intf
+		th.Unlock()
 	}
 }
 

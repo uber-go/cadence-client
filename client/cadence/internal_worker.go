@@ -355,25 +355,31 @@ func (th *hostEnvImpl) AddActivityRegistrationInterceptor(
 	}
 }
 
-func (th *hostEnvImpl) RegisterWorkflow(wf interface{}) error {
+func (th *hostEnvImpl) RegisterWorkflow(af interface{}) error {
 	// Validate that it is a function
-	fnType := reflect.TypeOf(wf)
-	if err := th.validateFnFormat(fnType, true); err != nil {
+	fnType := reflect.TypeOf(af)
+	if err := th.validateFnFormat(fnType, false); err != nil {
 		return err
 	}
 	// Check if already registered
-	fnName := getFunctionName(wf)
+	fnName := getFunctionName(af)
 	if _, ok := th.getWorkflowFn(fnName); ok {
-		return fmt.Errorf("Workflow type \"%v\" is already registered", fnName)
+		return fmt.Errorf("workflow type \"%v\" is already registered", fnName)
 	}
+	th.Lock()
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
-	for _, l := range th.workflowRegistrationInterceptors {
-		l(fnName, wf)
+	var interceptors []func(name string, workflow interface{}) (string, interface{})
+	for _, i := range th.workflowRegistrationInterceptors {
+		interceptors = append(interceptors, i)
 	}
-	th.addWorkflowFn(fnName, wf)
+	th.Unlock()
+	for _, l := range interceptors {
+		fnName, af = l(fnName, af)
+	}
+	th.addWorkflowFn(fnName, af)
 	return nil
 }
 
@@ -388,12 +394,18 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	if _, ok := th.getActivityFn(fnName); ok {
 		return fmt.Errorf("activity type \"%v\" is already registered", fnName)
 	}
+	th.Lock()
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
-	for _, l := range th.activityRegistrationInterceptors {
-		l(fnName, af)
+	var interceptors []func(name string, workflow interface{}) (string, interface{})
+	for _, i := range th.activityRegistrationInterceptors {
+		interceptors = append(interceptors, i)
+	}
+	th.Unlock()
+	for _, l := range interceptors {
+		fnName, af = l(fnName, af)
 	}
 	th.addActivityFn(fnName, af)
 	return nil

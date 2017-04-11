@@ -172,7 +172,6 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result in
 	channelName := fmt.Sprintf("\"activity %v\"", parameters.ActivityID)
 	resultChannel := NewNamedBufferedChannel(ctx, channelName, 1)
 	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
-		executeDispatch, e := isExecuteDispatchOnError(e)
 		var serializeErr error
 		if result, serializeErr = deSerializeFunctionResult(f, r); serializeErr != nil {
 			e = serializeErr
@@ -182,9 +181,7 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) (result in
 		if !ok {
 			panic("unexpected")
 		}
-		if executeDispatch {
-			executeDispatcher(ctx, getDispatcher(ctx))
-		}
+		executeDispatcher(ctx, getDispatcher(ctx))
 	})
 	Go(ctx, func(ctx Context) {
 		if ctx.Done() == nil {
@@ -236,15 +233,12 @@ func ExecuteActivityAsync(ctx Context, f interface{}, args ...interface{}) Futur
 	parameters.Input = input
 
 	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
-		executeDispatch, e := isExecuteDispatchOnError(e)
 		result, serializeErr := deSerializeFunctionResult(f, r)
 		if serializeErr != nil {
 			e = serializeErr
 		}
 		settable.Set(result, e)
-		if executeDispatch {
-			executeDispatcher(ctx, getDispatcher(ctx))
-		}
+		executeDispatcher(ctx, getDispatcher(ctx))
 	})
 	Go(ctx, func(ctx Context) {
 		if ctx.Done() == nil {
@@ -288,11 +282,8 @@ func NewTimer(ctx Context, d time.Duration) Future {
 	}
 
 	t := getWorkflowEnvironment(ctx).NewTimer(d, func(r []byte, e error) {
-		executeDispatch, e := isExecuteDispatchOnError(e)
 		settable.Set(nil, e)
-		if executeDispatch {
-			executeDispatcher(ctx, getDispatcher(ctx))
-		}
+		executeDispatcher(ctx, getDispatcher(ctx))
 	})
 	if t != nil {
 		Go(ctx, func(ctx Context) {

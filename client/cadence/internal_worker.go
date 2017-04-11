@@ -397,7 +397,7 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 
 func (th *hostEnvImpl) invokeInterceptors(name string, f interface{}, interceptors []interceptorFn) (string, interface{}) {
 	th.Lock()
-	var copy []func(name string, workflow interface{}) (string, interface{})
+	var copy []interceptorFn
 	for _, i := range interceptors {
 		copy = append(copy, i)
 	}

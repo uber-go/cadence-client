@@ -313,7 +313,7 @@ ProcessEvents:
 
 	// check if decisions from reply matches to the history events
 	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
-		wth.logger.Warnf("Nondeterministic workflow detected, %+v", err)
+		wth.logger.Warnf("replay and history match failed: %s", err)
 		return nil, "", err
 	}
 

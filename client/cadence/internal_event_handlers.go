@@ -35,22 +35,13 @@ type (
 		scheduledActivites             map[string]resultHandler // Map of Activities(activity ID ->) and their response handlers
 		waitForCancelRequestActivities map[string]bool          // Map of activity ID to whether to wait for cancelation.
 		scheduledEventIDToActivityID   map[int64]string         // Mapping from scheduled event ID to activity ID
-		scheduledTimers   map[string]resultHandler              // Map of scheduledTimers(timer ID ->) and their response handlers
-		counterID         int32                                 // To generate activity IDs
-		executeDecisions  []*m.Decision                         // Decisions made during the execute of the workflow
-		completeHandler   completionHandler                     // events completion handler
-		currentReplayTime time.Time                             // Indicates current replay time of the decision.
-		pendingHandlers   []*handlerSignature                   // Pending handlers that need to be executed at the end of the event.
-		logger            bark.Logger
-	}
-
-	// handlerSignature represents a handler to invoke.
-	// Our replay is designed to replay one event and we accumulate any pending handlers
-	// to process at the end of the processing the event.
-	handlerSignature struct {
-		handler resultHandler
-		result  []byte
-		err     error
+		scheduledTimers                map[string]resultHandler // Map of scheduledTimers(timer ID ->) and their response handlers
+		counterID                      int32                    // To generate activity IDs
+		executeDecisions               []*m.Decision            // Decisions made during the execute of the workflow
+		completeHandler                completionHandler        // events completion handler
+		currentReplayTime              time.Time                // Indicates current replay time of the decision.
+		postEventHooks                 []func()                 // postEvent hooks that need to be executed at the end of the event.
+		logger                         bark.Logger
 	}
 )
 
@@ -65,7 +56,7 @@ func newWorkflowExecutionEventHandler(workflowInfo *WorkflowInfo, workflowDefini
 		scheduledTimers:                make(map[string]resultHandler),
 		executeDecisions:               make([]*m.Decision, 0),
 		completeHandler:                completeHandler,
-		pendingHandlers:                []*handlerSignature{},
+		postEventHooks:                 []func(){},
 		logger:                         logger}
 	return &workflowExecutionEventHandlerImpl{context, nil, logger}
 }
@@ -137,7 +128,9 @@ func (wc *workflowEnvironmentImpl) RequestCancelActivity(activityID string) {
 	wc.executeDecisions = append(wc.executeDecisions, decision)
 
 	if wait, ok := wc.waitForCancelRequestActivities[activityID]; ok && !wait {
-		wc.addPendingHandler(&handlerSignature{handler: handler, result: nil, err: NewCanceledError()})
+		wc.addPostEventHooks(func() {
+			handler(nil, NewCanceledError())
+		})
 	}
 	wc.logger.Debugf("RequestCancelActivity: %v.", requestCancelAttr.GetActivityId())
 }
@@ -186,14 +179,16 @@ func (wc *workflowEnvironmentImpl) RequestCancelTimer(timerID string) {
 
 	wc.executeDecisions = append(wc.executeDecisions, decision)
 
-	wc.addPendingHandler(&handlerSignature{handler: handler, result: nil, err: NewCanceledError()})
+	wc.addPostEventHooks(func() {
+		handler(nil, NewCanceledError())
+	})
 	delete(wc.scheduledTimers, timerID)
 
 	wc.logger.Debugf("RequestCancelTimer: %v.", timerID)
 }
 
-func (wc *workflowEnvironmentImpl) addPendingHandler(handler *handlerSignature) {
-	wc.pendingHandlers = append(wc.pendingHandlers, handler)
+func (wc *workflowEnvironmentImpl) addPostEventHooks(hook func()) {
+	wc.postEventHooks = append(wc.postEventHooks, hook)
 }
 
 func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(event *m.HistoryEvent) ([]*m.Decision, bool, error) {
@@ -280,12 +275,12 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(event *m.HistoryEvent
 		return nil, unhandledDecision, fmt.Errorf("missing event handler for event type: %v", event)
 	}
 
-	// Invoke any pending handlers that has been added while processing the event.
-	if len(weh.pendingHandlers) > 0 {
-		for _, c := range weh.pendingHandlers {
-			c.handler(c.result, c.err)
+	// Invoke any pending post event hooks that have been added while processing the event.
+	if len(weh.postEventHooks) > 0 {
+		for _, c := range weh.postEventHooks {
+			c()
 		}
-		weh.pendingHandlers = []*handlerSignature{}
+		weh.postEventHooks = []func(){}
 	}
 	return weh.SwapExecuteDecisions([]*m.Decision{}), unhandledDecision, nil
 }

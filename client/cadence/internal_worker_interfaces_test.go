@@ -12,7 +12,6 @@ import (
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/mocks"
-	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 var (
@@ -55,7 +54,8 @@ func (wf helloWorldWorkflow) Execute(env workflowEnvironment, input []byte) {
 		TaskListName: "taskList",
 		ActivityType: ActivityType{activityName},
 		Input:        nil,
-	}≈c(result []byte, err error) {
+	}
+	a := env.ExecuteActivity(activityParameters, func(result []byte, err error) {
 		if err != nil {
 			if _, ok := err.(CanceledError); !ok {
 				env.Complete(nil, err)

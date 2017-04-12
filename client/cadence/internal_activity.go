@@ -234,7 +234,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 
 func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte) (interface{}, error) {
 	if fnType.Kind() != reflect.Func {
-		panic("expecting only function type.")
+		return nil, fmt.Errorf("expecting only function type but got type: %v.", fnType)
 	}
 
 	// We already validated during registration that it either have (result, error) (or) just error.

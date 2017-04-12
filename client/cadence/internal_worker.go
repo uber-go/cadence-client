@@ -367,7 +367,7 @@ func (th *hostEnvImpl) AddActivityRegistrationInterceptor(i interceptorFn) {
 func (th *hostEnvImpl) RegisterWorkflow(af interface{}) error {
 	// Validate that it is a function
 	fnType := reflect.TypeOf(af)
-	if err := validateFnFormat(fnType, false); err != nil {
+	if err := validateFnFormat(fnType, true); err != nil {
 		return err
 	}
 	// Check if already registered

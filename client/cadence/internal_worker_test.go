@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -16,7 +17,6 @@ import (
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
-	"sort"
 )
 
 // Used to test registration listeners
@@ -106,10 +106,12 @@ func TestDecisionTaskHandler(t *testing.T) {
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
 		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{}),
-		createTestEventActivityTaskScheduled(2, &s.ActivityTaskScheduledEventAttributes{
-			ActivityId: common.StringPtr("0"),
+		createTestEventActivityTaskScheduled(5, &s.ActivityTaskScheduledEventAttributes{
+			ActivityId:   common.StringPtr("0"),
+			ActivityType: &s.ActivityType{Name: common.StringPtr("testActivity")},
+			TaskList:     &s.TaskList{Name: &taskList},
 		}),
-		createTestEventActivityTaskStarted(3, &s.ActivityTaskStartedEventAttributes{}),
+		createTestEventActivityTaskStarted(6, &s.ActivityTaskStartedEventAttributes{}),
 	}
 
 	workflowType := "github.com/uber-go/cadence-client/client/cadence.testReplayWorkflow"
@@ -117,9 +119,10 @@ func TestDecisionTaskHandler(t *testing.T) {
 	runID := "testRunID"
 
 	task := &s.PollForDecisionTaskResponse{
-		WorkflowExecution: &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
-		WorkflowType:      &s.WorkflowType{Name: &workflowType},
-		History:           &s.History{Events: testEvents},
+		WorkflowExecution:      &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
+		WorkflowType:           &s.WorkflowType{Name: &workflowType},
+		History:                &s.History{Events: testEvents},
+		PreviousStartedEventId: common.Int64Ptr(5),
 	}
 
 	r := NewWorkflowTaskHandler("identity", logger)

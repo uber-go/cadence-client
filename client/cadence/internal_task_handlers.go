@@ -364,11 +364,11 @@ func matchReplayWithHistory(replayDecisions []*s.Decision, historyEvents []*s.Hi
 	for i := 0; i < len(historyEvents); i++ {
 		e := historyEvents[i]
 		if i >= len(replayDecisions) {
-			return fmt.Errorf("missing replay decision for %s", historyEventToString(e))
+			return fmt.Errorf("nondeterministic workflow: missing replay decision for %s", historyEventToString(e))
 		}
 		d := replayDecisions[i]
 		if !isDecisionMatchEvent(d, e, false) {
-			return fmt.Errorf("replay decision does not match to history event, history event is %s, replay decision is %s",
+			return fmt.Errorf("nondeterministic workflow: history event is %s, replay decision is %s",
 				historyEventToString(e), decisionToString(d))
 		}
 	}

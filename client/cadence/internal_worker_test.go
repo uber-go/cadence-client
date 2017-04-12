@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"sort"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -16,7 +18,6 @@ import (
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
-	"sort"
 )
 
 // Used to test registration listeners
@@ -106,10 +107,12 @@ func TestDecisionTaskHandler(t *testing.T) {
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
 		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{}),
-		createTestEventActivityTaskScheduled(2, &s.ActivityTaskScheduledEventAttributes{
-			ActivityId: common.StringPtr("0"),
+		createTestEventActivityTaskScheduled(5, &s.ActivityTaskScheduledEventAttributes{
+			ActivityId:   common.StringPtr("0"),
+			ActivityType: &s.ActivityType{Name: common.StringPtr("testActivity")},
+			TaskList:     &s.TaskList{Name: &taskList},
 		}),
-		createTestEventActivityTaskStarted(3, &s.ActivityTaskStartedEventAttributes{}),
+		createTestEventActivityTaskStarted(6, &s.ActivityTaskStartedEventAttributes{}),
 	}
 
 	workflowType := "github.com/uber-go/cadence-client/client/cadence.testReplayWorkflow"
@@ -117,9 +120,10 @@ func TestDecisionTaskHandler(t *testing.T) {
 	runID := "testRunID"
 
 	task := &s.PollForDecisionTaskResponse{
-		WorkflowExecution: &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
-		WorkflowType:      &s.WorkflowType{Name: &workflowType},
-		History:           &s.History{Events: testEvents},
+		WorkflowExecution:      &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
+		WorkflowType:           &s.WorkflowType{Name: &workflowType},
+		History:                &s.History{Events: testEvents},
+		PreviousStartedEventId: common.Int64Ptr(5),
 	}
 
 	r := NewWorkflowTaskHandler("identity", logger)
@@ -152,6 +156,8 @@ func TestCreateWorker(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
 	logger := getLogger()
+
+	domain := "testDomain"
 
 	workflowID := "w1"
 	runID := "r1"
@@ -197,6 +203,7 @@ func TestCreateWorker(t *testing.T) {
 	// Start Worker.
 	worker := NewWorker(
 		service,
+		domain,
 		"testGroupName2",
 		workerOptions)
 	err = worker.Start()
@@ -208,7 +215,8 @@ func TestCreateWorker(t *testing.T) {
 
 func TestCompleteActivity(t *testing.T) {
 	mockService := new(mocks.TChanWorkflowService)
-	wfClient := NewClient(mockService, nil)
+	domain := "testDomain"
+	wfClient := NewClient(mockService, domain, nil)
 	var completedRequest, canceledRequest, failedRequest interface{}
 	mockService.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
@@ -235,7 +243,8 @@ func TestCompleteActivity(t *testing.T) {
 
 func TestRecordActivityHeartbeat(t *testing.T) {
 	mockService := new(mocks.TChanWorkflowService)
-	wfClient := NewClient(mockService, nil)
+	domain := "testDomain"
+	wfClient := NewClient(mockService, domain, nil)
 	var heartbeatRequest *s.RecordActivityTaskHeartbeatRequest
 	cancelRequested := false
 	heartbeatResponse := s.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}

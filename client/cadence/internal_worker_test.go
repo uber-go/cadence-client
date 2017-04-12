@@ -43,11 +43,12 @@ func init() {
 }
 
 func TestActivityRegistrationListener(t *testing.T) {
-	require.Equal(t, 3, len(registeredActivities))
+	require.Equal(t, 4, len(registeredActivities))
 	expectedActivities := []string{
 		"github.com/uber-go/cadence-client/client/cadence.testActivity",
 		"github.com/uber-go/cadence-client/client/cadence.testActivityByteArgs",
 		"github.com/uber-go/cadence-client/client/cadence.testActivityMultipleArgs",
+		"github.com/uber-go/cadence-client/client/cadence.testActivityReturnString",
 	}
 	sort.Strings(expectedActivities)
 	expected := strings.Join(expectedActivities, ",")
@@ -73,7 +74,7 @@ func getLogger() bark.Logger {
 	formatter := &log.TextFormatter{}
 	formatter.FullTimestamp = true
 	log1 := log.New()
-	log1.Level = log.DebugLevel
+	//log1.Level = log.DebugLevel
 	log1.Formatter = formatter
 	return bark.NewLoggerFromLogrus(log1)
 }

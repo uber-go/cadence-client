@@ -9,13 +9,13 @@ import (
 )
 
 func anyToString(d interface{}) string {
-	var buf bytes.Buffer
 	v := reflect.ValueOf(d)
-	t := reflect.TypeOf(d)
 	switch v.Kind() {
 	case reflect.Ptr:
-		buf.WriteString(anyToString(v.Elem().Interface()))
+		return anyToString(v.Elem().Interface())
 	case reflect.Struct:
+		var buf bytes.Buffer
+		t := reflect.TypeOf(d)
 		buf.WriteString("(")
 		for i := 0; i < v.NumField(); i++ {
 			f := v.Field(i)
@@ -26,16 +26,16 @@ func anyToString(d interface{}) string {
 			if len(fieldValue) == 0 {
 				continue
 			}
-			if i > 0 {
+			if buf.Len() > 1 {
 				buf.WriteString(", ")
 			}
 			buf.WriteString(fmt.Sprintf("%s:%s", t.Field(i).Name, fieldValue))
 		}
 		buf.WriteString(")")
+		return buf.String()
 	default:
-		buf.WriteString(fmt.Sprint(d))
+		return fmt.Sprint(d)
 	}
-	return buf.String()
 }
 
 func valueToString(v reflect.Value) string {
@@ -48,7 +48,7 @@ func valueToString(v reflect.Value) string {
 		return ""
 	case reflect.Slice:
 		// TODO: find a better way to handle this.
-		return fmt.Sprintf("len=%d", v.Len())
+		return fmt.Sprintf("[len=%d]", v.Len())
 	default:
 		return fmt.Sprint(v.Interface())
 	}
@@ -56,106 +56,112 @@ func valueToString(v reflect.Value) string {
 
 // HistoryEventToString convert HistoryEvent to string
 func HistoryEventToString(e *s.HistoryEvent) string {
-	var attr interface{}
+	var data interface{}
 	switch e.GetEventType() {
 	case s.EventType_WorkflowExecutionStarted:
-		attr = e.GetWorkflowExecutionStartedEventAttributes()
+		data = e.GetWorkflowExecutionStartedEventAttributes()
 
 	case s.EventType_WorkflowExecutionCompleted:
-		attr = e.GetWorkflowExecutionCompletedEventAttributes()
+		data = e.GetWorkflowExecutionCompletedEventAttributes()
 
 	case s.EventType_WorkflowExecutionFailed:
-		attr = e.GetWorkflowExecutionFailedEventAttributes()
+		data = e.GetWorkflowExecutionFailedEventAttributes()
 
 	case s.EventType_WorkflowExecutionTimedOut:
-		attr = e.GetWorkflowExecutionTimedOutEventAttributes()
+		data = e.GetWorkflowExecutionTimedOutEventAttributes()
 
 	case s.EventType_DecisionTaskScheduled:
-		attr = e.GetDecisionTaskScheduledEventAttributes()
+		data = e.GetDecisionTaskScheduledEventAttributes()
 
 	case s.EventType_DecisionTaskStarted:
-		attr = e.GetDecisionTaskStartedEventAttributes()
+		data = e.GetDecisionTaskStartedEventAttributes()
 
 	case s.EventType_DecisionTaskCompleted:
-		attr = e.GetDecisionTaskCompletedEventAttributes()
+		data = e.GetDecisionTaskCompletedEventAttributes()
 
 	case s.EventType_DecisionTaskTimedOut:
-		attr = e.GetDecisionTaskTimedOutEventAttributes()
+		data = e.GetDecisionTaskTimedOutEventAttributes()
 
 	case s.EventType_ActivityTaskScheduled:
-		attr = e.GetActivityTaskScheduledEventAttributes()
+		data = e.GetActivityTaskScheduledEventAttributes()
 
 	case s.EventType_ActivityTaskStarted:
-		attr = e.GetActivityTaskStartedEventAttributes()
+		data = e.GetActivityTaskStartedEventAttributes()
 
 	case s.EventType_ActivityTaskCompleted:
-		attr = e.GetActivityTaskCompletedEventAttributes()
+		data = e.GetActivityTaskCompletedEventAttributes()
 
 	case s.EventType_ActivityTaskFailed:
-		attr = e.GetActivityTaskFailedEventAttributes()
+		data = e.GetActivityTaskFailedEventAttributes()
 
 	case s.EventType_ActivityTaskTimedOut:
-		attr = e.GetActivityTaskTimedOutEventAttributes()
+		data = e.GetActivityTaskTimedOutEventAttributes()
 
 	case s.EventType_ActivityTaskCancelRequested:
-		attr = e.GetActivityTaskCancelRequestedEventAttributes()
+		data = e.GetActivityTaskCancelRequestedEventAttributes()
 
 	case s.EventType_RequestCancelActivityTaskFailed:
-		attr = e.GetRequestCancelActivityTaskFailedEventAttributes()
+		data = e.GetRequestCancelActivityTaskFailedEventAttributes()
 
 	case s.EventType_ActivityTaskCanceled:
-		attr = e.GetActivityTaskCanceledEventAttributes()
+		data = e.GetActivityTaskCanceledEventAttributes()
 
 	case s.EventType_TimerStarted:
-		attr = e.GetTimerStartedEventAttributes()
+		data = e.GetTimerStartedEventAttributes()
 
 	case s.EventType_TimerFired:
-		attr = e.GetTimerFiredEventAttributes()
+		data = e.GetTimerFiredEventAttributes()
 
 	case s.EventType_CompleteWorkflowExecutionFailed:
-		attr = e.GetCompleteWorkflowExecutionFailedEventAttributes()
+		data = e.GetCompleteWorkflowExecutionFailedEventAttributes()
 
 	case s.EventType_CancelTimerFailed:
-		attr = e.GetCancelTimerFailedEventAttributes()
+		data = e.GetCancelTimerFailedEventAttributes()
 
 	case s.EventType_TimerCanceled:
-		attr = e.GetTimerCanceledEventAttributes()
+		data = e.GetTimerCanceledEventAttributes()
 
 	case s.EventType_MarkerRecorded:
-		attr = e.GetMarkerRecordedEventAttributes()
+		data = e.GetMarkerRecordedEventAttributes()
 
 	case s.EventType_WorkflowExecutionTerminated:
-		attr = e.GetWorkflowExecutionTerminatedEventAttributes()
+		data = e.GetWorkflowExecutionTerminatedEventAttributes()
+
+	default:
+		data = e
 	}
 
-	return e.GetEventType().String() + ": " + anyToString(attr)
+	return e.GetEventType().String() + ": " + anyToString(data)
 }
 
 // DecisionToString convert Decision to string
 func DecisionToString(d *s.Decision) string {
-	var attr interface{}
+	var data interface{}
 	switch d.GetDecisionType() {
 	case s.DecisionType_ScheduleActivityTask:
-		attr = d.GetScheduleActivityTaskDecisionAttributes()
+		data = d.GetScheduleActivityTaskDecisionAttributes()
 
 	case s.DecisionType_RequestCancelActivityTask:
-		attr = d.GetRequestCancelActivityTaskDecisionAttributes()
+		data = d.GetRequestCancelActivityTaskDecisionAttributes()
 
 	case s.DecisionType_StartTimer:
-		attr = d.GetStartTimerDecisionAttributes()
+		data = d.GetStartTimerDecisionAttributes()
 
 	case s.DecisionType_CancelTimer:
-		attr = d.GetCancelTimerDecisionAttributes()
+		data = d.GetCancelTimerDecisionAttributes()
 
 	case s.DecisionType_CompleteWorkflowExecution:
-		attr = d.GetCompleteWorkflowExecutionDecisionAttributes()
+		data = d.GetCompleteWorkflowExecutionDecisionAttributes()
 
 	case s.DecisionType_FailWorkflowExecution:
-		attr = d.GetFailWorkflowExecutionDecisionAttributes()
+		data = d.GetFailWorkflowExecutionDecisionAttributes()
 
 	case s.DecisionType_RecordMarker:
-		attr = d.GetRecordMarkerDecisionAttributes()
+		data = d.GetRecordMarkerDecisionAttributes()
+
+	default:
+		data = d
 	}
 
-	return d.GetDecisionType().String() + ": " + anyToString(attr)
+	return d.GetDecisionType().String() + ": " + anyToString(data)
 }

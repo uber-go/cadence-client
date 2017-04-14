@@ -18,7 +18,9 @@ type (
 		//     StartWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
 		StartWorkflow(options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*WorkflowExecution, error)
 
-		// TerminateWorkflow terminate a workflow execution
+		// TerminateWorkflow terminates a workflow execution.
+		// workflowID is required, other parameters are optional.
+		// If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
 		TerminateWorkflow(workflowID string, runID string, reason string, details []byte) error
 
 		// GetWorkflowHistory gets history of a particular workflow.

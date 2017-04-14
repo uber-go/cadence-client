@@ -92,7 +92,9 @@ func (wc *workflowClient) StartWorkflow(
 	return executionInfo, nil
 }
 
-// TerminateWorkflow terminate a workflow execution
+// TerminateWorkflow terminates a workflow execution.
+// workflowID is required, other parameters are optional.
+// If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
 func (wc *workflowClient) TerminateWorkflow(workflowID string, runID string, reason string, details []byte) error {
 	request := &s.TerminateWorkflowExecutionRequest{
 		Domain: common.StringPtr(wc.domain),

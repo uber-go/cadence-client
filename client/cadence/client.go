@@ -37,6 +37,12 @@ type (
 
 		// RecordActivityHeartbeat records heartbeat for an activity.
 		RecordActivityHeartbeat(taskToken, details []byte) error
+
+		// ListClosedWorkflow gets closed workflow executions based on request filters
+		ListClosedWorkflow(request *s.ListClosedWorkflowExecutionsRequest) (*s.ListClosedWorkflowExecutionsResponse, error)
+
+		// ListClosedWorkflow gets open workflow executions based on request filters
+		ListOpenWorkflow(request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error)
 	}
 
 	// ClientOptions are optional parameters for Client creation.

@@ -8,6 +8,8 @@ package cadence
 // point of view only to access them from other packages.
 
 import (
+	"reflect"
+
 	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
@@ -130,4 +132,35 @@ func AddWorkflowRegistrationInterceptor(
 func AddActivityRegistrationInterceptor(
 	i func(name string, activity interface{}) (string, interface{})) {
 	getHostEnvironment().AddActivityRegistrationInterceptor(i)
+}
+
+// SerializeActivityFnArgs serializes an activity function arguments.
+func SerializeActivityFnArgs(f interface{}, args []interface{}) ([]byte, error) {
+	if err := validateFunctionArgs(f, args, false); err != nil {
+		return nil, err
+	}
+	data, err := marshalFunctionArgs(getFunctionName(f), args)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// SerializeWorkflowFnArgs serializes an workflow function arguments.
+func SerializeWorkflowFnArgs(f interface{}, args []interface{}) ([]byte, error) {
+	if err := validateFunctionArgs(f, args, true); err != nil {
+		return nil, err
+	}
+	data, err := marshalFunctionArgs(getFunctionName(f), args)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// DeserializeFnResults de-serializes a function results.
+// The result doesn't include the error. The cadence server has result, error.
+// This is to de-serialize the result.
+func DeserializeFnResults(f interface{}, result []byte) (interface{}, error) {
+	return deSerializeFnResultFromFnType(reflect.TypeOf(f), result)
 }

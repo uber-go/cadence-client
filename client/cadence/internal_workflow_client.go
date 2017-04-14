@@ -138,7 +138,7 @@ func (wc *workflowClient) RecordActivityHeartbeat(taskToken, details []byte) err
 //	- DomainAlreadyExistsError
 //	- BadRequestError
 //	- InternalServiceError
-func (dc *domainClient) Register(options RegistrationOptions) error {
+func (dc *domainClient) Register(options DomainRegistrationOptions) error {
 	request := &s.RegisterDomainRequest{
 		Name: common.StringPtr(options.Name),
 		OwnerEmail: common.StringPtr(options.OwnerEmail),

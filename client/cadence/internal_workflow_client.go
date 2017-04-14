@@ -92,6 +92,28 @@ func (wc *workflowClient) StartWorkflow(
 	return executionInfo, nil
 }
 
+// TerminateWorkflow terminate a workflow execution
+func (wc *workflowClient) TerminateWorkflow(workflowID string, runID string, reason string, details []byte) error {
+	request := &s.TerminateWorkflowExecutionRequest{
+		Domain: common.StringPtr(wc.domain),
+		WorkflowExecution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      common.StringPtr(runID),
+		},
+		Reason:   common.StringPtr(reason),
+		Identity: common.StringPtr(wc.identity),
+	}
+
+	err := backoff.Retry(
+		func() error {
+			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+			defer cancel()
+			return wc.workflowService.TerminateWorkflowExecution(ctx, request)
+		}, serviceOperationRetryPolicy, isServiceTransientError)
+
+	return err
+}
+
 // GetWorkflowHistory gets history of a particular workflow.
 func (wc *workflowClient) GetWorkflowHistory(workflowID string, runID string) (*s.History, error) {
 	request := &s.GetWorkflowExecutionHistoryRequest{

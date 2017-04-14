@@ -18,6 +18,9 @@ type (
 		//     StartWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
 		StartWorkflow(options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*WorkflowExecution, error)
 
+		// TerminateWorkflow terminate a workflow execution
+		TerminateWorkflow(workflowID string, runID string, reason string, details []byte) error
+
 		// GetWorkflowHistory gets history of a particular workflow.
 		GetWorkflowHistory(workflowID string, runID string) (*s.History, error)
 

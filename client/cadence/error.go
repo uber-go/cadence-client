@@ -60,7 +60,8 @@ func NewErrorWithDetails(reason string, details []byte) ErrorWithDetails {
 	return &errorWithDetails{reason: reason, details: details}
 }
 
-// NewTimeoutError creates TimeoutError instance
+// NewTimeoutError creates TimeoutError instance.
+// Use NewHeartbeatTimeoutError to create heartbeat TimeoutError
 func NewTimeoutError(timeoutType shared.TimeoutType) TimeoutError {
 	return &timeoutError{timeoutType: timeoutType}
 }
@@ -129,7 +130,7 @@ type canceledError struct {
 	details []byte
 }
 
-// ErrorWithDetails from error.ErrorWithDetails
+// Error from error interface
 func (e *canceledError) Error() string {
 	return fmt.Sprintf("Details: %s", e.details)
 }

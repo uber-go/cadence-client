@@ -80,7 +80,7 @@ func (w *helloWorldActivityWorkflow) Execute(ctx Context, input []byte) (result 
 	ctx1 := WithActivityOptions(ctx, NewActivityOptions().(*activityOptions).WithActivityID("id1"))
 	r1, err := ExecuteActivity(ctx1, "testAct", input)
 	if err != nil {
-		fmt.Printf("ErrorWithDetails: %v \n", err.Error())
+		fmt.Printf("Error: %v \n", err.Error())
 	}
 	require.NoError(w.t, err)
 	return r1.([]byte), nil

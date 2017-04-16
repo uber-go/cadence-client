@@ -87,6 +87,7 @@ type errorWithDetails struct {
 	details []byte
 }
 
+// Error from error interface
 func (e *errorWithDetails) Error() string {
 	return e.reason
 }
@@ -110,7 +111,7 @@ type timeoutError struct {
 	details     []byte
 }
 
-// ErrorWithDetails from error.ErrorWithDetails
+// Error from error interface
 func (e *timeoutError) Error() string {
 	return fmt.Sprintf("TimeoutType: %v", e.timeoutType)
 }

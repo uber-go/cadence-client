@@ -80,7 +80,7 @@ func (w *helloWorldActivityWorkflow) Execute(ctx Context, input []byte) (result 
 	ctx1 := WithActivityOptions(ctx, NewActivityOptions().(*activityOptions).WithActivityID("id1"))
 	r1, err := ExecuteActivity(ctx1, "testAct", input)
 	if err != nil {
-		fmt.Printf("Error: %v \n", err.Error())
+		fmt.Printf("ErrorWithDetails: %v \n", err.Error())
 	}
 	require.NoError(w.t, err)
 	return r1.([]byte), nil
@@ -214,7 +214,7 @@ func TestWorkflowPanic(t *testing.T) {
 		cbProcessor.Add(callback, []byte("test"), nil)
 	}).Twice()
 	ctx.On("Complete", []byte(nil), mock.Anything).Return().Run(func(args mock.Arguments) {
-		resultErr := args.Get(1).(Error)
+		resultErr := args.Get(1).(ErrorWithDetails)
 		require.EqualValues(t, "simulated", resultErr.Reason())
 		require.Contains(t, string(resultErr.Details()), "cadence.(*splitJoinActivityWorkflow).Execute")
 		workflowComplete <- struct{}{}

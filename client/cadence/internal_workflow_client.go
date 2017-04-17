@@ -26,9 +26,9 @@ type (
 
 	// domainClient is the client for managing domains.
 	domainClient struct {
-		workflowService   m.TChanWorkflowService
-		metricsScope      tally.Scope
-		identity          string
+		workflowService m.TChanWorkflowService
+		metricsScope    tally.Scope
+		identity        string
 	}
 )
 
@@ -92,6 +92,25 @@ func (wc *workflowClient) StartWorkflow(
 	return executionInfo, nil
 }
 
+// CancelWorkflow cancels a workflow in execution.
+func (wc *workflowClient) CancelWorkflow(workflowID string, runID string) error {
+	request := &s.RequestCancelWorkflowExecutionRequest{
+		Domain: common.StringPtr(wc.domain),
+		WorkflowExecution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      common.StringPtr(runID),
+		},
+		Identity: common.StringPtr(wc.identity),
+	}
+
+	return backoff.Retry(
+		func() error {
+			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+			defer cancel()
+			return wc.workflowService.RequestCancelWorkflowExecution(ctx, request)
+		}, serviceOperationRetryPolicy, isServiceTransientError)
+}
+
 // GetWorkflowHistory gets history of a particular workflow.
 func (wc *workflowClient) GetWorkflowHistory(workflowID string, runID string) (*s.History, error) {
 	request := &s.GetWorkflowExecutionHistoryRequest{
@@ -132,7 +151,6 @@ func (wc *workflowClient) RecordActivityHeartbeat(taskToken, details []byte) err
 	return recordActivityHeartbeat(wc.workflowService, wc.identity, taskToken, details)
 }
 
-
 // Register a domain with cadence server
 // The errors it can throw:
 //	- DomainAlreadyExistsError
@@ -140,11 +158,11 @@ func (wc *workflowClient) RecordActivityHeartbeat(taskToken, details []byte) err
 //	- InternalServiceError
 func (dc *domainClient) Register(options DomainRegistrationOptions) error {
 	request := &s.RegisterDomainRequest{
-		Name: common.StringPtr(options.Name),
-		OwnerEmail: common.StringPtr(options.OwnerEmail),
-		Description: common.StringPtr(options.Description),
+		Name:                                   common.StringPtr(options.Name),
+		OwnerEmail:                             common.StringPtr(options.OwnerEmail),
+		Description:                            common.StringPtr(options.Description),
 		WorkflowExecutionRetentionPeriodInDays: common.Int32Ptr(options.WorkflowExecutionRetentionPeriodInDays),
-		EmitMetric: common.BoolPtr(options.EmitMetric),
+		EmitMetric:                             common.BoolPtr(options.EmitMetric),
 	}
 
 	return backoff.Retry(
@@ -162,7 +180,7 @@ func (dc *domainClient) Register(options DomainRegistrationOptions) error {
 //	- EntityNotExistsError
 //	- BadRequestError
 //	- InternalServiceError
-func (dc *domainClient) Describe(name string) (*s.DomainInfo, *s.DomainConfiguration, error)  {
+func (dc *domainClient) Describe(name string) (*s.DomainInfo, *s.DomainConfiguration, error) {
 	request := &s.DescribeDomainRequest{
 		Name: common.StringPtr(name),
 	}
@@ -189,10 +207,10 @@ func (dc *domainClient) Describe(name string) (*s.DomainInfo, *s.DomainConfigura
 //	- EntityNotExistsError
 //	- BadRequestError
 //	- InternalServiceError
-func (dc *domainClient)Update(name string, domainInfo *s.UpdateDomainInfo, domainConfig *s.DomainConfiguration) error {
+func (dc *domainClient) Update(name string, domainInfo *s.UpdateDomainInfo, domainConfig *s.DomainConfiguration) error {
 	request := &s.UpdateDomainRequest{
-		Name: common.StringPtr(name),
-		UpdatedInfo: domainInfo,
+		Name:          common.StringPtr(name),
+		UpdatedInfo:   domainInfo,
 		Configuration: domainConfig,
 	}
 
@@ -204,4 +222,3 @@ func (dc *domainClient)Update(name string, domainInfo *s.UpdateDomainInfo, domai
 			return err
 		}, serviceOperationRetryPolicy, isServiceTransientError)
 }
-

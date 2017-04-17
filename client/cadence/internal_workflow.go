@@ -15,6 +15,7 @@ type (
 	syncWorkflowDefinition struct {
 		workflow   workflow
 		dispatcher dispatcher
+		cancel     CancelFunc
 	}
 
 	workflowResult struct {
@@ -213,11 +214,20 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	ctx = WithValue(ctx, workflowResultContextKey, &resultPtr)
 
 	d.dispatcher = newDispatcher(ctx, func(ctx Context) {
+		ctx, d.cancel = WithCancel(ctx)
 		r := &workflowResult{}
 		r.workflowResult, r.error = d.workflow.Execute(ctx, input)
 		rpp := getWorkflowResultPointerPointer(ctx)
 		*rpp = r
 	})
+
+	getWorkflowEnvironment(ctx).RegisterCancel(func() {
+		// It is ok to call this method multiple times.
+		// it doesn't do anything new, the context remains cancelled.
+		d.cancel()
+		executeDispatcher(ctx, d.dispatcher)
+	})
+
 	executeDispatcher(ctx, d.dispatcher)
 }
 

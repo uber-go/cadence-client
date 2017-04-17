@@ -310,3 +310,11 @@ func Sleep(ctx Context, d time.Duration) (err error) {
 	_, err = t.Get(ctx)
 	return
 }
+
+// RequestCancelWorkflow can be used to request cancellation of an external workflow.
+// - domainName - name of the domain that this workflow belongs to.
+// - workflowID - name of the workflow ID.
+// - runID 	- Optional - indicates the instance of a workflow.
+func RequestCancelWorkflow(ctx Context, domainName, workflowID, runID string) error {
+	return getWorkflowEnvironment(ctx).RequestCancelWorkflow(domainName, workflowID, runID)
+}

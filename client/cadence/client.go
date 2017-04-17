@@ -16,9 +16,26 @@ type (
 		//     StartWorkflow(options, "workflowTypeName", input)
 		//     or
 		//     StartWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+		// The errors it can throw:
+		//	- EntityNotExistsError
+		//	- BadRequestError
+		//	- WorkflowExecutionAlreadyStartedError
 		StartWorkflow(options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*WorkflowExecution, error)
 
+		// CancelWorkflow cancels a workflow in execution
+		// - workflow ID of the workflow.
+		// - runID can be optional if not specified it will pick the latest execution of that workflow ID.
+		// The errors it can throw:
+		//	- EntityNotExistsError
+		//	- BadRequestError
+		//	- InternalServiceError
+		CancelWorkflow(workflowID string, runID string) error
+
 		// GetWorkflowHistory gets history of a particular workflow.
+		// The errors it can throw:
+		//	- EntityNotExistsError
+		//	- BadRequestError
+		//	- InternalServiceError
 		GetWorkflowHistory(workflowID string, runID string) (*s.History, error)
 
 		// CompleteActivity reports activity completed.

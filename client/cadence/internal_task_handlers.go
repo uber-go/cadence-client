@@ -359,6 +359,10 @@ func isEventTypeRespondToDecision(t s.EventType) bool {
 		return true
 	case s.EventType_MarkerRecorded:
 		return true
+	case s.EventType_RequestCancelExternalWorkflowExecutionInitiated:
+		return true
+	case s.EventType_WorkflowExecutionCanceled:
+		return true
 	default:
 		return false
 	}
@@ -479,6 +483,32 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 
 		return true
+
+	case s.DecisionType_RequestCancelExternalWorkflowExecution:
+		if e.GetEventType() != s.EventType_RequestCancelExternalWorkflowExecutionInitiated {
+			return false
+		}
+		eventAttributes := e.GetRequestCancelExternalWorkflowExecutionInitiatedEventAttributes()
+		decisionAttributes := d.GetRequestCancelExternalWorkflowExecutionDecisionAttributes()
+		if eventAttributes.GetDomain() != decisionAttributes.GetDomain() ||
+			eventAttributes.GetWorkflowId() != decisionAttributes.GetWorkflowId() ||
+			eventAttributes.GetRunId() != decisionAttributes.GetRunId() {
+			return false
+		}
+
+		return true
+
+	case s.DecisionType_CancelWorkflowExecution:
+		if e.GetEventType() != s.EventType_WorkflowExecutionCanceled {
+			return false
+		}
+		eventAttributes := e.GetWorkflowExecutionCanceledEventAttributes()
+		decisionAttributes := d.GetCancelWorkflowExecutionDecisionAttributes()
+		if bytes.Compare(eventAttributes.GetDetails(), decisionAttributes.GetDetails()) != 0 {
+			return false
+		}
+		return true
+
 	}
 
 	return false

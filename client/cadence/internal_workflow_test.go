@@ -258,7 +258,8 @@ func (w *testTimerWorkflow) Execute(ctx Context, input []byte) (result []byte, e
 
 	isWokeByTimer := false
 
-	NewSelector(ctx).AddFuture(t, func(v interface{}, err error) {
+	NewSelector(ctx).AddFuture(t, func(f Future) {
+		err := f.Get(ctx, nil)
 		require.NoError(w.t, err)
 		isWokeByTimer = true
 	}).Select(ctx)
@@ -269,9 +270,8 @@ func (w *testTimerWorkflow) Execute(ctx Context, input []byte) (result []byte, e
 	ctx2, c2 := WithCancel(ctx)
 	t2 := NewTimer(ctx2, 1)
 	c2()
-	r2, err2 := t2.Get(ctx2)
+	err2 := t2.Get(ctx2, nil)
 
-	require.Nil(w.t, r2)
 	require.Error(w.t, err2)
 	_, isCancelErr := err2.(CanceledError)
 	require.True(w.t, isCancelErr)
@@ -355,7 +355,8 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 	ctx2 = WithActivityOptions(ctx2, NewActivityOptions().(*activityOptions).WithActivityID("id2"))
 	f := ExecuteActivityAsync(ctx2, "testAct")
 	c2()
-	res2, err2 := f.Get(ctx)
+	var res2 []byte
+	err2 := f.Get(ctx, &res2)
 	require.NotNil(w.t, res2)
 	require.NoError(w.t, err2)
 
@@ -364,7 +365,8 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 	ctx3 = WithActivityOptions(ctx3, NewActivityOptions().(*activityOptions).WithActivityID("id3"))
 	f3 := ExecuteActivityAsync(ctx3, "testAct")
 	c3()
-	res3, err3 := f3.Get(ctx)
+	var res3 []byte
+	err3 := f3.Get(ctx, &res3)
 	require.Nil(w.t, res3)
 	require.Equal(w.t, "testCancelDetails", string(err3.(CanceledError).Details()))
 

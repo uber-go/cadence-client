@@ -30,14 +30,14 @@ type (
 		AddReceive(c Channel, f func(v interface{})) Selector
 		AddReceiveWithMoreFlag(c Channel, f func(v interface{}, more bool)) Selector
 		AddSend(c Channel, v interface{}, f func()) Selector
-		AddFuture(future Future, f func(v interface{}, err error)) Selector
+		AddFuture(future Future, f func(f Future)) Selector
 		AddDefault(f func())
 		Select(ctx Context)
 	}
 
 	// Future represents the result of an asynchronous computation.
 	Future interface {
-		Get(ctx Context) (interface{}, error)
+		Get(ctx Context, value interface{}) error
 		IsReady() bool
 	}
 
@@ -307,6 +307,6 @@ func NewTimer(ctx Context, d time.Duration) Future {
 //    error TimerCanceledError.
 func Sleep(ctx Context, d time.Duration) (err error) {
 	t := NewTimer(ctx, d)
-	_, err = t.Get(ctx)
+	err = t.Get(ctx, nil)
 	return
 }

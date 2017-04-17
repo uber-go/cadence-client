@@ -471,12 +471,13 @@ func TestFutureSetValue(t *testing.T) {
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
 			assert.False(t, f.IsReady())
-			v, err := f.Get(ctx)
+			var v string
+			err := f.Get(ctx, &v)
 			assert.Nil(t, err)
 			assert.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("future-get-%v", v))
 			// test second get of the ready future
-			v, err = f.Get(ctx)
+			err = f.Get(ctx, &v)
 			assert.Nil(t, err)
 			assert.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("child-end-%v", v))
@@ -520,14 +521,13 @@ func TestFutureFail(t *testing.T) {
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
 			assert.False(t, f.IsReady())
-			v, err := f.Get(ctx)
-			assert.Nil(t, v)
+			var v string
+			err := f.Get(ctx, &v)
 			assert.NotNil(t, err)
 			assert.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("future-get-%v", err))
 			// test second get of the ready future
-			v, err = f.Get(ctx)
-			assert.Nil(t, v)
+			err = f.Get(ctx, &v)
 			assert.NotNil(t, err)
 			assert.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("child-end-%v", err))
@@ -570,13 +570,14 @@ func TestFutureSet(t *testing.T) {
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
 			assert.False(t, f.IsReady())
-			v, err := f.Get(ctx)
+			var v string
+			err := f.Get(ctx, &v)
 			assert.NotNil(t, err)
 			assert.NotNil(t, v)
 			assert.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("future-get-%v-%v", v, err))
 			// test second get of the ready future
-			v, err = f.Get(ctx)
+			err = f.Get(ctx, &v)
 			assert.NotNil(t, err)
 			assert.NotNil(t, v)
 			assert.True(t, f.IsReady())
@@ -623,13 +624,14 @@ func TestFutureChain(t *testing.T) {
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
 			assert.False(t, f.IsReady())
-			v, err := f.Get(ctx)
+			var v string
+			err := f.Get(ctx, &v)
 			assert.NotNil(t, err)
 			assert.NotNil(t, v)
 			assert.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("future-get-%v-%v", v, err))
 			// test second get of the ready future
-			v, err = f.Get(ctx)
+			err = f.Get(ctx, &v)
 			assert.NotNil(t, err)
 			assert.NotNil(t, v)
 			assert.True(t, f.IsReady())
@@ -683,7 +685,9 @@ func TestSelectFuture(t *testing.T) {
 			AddReceiveWithMoreFlag(c1, func(v interface{}, more bool) {
 				assert.True(t, more)
 				history = append(history, fmt.Sprintf("c1-%v", v))
-			}).AddFuture(future, func(v interface{}, err error) {
+			}).AddFuture(future, func(f Future) {
+			var v string
+			err := f.Get(ctx, &v)
 			assert.Nil(t, err)
 			history = append(history, fmt.Sprintf("c2-%v", v))
 		})

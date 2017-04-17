@@ -3,6 +3,7 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -75,10 +76,10 @@ type (
 		receiveFunc             *func(v interface{})            // function to call when channel has a message. nil for send case.
 		receiveWithMoreFlagFunc *func(v interface{}, more bool) // function to call when channel has a message. nil for send case.
 
-		sendFunc   *func()                         // function to call when channel accepted a message. nil for receive case.
-		sendValue  *interface{}                    // value to send to the channel. Used only for send case.
-		future     Future                          // Used for future case
-		futureFunc *func(v interface{}, err error) // function to call when Future is ready
+		sendFunc   *func()         // function to call when channel accepted a message. nil for receive case.
+		sendValue  *interface{}    // value to send to the channel. Used only for send case.
+		future     Future          // Used for future case
+		futureFunc *func(f Future) // function to call when Future is ready
 	}
 
 	// Implements Selector interface
@@ -142,7 +143,7 @@ func getWorkflowEnvironment(ctx Context) workflowEnvironment {
 	return wc.(workflowEnvironment)
 }
 
-func (f *futureImpl) Get(ctx Context) (interface{}, error) {
+func (f *futureImpl) Get(ctx Context, value interface{}) error {
 	_, more := f.channel.ReceiveWithMoreFlag(ctx)
 	if more {
 		panic("not closed")
@@ -150,7 +151,18 @@ func (f *futureImpl) Get(ctx Context) (interface{}, error) {
 	if !f.ready {
 		panic("not ready")
 	}
-	return f.value, f.err
+	if value == nil {
+		return f.err
+	}
+	rf := reflect.ValueOf(value)
+	if rf.Type().Kind() != reflect.Ptr {
+		return errors.New("value parameter is not a pointer")
+	}
+	fv := reflect.ValueOf(f.value)
+	if fv.IsValid() {
+		rf.Elem().Set(fv)
+	}
+	return f.err
 }
 
 func (f *futureImpl) IsReady() bool {
@@ -640,7 +652,7 @@ func (s *selectorImpl) AddSend(c Channel, v interface{}, f func()) Selector {
 	return s
 }
 
-func (s *selectorImpl) AddFuture(future Future, f func(v interface{}, err error)) Selector {
+func (s *selectorImpl) AddFuture(future Future, f func(f Future)) Selector {
 	s.cases = append(s.cases, selectCase{future: future, futureFunc: &f})
 	return s
 }
@@ -680,7 +692,7 @@ func (s *selectorImpl) Select(ctx Context) {
 			} else if pair.futureFunc != nil {
 				if pair.future.IsReady() {
 					f := *pair.futureFunc
-					f(pair.future.Get(ctx))
+					f(pair.future)
 					state.unblocked()
 					return
 				}

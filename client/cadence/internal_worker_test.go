@@ -45,7 +45,7 @@ func init() {
 }
 
 func TestActivityRegistrationListener(t *testing.T) {
-	require.Equal(t, 4, len(registeredActivities))
+	require.Equal(t, 6, len(registeredActivities))
 	expectedActivities := []string{
 		"github.com/uber-go/cadence-client/client/cadence.testActivity",
 		"github.com/uber-go/cadence-client/client/cadence.testActivityByteArgs",

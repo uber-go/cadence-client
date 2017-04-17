@@ -157,6 +157,10 @@ func (wc *workflowClient) RecordActivityHeartbeat(taskToken, details []byte) err
 }
 
 // ListClosedWorkflow gets closed workflow executions based on request filters
+// The errors it can throw:
+//  - BadRequestError
+//  - InternalServiceError
+//  - EntityNotExistError
 func (wc *workflowClient) ListClosedWorkflow(request *s.ListClosedWorkflowExecutionsRequest) (*s.ListClosedWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
 		request.Domain = common.StringPtr(wc.domain)
@@ -177,6 +181,10 @@ func (wc *workflowClient) ListClosedWorkflow(request *s.ListClosedWorkflowExecut
 }
 
 // ListClosedWorkflow gets open workflow executions based on request filters
+// The errors it can throw:
+//  - BadRequestError
+//  - InternalServiceError
+//  - EntityNotExistError
 func (wc *workflowClient) ListOpenWorkflow(request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
 		request.Domain = common.StringPtr(wc.domain)

@@ -40,6 +40,8 @@ func init() {
 	})
 	RegisterActivity(testActivityMultipleArgs)
 	RegisterActivity(testActivityReturnString)
+	RegisterActivity(testActivityReturnEmptyString)
+	RegisterActivity(testActivityReturnEmptyStruct)
 }
 
 func TestActivityRegistrationListener(t *testing.T) {
@@ -49,6 +51,8 @@ func TestActivityRegistrationListener(t *testing.T) {
 		"github.com/uber-go/cadence-client/client/cadence.testActivityByteArgs",
 		"github.com/uber-go/cadence-client/client/cadence.testActivityMultipleArgs",
 		"github.com/uber-go/cadence-client/client/cadence.testActivityReturnString",
+		"github.com/uber-go/cadence-client/client/cadence.testActivityReturnEmptyString",
+		"github.com/uber-go/cadence-client/client/cadence.testActivityReturnEmptyStruct",
 	}
 	sort.Strings(expectedActivities)
 	expected := strings.Join(expectedActivities, ",")
@@ -359,6 +363,14 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, "testActivity", rString.(string))
 
+	r2String, err := ExecuteActivity(ctx, testActivityReturnEmptyString)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, "", r2String.(string))
+
+	r2Struct, err := ExecuteActivity(ctx, testActivityReturnEmptyStruct)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, testActivityResult{}, r2Struct.(testActivityResult))
+
 	// By names.
 	_, err = ExecuteActivity(ctx, "testActivityByteArgs", input)
 	require.NoError(w.t, err, err)
@@ -381,6 +393,14 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	rString, err = ExecuteActivity(ctx, "github.com/uber-go/cadence-client/client/cadence.testActivityReturnString")
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, "testActivity", rString.(string), rString)
+
+	r2sString, err := ExecuteActivity(ctx, "github.com/uber-go/cadence-client/client/cadence.testActivityReturnEmptyString")
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, "", r2sString.(string))
+
+	r2sStruct, err := ExecuteActivity(ctx, "github.com/uber-go/cadence-client/client/cadence.testActivityReturnEmptyStruct")
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, testActivityResult{}, r2sStruct.(testActivityResult))
 
 	return []byte("Done"), nil
 }
@@ -420,6 +440,22 @@ func testActivityReturnString() (string, error) {
 	return "testActivity", nil
 }
 
+// testActivityReturnEmptyString
+func testActivityReturnEmptyString() (string, error) {
+	// Return is mocked to retrun nil from server.
+	// expect to convert it to appropriate default value.
+	return "", nil
+}
+
+type testActivityResult struct {}
+
+// testActivityReturnEmptyStruct
+func testActivityReturnEmptyStruct() (testActivityResult, error) {
+	// Return is mocked to retrun nil from server.
+	// expect to convert it to appropriate default value.
+	return testActivityResult{}, nil
+}
+
 func TestVariousActivitySchedulingOption(t *testing.T) {
 	w := newWorkflowDefinition(&activitiesCallingOptionsWorkflow{t: t})
 	ctx := &mockWorkflowEnvironment{}
@@ -436,12 +472,15 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 			r = testEncodeFunctionResult(5)
 		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnString") {
 			r = testEncodeFunctionResult("testActivity")
+		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnEmptyString") ||
+			strings.Contains(params.ActivityType.Name, "testActivityReturnEmptyStruct"){
+			r = nil
 		} else {
 			r = testEncodeFunctionResult([]byte("test"))
 		}
 		callback := args.Get(1).(resultHandler)
 		cbProcessor.Add(callback, r, nil)
-	}).Times(16)
+	}).Times(20)
 
 	ctx.On("Complete", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
 		if args.Get(1) != nil {

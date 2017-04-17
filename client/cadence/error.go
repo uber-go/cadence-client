@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/uber-go/cadence-client/.gen/go/shared"
+	"reflect"
 )
 
 type (
@@ -16,31 +17,31 @@ type (
 	ErrorWithDetails interface {
 		error
 		Reason() string
-		Details() []byte
-		errorWithDetails() // interface marker
+		Details(d interface{}) // Extracts details into passed pointer
+		errorWithDetails()     // interface marker
 	}
 
 	// TimeoutError returned when activity or child workflow timed out
 	TimeoutError interface {
 		error
 		TimeoutType() shared.TimeoutType
-		Details() []byte // Present only for HEARTBEAT TimeoutType
-		timeoutError()   // interface marker
+		Details(d interface{}) // Present only for HEARTBEAT TimeoutType
+		timeoutError()         // interface marker
 	}
 
 	// CanceledError returned when operation was canceled
 	CanceledError interface {
 		error
-		Details() []byte
-		canceledError() // interface marker
+		Details(d interface{}) // Extracts details into passed pointer
+		canceledError()        // interface marker
 	}
 
 	// PanicError contains information about panicked workflow
 	PanicError interface {
 		error
-		Value() interface{} // Value passed to panic call
-		StackTrace() string // Stack trace of a panicked coroutine
-		panicError()        // interface marker
+		Value(v interface{}) // Value passed to panic call
+		StackTrace() string  // Stack trace of a panicked coroutine
+		panicError()         // interface marker
 	}
 )
 
@@ -54,10 +55,15 @@ var _ PanicError = (*panicError)(nil)
 var ErrActivityResultPending = errors.New("not error: do not autocomplete, " +
 	"using Client.CompleteActivity() to complete")
 
+// TODO: Serialization of details. Currently only []byte type of them is supported
+
 // NewErrorWithDetails creates ErrorWithDetails instance
 // Create standard error through errors.New or fmt.Errorf if no details are provided
-func NewErrorWithDetails(reason string, details []byte) ErrorWithDetails {
-	return &errorWithDetails{reason: reason, details: details}
+func NewErrorWithDetails(reason string, details interface{}) ErrorWithDetails {
+	if details == nil {
+		details = []byte{}
+	}
+	return &errorWithDetails{reason: reason, details: details.([]byte)}
 }
 
 // NewTimeoutError creates TimeoutError instance.
@@ -72,13 +78,16 @@ func NewHeartbeatTimeoutError(details []byte) TimeoutError {
 }
 
 // NewCanceledErrorWithDetails creates CanceledError instance
-func NewCanceledErrorWithDetails(details []byte) CanceledError {
-	return &canceledError{details: details}
+func NewCanceledErrorWithDetails(details interface{}) CanceledError {
+	if details == nil {
+		details = []byte{}
+	}
+	return &canceledError{details: details.([]byte)}
 }
 
 // NewCanceledError creates CanceledError instance
 func NewCanceledError() CanceledError {
-	return NewCanceledErrorWithDetails([]byte{})
+	return NewCanceledErrorWithDetails(nil)
 }
 
 // errorWithDetails implements ErrorWithDetails
@@ -98,8 +107,8 @@ func (e *errorWithDetails) Reason() string {
 }
 
 // Details is from ErrorWithDetails interface
-func (e *errorWithDetails) Details() []byte {
-	return e.details
+func (e *errorWithDetails) Details(d interface{}) {
+	assignToInterface(d, e.details)
 }
 
 // errorWithDetails is from ErrorWithDetails interface
@@ -120,9 +129,9 @@ func (e *timeoutError) TimeoutType() shared.TimeoutType {
 	return e.timeoutType
 }
 
-// Details is from ErrorWithDetails interface
-func (e *timeoutError) Details() []byte {
-	return e.details
+// Details is from TimeoutError interface
+func (e *timeoutError) Details(d interface{}) {
+	assignToInterface(d, e.details)
 }
 
 func (e *timeoutError) timeoutError() {}
@@ -133,12 +142,12 @@ type canceledError struct {
 
 // Error from error interface
 func (e *canceledError) Error() string {
-	return fmt.Sprintf("Details: %s", e.details)
+	return "CanceledError"
 }
 
-// Details of the error
-func (e *canceledError) Details() []byte {
-	return e.details
+// Details is from CanceledError interface
+func (e *canceledError) Details(d interface{}) {
+	assignToInterface(d, e.details)
 }
 
 func (e *canceledError) canceledError() {}
@@ -156,8 +165,8 @@ func (e *panicError) Error() string {
 	return fmt.Sprintf("%v", e.value)
 }
 
-func (e *panicError) Value() interface{} {
-	return e.value
+func (e *panicError) Value(v  interface{}) {
+	assignToInterface(v, e.value)
 }
 
 func (e *panicError) StackTrace() string {
@@ -165,3 +174,11 @@ func (e *panicError) StackTrace() string {
 }
 
 func (e *panicError) panicError() {}
+
+func assignToInterface(to interface{}, from interface{}) {
+	v := reflect.ValueOf(to)
+	if v.Type().Kind() != reflect.Ptr {
+		panic("Pointer argument expected")
+	}
+	v.Elem().Set(reflect.ValueOf(from))
+}

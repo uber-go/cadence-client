@@ -216,7 +216,9 @@ func TestWorkflowPanic(t *testing.T) {
 	ctx.On("Complete", []byte(nil), mock.Anything).Return().Run(func(args mock.Arguments) {
 		resultErr := args.Get(1).(ErrorWithDetails)
 		require.EqualValues(t, "simulated", resultErr.Reason())
-		require.Contains(t, string(resultErr.Details()), "cadence.(*splitJoinActivityWorkflow).Execute")
+		var details []byte
+		resultErr.Details(&details)
+		require.Contains(t, string(details), "cadence.(*splitJoinActivityWorkflow).Execute")
 		workflowComplete <- struct{}{}
 	}).Once()
 
@@ -366,7 +368,9 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 	c3()
 	res3, err3 := f3.Get(ctx)
 	require.Nil(w.t, res3)
-	require.Equal(w.t, "testCancelDetails", string(err3.(CanceledError).Details()))
+	var details []byte
+	err3.(CanceledError).Details(&details)
+	require.Equal(w.t, "testCancelDetails", string(details))
 
 	return []byte("workflow-completed"), nil
 }

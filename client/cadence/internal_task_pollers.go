@@ -5,14 +5,13 @@ package cadence
 import (
 	"time"
 
-	"github.com/uber-common/bark"
-	"github.com/uber-go/tally"
-
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/common/backoff"
 	"github.com/uber-go/cadence-client/common/metrics"
+	"github.com/uber-go/tally"
+	"go.uber.org/zap"
 )
 
 const (
@@ -44,7 +43,7 @@ type (
 		service      m.TChanWorkflowService
 		taskHandler  WorkflowTaskHandler
 		metricsScope tally.Scope
-		logger       bark.Logger
+		logger       *zap.Logger
 	}
 
 	// activityTaskPoller implements polling/processing a workflow task
@@ -55,7 +54,7 @@ type (
 		service      m.TChanWorkflowService
 		taskHandler  ActivityTaskHandler
 		metricsScope tally.Scope
-		logger       bark.Logger
+		logger       *zap.Logger
 	}
 )
 
@@ -131,7 +130,7 @@ func (wtp *workflowTaskPoller) PollAndProcessSingleTask() error {
 			defer cancel()
 			err1 := wtp.service.RespondDecisionTaskCompleted(ctx, completedRequest)
 			if err1 != nil {
-				wtp.logger.Debugf("RespondDecisionTaskCompleted: Failed with error: %+v", err1)
+				wtp.logger.Debug("RespondDecisionTaskCompleted failed.", zap.Error(err1))
 			}
 			return err1
 		}, serviceOperationRetryPolicy, isServiceTransientError)
@@ -227,7 +226,7 @@ func (atp *activityTaskPoller) PollAndProcessSingleTask() error {
 
 	reportErr := reportActivityComplete(atp.service, request)
 	if reportErr != nil {
-		atp.logger.Debugf("reportActivityComplete: Failed with error: %+v", reportErr)
+		atp.logger.Debug("reportActivityComplete failed", zap.Error(reportErr))
 	}
 
 	return reportErr

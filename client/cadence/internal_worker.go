@@ -13,10 +13,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/uber-go/tally"
+	"go.uber.org/zap"
 )
 
 const (
@@ -88,7 +87,7 @@ type (
 
 		MetricsScope tally.Scope
 
-		Logger bark.Logger
+		Logger *zap.Logger
 	}
 )
 
@@ -108,8 +107,8 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 		params.Identity = getWorkerIdentity(params.TaskList)
 	}
 	if params.Logger == nil {
-		log := logrus.New()
-		params.Logger = bark.NewLoggerFromLogrus(log)
+		logger, _ := zap.NewProduction()
+		params.Logger = logger
 		params.Logger.Info("No logger configured for cadence worker. Created default one.")
 	}
 }
@@ -242,7 +241,7 @@ type workerOptions struct {
 	autoHeartBeatForActivities bool
 	identity                   string
 	metricsScope               tally.Scope
-	logger                     bark.Logger
+	logger                     *zap.Logger
 	disableWorkflowWorker      bool
 	disableActivityWorker      bool
 	testTags                   map[string]map[string]string
@@ -278,7 +277,7 @@ func (wo *workerOptions) SetMetrics(metricsScope tally.Scope) WorkerOptions {
 }
 
 // SetLogger sets the logger for the framework.
-func (wo *workerOptions) SetLogger(logger bark.Logger) WorkerOptions {
+func (wo *workerOptions) SetLogger(logger *zap.Logger) WorkerOptions {
 	wo.logger = logger
 	return wo
 }

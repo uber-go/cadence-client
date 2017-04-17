@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
@@ -17,6 +16,7 @@ import (
 	"github.com/uber-go/cadence-client/common/metrics"
 	"github.com/uber-go/cadence-client/common/util"
 	"github.com/uber-go/tally"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 )
 
@@ -49,7 +49,7 @@ type (
 		workflowDefFactory workflowDefinitionFactory
 		metricsScope       tally.Scope
 		ppMgr              pressurePointMgr
-		logger             bark.Logger
+		logger             *zap.Logger
 		identity           string
 	}
 
@@ -60,7 +60,7 @@ type (
 		implementations map[ActivityType]activity
 		service         m.TChanWorkflowService
 		metricsScope    tally.Scope
-		logger          bark.Logger
+		logger          *zap.Logger
 	}
 
 	// history wrapper method to help information about events.
@@ -232,8 +232,9 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		return nil, "", errors.New("nil TaskList in WorkflowExecutionStarted event")
 	}
 
-	wth.logger.Debugf("Processing New Workflow Task: Type=%s, PreviousStartedEventId=%d",
-		task.GetWorkflowType().GetName(), task.GetPreviousStartedEventId())
+	wth.logger.Debug("Processing New Workflow Task.",
+		zap.String("WorkflowType", task.GetWorkflowType().GetName()),
+		zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 
 	// Setup workflow Info
 	workflowInfo := &WorkflowInfo{
@@ -272,7 +273,9 @@ ProcessEvents:
 		}
 
 		for _, event := range reorderedEvents {
-			wth.logger.Debugf("ProcessEvent: Id=%d, EventType=%v", event.GetEventId(), event.GetEventType())
+			wth.logger.Debug("ProcessEvent",
+				zap.Int64("EventID", event.GetEventId()),
+				zap.String("EventType", event.GetEventType().String()))
 
 			isInReplay := event.GetEventId() < reorderedHistory.LastNonReplayedID()
 			if isEventTypeRespondToDecision(event.GetEventType()) {
@@ -314,7 +317,7 @@ ProcessEvents:
 
 	// check if decisions from reply matches to the history events
 	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
-		wth.logger.Warnf("replay and history match failed: %s", err)
+		wth.logger.Warn("replay and history match failed.", zap.Error(err))
 		return nil, "", err
 	}
 
@@ -568,8 +571,9 @@ func newServiceInvoker(taskToken []byte, identity string, service m.TChanWorkflo
 
 // Execute executes an implementation of the activity.
 func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (interface{}, error) {
-	ath.logger.Debugf("[WorkflowID: %s] Execute activity: %s",
-		t.GetWorkflowExecution().GetWorkflowId(), t.GetActivityType().GetName())
+	ath.logger.Debug("activityTaskHandlerImpl.Execute",
+		zap.String("WorkflowID", t.GetWorkflowExecution().GetWorkflowId()),
+		zap.String("ActivityType", t.GetActivityType().GetName()))
 
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service)
 	ctx := WithActivityTask(context.Background(), t, invoker)

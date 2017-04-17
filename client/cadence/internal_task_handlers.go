@@ -318,7 +318,8 @@ ProcessEvents:
 		return nil, "", err
 	}
 
-	eventDecisions := wth.completeWorkflow(isWorkflowCompleted, unhandledDecision, completionResult, failure)
+	eventDecisions := wth.completeWorkflow(
+		isWorkflowCompleted, unhandledDecision, completionResult, failure)
 	if len(eventDecisions) > 0 {
 		decisions = append(decisions, eventDecisions...)
 		if wth.metricsScope != nil {
@@ -483,11 +484,22 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 	return false
 }
 
-func (wth *workflowTaskHandlerImpl) completeWorkflow(isWorkflowCompleted bool, unhandledDecision bool, completionResult []byte,
-	err error) []*s.Decision {
+func (wth *workflowTaskHandlerImpl) completeWorkflow(
+	isWorkflowCompleted bool,
+	unhandledDecision bool,
+	completionResult []byte,
+	err error,
+) []*s.Decision {
 	decisions := []*s.Decision{}
 	if !unhandledDecision {
-		if err != nil {
+		if err == ErrCanceled {
+			// Workflow cancelled
+			cancelDecision := createNewDecision(s.DecisionType_CancelWorkflowExecution)
+			cancelDecision.CancelWorkflowExecutionDecisionAttributes = &s.CancelWorkflowExecutionDecisionAttributes{
+				Details: completionResult,
+			}
+			decisions = append(decisions, cancelDecision)
+		} else if err != nil {
 			// Workflow failures
 			failDecision := createNewDecision(s.DecisionType_FailWorkflowExecution)
 			reason, details := getErrorDetails(err)

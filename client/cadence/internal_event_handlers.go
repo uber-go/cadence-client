@@ -41,6 +41,7 @@ type (
 		completeHandler                completionHandler        // events completion handler
 		currentReplayTime              time.Time                // Indicates current replay time of the decision.
 		postEventHooks                 []func()                 // postEvent hooks that need to be executed at the end of the event.
+		cancelHandler                  func()                   // A cancel handler to be invoked on a cancel notification
 		logger                         bark.Logger
 	}
 )
@@ -67,6 +68,30 @@ func (wc *workflowEnvironmentImpl) WorkflowInfo() *WorkflowInfo {
 
 func (wc *workflowEnvironmentImpl) Complete(result []byte, err error) {
 	wc.completeHandler(result, err)
+}
+
+func (wc *workflowEnvironmentImpl) RequestCancelWorkflow(domainName, workflowID, runID string) error {
+	if domainName == "" {
+		return errors.New("need a valid domain, provided empty")
+	}
+	if workflowID == "" {
+		return errors.New("need a valid workflow ID, provided empty")
+	}
+
+	attributes := m.NewRequestCancelExternalWorkflowExecutionDecisionAttributes()
+	attributes.Domain = common.StringPtr(domainName)
+	attributes.WorkflowId = common.StringPtr(workflowID)
+	attributes.RunId = common.StringPtr(runID)
+
+	decision := wc.CreateNewDecision(m.DecisionType_RequestCancelExternalWorkflowExecution)
+	decision.RequestCancelExternalWorkflowExecutionDecisionAttributes = attributes
+
+	wc.executeDecisions = append(wc.executeDecisions, decision)
+	return nil
+}
+
+func (wc *workflowEnvironmentImpl) RegisterCancel(handler func()) {
+	wc.cancelHandler = handler
 }
 
 func (wc *workflowEnvironmentImpl) GenerateSequenceID() string {
@@ -271,6 +296,16 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(event *m.HistoryEvent
 	case m.EventType_CancelTimerFailed:
 		// No Operation.
 
+	case m.EventType_WorkflowExecutionCancelRequested:
+		weh.handleWorkflowExecutionCancelRequested(event.WorkflowExecutionCancelRequestedEventAttributes)
+
+	case m.EventType_WorkflowExecutionCanceled:
+		// No Operation.
+	case m.EventType_CancelWorkflowExecutionFailed:
+		// No Operation.
+	case m.EventType_RequestCancelExternalWorkflowExecutionInitiated:
+	case m.EventType_RequestCancelExternalWorkflowExecutionFailed:
+
 	default:
 		return nil, unhandledDecision, fmt.Errorf("missing event handler for event type: %v", event)
 	}
@@ -420,4 +455,9 @@ func (weh *workflowExecutionEventHandlerImpl) handleTimerFired(
 	// Invoke the callback
 	handler(nil, nil)
 	return nil
+}
+
+func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionCancelRequested(
+	attributes *m.WorkflowExecutionCancelRequestedEventAttributes) {
+	weh.cancelHandler()
 }

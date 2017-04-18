@@ -73,8 +73,8 @@ func NewTimeoutError(timeoutType shared.TimeoutType) TimeoutError {
 }
 
 // NewHeartbeatTimeoutError creates TimeoutError instance
-func NewHeartbeatTimeoutError(details []byte) TimeoutError {
-	return &timeoutError{timeoutType: shared.TimeoutType_HEARTBEAT, details: details}
+func NewHeartbeatTimeoutError(details ...interface{}) TimeoutError {
+	return &timeoutError{timeoutType: shared.TimeoutType_HEARTBEAT, details: toByteSlice(details)}
 }
 
 // NewCanceledError creates CanceledError instance

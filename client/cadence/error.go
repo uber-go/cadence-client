@@ -68,11 +68,15 @@ func NewErrorWithDetails(reason string, details interface{}) ErrorWithDetails {
 
 // NewTimeoutError creates TimeoutError instance.
 // Use NewHeartbeatTimeoutError to create heartbeat TimeoutError
+// WARNING: This function is public only to support unit testing of workflows.
+// It shouldn't be used by application level code.
 func NewTimeoutError(timeoutType shared.TimeoutType) TimeoutError {
 	return &timeoutError{timeoutType: timeoutType}
 }
 
 // NewHeartbeatTimeoutError creates TimeoutError instance
+// WARNING: This function is public only to support unit testing of workflows.
+// It shouldn't be used by application level code.
 func NewHeartbeatTimeoutError(details ...interface{}) TimeoutError {
 	return &timeoutError{timeoutType: shared.TimeoutType_HEARTBEAT, details: toByteSlice(details)}
 }

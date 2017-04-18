@@ -17,6 +17,7 @@ import (
 	"github.com/uber-go/cadence-client/common/util"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/context"
 )
 
@@ -274,8 +275,8 @@ ProcessEvents:
 
 		for _, event := range reorderedEvents {
 			wth.logger.Debug("ProcessEvent",
-				zap.Int64("EventID", event.GetEventId()),
-				zap.String("EventType", event.GetEventType().String()))
+				zap.Int64(tagEventID, event.GetEventId()),
+				zap.String(tagEventType, event.GetEventType().String()))
 
 			isInReplay := event.GetEventId() < reorderedHistory.LastNonReplayedID()
 			if isEventTypeRespondToDecision(event.GetEventType()) {
@@ -317,7 +318,7 @@ ProcessEvents:
 
 	// check if decisions from reply matches to the history events
 	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
-		wth.logger.Warn("replay and history match failed.", zap.Error(err))
+		wth.logger.Error("Replay and history match failed.", zap.Error(err))
 		return nil, "", err
 	}
 
@@ -547,8 +548,10 @@ func newActivityTaskHandler(activities []activity,
 		identity:        params.Identity,
 		implementations: implementations,
 		service:         service,
-		logger:          params.Logger,
-		metricsScope:    params.MetricsScope}
+		logger: params.Logger.With(
+			zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: params.Identity},
+			zapcore.Field{Key: tagTaskList, Type: zapcore.StringType, String: params.TaskList}),
+		metricsScope: params.MetricsScope}
 }
 
 type cadenceInvoker struct {

@@ -12,13 +12,12 @@ import (
 	"github.com/uber-go/cadence-client/common/metrics"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
 	pollTaskServiceTimeOut    = 3 * time.Minute // Server long poll is 1 * Minutes + delta
 	respondTaskServiceTimeOut = 10 * time.Second
-
-	tagTaskListName = "taskListName"
 
 	retryServiceOperationInitialInterval    = time.Millisecond
 	retryServiceOperationMaxInterval        = 4 * time.Second
@@ -91,7 +90,9 @@ func newWorkflowTaskPoller(taskHandler WorkflowTaskHandler, service m.TChanWorkf
 		identity:     params.Identity,
 		taskHandler:  taskHandler,
 		metricsScope: params.MetricsScope,
-		logger:       params.Logger,
+		logger: params.Logger.With(
+			zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: params.Identity},
+			zapcore.Field{Key: tagTaskList, Type: zapcore.StringType, String: params.TaskList}),
 	}
 }
 
@@ -171,7 +172,9 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service m.TChanWorkf
 		domain:       domain,
 		taskListName: params.TaskList,
 		identity:     params.Identity,
-		logger:       params.Logger,
+		logger: params.Logger.With(
+			zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: params.Identity},
+			zapcore.Field{Key: tagTaskList, Type: zapcore.StringType, String: params.TaskList}),
 		metricsScope: params.MetricsScope}
 }
 

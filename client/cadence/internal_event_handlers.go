@@ -10,6 +10,7 @@ import (
 	m "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -57,7 +58,11 @@ func newWorkflowExecutionEventHandler(workflowInfo *WorkflowInfo, workflowDefini
 		executeDecisions:               make([]*m.Decision, 0),
 		completeHandler:                completeHandler,
 		postEventHooks:                 []func(){},
-		logger:                         logger}
+		logger: logger.With(
+			zapcore.Field{Key: tagWorkflowType, Type: zapcore.StringType, String: workflowInfo.WorkflowType.Name},
+			zapcore.Field{Key: tagWorkflowID, Type: zapcore.StringType, String: workflowInfo.WorkflowExecution.ID},
+			zapcore.Field{Key: tagRunID, Type: zapcore.StringType, String: workflowInfo.WorkflowExecution.RunID},
+		)}
 	return &workflowExecutionEventHandlerImpl{context, nil, logger}
 }
 
@@ -110,9 +115,9 @@ func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityPar
 	wc.scheduledActivites[scheduleTaskAttr.GetActivityId()] = callback
 	wc.waitForCancelRequestActivities[scheduleTaskAttr.GetActivityId()] = parameters.WaitForCancellation
 	wc.logger.Debug("ExectueActivity",
-		zap.String("ActivityID", scheduleTaskAttr.GetActivityId()),
-		zap.String("ActivityType", scheduleTaskAttr.GetActivityType().GetName()),
-		zap.String("TaskList", scheduleTaskAttr.GetTaskList().GetName()))
+		zap.String(tagActivityID, scheduleTaskAttr.GetActivityId()),
+		zap.String(tagActivityType, scheduleTaskAttr.GetActivityType().GetName()),
+		zap.String(tagTaskList, scheduleTaskAttr.GetTaskList().GetName()))
 
 	return &activityInfo{activityID: scheduleTaskAttr.GetActivityId()}
 }
@@ -165,7 +170,7 @@ func (wc *workflowEnvironmentImpl) NewTimer(d time.Duration, callback resultHand
 	wc.executeDecisions = append(wc.executeDecisions, decision)
 	wc.scheduledTimers[startTimerAttr.GetTimerId()] = callback
 	wc.logger.Debug("NewTimer",
-		zap.String("TimerID", startTimerAttr.GetTimerId()),
+		zap.String(tagTimerID, startTimerAttr.GetTimerId()),
 		zap.Duration("Duration", d))
 
 	return &timerInfo{timerID: timerID}
@@ -174,7 +179,7 @@ func (wc *workflowEnvironmentImpl) NewTimer(d time.Duration, callback resultHand
 func (wc *workflowEnvironmentImpl) RequestCancelTimer(timerID string) {
 	handler, ok := wc.scheduledTimers[timerID]
 	if !ok {
-		wc.logger.Debug("RequestCancelTimer failed, TimerID not exists.", zap.String("TimerID", timerID))
+		wc.logger.Debug("RequestCancelTimer failed, TimerID not exists.", zap.String(tagTimerID, timerID))
 		return
 	}
 	cancelTimerAttr := &m.CancelTimerDecisionAttributes{TimerId: common.StringPtr(timerID)}
@@ -188,7 +193,7 @@ func (wc *workflowEnvironmentImpl) RequestCancelTimer(timerID string) {
 	})
 	delete(wc.scheduledTimers, timerID)
 
-	wc.logger.Debug("RequestCancelTimer", zap.String("TimerID", timerID))
+	wc.logger.Debug("RequestCancelTimer", zap.String(tagTimerID, timerID))
 }
 
 func (wc *workflowEnvironmentImpl) addPostEventHooks(hook func()) {

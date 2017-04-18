@@ -14,10 +14,6 @@ import (
 )
 
 const (
-	tagWorkerID   = "WorkerID"
-	tagWorkerType = "WorkerType"
-	tagRoutineID  = "routineID"
-
 	retryPollOperationInitialInterval    = time.Millisecond
 	retryPollOperationMaxInterval        = 1 * time.Second
 	retryPollOperationExpirationInterval = backoff.NoInterval // We don't ever expire

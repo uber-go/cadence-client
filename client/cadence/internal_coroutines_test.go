@@ -745,33 +745,37 @@ func TestFutureChain(t *testing.T) {
 func TestSelectFuture(t *testing.T) {
 	var history []string
 	d := newDispatcher(background, func(ctx Context) {
-		c1 := NewChannel(ctx)
-		future, settable := NewFuture(ctx)
+		future1, settable1 := NewFuture(ctx)
+		future2, settable2 := NewFuture(ctx)
 		Go(ctx, func(ctx Context) {
 			history = append(history, "add-one")
-			c1.Send(ctx, "one")
+			settable1.SetValue("one")
 		})
 		Go(ctx, func(ctx Context) {
 			history = append(history, "add-two")
-			settable.SetValue("two")
+			settable2.SetValue("two")
 		})
 
 		s := NewSelector(ctx)
 		s.
-			AddReceiveWithMoreFlag(c1, func(v interface{}, more bool) {
-				assert.True(t, more)
+			AddFuture(future1, func(v interface{}, err error) {
+				assert.Nil(t, err)
 				history = append(history, fmt.Sprintf("c1-%v", v))
-			}).AddFuture(future, func(v interface{}, err error) {
-			assert.Nil(t, err)
-			history = append(history, fmt.Sprintf("c2-%v", v))
-		})
+			}).
+			AddFuture(future2, func(v interface{}, err error) {
+				assert.Nil(t, err)
+				history = append(history, fmt.Sprintf("c2-%v", v))
+			})
 		history = append(history, "select1")
 		s.Select(ctx)
 		history = append(history, "select2")
 		s.Select(ctx)
 		history = append(history, "done")
 	})
-	d.ExecuteUntilAllBlocked()
+	err := d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err, err.StackTrace())
+	}
 	require.True(t, d.IsDone())
 
 	expected := []string{

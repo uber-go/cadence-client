@@ -86,8 +86,8 @@ type (
 	// Implements Selector interface
 	selectorImpl struct {
 		name        string
-		cases       []selectCase // cases that this select is comprised from
-		defaultFunc *func()      // default case
+		cases       []*selectCase // cases that this select is comprised from
+		defaultFunc *func()       // default case
 	}
 
 	// unblockFunc is passed evaluated by a coroutine yield. When it returns false the yield returns to a caller.
@@ -648,22 +648,22 @@ func (d *dispatcherImpl) StackTrace() string {
 }
 
 func (s *selectorImpl) AddReceive(c Channel, f func(v interface{})) Selector {
-	s.cases = append(s.cases, selectCase{channel: c.(*channelImpl), receiveFunc: &f})
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveFunc: &f})
 	return s
 }
 
 func (s *selectorImpl) AddReceiveWithMoreFlag(c Channel, f func(v interface{}, more bool)) Selector {
-	s.cases = append(s.cases, selectCase{channel: c.(*channelImpl), receiveWithMoreFlagFunc: &f})
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveWithMoreFlagFunc: &f})
 	return s
 }
 
 func (s *selectorImpl) AddSend(c Channel, v interface{}, f func()) Selector {
-	s.cases = append(s.cases, selectCase{channel: c.(*channelImpl), sendFunc: &f, sendValue: &v})
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), sendFunc: &f, sendValue: &v})
 	return s
 }
 
 func (s *selectorImpl) AddFuture(future Future, f func(v interface{}, err error)) Selector {
-	s.cases = append(s.cases, selectCase{future: future.(*futureImpl), futureFunc: &f})
+	s.cases = append(s.cases, &selectCase{future: future.(*futureImpl), futureFunc: &f})
 	return s
 }
 
@@ -673,111 +673,92 @@ func (s *selectorImpl) AddDefault(f func()) {
 
 func (s *selectorImpl) Select(ctx Context) {
 	state := getState(ctx)
-	first := true
 	var readyBranch func()
+	for _, pair := range s.cases {
+		if pair.receiveFunc != nil {
+			f := *pair.receiveFunc
+			callback := func(v interface{}, more bool) bool {
+				if readyBranch != nil {
+					return false
+				}
+				readyBranch = func() {
+					f(v)
+				}
+				return true
+			}
+
+			v, ok, more := pair.channel.receiveAsyncImpl(callback)
+			if ok || !more {
+				f(v)
+				return
+			}
+		} else if pair.receiveWithMoreFlagFunc != nil {
+			f := *pair.receiveWithMoreFlagFunc
+			callback := func(v interface{}, more bool) bool {
+				if readyBranch != nil {
+					return false
+				}
+				readyBranch = func() {
+					f(v, more)
+				}
+				return true
+			}
+			v, ok, more := pair.channel.receiveAsyncImpl(callback)
+			if ok || !more {
+				f(v, more)
+				return
+			}
+		} else if pair.sendFunc != nil {
+			f := *pair.sendFunc
+			p := &valueCallbackPair{
+				value: *pair.sendValue,
+				callback: func() bool {
+					if readyBranch != nil {
+						return false
+					}
+					readyBranch = func() {
+						f()
+					}
+					return true
+				},
+			}
+			ok := pair.channel.sendAsyncImpl(*pair.sendValue, p)
+			if ok {
+				f()
+				return
+			}
+		} else if pair.futureFunc != nil {
+			p := pair
+			f := *p.futureFunc
+			callback := func(v interface{}, more bool) bool {
+				if readyBranch != nil {
+					return false
+				}
+				p.futureFunc = nil
+				readyBranch = func() {
+					v, _, err := p.future.get(nil)
+					f(v, err)
+				}
+				return true
+			}
+			v, ok, err := p.future.get(callback)
+			if ok {
+				p.futureFunc = nil
+				f(v, err)
+				return
+			}
+		}
+	}
+	if s.defaultFunc != nil {
+		f := *s.defaultFunc
+		f()
+		return
+	}
 	for {
 		if readyBranch != nil {
 			readyBranch()
 			state.unblocked()
 			return
-		}
-		for _, pair := range s.cases {
-			if pair.receiveFunc != nil {
-				f := *pair.receiveFunc
-				var callback receiveCallback
-				if first {
-					callback = func(v interface{}, more bool) bool {
-						if readyBranch != nil {
-							return false
-						}
-						readyBranch = func() {
-							f(v)
-						}
-						return true
-					}
-				}
-				v, ok, more := pair.channel.receiveAsyncImpl(callback)
-				if ok || !more {
-					f(v)
-					state.unblocked()
-					return
-				}
-			} else if pair.receiveWithMoreFlagFunc != nil {
-				f := *pair.receiveWithMoreFlagFunc
-				var callback receiveCallback
-				if first {
-					callback = func(v interface{}, more bool) bool {
-						if readyBranch != nil {
-							return false
-						}
-						readyBranch = func() {
-							f(v, more)
-						}
-						return true
-					}
-				}
-				v, ok, more := pair.channel.receiveAsyncImpl(callback)
-				if ok || !more {
-					f(v, more)
-					state.unblocked()
-					return
-				}
-			} else if pair.sendFunc != nil {
-				f := *pair.sendFunc
-				var p *valueCallbackPair
-				if first {
-					p = &valueCallbackPair{
-						value: *pair.sendValue,
-						callback: func() bool {
-							if readyBranch != nil {
-								return false
-							}
-							readyBranch = func() {
-								f()
-							}
-							return true
-						},
-					}
-				}
-				ok := pair.channel.sendAsyncImpl(*pair.sendValue, p)
-				if ok {
-					f()
-					state.unblocked()
-					return
-				}
-			} else if pair.futureFunc != nil {
-				f := *pair.futureFunc
-				var callback receiveCallback
-				if first {
-					callback = func(v interface{}, more bool) bool {
-						if readyBranch != nil {
-							return false
-						}
-						readyBranch = func() {
-							v, _, err := pair.future.get(nil)
-							f(v, err)
-						}
-						return true
-					}
-				}
-				v, ok, err := pair.future.get(callback)
-				if ok {
-					f(v, err)
-					state.unblocked()
-					return
-				}
-			} else {
-				panic("Invalid case")
-			}
-		}
-		if s.defaultFunc != nil {
-			f := *s.defaultFunc
-			f()
-			state.unblocked()
-			return
-		}
-		if first {
-			first = false
 		}
 		state.yield(fmt.Sprintf("blocked on %s.Select", s.name))
 	}

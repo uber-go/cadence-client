@@ -57,7 +57,7 @@ type (
 
 	valueCallbackPair struct {
 		value    interface{}
-		callback func()
+		callback func() bool
 	}
 
 	receiveCallback func(v interface{}, more bool) bool // when false is returned callback should be ignored
@@ -326,10 +326,13 @@ func (c *channelImpl) receiveAsyncImpl(callback receiveCallback) (v interface{},
 	if c.closed {
 		return nil, false, false
 	}
-	if len(c.blockedSends) > 0 {
+blockedSendsLoop:
+	for len(c.blockedSends) > 0 {
 		b := c.blockedSends[0]
 		c.blockedSends = c.blockedSends[1:]
-		b.callback()
+		if !b.callback() {
+			continue blockedSendsLoop
+		}
 		return b.value, true, true
 	}
 	if callback != nil {
@@ -353,7 +356,13 @@ func (c *channelImpl) Send(ctx Context, v interface{}) {
 		}
 		var pair *valueCallbackPair
 		if first {
-			pair = &valueCallbackPair{value: v, callback: func() { valueConsumed = true }}
+			pair = &valueCallbackPair{
+				value: v,
+				callback: func() bool {
+					valueConsumed = true
+					return true
+				},
+			}
 			first = false
 		}
 		ok := c.sendAsyncImpl(v, pair)
@@ -702,9 +711,24 @@ func (s *selectorImpl) Select(ctx Context) {
 					return
 				}
 			} else if pair.sendFunc != nil {
-				ok := pair.channel.SendAsync(*pair.sendValue)
+				f := *pair.sendFunc
+				var p *valueCallbackPair
+				if first {
+					p = &valueCallbackPair{
+						value: *pair.sendValue,
+						callback: func() bool {
+							if readyBranch != nil {
+								return false
+							}
+							readyBranch = func() {
+								f()
+							}
+							return true
+						},
+					}
+				}
+				ok := pair.channel.sendAsyncImpl(*pair.sendValue, p)
 				if ok {
-					f := *pair.sendFunc
 					f()
 					state.unblocked()
 					return

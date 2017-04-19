@@ -31,7 +31,7 @@ type (
 		value   interface{}
 		err     error
 		ready   bool
-		channel Channel
+		channel *channelImpl
 		chained []*futureImpl // Futures that are chained to this one
 	}
 
@@ -79,7 +79,7 @@ type (
 
 		sendFunc   *func()                         // function to call when channel accepted a message. nil for receive case.
 		sendValue  *interface{}                    // value to send to the channel. Used only for send case.
-		future     Future                          // Used for future case
+		future     *futureImpl                     // Used for future case
 		futureFunc *func(v interface{}, err error) // function to call when Future is ready
 	}
 
@@ -153,6 +153,18 @@ func (f *futureImpl) Get(ctx Context) (interface{}, error) {
 		panic("not ready")
 	}
 	return f.value, f.err
+}
+
+// Used by selectorImpl
+func (f *futureImpl) get(callback receiveCallback) (v interface{}, ok bool, err error) {
+	_, _, more := f.channel.receiveAsyncImpl(callback)
+	if more {
+		return nil, false, nil
+	}
+	if !f.ready {
+		panic("not ready")
+	}
+	return f.value, true, f.err
 }
 
 func (f *futureImpl) IsReady() bool {
@@ -651,7 +663,7 @@ func (s *selectorImpl) AddSend(c Channel, v interface{}, f func()) Selector {
 }
 
 func (s *selectorImpl) AddFuture(future Future, f func(v interface{}, err error)) Selector {
-	s.cases = append(s.cases, selectCase{future: future, futureFunc: &f})
+	s.cases = append(s.cases, selectCase{future: future.(*futureImpl), futureFunc: &f})
 	return s
 }
 
@@ -734,9 +746,23 @@ func (s *selectorImpl) Select(ctx Context) {
 					return
 				}
 			} else if pair.futureFunc != nil {
-				if pair.future.IsReady() {
-					f := *pair.futureFunc
-					f(pair.future.Get(ctx))
+				f := *pair.futureFunc
+				var callback receiveCallback
+				if first {
+					callback = func(v interface{}, more bool) bool {
+						if readyBranch != nil {
+							return false
+						}
+						readyBranch = func() {
+							v, _, err := pair.future.get(nil)
+							f(v, err)
+						}
+						return true
+					}
+				}
+				v, ok, err := pair.future.get(callback)
+				if ok {
+					f(v, err)
 					state.unblocked()
 					return
 				}

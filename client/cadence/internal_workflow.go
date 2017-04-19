@@ -655,15 +655,14 @@ func (s *selectorImpl) Select(ctx Context) {
 	first := true
 	var readyBranch func()
 	for {
-		if first {
-			first = false
-		}
 		if readyBranch != nil {
 			readyBranch()
+			state.unblocked()
 			return
 		}
 		for _, pair := range s.cases {
 			if pair.receiveFunc != nil {
+				f := *pair.receiveFunc
 				var callback receiveCallback
 				if first {
 					callback = func(v interface{}, more bool) bool {
@@ -671,7 +670,6 @@ func (s *selectorImpl) Select(ctx Context) {
 							return false
 						}
 						readyBranch = func() {
-							f := *pair.receiveFunc
 							f(v)
 						}
 						return true
@@ -679,15 +677,26 @@ func (s *selectorImpl) Select(ctx Context) {
 				}
 				v, ok, more := pair.channel.receiveAsyncImpl(callback)
 				if ok || !more {
-					f := *pair.receiveFunc
 					f(v)
 					state.unblocked()
 					return
 				}
 			} else if pair.receiveWithMoreFlagFunc != nil {
-				v, ok, more := pair.channel.ReceiveAsyncWithMoreFlag()
+				f := *pair.receiveWithMoreFlagFunc
+				var callback receiveCallback
+				if first {
+					callback = func(v interface{}, more bool) bool {
+						if readyBranch != nil {
+							return false
+						}
+						readyBranch = func() {
+							f(v, more)
+						}
+						return true
+					}
+				}
+				v, ok, more := pair.channel.receiveAsyncImpl(callback)
 				if ok || !more {
-					f := *pair.receiveWithMoreFlagFunc
 					f(v, more)
 					state.unblocked()
 					return
@@ -716,6 +725,9 @@ func (s *selectorImpl) Select(ctx Context) {
 			f()
 			state.unblocked()
 			return
+		}
+		if first {
+			first = false
 		}
 		state.yield(fmt.Sprintf("blocked on %s.Select", s.name))
 	}

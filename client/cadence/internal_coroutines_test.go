@@ -1,13 +1,13 @@
 package cadence
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
-	"errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -236,54 +236,13 @@ func TestBlockingSelect(t *testing.T) {
 		Go(ctx, func(ctx Context) {
 			history = append(history, "add-one")
 			c1.Send(ctx, "one")
+			history = append(history, "add-one-done")
+
 		})
 		Go(ctx, func(ctx Context) {
 			history = append(history, "add-two")
 			c2.Send(ctx, "two")
-		})
-
-		s := NewSelector(ctx)
-		s.
-			AddReceiveWithMoreFlag(c1, func(v interface{}, more bool) {
-				assert.True(t, more)
-				history = append(history, fmt.Sprintf("c1-%v", v))
-			}).
-			AddReceive(c2, func(v interface{}) {
-				history = append(history, fmt.Sprintf("c2-%v", v))
-			})
-		history = append(history, "select1")
-		s.Select(ctx)
-		history = append(history, "select2")
-		s.Select(ctx)
-		history = append(history, "done")
-	})
-	d.ExecuteUntilAllBlocked()
-	require.True(t, d.IsDone())
-
-	expected := []string{
-		"select1",
-		"add-one",
-		"add-two",
-		"c1-one",
-		"select2",
-		"c2-two",
-		"done",
-	}
-	require.EqualValues(t, expected, history)
-}
-
-func TestBlockingSelectAsyncSend(t *testing.T) {
-	var history []string
-	d := newDispatcher(background, func(ctx Context) {
-		c1 := NewChannel(ctx)
-		c2 := NewChannel(ctx)
-		Go(ctx, func(ctx Context) {
-			history = append(history, "add-one")
-			c1.SendAsync("one")
-		})
-		Go(ctx, func(ctx Context) {
-			history = append(history, "add-two")
-			c2.SendAsync("two")
+			history = append(history, "add-two-done")
 		})
 
 		s := NewSelector(ctx)
@@ -307,10 +266,42 @@ func TestBlockingSelectAsyncSend(t *testing.T) {
 	expected := []string{
 		"select1",
 		"add-one",
+		"add-one-done",
 		"add-two",
 		"c1-one",
 		"select2",
 		"c2-two",
+		"done",
+		"add-two-done",
+	}
+	require.EqualValues(t, expected, history)
+}
+
+func TestBlockingSelectAsyncSend(t *testing.T) {
+	var history []string
+	d := newDispatcher(background, func(ctx Context) {
+		c1 := NewChannel(ctx)
+		Go(ctx, func(ctx Context) {
+			history = append(history, "add-one")
+			c1.SendAsync("one")
+		})
+		s := NewSelector(ctx)
+		s.
+			AddReceiveWithMoreFlag(c1, func(v interface{}, more bool) {
+				assert.True(t, more)
+				history = append(history, fmt.Sprintf("c1-%v", v))
+			})
+		history = append(history, "select1")
+		s.Select(ctx)
+		history = append(history, "done")
+	})
+	d.ExecuteUntilAllBlocked()
+	require.True(t, d.IsDone(), strings.Join(history, "\n"))
+
+	expected := []string{
+		"select1",
+		"add-one",
+		"c1-one",
 		"done",
 	}
 	require.EqualValues(t, expected, history)

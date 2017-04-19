@@ -280,24 +280,25 @@ func (c *channelImpl) Receive(ctx Context) (v interface{}) {
 func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (v interface{}, more bool) {
 	state := getState(ctx)
 	hasResult := false
-	appended := false
+	first := true
 	var result interface{}
 	for {
 		if hasResult {
 			state.unblocked()
 			return result, true
 		}
-		v, ok, more := c.ReceiveAsyncWithMoreFlag()
+		var callback func(v interface{})
+		if first {
+			callback = func(v interface{}) {
+				result = v
+				hasResult = true
+			}
+			first = false
+		}
+		v, ok, more := c.receiveAsyncImpl(callback)
 		if ok || !more {
 			state.unblocked()
 			return v, more
-		}
-		if !appended {
-			c.blockedReceives = append(c.blockedReceives, func(v interface{}) {
-				result = v
-				hasResult = true
-			})
-			appended = true
 		}
 		state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
 	}
@@ -309,6 +310,10 @@ func (c *channelImpl) ReceiveAsync() (v interface{}, ok bool) {
 }
 
 func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more bool) {
+	return c.receiveAsyncImpl(nil)
+}
+
+func (c *channelImpl) receiveAsyncImpl(callback func(interface{})) (v interface{}, ok bool, more bool) {
 	if len(c.buffer) > 0 {
 		r := c.buffer[0]
 		c.buffer = c.buffer[1:]
@@ -322,6 +327,9 @@ func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more b
 		c.blockedSends = c.blockedSends[1:]
 		b.callback()
 		return b.value, true, true
+	}
+	if callback != nil {
+		c.blockedReceives = append(c.blockedReceives, callback)
 	}
 	return nil, false, true
 }
@@ -342,8 +350,8 @@ func (c *channelImpl) Send(ctx Context, v interface{}) {
 		var pair *valueCallbackPair
 		if first {
 			pair = &valueCallbackPair{value: v, callback: func() { valueConsumed = true }}
+			first = false
 		}
-		first = false
 		ok := c.sendAsyncImpl(v, pair)
 		if ok {
 			state.unblocked()

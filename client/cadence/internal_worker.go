@@ -16,6 +16,7 @@ import (
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -107,7 +108,12 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 		params.Identity = getWorkerIdentity(params.TaskList)
 	}
 	if params.Logger == nil {
-		logger, _ := zap.NewProduction()
+		// create default logger if user does not supply one.
+		config := zap.NewProductionConfig()
+		// set default time formatter to "2006-01-02T15:04:05.000Z0700"
+		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+		//config.Level.SetLevel(zapcore.DebugLevel)
+		logger, _ := config.Build()
 		params.Logger = logger
 		params.Logger.Info("No logger configured for cadence worker. Created default one.")
 	}

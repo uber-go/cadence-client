@@ -142,7 +142,7 @@ func (bw *baseWorker) execute(routineID int) {
 		select {
 		// Shutdown the Routine.
 		case <-bw.shutdownCh:
-			bw.logger.Info("Shutting Down!", zap.Int(tagRoutineID, routineID))
+			bw.logger.Info("Worker shutting down.", zap.Int(tagRoutineID, routineID))
 			bw.shutdownWG.Done()
 			return
 

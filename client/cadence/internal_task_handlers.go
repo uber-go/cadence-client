@@ -234,7 +234,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	}
 
 	wth.logger.Debug("Processing New Workflow Task.",
-		zap.String("WorkflowType", task.GetWorkflowType().GetName()),
+		zap.String(tagWorkflowType, task.GetWorkflowType().GetName()),
 		zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 
 	// Setup workflow Info
@@ -575,8 +575,8 @@ func newServiceInvoker(taskToken []byte, identity string, service m.TChanWorkflo
 // Execute executes an implementation of the activity.
 func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (interface{}, error) {
 	ath.logger.Debug("activityTaskHandlerImpl.Execute",
-		zap.String("WorkflowID", t.GetWorkflowExecution().GetWorkflowId()),
-		zap.String("ActivityType", t.GetActivityType().GetName()))
+		zap.String(tagWorkflowID, t.GetWorkflowExecution().GetWorkflowId()),
+		zap.String(tagActivityType, t.GetActivityType().GetName()))
 
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service)
 	ctx := WithActivityTask(context.Background(), t, invoker)

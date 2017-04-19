@@ -139,7 +139,7 @@ func (wc *workflowEnvironmentImpl) RequestCancelActivity(activityID string) {
 			handler(nil, NewCanceledError())
 		})
 	}
-	wc.logger.Debug("RequestCancelActivity", zap.String("ActivityID", requestCancelAttr.GetActivityId()))
+	wc.logger.Debug("RequestCancelActivity", zap.String(tagActivityID, requestCancelAttr.GetActivityId()))
 }
 
 func (wc *workflowEnvironmentImpl) SetCurrentReplayTime(replayTime time.Time) {
@@ -425,7 +425,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleTimerFired(
 	attributes *m.TimerFiredEventAttributes) error {
 	handler, ok := weh.scheduledTimers[attributes.GetTimerId()]
 	if !ok {
-		weh.logger.Debug("Unable to find the timer callback when it is fired.", zap.String("TimerID", attributes.GetTimerId()))
+		weh.logger.Debug("Unable to find the timer callback when it is fired.", zap.String(tagTimerID, attributes.GetTimerId()))
 		return nil
 	}
 

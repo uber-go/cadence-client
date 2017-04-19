@@ -287,25 +287,10 @@ func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (v interface{}, more bool
 			state.unblocked()
 			return result, true
 		}
-		if len(c.buffer) > 0 {
-			r := c.buffer[0]
-			c.buffer = c.buffer[1:]
+		v, ok, more := c.ReceiveAsyncWithMoreFlag()
+		if ok || !more {
 			state.unblocked()
-			return r, true
-		}
-		// Let the buffer drain before delivering closed
-		if c.closed {
-			return nil, false
-		}
-		if len(c.blockedSends) > 0 {
-			if len(c.blockedReceives) > 0 {
-				panic("both blockedSends and blockedReceives are not empty")
-			}
-			b := c.blockedSends[0]
-			c.blockedSends = c.blockedSends[1:]
-			b.callback()
-			state.unblocked()
-			return b.value, true
+			return v, more
 		}
 		if !appended {
 			c.blockedReceives = append(c.blockedReceives, func(v interface{}) {
@@ -354,18 +339,8 @@ func (c *channelImpl) Send(ctx Context, v interface{}) {
 			state.unblocked()
 			return
 		}
-		if len(c.blockedReceives) > 0 {
-			if len(c.blockedSends) > 0 {
-				panic("both blockedSends and blockedReceives are not empty")
-			}
-			blockedGet := c.blockedReceives[0]
-			c.blockedReceives = c.blockedReceives[1:]
-			blockedGet(v)
-			state.unblocked()
-			return
-		}
-		if len(c.buffer) < c.size {
-			c.buffer = append(c.buffer, v)
+		ok := c.SendAsync(v)
+		if ok {
 			state.unblocked()
 			return
 		}

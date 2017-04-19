@@ -288,13 +288,13 @@ func TestBlockingSelectAsyncSend(t *testing.T) {
 
 		s := NewSelector(ctx)
 		s.
-		AddReceiveWithMoreFlag(c1, func(v interface{}, more bool) {
-			assert.True(t, more)
-			history = append(history, fmt.Sprintf("c1-%v", v))
-		}).
+			AddReceiveWithMoreFlag(c1, func(v interface{}, more bool) {
+				assert.True(t, more)
+				history = append(history, fmt.Sprintf("c1-%v", v))
+			}).
 			AddReceive(c2, func(v interface{}) {
-			history = append(history, fmt.Sprintf("c2-%v", v))
-		})
+				history = append(history, fmt.Sprintf("c2-%v", v))
+			})
 		history = append(history, "select1")
 		s.Select(ctx)
 		history = append(history, "select2")

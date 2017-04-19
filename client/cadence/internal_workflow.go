@@ -329,7 +329,7 @@ func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more b
 func (c *channelImpl) Send(ctx Context, v interface{}) {
 	state := getState(ctx)
 	valueConsumed := false
-	appended := false
+	first := true
 	for {
 		// Check for closed in the loop as close can be called when send is blocked
 		if c.closed {
@@ -339,21 +339,25 @@ func (c *channelImpl) Send(ctx Context, v interface{}) {
 			state.unblocked()
 			return
 		}
-		ok := c.SendAsync(v)
+		var pair *valueCallbackPair
+		if first {
+			pair = &valueCallbackPair{value: v, callback: func() { valueConsumed = true }}
+		}
+		first = false
+		ok := c.sendAsyncImpl(v, pair)
 		if ok {
 			state.unblocked()
 			return
-		}
-		if !appended {
-			c.blockedSends = append(c.blockedSends,
-				valueCallbackPair{value: v, callback: func() { valueConsumed = true }})
-			appended = true
 		}
 		state.yield(fmt.Sprintf("blocked on %s.Send", c.name))
 	}
 }
 
 func (c *channelImpl) SendAsync(v interface{}) (ok bool) {
+	return c.sendAsyncImpl(v, nil)
+}
+
+func (c *channelImpl) sendAsyncImpl(v interface{}, pair *valueCallbackPair) (ok bool) {
 	if c.closed {
 		panic("Closed channel")
 	}
@@ -366,6 +370,9 @@ func (c *channelImpl) SendAsync(v interface{}) (ok bool) {
 		c.blockedReceives = c.blockedReceives[1:]
 		blockedGet(v)
 		return true
+	}
+	if pair != nil {
+		c.blockedSends = append(c.blockedSends, *pair)
 	}
 	return false
 }

@@ -136,7 +136,7 @@ func NewFuture(ctx Context) (Future, Settable) {
 	return impl, impl
 }
 
-// ExecuteActivityAsync requests activity execution in the context of a workflow.
+// ExecuteActivity requests activity execution in the context of a workflow.
 //  - Context can be used to pass the settings for this activity.
 // 	For example: task list that this need to be routed, timeouts that need to be configured.
 //	Use ActivityOptions to pass down the options.
@@ -153,8 +153,7 @@ func NewFuture(ctx Context) (Future, Settable) {
 // and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError.
 //  - You can also cancel the pending activity using context(WithCancel(ctx)) and that will fail the activity with
 // error ActivityTaskCanceledError.
-// - result - Result the activity returns, if there is no result the activity returns
-//      then it will be nil, indicating no result.
+// - returns Future with activity result or failure
 func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.
 	future, settable := NewFuture(ctx)

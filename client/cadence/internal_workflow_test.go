@@ -1,9 +1,8 @@
 package cadence
 
 import (
-	"testing"
-
 	"encoding/json"
+	"testing"
 	"time"
 
 	"fmt"
@@ -47,7 +46,7 @@ func (ac *asyncTestCallbackProcessor) ProcessOrWait(waitForComplete <-chan struc
 			return true
 
 		case <-time.After(2 * time.Second):
-			fmt.Println("timeout 10 second")
+			fmt.Println("timeout 2 second")
 			return false
 		}
 	}
@@ -145,20 +144,23 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	c2 := NewChannel(ctx)
 	Go(ctx, func(ctx Context) {
 		ctx1 := WithActivityOptions(ctx, NewActivityOptions().(*activityOptions).WithActivityID("id1"))
-		f := ExecuteActivity(ctx1, "testAct", nil)
-		err = f.Get(ctx, &result1)
+		f := ExecuteActivity(ctx1, "testAct")
+		err1 = f.Get(ctx, &result1)
 		require.NoError(w.t, err1, err1)
 		c1.Send(ctx, true)
 	})
 	Go(ctx, func(ctx Context) {
 		ctx2 := WithActivityOptions(ctx, NewActivityOptions().(*activityOptions).WithActivityID("id2"))
-		f := ExecuteActivity(ctx2, "testAct", nil)
+		f := ExecuteActivity(ctx2, "testAct")
 		err1 := f.Get(ctx, &result2)
 		require.NoError(w.t, err1, err1)
 		if w.panic {
 			panic("simulated")
 		}
+		fmt.Printf("Before c2.Send")
+
 		c2.Send(ctx, true)
+		fmt.Printf("After c2.Send")
 	})
 
 	c1.Receive(ctx)
@@ -191,6 +193,8 @@ func TestSplitJoinActivityWorkflow(t *testing.T) {
 			cbProcessor.Add(callback, []byte("Hello"), nil)
 		case "id2":
 			cbProcessor.Add(callback, []byte(" Flow!"), nil)
+		default:
+			panic(fmt.Sprintf("Unexpected activityID: %v", *parameters.ActivityID))
 		}
 	}).Twice()
 
@@ -220,7 +224,9 @@ func TestWorkflowPanic(t *testing.T) {
 	ctx.On("Complete", []byte(nil), mock.Anything).Return().Run(func(args mock.Arguments) {
 		resultErr := args.Get(1).(ErrorWithDetails)
 		require.EqualValues(t, "simulated", resultErr.Reason())
-		require.Contains(t, string(resultErr.Details()), "cadence.(*splitJoinActivityWorkflow).Execute")
+		var details []byte
+		resultErr.Details(&details)
+		require.Contains(t, string(details), "cadence.(*splitJoinActivityWorkflow).Execute")
 		workflowComplete <- struct{}{}
 	}).Once()
 
@@ -374,7 +380,9 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 	var res3 []byte
 	err3 := f3.Get(ctx, &res3)
 	require.Nil(w.t, res3)
-	require.Equal(w.t, "testCancelDetails", string(err3.(CanceledError).Details()))
+	var details []byte
+	err3.(CanceledError).Details(&details)
+	require.Equal(w.t, "testCancelDetails", string(details))
 
 	return []byte("workflow-completed"), nil
 }
@@ -405,7 +413,7 @@ func TestActivityCancelWorkflow(t *testing.T) {
 			cbProcessor.Add(
 				callbackHandler3,
 				nil,
-				NewCanceledErrorWithDetails([]byte("testCancelDetails")),
+				NewCanceledError([]byte("testCancelDetails")),
 			)
 		}
 	}).Times(3)

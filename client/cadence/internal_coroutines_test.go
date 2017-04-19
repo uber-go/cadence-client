@@ -272,6 +272,50 @@ func TestBlockingSelect(t *testing.T) {
 	require.EqualValues(t, expected, history)
 }
 
+func TestBlockingSelectAsyncSend(t *testing.T) {
+	var history []string
+	d := newDispatcher(background, func(ctx Context) {
+		c1 := NewChannel(ctx)
+		c2 := NewChannel(ctx)
+		Go(ctx, func(ctx Context) {
+			history = append(history, "add-one")
+			c1.SendAsync("one")
+		})
+		Go(ctx, func(ctx Context) {
+			history = append(history, "add-two")
+			c2.SendAsync("two")
+		})
+
+		s := NewSelector(ctx)
+		s.
+		AddReceiveWithMoreFlag(c1, func(v interface{}, more bool) {
+			assert.True(t, more)
+			history = append(history, fmt.Sprintf("c1-%v", v))
+		}).
+			AddReceive(c2, func(v interface{}) {
+			history = append(history, fmt.Sprintf("c2-%v", v))
+		})
+		history = append(history, "select1")
+		s.Select(ctx)
+		history = append(history, "select2")
+		s.Select(ctx)
+		history = append(history, "done")
+	})
+	d.ExecuteUntilAllBlocked()
+	require.True(t, d.IsDone(), strings.Join(history, "\n"))
+
+	expected := []string{
+		"select1",
+		"add-one",
+		"add-two",
+		"c1-one",
+		"select2",
+		"c2-two",
+		"done",
+	}
+	require.EqualValues(t, expected, history)
+}
+
 func TestSendSelect(t *testing.T) {
 	var history []string
 	d := newDispatcher(background, func(ctx Context) {

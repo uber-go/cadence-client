@@ -37,7 +37,16 @@ type (
 
 	// Future represents the result of an asynchronous computation.
 	Future interface {
-		Get(ctx Context, value interface{}) error
+		// Get blocks until the future is ready. When ready it either returns non nil error
+		// or assigns result value to the provided pointer.
+		// Example:
+		// var v string
+		// if err := f.Get(ctx, &v); err != nil {
+		//     return err
+		// }
+		// fmt.Printf("Value=%v", v)
+		Get(ctx Context, valuePtr interface{}) error
+		// When true Get is guaranteed to not block
 		IsReady() bool
 	}
 

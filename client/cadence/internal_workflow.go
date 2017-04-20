@@ -58,7 +58,7 @@ type (
 
 	valueCallbackPair struct {
 		value    interface{}
-		callback func() bool
+		callback func() bool // false indicates that callback didn't accept the value
 	}
 
 	// false result means that callback didn't accept the value and it is still up for delivery
@@ -169,10 +169,12 @@ func (f *futureImpl) Get(ctx Context, value interface{}) error {
 }
 
 // Used by selectorImpl
-func (f *futureImpl) get(callback receiveCallback) (v interface{}, ok bool, err error) {
+// If Future is ready returns its value immediately.
+// If not registers callback which is called when it is ready.
+func (f *futureImpl) getAsync(callback receiveCallback) (v interface{}, ok bool, err error) {
 	_, _, more := f.channel.receiveAsyncImpl(callback)
 	// Future uses Channel.Close to indicate that it is ready.
-	// So more being true indicates no data.
+	// So more being true (channel is still open) indicates future is not ready.
 	if more {
 		return nil, false, nil
 	}
@@ -338,6 +340,8 @@ func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more b
 	return c.receiveAsyncImpl(nil)
 }
 
+// ok = true means that value was received
+// more = true means that channel is not closed and more deliveries are possible
 func (c *channelImpl) receiveAsyncImpl(callback receiveCallback) (v interface{}, ok bool, more bool) {
 	if len(c.buffer) > 0 {
 		r := c.buffer[0]
@@ -347,14 +351,12 @@ func (c *channelImpl) receiveAsyncImpl(callback receiveCallback) (v interface{},
 	if c.closed {
 		return nil, false, false
 	}
-blockedSendsLoop:
 	for len(c.blockedSends) > 0 {
 		b := c.blockedSends[0]
 		c.blockedSends = c.blockedSends[1:]
-		if !b.callback() {
-			continue blockedSendsLoop
+		if b.callback() {
+			return b.value, true, true
 		}
-		return b.value, true, true
 	}
 	if callback != nil {
 		c.blockedReceives = append(c.blockedReceives, callback)
@@ -365,8 +367,7 @@ blockedSendsLoop:
 func (c *channelImpl) Send(ctx Context, v interface{}) {
 	state := getState(ctx)
 	valueConsumed := false
-	var pair *valueCallbackPair
-	pair = &valueCallbackPair{
+	pair := &valueCallbackPair{
 		value: v,
 		callback: func() bool {
 			valueConsumed = true
@@ -399,15 +400,13 @@ func (c *channelImpl) sendAsyncImpl(v interface{}, pair *valueCallbackPair) (ok 
 	if c.closed {
 		panic("Closed channel")
 	}
-blockedReceivesLoop:
 	for len(c.blockedReceives) > 0 {
 		blockedGet := c.blockedReceives[0]
 		c.blockedReceives = c.blockedReceives[1:]
-		if !blockedGet(v, true) {
-			// false from callback indicates that value wasn't consumed
-			continue blockedReceivesLoop
+		// false from callback indicates that value wasn't consumed
+		if blockedGet(v, true) {
+			return true
 		}
-		return true
 	}
 	if len(c.buffer) < c.size {
 		c.buffer = append(c.buffer, v)
@@ -746,7 +745,7 @@ func (s *selectorImpl) Select(ctx Context) {
 				}
 				return true
 			}
-			_, ok, _ := p.future.get(callback)
+			_, ok, _ := p.future.getAsync(callback)
 			if ok {
 				p.futureFunc = nil
 				f(p.future)

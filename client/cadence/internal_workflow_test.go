@@ -2,10 +2,10 @@ package cadence
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
-	"fmt"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

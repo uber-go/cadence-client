@@ -61,7 +61,8 @@ type (
 		callback func() bool
 	}
 
-	receiveCallback func(v interface{}, more bool) bool // when false is returned callback should be ignored
+	// false result means that callback didn't accept the value and it is still up for delivery
+	receiveCallback func(v interface{}, more bool) bool
 
 	channelImpl struct {
 		name            string              // human readable channel name
@@ -170,6 +171,8 @@ func (f *futureImpl) Get(ctx Context, value interface{}) error {
 // Used by selectorImpl
 func (f *futureImpl) get(callback receiveCallback) (v interface{}, ok bool, err error) {
 	_, _, more := f.channel.receiveAsyncImpl(callback)
+	// Future uses Channel.Close to indicate that it is ready.
+	// So more being true indicates no data.
 	if more {
 		return nil, false, nil
 	}
@@ -303,30 +306,24 @@ func (c *channelImpl) Receive(ctx Context) (v interface{}) {
 	return v
 }
 
-func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (v interface{}, more bool) {
+func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (value interface{}, more bool) {
 	state := getState(ctx)
 	hasResult := false
-	first := true
 	var result interface{}
+	callback := func(v interface{}, m bool) bool {
+		result = v
+		hasResult = true
+		more = m
+		return true
+	}
+	v, ok, more := c.receiveAsyncImpl(callback)
+	if ok || !more {
+		return v, more
+	}
 	for {
 		if hasResult {
 			state.unblocked()
 			return result, more
-		}
-		var callback receiveCallback
-		if first {
-			callback = func(v interface{}, m bool) bool {
-				result = v
-				hasResult = true
-				more = m
-				return true
-			}
-			first = false
-		}
-		v, ok, more := c.receiveAsyncImpl(callback)
-		if ok || !more {
-			state.unblocked()
-			return v, more
 		}
 		state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
 	}
@@ -368,29 +365,25 @@ blockedSendsLoop:
 func (c *channelImpl) Send(ctx Context, v interface{}) {
 	state := getState(ctx)
 	valueConsumed := false
-	first := true
+	var pair *valueCallbackPair
+	pair = &valueCallbackPair{
+		value: v,
+		callback: func() bool {
+			valueConsumed = true
+			return true
+		},
+	}
+	ok := c.sendAsyncImpl(v, pair)
+	if ok {
+		state.unblocked()
+		return
+	}
 	for {
 		// Check for closed in the loop as close can be called when send is blocked
 		if c.closed {
 			panic("Closed channel")
 		}
 		if valueConsumed {
-			state.unblocked()
-			return
-		}
-		var pair *valueCallbackPair
-		if first {
-			pair = &valueCallbackPair{
-				value: v,
-				callback: func() bool {
-					valueConsumed = true
-					return true
-				},
-			}
-			first = false
-		}
-		ok := c.sendAsyncImpl(v, pair)
-		if ok {
 			state.unblocked()
 			return
 		}
@@ -406,17 +399,18 @@ func (c *channelImpl) sendAsyncImpl(v interface{}, pair *valueCallbackPair) (ok 
 	if c.closed {
 		panic("Closed channel")
 	}
-	if len(c.buffer) < c.size {
-		c.buffer = append(c.buffer, v)
-		return true
-	}
 blockedReceivesLoop:
 	for len(c.blockedReceives) > 0 {
 		blockedGet := c.blockedReceives[0]
 		c.blockedReceives = c.blockedReceives[1:]
 		if !blockedGet(v, true) {
+			// false from callback indicates that value wasn't consumed
 			continue blockedReceivesLoop
 		}
+		return true
+	}
+	if len(c.buffer) < c.size {
+		c.buffer = append(c.buffer, v)
 		return true
 	}
 	if pair != nil {

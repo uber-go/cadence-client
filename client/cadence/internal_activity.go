@@ -158,6 +158,36 @@ func validateFunctionArgs(f interface{}, args []interface{}, isWorkflow bool) er
 	return nil
 }
 
+func validateActivityFuncResults(f interface{}, result interface{}) ([]byte, error) {
+	fType := reflect.TypeOf(f)
+	switch fType.Kind() {
+	case reflect.String:
+	case reflect.Func:
+		err := validateFnFormat(fType, false)
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, fmt.Errorf(
+			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
+	}
+
+	if result == nil {
+		return nil, nil
+	}
+
+	fr := fnReturnSignature{Ret: result}
+	if err := getHostEnvironment().Encoder().Register(result); err != nil {
+		return nil, err
+	}
+	data, err := getHostEnvironment().Encoder().Marshal(fr)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(f)

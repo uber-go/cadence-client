@@ -39,7 +39,8 @@ type (
 		CompleteActivity(taskToken []byte, activityFunc interface{}, result interface{}, err error) error
 
 		// RecordActivityHeartbeat records heartbeat for an activity.
-		RecordActivityHeartbeat(taskToken, details []byte) error
+		// details - is the progress you want to record along with heart beat for this activity.
+		RecordActivityHeartbeat(taskToken []byte, details interface{}) error
 	}
 
 	// ClientOptions are optional parameters for Client creation.

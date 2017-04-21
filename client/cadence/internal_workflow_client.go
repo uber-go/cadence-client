@@ -156,8 +156,12 @@ func (wc *workflowClient) CompleteActivity(taskToken []byte, activityFunc interf
 }
 
 // RecordActivityHeartbeat records heartbeat for an activity.
-func (wc *workflowClient) RecordActivityHeartbeat(taskToken, details []byte) error {
-	return recordActivityHeartbeat(wc.workflowService, wc.identity, taskToken, details)
+func (wc *workflowClient) RecordActivityHeartbeat(taskToken []byte, details interface{}) error {
+	data, err := encodeActivityProgress(details)
+	if err != nil {
+		return err
+	}
+	return recordActivityHeartbeat(wc.workflowService, wc.identity, taskToken, data)
 }
 
 // Register a domain with cadence server

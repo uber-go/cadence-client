@@ -149,7 +149,7 @@ func (wc *workflowClient) GetWorkflowHistory(workflowID string, runID string) (*
 func (wc *workflowClient) CompleteActivity(taskToken []byte, activityFunc interface{}, result interface{}, err error) error {
 	data, err0 := validateActivityFuncResults(activityFunc, result)
 	if err0 != nil {
-		return nil
+		return err0
 	}
 	request := convertActivityResultToRespondRequest(wc.identity, taskToken, data, err)
 	return reportActivityComplete(wc.workflowService, request)

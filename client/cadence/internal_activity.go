@@ -162,6 +162,7 @@ func validateActivityFuncResults(f interface{}, result interface{}) ([]byte, err
 	fType := reflect.TypeOf(f)
 	switch fType.Kind() {
 	case reflect.String:
+		// Nothing to validate.
 	case reflect.Func:
 		err := validateFnFormat(fType, false)
 		if err != nil {

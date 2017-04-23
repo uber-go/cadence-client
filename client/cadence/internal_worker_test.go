@@ -551,6 +551,105 @@ func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	//require.NoError(t, err)
 }
 
+type testErrorDetails struct {
+	T string
+}
+
+func TestActivityErrorWithDetails(t *testing.T) {
+	a1 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (err error) {
+			return NewErrorWithDetails("testReason", "testStringDetails")
+		} }
+	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
+	r, err := deSerializeFunctionResult(a1.fn, encResult)
+	require.NoError(t, err)
+	require.Nil(t, r)
+	require.Error(t, e)
+	errWD := e.(ErrorWithDetails)
+	require.Equal(t, "testReason", errWD.Reason())
+	var strDetails string
+	errWD.Details(&strDetails)
+	require.Equal(t, "testStringDetails", strDetails)
+
+	a2:= activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (err error) {
+			return NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack"})
+		} }
+	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
+	r, err = deSerializeFunctionResult(a2.fn, encResult)
+	require.NoError(t, err)
+	require.Nil(t, r)
+	require.Error(t, e)
+	errWD = e.(ErrorWithDetails)
+	require.Equal(t, "testReason", errWD.Reason())
+	var td testErrorDetails
+	errWD.Details(&td)
+	require.Equal(t, testErrorDetails{T: "testErrorStack"}, td)
+
+	a3:= activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (result string, err error) {
+			return "testResult", NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack2"})
+		} }
+	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
+	r, err = deSerializeFunctionResult(a3.fn, encResult)
+	require.NoError(t, err)
+	require.Equal(t, "testResult", r.(string))
+	require.Error(t, e)
+	errWD = e.(ErrorWithDetails)
+	require.Equal(t, "testReason", errWD.Reason())
+	errWD.Details(&td)
+	require.Equal(t, testErrorDetails{T: "testErrorStack2"}, td)
+}
+
+func TestActivityCancelledError(t *testing.T) {
+	a1 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (err error) {
+			return NewCanceledError("testCancelStringDetails")
+		} }
+	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
+	r, err := deSerializeFunctionResult(a1.fn, encResult)
+	require.NoError(t, err)
+	require.Nil(t, r)
+	require.Error(t, e)
+	errWD := e.(CanceledError)
+	var strDetails string
+	errWD.Details(&strDetails)
+	require.Equal(t, "testCancelStringDetails", strDetails)
+
+	a2:= activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (err error) {
+			return NewCanceledError(testErrorDetails{T: "testCancelErrorStack"})
+		} }
+	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
+	r, err = deSerializeFunctionResult(a2.fn, encResult)
+	require.NoError(t, err)
+	require.Nil(t, r)
+	require.Error(t, e)
+	errWD = e.(CanceledError)
+	var td testErrorDetails
+	errWD.Details(&td)
+	require.Equal(t, testErrorDetails{T: "testCancelErrorStack"}, td)
+
+	a3:= activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (result string, err error) {
+			return "testResult", NewCanceledError(testErrorDetails{T: "testErrorStack2"})
+		} }
+	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
+	r, err = deSerializeFunctionResult(a3.fn, encResult)
+	require.NoError(t, err)
+	require.Equal(t, "testResult", r.(string))
+	require.Error(t, e)
+	errWD = e.(CanceledError)
+	errWD.Details(&td)
+	require.Equal(t, testErrorDetails{T: "testErrorStack2"}, td)
+}
+
 // Encode function result.
 func testEncodeFunctionResult(r interface{}) []byte {
 	if err := getHostEnvironment().Encoder().Register(r); err != nil {

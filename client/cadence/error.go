@@ -55,15 +55,10 @@ var _ PanicError = (*panicError)(nil)
 var ErrActivityResultPending = errors.New("not error: do not autocomplete, " +
 	"using Client.CompleteActivity() to complete")
 
-// TODO: Serialization of details. Currently only []byte type of them is supported
-
 // NewErrorWithDetails creates ErrorWithDetails instance
-// Create standard error through errors.New or fmt.Errorf if no details are provided
-func NewErrorWithDetails(reason string, details interface{}) ErrorWithDetails {
-	if details == nil {
-		details = []byte{}
-	}
-	return &errorWithDetails{reason: reason, details: details.([]byte)}
+// Create standard error through errors.New or fmt.Errorf() if no details are provided
+func NewErrorWithDetails(reason string, details ...interface{}) ErrorWithDetails {
+	return &errorWithDetails{reason: reason, details: toByteSlice(details)}
 }
 
 // NewTimeoutError creates TimeoutError instance.
@@ -178,16 +173,65 @@ func toByteSlice(args []interface{}) []byte {
 	if len(args) == 0 {
 		return []byte{}
 	}
-	return args[0].([]byte)
+	if isTypeByteSlice(reflect.TypeOf(args[0])) {
+		return args[0].([]byte)
+	}
+	data, err := encodeDetails(args[0])
+	if err != nil {
+		panic(err)
+	}
+	return data
 }
 
-func assignValue(to []interface{}, from interface{}) {
+func assignValue(to []interface{}, from []byte) {
 	if len(to) == 0 {
 		panic("empty receiver")
 	}
 	if len(to) > 1 {
 		panic("multiple args not supported yet")
 	}
-	vto := reflect.ValueOf(to[0])
-	vto.Elem().Set(reflect.ValueOf(from))
+	if isTypeByteSlice(reflect.TypeOf(to[0])) {
+		reflect.ValueOf(to[0]).Elem().SetBytes(from)
+		return
+	}
+	if err := decodeDetails(from, to[0]); err != nil {
+		panic(err)
+	}
 }
+
+// encodes error details.
+func encodeDetails(r interface{}) ([]byte, error) {
+	// TODO: refactor the registration to host environment
+	if rType := reflect.Indirect(reflect.ValueOf(r)).Type(); rType.Kind() != reflect.Interface {
+		t := reflect.Zero(rType).Interface()
+		if err := getHostEnvironment().Encoder().Register(t); err != nil {
+			return nil, err
+		}
+	}
+	data, err := getHostEnvironment().Encoder().Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// decodes error details.
+func decodeDetails(data []byte, to interface{}) (error) {
+	// TODO: refactor the registration to host environment
+	if toType := reflect.Indirect(reflect.ValueOf(to)).Type(); toType.Kind() != reflect.Interface {
+		t := reflect.Zero(toType).Interface()
+		if err := getHostEnvironment().Encoder().Register(t); err != nil {
+			return err
+		}
+	}
+	if err := getHostEnvironment().Encoder().Unmarshal(data, to); err != nil {
+		return err
+	}
+	return nil
+}
+
+func isTypeByteSlice(inType reflect.Type) bool {
+	r := reflect.TypeOf(([]byte)(nil))
+	return inType == r || inType == reflect.PtrTo(r)
+}
+

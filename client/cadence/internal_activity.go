@@ -112,7 +112,7 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 
 func marshalFunctionArgs(args []interface{}) ([]byte, error) {
 	s := fnSignature{Args: args}
-	input, err := getHostEnvironment().Encoder().Marshal(s)
+	input, err := getHostEnvironment().encode(s)
 	if err != nil {
 		return nil, err
 	}

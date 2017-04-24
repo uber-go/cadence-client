@@ -146,7 +146,7 @@ func SerializeFnArgs(args ...interface{}) ([]byte, error) {
 // This is to de-serialize the result.
 func DeserializeFnResults(result []byte) (interface{}, error) {
 	var fr fnReturnSignature
-	if err := getHostEnvironment().Encoder().Unmarshal(result, &fr); err != nil {
+	if err := getHostEnvironment().decode(result, &fr); err != nil {
 		return nil, err
 	}
 	return fr.Ret, nil

@@ -568,6 +568,53 @@ func (th *hostEnvImpl) getRegisteredActivities() []activity {
 	return result
 }
 
+// encode a single value.
+func (th *hostEnvImpl) encode(r interface{}) ([]byte, error) {
+	if isTypeByteSlice(reflect.TypeOf(r)) {
+		return r.([]byte), nil
+	}
+
+	// Interfaces cannot be registered, their implementations should be
+	// https://golang.org/pkg/encoding/gob/#Register
+	if rType := reflect.Indirect(reflect.ValueOf(r)).Type(); rType.Kind() != reflect.Interface {
+		t := reflect.Zero(rType).Interface()
+		if err := getHostEnvironment().Encoder().Register(t); err != nil {
+			return nil, err
+		}
+	}
+	data, err := getHostEnvironment().Encoder().Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// decode a single value.
+func (th *hostEnvImpl) decode(data []byte, to interface{}) error {
+	if isTypeByteSlice(reflect.TypeOf(to)) {
+		reflect.ValueOf(to).Elem().SetBytes(data)
+		return nil
+	}
+
+	// Interfaces cannot be registered, their implementations should be
+	// https://golang.org/pkg/encoding/gob/#Register
+	if toType := reflect.Indirect(reflect.ValueOf(to)).Type(); toType.Kind() != reflect.Interface {
+		t := reflect.Zero(toType).Interface()
+		if err := getHostEnvironment().Encoder().Register(t); err != nil {
+			return err
+		}
+	}
+	if err := getHostEnvironment().Encoder().Unmarshal(data, to); err != nil {
+		return err
+	}
+	return nil
+}
+
+func isTypeByteSlice(inType reflect.Type) bool {
+	r := reflect.TypeOf(([]byte)(nil))
+	return inType == r || inType == reflect.PtrTo(r)
+}
+
 var once sync.Once
 
 // Singleton to hold the host registration details.
@@ -600,7 +647,7 @@ type workflowExecutor struct {
 
 func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
 	var fs fnSignature
-	if err := getHostEnvironment().Encoder().Unmarshal(input, &fs); err != nil {
+	if err := getHostEnvironment().decode(input, &fs); err != nil {
 		return nil, fmt.Errorf(
 			"Unable to decode the workflow function input bytes with error: %v, function name: %v",
 			err, we.name)
@@ -630,7 +677,7 @@ func (ae *activityExecutor) ActivityType() ActivityType {
 
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
 	var fs fnSignature
-	if err := getHostEnvironment().Encoder().Unmarshal(input, &fs); err != nil {
+	if err := getHostEnvironment().decode(input, &fs); err != nil {
 		return nil, fmt.Errorf(
 			"Unable to decode the activity function input bytes with error: %v for function name: %v",
 			err, ae.name)

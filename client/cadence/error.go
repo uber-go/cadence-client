@@ -173,10 +173,7 @@ func toByteSlice(args []interface{}) []byte {
 	if len(args) == 0 {
 		return []byte{}
 	}
-	if isTypeByteSlice(reflect.TypeOf(args[0])) {
-		return args[0].([]byte)
-	}
-	data, err := encodeDetails(args[0])
+	data, err := getHostEnvironment().encode(args[0])
 	if err != nil {
 		panic(err)
 	}
@@ -190,48 +187,7 @@ func assignValue(to []interface{}, from []byte) {
 	if len(to) > 1 {
 		panic("multiple args not supported yet")
 	}
-	if isTypeByteSlice(reflect.TypeOf(to[0])) {
-		reflect.ValueOf(to[0]).Elem().SetBytes(from)
-		return
-	}
-	if err := decodeDetails(from, to[0]); err != nil {
+	if err := getHostEnvironment().decode(from, to[0]); err != nil {
 		panic(err)
 	}
 }
-
-// encodes error details.
-func encodeDetails(r interface{}) ([]byte, error) {
-	// TODO: refactor the registration to host environment
-	if rType := reflect.Indirect(reflect.ValueOf(r)).Type(); rType.Kind() != reflect.Interface {
-		t := reflect.Zero(rType).Interface()
-		if err := getHostEnvironment().Encoder().Register(t); err != nil {
-			return nil, err
-		}
-	}
-	data, err := getHostEnvironment().Encoder().Marshal(r)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-// decodes error details.
-func decodeDetails(data []byte, to interface{}) (error) {
-	// TODO: refactor the registration to host environment
-	if toType := reflect.Indirect(reflect.ValueOf(to)).Type(); toType.Kind() != reflect.Interface {
-		t := reflect.Zero(toType).Interface()
-		if err := getHostEnvironment().Encoder().Register(t); err != nil {
-			return err
-		}
-	}
-	if err := getHostEnvironment().Encoder().Unmarshal(data, to); err != nil {
-		return err
-	}
-	return nil
-}
-
-func isTypeByteSlice(inType reflect.Type) bool {
-	r := reflect.TypeOf(([]byte)(nil))
-	return inType == r || inType == reflect.PtrTo(r)
-}
-

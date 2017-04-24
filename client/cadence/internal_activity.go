@@ -208,11 +208,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	// Parse result
 	if resultSize > 1 {
 		r := values[0].Interface()
-		if err := getHostEnvironment().Encoder().Register(r); err != nil {
-			return nil, err
-		}
-		fr := fnReturnSignature{Ret: r}
-		result, err = getHostEnvironment().Encoder().Marshal(fr)
+		result, err = getHostEnvironment().encode(fnReturnSignature{Ret: r})
 		if err != nil {
 			return nil, err
 		}
@@ -245,7 +241,7 @@ func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte) (interfac
 			return reflect.Zero(fnType.Out(0)).Interface(), nil
 		}
 		var fr fnReturnSignature
-		if err := getHostEnvironment().Encoder().Unmarshal(result, &fr); err != nil {
+		if err := getHostEnvironment().decode(result, &fr); err != nil {
 			return nil, err
 		}
 		return fr.Ret, nil

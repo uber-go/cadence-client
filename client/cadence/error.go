@@ -58,7 +58,7 @@ var ErrActivityResultPending = errors.New("not error: do not autocomplete, " +
 // NewErrorWithDetails creates ErrorWithDetails instance
 // Create standard error through errors.New or fmt.Errorf() if no details are provided
 func NewErrorWithDetails(reason string, details ...interface{}) ErrorWithDetails {
-	data, err := getHostEnvironment().encodeArgs(details, true)
+	data, err := getHostEnvironment().encodeArgs(details)
 	if err != nil {
 		panic(err)
 	}
@@ -77,7 +77,7 @@ func NewTimeoutError(timeoutType shared.TimeoutType) TimeoutError {
 // WARNING: This function is public only to support unit testing of workflows.
 // It shouldn't be used by application level code.
 func NewHeartbeatTimeoutError(details ...interface{}) TimeoutError {
-	data, err := getHostEnvironment().encodeArgs(details, true)
+	data, err := getHostEnvironment().encodeArgs(details)
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +86,7 @@ func NewHeartbeatTimeoutError(details ...interface{}) TimeoutError {
 
 // NewCanceledError creates CanceledError instance
 func NewCanceledError(details ...interface{}) CanceledError {
-	data, err := getHostEnvironment().encodeArgs(details, true)
+	data, err := getHostEnvironment().encodeArgs(details)
 	if err != nil {
 		panic(err)
 	}

@@ -3,9 +3,9 @@ package cadence
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/uber-go/cadence-client/.gen/go/shared"
-	"reflect"
 )
 
 type (

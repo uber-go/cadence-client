@@ -151,4 +151,3 @@ func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
 		futureImpl{channel: NewChannel(ctx).(*channelImpl)}, fn}
 	return impl, impl
 }
-

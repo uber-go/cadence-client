@@ -560,7 +560,7 @@ func TestActivityErrorWithDetails(t *testing.T) {
 		name: "test",
 		fn: func(arg1 int) (err error) {
 			return NewErrorWithDetails("testReason", "testStringDetails")
-		} }
+		}}
 	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
 
 	err := deSerializeFunctionResult(a1.fn, encResult, nil)
@@ -572,11 +572,11 @@ func TestActivityErrorWithDetails(t *testing.T) {
 	errWD.Details(&strDetails)
 	require.Equal(t, "testStringDetails", strDetails)
 
-	a2:= activityExecutor{
+	a2 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (err error) {
 			return NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack"})
-		} }
+		}}
 	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
 	err = deSerializeFunctionResult(a2.fn, encResult, nil)
 	require.NoError(t, err)
@@ -587,11 +587,11 @@ func TestActivityErrorWithDetails(t *testing.T) {
 	errWD.Details(&td)
 	require.Equal(t, testErrorDetails{T: "testErrorStack"}, td)
 
-	a3:= activityExecutor{
+	a3 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (result string, err error) {
 			return "testResult", NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack2"})
-		} }
+		}}
 	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
 	var result string
 	err = deSerializeFunctionResult(a3.fn, encResult, &result)
@@ -609,7 +609,7 @@ func TestActivityCancelledError(t *testing.T) {
 		name: "test",
 		fn: func(arg1 int) (err error) {
 			return NewCanceledError("testCancelStringDetails")
-		} }
+		}}
 	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
 	err := deSerializeFunctionResult(a1.fn, encResult, nil)
 	require.NoError(t, err)
@@ -619,11 +619,11 @@ func TestActivityCancelledError(t *testing.T) {
 	errWD.Details(&strDetails)
 	require.Equal(t, "testCancelStringDetails", strDetails)
 
-	a2:= activityExecutor{
+	a2 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (err error) {
 			return NewCanceledError(testErrorDetails{T: "testCancelErrorStack"})
-		} }
+		}}
 	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
 	err = deSerializeFunctionResult(a2.fn, encResult, nil)
 	require.NoError(t, err)
@@ -633,11 +633,11 @@ func TestActivityCancelledError(t *testing.T) {
 	errWD.Details(&td)
 	require.Equal(t, testErrorDetails{T: "testCancelErrorStack"}, td)
 
-	a3:= activityExecutor{
+	a3 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (result string, err error) {
 			return "testResult", NewCanceledError(testErrorDetails{T: "testErrorStack2"})
-		} }
+		}}
 	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
 	var r string
 	err = deSerializeFunctionResult(a3.fn, encResult, &r)

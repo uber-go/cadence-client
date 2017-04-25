@@ -671,13 +671,19 @@ func (th *hostEnvImpl) decodeArgsTo(data []byte, to []interface{}) error {
 	}
 	for i := 0; i < len(to); i++ {
 		vto := reflect.ValueOf(to[0])
-		vto.Elem().Set(reflect.ValueOf(s.Args[i]))
+		if vto.IsValid() {
+			vto.Elem().Set(reflect.ValueOf(s.Args[i]))
+		}
 	}
 	return nil
 }
 
 // encode single value(like return parameter).
 func (th *hostEnvImpl) encodeArg(arg interface{}) ([]byte, error) {
+	if isTypeByteSlice(reflect.TypeOf(arg)) {
+		return arg.([]byte), nil
+	}
+
 	s := fnReturnSignature{Ret: arg}
 	input, err := getHostEnvironment().encode(s)
 	if err != nil {
@@ -687,13 +693,22 @@ func (th *hostEnvImpl) encodeArg(arg interface{}) ([]byte, error) {
 }
 
 // decode single value(like return parameter).
-func (th *hostEnvImpl) decodeArg(data []byte) (interface{}, error) {
+func (th *hostEnvImpl) decodeArg(data []byte, to interface{}) error {
+	if isTypeByteSlice(reflect.TypeOf(to)) {
+		reflect.ValueOf(to).Elem().SetBytes(data)
+		return nil
+	}
+
 	s := fnReturnSignature{}
 	err := getHostEnvironment().decode(data, &s)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return s.Ret, nil
+	fv := reflect.ValueOf(to)
+	if fv.IsValid() {
+		fv.Elem().Set(reflect.ValueOf(s.Ret))
+	}
+	return nil
 }
 
 func isTypeByteSlice(inType reflect.Type) bool {

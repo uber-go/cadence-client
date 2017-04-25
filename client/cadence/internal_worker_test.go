@@ -129,7 +129,7 @@ func TestDecisionTaskHandler(t *testing.T) {
 	_, stackTrace, err := r.ProcessWorkflowTask(task, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, stackTrace, stackTrace)
-	require.Contains(t, stackTrace, "cadence.(*futureImpl).Get")
+	require.Contains(t, stackTrace, "cadence.(*decodeFutureImpl).Get")
 }
 
 // testSampleWorkflow
@@ -154,7 +154,7 @@ func testActivityMultipleArgs(ctx context.Context, arg1 int, arg2 string, arg3 b
 func TestCreateWorker(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
-	logger := getLogger()
+	//logger := getLogger()
 
 	domain := "testDomain"
 
@@ -197,7 +197,7 @@ func TestCreateWorker(t *testing.T) {
 	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 
 	// Configure worker options.
-	workerOptions := NewWorkerOptions().SetLogger(logger).SetMaxActivityExecutionRate(20)
+	workerOptions := NewWorkerOptions().SetMaxActivityExecutionRate(20)
 
 	// Start Worker.
 	worker := NewWorker(
@@ -562,9 +562,9 @@ func TestActivityErrorWithDetails(t *testing.T) {
 			return NewErrorWithDetails("testReason", "testStringDetails")
 		} }
 	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
-	r, err := deSerializeFunctionResult(a1.fn, encResult)
+
+	err := deSerializeFunctionResult(a1.fn, encResult, nil)
 	require.NoError(t, err)
-	require.Nil(t, r)
 	require.Error(t, e)
 	errWD := e.(ErrorWithDetails)
 	require.Equal(t, "testReason", errWD.Reason())
@@ -578,9 +578,8 @@ func TestActivityErrorWithDetails(t *testing.T) {
 			return NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack"})
 		} }
 	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
-	r, err = deSerializeFunctionResult(a2.fn, encResult)
+	err = deSerializeFunctionResult(a2.fn, encResult, nil)
 	require.NoError(t, err)
-	require.Nil(t, r)
 	require.Error(t, e)
 	errWD = e.(ErrorWithDetails)
 	require.Equal(t, "testReason", errWD.Reason())
@@ -594,9 +593,10 @@ func TestActivityErrorWithDetails(t *testing.T) {
 			return "testResult", NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack2"})
 		} }
 	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
-	r, err = deSerializeFunctionResult(a3.fn, encResult)
+	var result string
+	err = deSerializeFunctionResult(a3.fn, encResult, &result)
 	require.NoError(t, err)
-	require.Equal(t, "testResult", r.(string))
+	require.Equal(t, "testResult", result)
 	require.Error(t, e)
 	errWD = e.(ErrorWithDetails)
 	require.Equal(t, "testReason", errWD.Reason())
@@ -611,9 +611,8 @@ func TestActivityCancelledError(t *testing.T) {
 			return NewCanceledError("testCancelStringDetails")
 		} }
 	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
-	r, err := deSerializeFunctionResult(a1.fn, encResult)
+	err := deSerializeFunctionResult(a1.fn, encResult, nil)
 	require.NoError(t, err)
-	require.Nil(t, r)
 	require.Error(t, e)
 	errWD := e.(CanceledError)
 	var strDetails string
@@ -626,9 +625,8 @@ func TestActivityCancelledError(t *testing.T) {
 			return NewCanceledError(testErrorDetails{T: "testCancelErrorStack"})
 		} }
 	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
-	r, err = deSerializeFunctionResult(a2.fn, encResult)
+	err = deSerializeFunctionResult(a2.fn, encResult, nil)
 	require.NoError(t, err)
-	require.Nil(t, r)
 	require.Error(t, e)
 	errWD = e.(CanceledError)
 	var td testErrorDetails
@@ -641,9 +639,10 @@ func TestActivityCancelledError(t *testing.T) {
 			return "testResult", NewCanceledError(testErrorDetails{T: "testErrorStack2"})
 		} }
 	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
-	r, err = deSerializeFunctionResult(a3.fn, encResult)
+	var r string
+	err = deSerializeFunctionResult(a3.fn, encResult, &r)
 	require.NoError(t, err)
-	require.Equal(t, "testResult", r.(string))
+	require.Equal(t, "testResult", r)
 	require.Error(t, e)
 	errWD = e.(CanceledError)
 	errWD.Details(&td)

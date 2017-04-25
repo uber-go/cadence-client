@@ -140,6 +140,15 @@ func SerializeFnArgs(args ...interface{}) ([]byte, error) {
 // DeserializeFnResults de-serializes a function results.
 // The input result doesn't include the error. The cadence server has result, error.
 // This is to de-serialize the result.
-func DeserializeFnResults(result []byte) (interface{}, error) {
-	return getHostEnvironment().decodeArg(result)
+func DeserializeFnResults(result []byte, to interface{}) error {
+	return getHostEnvironment().decodeArg(result, to)
 }
+
+// newDecodeFuture creates a new future as well as associated Settable that is used to set its value.
+// fn - the decoded value needs to be validated against a function.
+func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
+	impl := &decodeFutureImpl{
+		futureImpl{channel: NewChannel(ctx).(*channelImpl)}, fn}
+	return impl, impl
+}
+

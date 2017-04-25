@@ -165,7 +165,7 @@ func TestCreateWorker(t *testing.T) {
 	activityID := "a1"
 	taskList := "tl1"
 	var startedEventID int64 = 10
-	input, err := getHostEnvironment().encodeArgs([]interface{}{}, false)
+	input, err := getHostEnvironment().encodeArgs([]interface{}{})
 	require.NoError(t, err)
 
 	activityTask := &s.PollForActivityTaskResponse{
@@ -666,7 +666,7 @@ func testEncodeFunctionArgs(workflowFunc interface{}, args ...interface{}) []byt
 		fmt.Println(err)
 		panic("Failed to register function types")
 	}
-	input, err := getHostEnvironment().encodeArgs(args, false)
+	input, err := getHostEnvironment().encodeArgs(args)
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to encode arguments")

@@ -134,7 +134,7 @@ func AddActivityRegistrationInterceptor(
 
 // SerializeFnArgs serializes an activity function arguments.
 func SerializeFnArgs(args ...interface{}) ([]byte, error) {
-	return getHostEnvironment().encodeArgs(args, false)
+	return getHostEnvironment().encodeArgs(args)
 }
 
 // DeserializeFnResults de-serializes a function results.

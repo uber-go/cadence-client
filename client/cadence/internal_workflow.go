@@ -792,7 +792,7 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*
 			workflowFunc)
 	}
 
-	input, err := getHostEnvironment().encodeArgs(args, false)
+	input, err := getHostEnvironment().encodeArgs(args)
 	if err != nil {
 		return nil, nil, err
 	}

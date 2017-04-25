@@ -666,7 +666,7 @@ func (th *hostEnvImpl) decodeArgsTo(data []byte, to []interface{}) error {
 
 	s := fnSignature{}
 	err := getHostEnvironment().decode(data, &s)
-	if err != nil {inter
+	if err != nil {
 		return err
 	}
 	for i := 0; i < len(to); i++ {

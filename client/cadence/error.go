@@ -58,7 +58,11 @@ var ErrActivityResultPending = errors.New("not error: do not autocomplete, " +
 // NewErrorWithDetails creates ErrorWithDetails instance
 // Create standard error through errors.New or fmt.Errorf() if no details are provided
 func NewErrorWithDetails(reason string, details ...interface{}) ErrorWithDetails {
-	return &errorWithDetails{reason: reason, details: toByteSlice(details)}
+	data, err := getHostEnvironment().encodeArgs(details, true)
+	if err != nil {
+		panic(err)
+	}
+	return &errorWithDetails{reason: reason, details: data}
 }
 
 // NewTimeoutError creates TimeoutError instance.
@@ -73,12 +77,20 @@ func NewTimeoutError(timeoutType shared.TimeoutType) TimeoutError {
 // WARNING: This function is public only to support unit testing of workflows.
 // It shouldn't be used by application level code.
 func NewHeartbeatTimeoutError(details ...interface{}) TimeoutError {
-	return &timeoutError{timeoutType: shared.TimeoutType_HEARTBEAT, details: toByteSlice(details)}
+	data, err := getHostEnvironment().encodeArgs(details, true)
+	if err != nil {
+		panic(err)
+	}
+	return &timeoutError{timeoutType: shared.TimeoutType_HEARTBEAT, details: data}
 }
 
 // NewCanceledError creates CanceledError instance
 func NewCanceledError(details ...interface{}) CanceledError {
-	return &canceledError{details: toByteSlice(details)}
+	data, err := getHostEnvironment().encodeArgs(details, true)
+	if err != nil {
+		panic(err)
+	}
+	return &canceledError{details: data}
 }
 
 // errorWithDetails implements ErrorWithDetails
@@ -99,7 +111,9 @@ func (e *errorWithDetails) Reason() string {
 
 // Details is from ErrorWithDetails interface
 func (e *errorWithDetails) Details(d ...interface{}) {
-	assignValue(d, e.details)
+	if err := getHostEnvironment().decodeArgsTo(e.details, d); err != nil {
+		panic(err)
+	}
 }
 
 // errorWithDetails is from ErrorWithDetails interface
@@ -122,7 +136,10 @@ func (e *timeoutError) TimeoutType() shared.TimeoutType {
 
 // Details is from TimeoutError interface
 func (e *timeoutError) Details(d ...interface{}) {
-	assignValue(d, e.details)
+	if err := getHostEnvironment().decodeArgsTo(e.details, d); err != nil {
+		panic(err)
+	}
+
 }
 
 func (e *timeoutError) timeoutError() {}
@@ -138,7 +155,9 @@ func (e *canceledError) Error() string {
 
 // Details is from CanceledError interface
 func (e *canceledError) Details(d ...interface{}) {
-	assignValue(d, e.details)
+	if err := getHostEnvironment().decodeArgsTo(e.details, d); err != nil {
+		panic(err)
+	}
 }
 
 func (e *canceledError) canceledError() {}
@@ -165,29 +184,3 @@ func (e *panicError) StackTrace() string {
 }
 
 func (e *panicError) panicError() {}
-
-func toByteSlice(args []interface{}) []byte {
-	if len(args) > 1 {
-		panic("multiple args not supported yet")
-	}
-	if len(args) == 0 {
-		return []byte{}
-	}
-	data, err := getHostEnvironment().encode(args[0])
-	if err != nil {
-		panic(err)
-	}
-	return data
-}
-
-func assignValue(to []interface{}, from []byte) {
-	if len(to) == 0 {
-		panic("empty receiver")
-	}
-	if len(to) > 1 {
-		panic("multiple args not supported yet")
-	}
-	if err := getHostEnvironment().decode(from, to[0]); err != nil {
-		panic(err)
-	}
-}

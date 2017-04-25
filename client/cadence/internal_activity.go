@@ -110,15 +110,6 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 	return p, nil
 }
 
-func marshalFunctionArgs(args []interface{}) ([]byte, error) {
-	s := fnSignature{Args: args}
-	input, err := getHostEnvironment().encode(s)
-	if err != nil {
-		return nil, err
-	}
-	return input, nil
-}
-
 func validateFunctionArgs(f interface{}, args []interface{}, isWorkflow bool) error {
 	fType := reflect.TypeOf(f)
 	if fType.Kind() != reflect.Func {
@@ -176,7 +167,7 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityT
 			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
 	}
 
-	input, err := marshalFunctionArgs(args)
+	input, err := getHostEnvironment().encodeArgs(args, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -208,7 +199,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	// Parse result
 	if resultSize > 1 {
 		r := values[0].Interface()
-		result, err = getHostEnvironment().encode(fnReturnSignature{Ret: r})
+		result, err = getHostEnvironment().encodeArg(r)
 		if err != nil {
 			return nil, err
 		}
@@ -240,11 +231,12 @@ func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte) (interfac
 		if result == nil {
 			return reflect.Zero(fnType.Out(0)).Interface(), nil
 		}
-		var fr fnReturnSignature
-		if err := getHostEnvironment().decode(result, &fr); err != nil {
+
+		fr, err := getHostEnvironment().decodeArg(result)
+		if err != nil {
 			return nil, err
 		}
-		return fr.Ret, nil
+		return fr, nil
 	}
 	return result, nil
 }

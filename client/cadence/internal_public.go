@@ -134,20 +134,12 @@ func AddActivityRegistrationInterceptor(
 
 // SerializeFnArgs serializes an activity function arguments.
 func SerializeFnArgs(args ...interface{}) ([]byte, error) {
-	data, err := marshalFunctionArgs(args)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+	return getHostEnvironment().encodeArgs(args, false)
 }
 
 // DeserializeFnResults de-serializes a function results.
 // The input result doesn't include the error. The cadence server has result, error.
 // This is to de-serialize the result.
 func DeserializeFnResults(result []byte) (interface{}, error) {
-	var fr fnReturnSignature
-	if err := getHostEnvironment().decode(result, &fr); err != nil {
-		return nil, err
-	}
-	return fr.Ret, nil
+	return getHostEnvironment().decodeArg(result)
 }

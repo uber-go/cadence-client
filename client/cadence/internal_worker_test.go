@@ -165,7 +165,7 @@ func TestCreateWorker(t *testing.T) {
 	activityID := "a1"
 	taskList := "tl1"
 	var startedEventID int64 = 10
-	input, err := marshalFunctionArgs([]interface{}{})
+	input, err := getHostEnvironment().encodeArgs([]interface{}{}, false)
 	require.NoError(t, err)
 
 	activityTask := &s.PollForActivityTaskResponse{
@@ -652,15 +652,10 @@ func TestActivityCancelledError(t *testing.T) {
 
 // Encode function result.
 func testEncodeFunctionResult(r interface{}) []byte {
-	if err := getHostEnvironment().Encoder().Register(r); err != nil {
-		fmt.Println(err)
-		panic("Failed to register")
-	}
-	fr := fnReturnSignature{Ret: r}
-	result, err := getHostEnvironment().Encoder().Marshal(fr)
+	result, err := getHostEnvironment().encodeArg(r)
 	if err != nil {
 		fmt.Println(err)
-		panic("Failed to Marshal")
+		panic("Failed to encode")
 	}
 	return result
 }
@@ -672,7 +667,7 @@ func testEncodeFunctionArgs(workflowFunc interface{}, args ...interface{}) []byt
 		fmt.Println(err)
 		panic("Failed to register function types")
 	}
-	input, err := marshalFunctionArgs(args)
+	input, err := getHostEnvironment().encodeArgs(args, false)
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to encode arguments")

@@ -610,6 +610,92 @@ func (th *hostEnvImpl) decode(data []byte, to interface{}) error {
 	return nil
 }
 
+// encode multiple values.
+// Option whether to by pass byte buffer.
+func (th *hostEnvImpl) encodeArgs(args []interface{}, excludeByteBuffer bool) ([]byte, error) {
+	if excludeByteBuffer && len(args) == 1 && isTypeByteSlice(reflect.TypeOf(args[0])) {
+		return args[0].([]byte), nil
+	}
+
+	for i := 0; i < len(args); i++ {
+		// Interfaces cannot be registered, their implementations should be
+		// https://golang.org/pkg/encoding/gob/#Register
+		if rType := reflect.Indirect(reflect.ValueOf(args[0])).Type(); rType.Kind() != reflect.Interface {
+			t := reflect.Zero(rType).Interface()
+			if err := getHostEnvironment().Encoder().Register(t); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	s := fnSignature{Args: args}
+	input, err := getHostEnvironment().encode(s)
+	if err != nil {
+		return nil, err
+	}
+	return input, nil
+}
+
+// decode multiple values.
+func (th *hostEnvImpl) decodeArgs(data []byte) ([]interface{}, error) {
+	s := fnSignature{}
+	err := getHostEnvironment().decode(data, &s)
+	if err != nil {
+		return nil, err
+	}
+	return s.Args, nil
+}
+
+// decode multiple values in to a given structure.
+func (th *hostEnvImpl) decodeArgsTo(data []byte, to []interface{}) error {
+	if len(to) == 1 && isTypeByteSlice(reflect.TypeOf(to[0])) {
+		reflect.ValueOf(to[0]).Elem().SetBytes(data)
+		return nil
+	}
+
+	for i := 0; i < len(to); i++ {
+		// Interfaces cannot be registered, their implementations should be
+		// https://golang.org/pkg/encoding/gob/#Register
+		if rType := reflect.Indirect(reflect.ValueOf(to[0])).Type(); rType.Kind() != reflect.Interface {
+			t := reflect.Zero(rType).Interface()
+			if err := getHostEnvironment().Encoder().Register(t); err != nil {
+				return err
+			}
+		}
+	}
+
+	s := fnSignature{}
+	err := getHostEnvironment().decode(data, &s)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < len(to); i++ {
+		vto := reflect.ValueOf(to[0])
+		vto.Elem().Set(reflect.ValueOf(s.Args[i]))
+	}
+	return nil
+}
+
+// encode single value(like return parameter).
+func (th *hostEnvImpl) encodeArg(arg interface{}) ([]byte, error) {
+	s := fnReturnSignature{Ret: arg}
+	input, err := getHostEnvironment().encode(s)
+	if err != nil {
+		return nil, err
+	}
+	return input, nil
+}
+
+// decode single value(like return parameter).
+func (th *hostEnvImpl) decodeArg(data []byte) (interface{}, error) {
+	s := fnReturnSignature{}
+	err := getHostEnvironment().decode(data, &s)
+	if err != nil {
+		return nil, err
+	}
+	return s.Ret, nil
+}
+
 func isTypeByteSlice(inType reflect.Type) bool {
 	r := reflect.TypeOf(([]byte)(nil))
 	return inType == r || inType == reflect.PtrTo(r)
@@ -646,8 +732,8 @@ type workflowExecutor struct {
 }
 
 func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
-	var fs fnSignature
-	if err := getHostEnvironment().decode(input, &fs); err != nil {
+	args, err := getHostEnvironment().decodeArgs(input)
+	if err != nil {
 		return nil, fmt.Errorf(
 			"Unable to decode the workflow function input bytes with error: %v, function name: %v",
 			err, we.name)
@@ -655,7 +741,7 @@ func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
 
 	targetArgs := []reflect.Value{reflect.ValueOf(ctx)}
 	// rest of the parameters.
-	for _, arg := range fs.Args {
+	for _, arg := range args {
 		targetArgs = append(targetArgs, reflect.ValueOf(arg))
 	}
 
@@ -676,8 +762,8 @@ func (ae *activityExecutor) ActivityType() ActivityType {
 }
 
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
-	var fs fnSignature
-	if err := getHostEnvironment().decode(input, &fs); err != nil {
+	args, err := getHostEnvironment().decodeArgs(input)
+	if err != nil {
 		return nil, fmt.Errorf(
 			"Unable to decode the activity function input bytes with error: %v for function name: %v",
 			err, ae.name)
@@ -689,8 +775,9 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 	if fnType.NumIn() > 0 && isActivityContext(fnType.In(0)) {
 		targetArgs = append(targetArgs, reflect.ValueOf(ctx))
 	}
+
 	// rest of the parameters.
-	for _, arg := range fs.Args {
+	for _, arg := range args {
 		targetArgs = append(targetArgs, reflect.ValueOf(arg))
 	}
 

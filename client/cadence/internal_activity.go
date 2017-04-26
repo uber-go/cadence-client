@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/uber-go/cadence-client/common"
+	"go.uber.org/zap"
 )
 
 type (
@@ -55,6 +56,7 @@ type (
 		activityID        string
 		activityType      ActivityType
 		serviceInvoker    ServiceInvoker
+		logger            *zap.Logger
 	}
 
 	// activityOptions stores all activity-specific parameters that will
@@ -108,15 +110,6 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 		return nil, errors.New("missing or negative StartToCloseTimeoutSeconds")
 	}
 	return p, nil
-}
-
-func marshalFunctionArgs(args []interface{}) ([]byte, error) {
-	s := fnSignature{Args: args}
-	input, err := getHostEnvironment().Encoder().Marshal(s)
-	if err != nil {
-		return nil, err
-	}
-	return input, nil
 }
 
 func validateFunctionArgs(f interface{}, args []interface{}, isWorkflow bool) error {
@@ -207,7 +200,7 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityT
 			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
 	}
 
-	input, err := marshalFunctionArgs(args)
+	input, err := getHostEnvironment().encodeArgs(args)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -239,11 +232,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	// Parse result
 	if resultSize > 1 {
 		r := values[0].Interface()
-		if err := getHostEnvironment().Encoder().Register(r); err != nil {
-			return nil, err
-		}
-		fr := fnReturnSignature{Ret: r}
-		result, err = getHostEnvironment().Encoder().Marshal(fr)
+		result, err = getHostEnvironment().encodeArg(r)
 		if err != nil {
 			return nil, err
 		}
@@ -263,41 +252,51 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	return result, errInterface
 }
 
-func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte) (interface{}, error) {
+func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interface{}) error {
 	if fnType.Kind() != reflect.Func {
-		return nil, fmt.Errorf("expecting only function type but got type: %v", fnType)
+		return fmt.Errorf("expecting only function type but got type: %v", fnType)
 	}
 
 	// We already validated during registration that it either have (result, error) (or) just error.
 	if fnType.NumOut() <= 1 {
-		return nil, nil
+		return nil
 	} else if fnType.NumOut() == 2 {
-		var fr fnReturnSignature
-		if err := getHostEnvironment().Encoder().Unmarshal(result, &fr); err != nil {
-			return nil, err
+		if result == nil {
+			return nil
 		}
-		return fr.Ret, nil
+		err := getHostEnvironment().decodeArg(result, to)
+		if err != nil {
+			return err
+		}
 	}
-	return result, nil
+	return nil
 }
 
-func deSerializeFunctionResult(f interface{}, result []byte) (interface{}, error) {
+func deSerializeFunctionResult(f interface{}, result []byte, to interface{}) error {
 	fType := reflect.TypeOf(f)
 
 	switch fType.Kind() {
 	case reflect.Func:
 		// We already validated that it either have (result, error) (or) just error.
-		return deSerializeFnResultFromFnType(fType, result)
+		return deSerializeFnResultFromFnType(fType, result, to)
 
 	case reflect.String:
 		// If we know about this function through registration then we will try to return corresponding result type.
 		fnName := reflect.ValueOf(f).String()
 		if fnRegistered, ok := getHostEnvironment().getActivityFn(fnName); ok {
-			return deSerializeFnResultFromFnType(reflect.TypeOf(fnRegistered), result)
+			return deSerializeFnResultFromFnType(reflect.TypeOf(fnRegistered), result, to)
 		}
 	}
+
 	// For everything we return result.
-	return result, nil
+	fv := reflect.ValueOf(to)
+	if fv.IsValid() {
+		fv.Elem().SetBytes(result)
+	} else {
+		return errors.New("deSerializeFunctionResult: Unable to assign result to the type provided")
+	}
+
+	return nil
 }
 
 func setActivityParametersIfNotExist(ctx Context) Context {

@@ -5,19 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	"sort"
-
-	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/uber-common/bark"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
+	"go.uber.org/zap"
 )
 
 // Used to test registration listeners
@@ -40,15 +38,19 @@ func init() {
 	})
 	RegisterActivity(testActivityMultipleArgs)
 	RegisterActivity(testActivityReturnString)
+	RegisterActivity(testActivityReturnEmptyString)
+	RegisterActivity(testActivityReturnEmptyStruct)
 }
 
 func TestActivityRegistrationListener(t *testing.T) {
-	require.Equal(t, 4, len(registeredActivities))
+	require.Equal(t, 6, len(registeredActivities))
 	expectedActivities := []string{
 		"github.com/uber-go/cadence-client/client/cadence.testActivity",
 		"github.com/uber-go/cadence-client/client/cadence.testActivityByteArgs",
 		"github.com/uber-go/cadence-client/client/cadence.testActivityMultipleArgs",
 		"github.com/uber-go/cadence-client/client/cadence.testActivityReturnString",
+		"github.com/uber-go/cadence-client/client/cadence.testActivityReturnEmptyString",
+		"github.com/uber-go/cadence-client/client/cadence.testActivityReturnEmptyStruct",
 	}
 	sort.Strings(expectedActivities)
 	expected := strings.Join(expectedActivities, ",")
@@ -70,13 +72,9 @@ func TestWorkflowRegistrationListener(t *testing.T) {
 	require.Equal(t, expected, registered)
 }
 
-func getLogger() bark.Logger {
-	formatter := &log.TextFormatter{}
-	formatter.FullTimestamp = true
-	log1 := log.New()
-	//log1.Level = log.DebugLevel
-	log1.Formatter = formatter
-	return bark.NewLoggerFromLogrus(log1)
+func getLogger() *zap.Logger {
+	logger, _ := zap.NewDevelopment()
+	return logger
 }
 
 func testReplayWorkflow(ctx Context) error {
@@ -85,9 +83,9 @@ func testReplayWorkflow(ctx Context) error {
 		WithScheduleToStartTimeout(time.Second).
 		WithStartToCloseTimeout(time.Second).
 		WithScheduleToCloseTimeout(time.Second))
-	_, err := ExecuteActivity(ctx, "testActivity")
+	err := ExecuteActivity(ctx, "testActivity").Get(ctx, nil)
 	if err != nil {
-		getLogger().Errorf("activity failed with error: %v", err)
+		getLogger().Error("activity failed with error.", zap.Error(err))
 		panic("Failed workflow")
 	}
 	return err
@@ -131,7 +129,7 @@ func TestDecisionTaskHandler(t *testing.T) {
 	_, stackTrace, err := r.ProcessWorkflowTask(task, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, stackTrace, stackTrace)
-	require.Contains(t, stackTrace, "cadence.ExecuteActivity")
+	require.Contains(t, stackTrace, "cadence.(*decodeFutureImpl).Get")
 }
 
 // testSampleWorkflow
@@ -156,7 +154,7 @@ func testActivityMultipleArgs(ctx context.Context, arg1 int, arg2 string, arg3 b
 func TestCreateWorker(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
-	logger := getLogger()
+	//logger := getLogger()
 
 	domain := "testDomain"
 
@@ -167,7 +165,7 @@ func TestCreateWorker(t *testing.T) {
 	activityID := "a1"
 	taskList := "tl1"
 	var startedEventID int64 = 10
-	input, err := marshalFunctionArgs([]interface{}{})
+	input, err := getHostEnvironment().encodeArgs([]interface{}{})
 	require.NoError(t, err)
 
 	activityTask := &s.PollForActivityTaskResponse{
@@ -199,7 +197,7 @@ func TestCreateWorker(t *testing.T) {
 	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 
 	// Configure worker options.
-	workerOptions := NewWorkerOptions().SetLogger(logger).SetMaxActivityExecutionRate(20)
+	workerOptions := NewWorkerOptions().SetMaxActivityExecutionRate(20)
 
 	// Start Worker.
 	worker := NewWorker(
@@ -329,58 +327,89 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 		WithScheduleToCloseTimeout(10*time.Second))
 
 	// By functions.
-	_, err = ExecuteActivity(ctx, testActivityByteArgs, input)
+	err = ExecuteActivity(ctx, testActivityByteArgs, input).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, testActivityMultipleArgs, 2, "test", true)
+	err = ExecuteActivity(ctx, testActivityMultipleArgs, 2, "test", true).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, testActivityNoResult, 2, "test")
+	err = ExecuteActivity(ctx, testActivityNoResult, 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, testActivityNoContextArg, 2, "test")
+	err = ExecuteActivity(ctx, testActivityNoContextArg, 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, testActivityNoError, 2, "test")
+	err = ExecuteActivity(ctx, testActivityNoError, 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, testActivityNoArgsAndNoResult)
+	err = ExecuteActivity(ctx, testActivityNoArgsAndNoResult).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	r, err := ExecuteActivity(ctx, testActivityReturnByteArray)
+	f := ExecuteActivity(ctx, testActivityReturnByteArray)
+	var r []byte
+	err = f.Get(ctx, &r)
 	require.NoError(w.t, err, err)
-	require.Equal(w.t, []byte("testActivity"), r.([]byte))
+	require.Equal(w.t, []byte("testActivity"), r)
 
-	rInt, err := ExecuteActivity(ctx, testActivityReturnInt)
+	f = ExecuteActivity(ctx, testActivityReturnInt)
+	var rInt int
+	err = f.Get(ctx, &rInt)
 	require.NoError(w.t, err, err)
-	require.Equal(w.t, 5, rInt.(int))
+	require.Equal(w.t, 5, rInt)
 
-	rString, err := ExecuteActivity(ctx, testActivityReturnString)
+	f = ExecuteActivity(ctx, testActivityReturnString)
+	var rString string
+	err = f.Get(ctx, &rString)
+
 	require.NoError(w.t, err, err)
-	require.Equal(w.t, "testActivity", rString.(string))
+	require.Equal(w.t, "testActivity", rString)
+
+	f = ExecuteActivity(ctx, testActivityReturnEmptyString)
+	var r2String string
+	err = f.Get(ctx, &r2String)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, "", r2String)
+
+	f = ExecuteActivity(ctx, testActivityReturnEmptyStruct)
+	var r2Struct testActivityResult
+	err = f.Get(ctx, &r2Struct)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, testActivityResult{}, r2Struct)
 
 	// By names.
-	_, err = ExecuteActivity(ctx, "testActivityByteArgs", input)
+	err = ExecuteActivity(ctx, "testActivityByteArgs", input).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, "testActivityMultipleArgs", 2, "test", true)
+	err = ExecuteActivity(ctx, "testActivityMultipleArgs", 2, "test", true).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, "testActivityNoResult", 2, "test")
+	err = ExecuteActivity(ctx, "testActivityNoResult", 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, "testActivityNoContextArg", 2, "test")
+	err = ExecuteActivity(ctx, "testActivityNoContextArg", 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, "testActivityNoError", 2, "test")
+	err = ExecuteActivity(ctx, "testActivityNoError", 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	_, err = ExecuteActivity(ctx, "testActivityNoArgsAndNoResult")
+	err = ExecuteActivity(ctx, "testActivityNoArgsAndNoResult").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	rString, err = ExecuteActivity(ctx, "github.com/uber-go/cadence-client/client/cadence.testActivityReturnString")
+	f = ExecuteActivity(ctx, "github.com/uber-go/cadence-client/client/cadence.testActivityReturnString")
+	err = f.Get(ctx, &rString)
 	require.NoError(w.t, err, err)
-	require.Equal(w.t, "testActivity", rString.(string), rString)
+	require.Equal(w.t, "testActivity", rString, rString)
+
+	f = ExecuteActivity(ctx, "github.com/uber-go/cadence-client/client/cadence.testActivityReturnEmptyString")
+	var r2sString string
+	err = f.Get(ctx, &r2String)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, "", r2sString)
+
+	f = ExecuteActivity(ctx, "github.com/uber-go/cadence-client/client/cadence.testActivityReturnEmptyStruct")
+	err = f.Get(ctx, &r2Struct)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, testActivityResult{}, r2Struct)
 
 	return []byte("Done"), nil
 }
@@ -420,6 +449,22 @@ func testActivityReturnString() (string, error) {
 	return "testActivity", nil
 }
 
+// testActivityReturnEmptyString
+func testActivityReturnEmptyString() (string, error) {
+	// Return is mocked to retrun nil from server.
+	// expect to convert it to appropriate default value.
+	return "", nil
+}
+
+type testActivityResult struct{}
+
+// testActivityReturnEmptyStruct
+func testActivityReturnEmptyStruct() (testActivityResult, error) {
+	// Return is mocked to retrun nil from server.
+	// expect to convert it to appropriate default value.
+	return testActivityResult{}, nil
+}
+
 func TestVariousActivitySchedulingOption(t *testing.T) {
 	w := newWorkflowDefinition(&activitiesCallingOptionsWorkflow{t: t})
 	ctx := &mockWorkflowEnvironment{}
@@ -436,17 +481,22 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 			r = testEncodeFunctionResult(5)
 		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnString") {
 			r = testEncodeFunctionResult("testActivity")
+		} else if strings.Contains(params.ActivityType.Name, "testActivityReturnEmptyString") ||
+			strings.Contains(params.ActivityType.Name, "testActivityReturnEmptyStruct") {
+			r = nil
 		} else {
 			r = testEncodeFunctionResult([]byte("test"))
 		}
 		callback := args.Get(1).(resultHandler)
 		cbProcessor.Add(callback, r, nil)
-	}).Times(16)
+	}).Times(20)
 
 	ctx.On("Complete", mock.Anything, mock.Anything).Return().Run(func(args mock.Arguments) {
 		if args.Get(1) != nil {
-			err := args.Get(1).(Error)
-			fmt.Printf("Error: %v, Stack: %v \n", err.Reason(), string(err.Details()))
+			err := args.Get(1).(ErrorWithDetails)
+			var details []byte
+			err.Details(&details)
+			fmt.Printf("ErrorWithDetails: %v, Stack: %v \n", err.Reason(), string(details))
 		}
 		workflowComplete <- struct{}{}
 	}).Once()
@@ -501,17 +551,143 @@ func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	//require.NoError(t, err)
 }
 
+type testErrorDetails struct {
+	T string
+}
+
+func TestActivityErrorWithDetails(t *testing.T) {
+	a1 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (err error) {
+			return NewErrorWithDetails("testReason", "testStringDetails")
+		}}
+	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
+
+	err := deSerializeFunctionResult(a1.fn, encResult, nil)
+	require.NoError(t, err)
+	require.Error(t, e)
+	errWD := e.(ErrorWithDetails)
+	require.Equal(t, "testReason", errWD.Reason())
+	var strDetails string
+	errWD.Details(&strDetails)
+	require.Equal(t, "testStringDetails", strDetails)
+
+	a2 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (err error) {
+			return NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack"})
+		}}
+	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
+	err = deSerializeFunctionResult(a2.fn, encResult, nil)
+	require.NoError(t, err)
+	require.Error(t, e)
+	errWD = e.(ErrorWithDetails)
+	require.Equal(t, "testReason", errWD.Reason())
+	var td testErrorDetails
+	errWD.Details(&td)
+	require.Equal(t, testErrorDetails{T: "testErrorStack"}, td)
+
+	a3 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (result string, err error) {
+			return "testResult", NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack3"})
+		}}
+	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a3.fn, 1))
+	var result string
+	err = deSerializeFunctionResult(a3.fn, encResult, &result)
+	require.NoError(t, err)
+	require.Equal(t, "testResult", result)
+	require.Error(t, e)
+	errWD = e.(ErrorWithDetails)
+	require.Equal(t, "testReason", errWD.Reason())
+	errWD.Details(&td)
+	require.Equal(t, testErrorDetails{T: "testErrorStack3"}, td)
+
+	a4 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (result string, err error) {
+			return "testResult4", NewErrorWithDetails("testReason", "testMultipleString", testErrorDetails{T: "testErrorStack4"})
+		}}
+	encResult, e = a4.Execute(context.Background(), testEncodeFunctionArgs(a4.fn, 1))
+	err = deSerializeFunctionResult(a3.fn, encResult, &result)
+	require.NoError(t, err)
+	require.Equal(t, "testResult4", result)
+	require.Error(t, e)
+	errWD = e.(ErrorWithDetails)
+	require.Equal(t, "testReason", errWD.Reason())
+	var ed string
+	errWD.Details(&ed, &td)
+	require.Equal(t, "testMultipleString", ed)
+	require.Equal(t, testErrorDetails{T: "testErrorStack4"}, td)
+}
+
+func TestActivityCancelledError(t *testing.T) {
+	a1 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (err error) {
+			return NewCanceledError("testCancelStringDetails")
+		}}
+	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
+	err := deSerializeFunctionResult(a1.fn, encResult, nil)
+	require.NoError(t, err)
+	require.Error(t, e)
+	errWD := e.(CanceledError)
+	var strDetails string
+	errWD.Details(&strDetails)
+	require.Equal(t, "testCancelStringDetails", strDetails)
+
+	a2 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (err error) {
+			return NewCanceledError(testErrorDetails{T: "testCancelErrorStack"})
+		}}
+	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
+	err = deSerializeFunctionResult(a2.fn, encResult, nil)
+	require.NoError(t, err)
+	require.Error(t, e)
+	errWD = e.(CanceledError)
+	var td testErrorDetails
+	errWD.Details(&td)
+	require.Equal(t, testErrorDetails{T: "testCancelErrorStack"}, td)
+
+	a3 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (result string, err error) {
+			return "testResult", NewCanceledError(testErrorDetails{T: "testErrorStack3"})
+		}}
+	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
+	var r string
+	err = deSerializeFunctionResult(a3.fn, encResult, &r)
+	require.NoError(t, err)
+	require.Equal(t, "testResult", r)
+	require.Error(t, e)
+	errWD = e.(CanceledError)
+	errWD.Details(&td)
+	require.Equal(t, testErrorDetails{T: "testErrorStack3"}, td)
+
+	a4 := activityExecutor{
+		name: "test",
+		fn: func(arg1 int) (result string, err error) {
+			return "testResult4", NewCanceledError("testMultipleString", testErrorDetails{T: "testErrorStack4"})
+		}}
+	encResult, e = a4.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
+	err = deSerializeFunctionResult(a3.fn, encResult, &r)
+	require.NoError(t, err)
+	require.Equal(t, "testResult4", r)
+	require.Error(t, e)
+	errWD = e.(CanceledError)
+	var ed string
+	errWD.Details(&ed, &td)
+	require.Equal(t, "testMultipleString", ed)
+	require.Equal(t, testErrorDetails{T: "testErrorStack4"}, td)
+}
+
 // Encode function result.
 func testEncodeFunctionResult(r interface{}) []byte {
-	if err := getHostEnvironment().Encoder().Register(r); err != nil {
-		fmt.Println(err)
-		panic("Failed to register")
-	}
-	fr := fnReturnSignature{Ret: r}
-	result, err := getHostEnvironment().Encoder().Marshal(fr)
+	result, err := getHostEnvironment().encodeArg(r)
 	if err != nil {
 		fmt.Println(err)
-		panic("Failed to Marshal")
+		panic("Failed to encode")
 	}
 	return result
 }
@@ -523,7 +699,7 @@ func testEncodeFunctionArgs(workflowFunc interface{}, args ...interface{}) []byt
 		fmt.Println(err)
 		panic("Failed to register function types")
 	}
-	input, err := marshalFunctionArgs(args)
+	input, err := getHostEnvironment().encodeArgs(args)
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to encode arguments")

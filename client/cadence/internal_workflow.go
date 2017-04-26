@@ -3,6 +3,7 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -31,7 +32,7 @@ type (
 		value   interface{}
 		err     error
 		ready   bool
-		channel Channel
+		channel *channelImpl
 		chained []*futureImpl // Futures that are chained to this one
 	}
 
@@ -57,35 +58,38 @@ type (
 
 	valueCallbackPair struct {
 		value    interface{}
-		callback func()
+		callback func() bool // false indicates that callback didn't accept the value
 	}
+
+	// false result means that callback didn't accept the value and it is still up for delivery
+	receiveCallback func(v interface{}, more bool) bool
 
 	channelImpl struct {
 		name            string              // human readable channel name
 		size            int                 // Channel buffer size. 0 for non buffered.
 		buffer          []interface{}       // buffered messages
 		blockedSends    []valueCallbackPair // puts waiting when buffer is full.
-		blockedReceives []func(interface{}) // receives waiting when no messages are available.
+		blockedReceives []receiveCallback   // receives waiting when no messages are available.
 		closed          bool                // true if channel is closed
 	}
 
 	// Single case statement of the Select
 	selectCase struct {
-		channel                 Channel                         // Channel of this case.
+		channel                 *channelImpl                    // Channel of this case.
 		receiveFunc             *func(v interface{})            // function to call when channel has a message. nil for send case.
 		receiveWithMoreFlagFunc *func(v interface{}, more bool) // function to call when channel has a message. nil for send case.
 
-		sendFunc   *func()                         // function to call when channel accepted a message. nil for receive case.
-		sendValue  *interface{}                    // value to send to the channel. Used only for send case.
-		future     Future                          // Used for future case
-		futureFunc *func(v interface{}, err error) // function to call when Future is ready
+		sendFunc   *func()         // function to call when channel accepted a message. nil for receive case.
+		sendValue  *interface{}    // value to send to the channel. Used only for send case.
+		future     *futureImpl     // Used for future case
+		futureFunc *func(f Future) // function to call when Future is ready
 	}
 
 	// Implements Selector interface
 	selectorImpl struct {
 		name        string
-		cases       []selectCase // cases that this select is comprised from
-		defaultFunc *func()      // default case
+		cases       []*selectCase // cases that this select is comprised from
+		defaultFunc *func()       // default case
 	}
 
 	// unblockFunc is passed evaluated by a coroutine yield. When it returns false the yield returns to a caller.
@@ -101,11 +105,6 @@ type (
 		keptBlocked  bool             // true indicates that coroutine didn't make any progress since the last yield unblocking
 		closed       bool             // indicates that owning coroutine has finished execution
 		panicError   PanicError       // non nil if coroutine had unhandled panic
-	}
-
-	panicError struct {
-		value      interface{}
-		stackTrace string
 	}
 
 	dispatcherImpl struct {
@@ -147,7 +146,7 @@ func getWorkflowEnvironment(ctx Context) workflowEnvironment {
 	return wc.(workflowEnvironment)
 }
 
-func (f *futureImpl) Get(ctx Context) (interface{}, error) {
+func (f *futureImpl) Get(ctx Context, value interface{}) error {
 	_, more := f.channel.ReceiveWithMoreFlag(ctx)
 	if more {
 		panic("not closed")
@@ -155,7 +154,34 @@ func (f *futureImpl) Get(ctx Context) (interface{}, error) {
 	if !f.ready {
 		panic("not ready")
 	}
-	return f.value, f.err
+	if value == nil {
+		return f.err
+	}
+	rf := reflect.ValueOf(value)
+	if rf.Type().Kind() != reflect.Ptr {
+		return errors.New("value parameter is not a pointer")
+	}
+	fv := reflect.ValueOf(f.value)
+	if fv.IsValid() {
+		rf.Elem().Set(fv)
+	}
+	return f.err
+}
+
+// Used by selectorImpl
+// If Future is ready returns its value immediately.
+// If not registers callback which is called when it is ready.
+func (f *futureImpl) getAsync(callback receiveCallback) (v interface{}, ok bool, err error) {
+	_, _, more := f.channel.receiveAsyncImpl(callback)
+	// Future uses Channel.Close to indicate that it is ready.
+	// So more being true (channel is still open) indicates future is not ready.
+	if more {
+		return nil, false, nil
+	}
+	if !f.ready {
+		panic("not ready")
+	}
+	return f.value, true, f.err
 }
 
 func (f *futureImpl) IsReady() bool {
@@ -282,42 +308,24 @@ func (c *channelImpl) Receive(ctx Context) (v interface{}) {
 	return v
 }
 
-func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (v interface{}, more bool) {
+func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (value interface{}, more bool) {
 	state := getState(ctx)
 	hasResult := false
-	appended := false
 	var result interface{}
+	callback := func(v interface{}, m bool) bool {
+		result = v
+		hasResult = true
+		more = m
+		return true
+	}
+	v, ok, more := c.receiveAsyncImpl(callback)
+	if ok || !more {
+		return v, more
+	}
 	for {
 		if hasResult {
 			state.unblocked()
-			return result, true
-		}
-		if len(c.buffer) > 0 {
-			r := c.buffer[0]
-			c.buffer = c.buffer[1:]
-			state.unblocked()
-			return r, true
-		}
-		// Let the buffer drain before delivering closed
-		if c.closed {
-			return nil, false
-		}
-		if len(c.blockedSends) > 0 {
-			if len(c.blockedReceives) > 0 {
-				panic("both blockedSends and blockedReceives are not empty")
-			}
-			b := c.blockedSends[0]
-			c.blockedSends = c.blockedSends[1:]
-			b.callback()
-			state.unblocked()
-			return b.value, true
-		}
-		if !appended {
-			c.blockedReceives = append(c.blockedReceives, func(v interface{}) {
-				result = v
-				hasResult = true
-			})
-			appended = true
+			return result, more
 		}
 		state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
 	}
@@ -329,6 +337,12 @@ func (c *channelImpl) ReceiveAsync() (v interface{}, ok bool) {
 }
 
 func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more bool) {
+	return c.receiveAsyncImpl(nil)
+}
+
+// ok = true means that value was received
+// more = true means that channel is not closed and more deliveries are possible
+func (c *channelImpl) receiveAsyncImpl(callback receiveCallback) (v interface{}, ok bool, more bool) {
 	if len(c.buffer) > 0 {
 		r := c.buffer[0]
 		c.buffer = c.buffer[1:]
@@ -337,11 +351,15 @@ func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more b
 	if c.closed {
 		return nil, false, false
 	}
-	if len(c.blockedSends) > 0 {
+	for len(c.blockedSends) > 0 {
 		b := c.blockedSends[0]
 		c.blockedSends = c.blockedSends[1:]
-		b.callback()
-		return b.value, true, true
+		if b.callback() {
+			return b.value, true, true
+		}
+	}
+	if callback != nil {
+		c.blockedReceives = append(c.blockedReceives, callback)
 	}
 	return nil, false, true
 }
@@ -349,7 +367,18 @@ func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more b
 func (c *channelImpl) Send(ctx Context, v interface{}) {
 	state := getState(ctx)
 	valueConsumed := false
-	appended := false
+	pair := &valueCallbackPair{
+		value: v,
+		callback: func() bool {
+			valueConsumed = true
+			return true
+		},
+	}
+	ok := c.sendAsyncImpl(v, pair)
+	if ok {
+		state.unblocked()
+		return
+	}
 	for {
 		// Check for closed in the loop as close can be called when send is blocked
 		if c.closed {
@@ -359,49 +388,42 @@ func (c *channelImpl) Send(ctx Context, v interface{}) {
 			state.unblocked()
 			return
 		}
-		if len(c.blockedReceives) > 0 {
-			if len(c.blockedSends) > 0 {
-				panic("both blockedSends and blockedReceives are not empty")
-			}
-			blockedGet := c.blockedReceives[0]
-			c.blockedReceives = c.blockedReceives[1:]
-			blockedGet(v)
-			state.unblocked()
-			return
-		}
-		if len(c.buffer) < c.size {
-			c.buffer = append(c.buffer, v)
-			state.unblocked()
-			return
-		}
-		if !appended {
-			c.blockedSends = append(c.blockedSends,
-				valueCallbackPair{value: v, callback: func() { valueConsumed = true }})
-			appended = true
-		}
 		state.yield(fmt.Sprintf("blocked on %s.Send", c.name))
 	}
 }
 
 func (c *channelImpl) SendAsync(v interface{}) (ok bool) {
+	return c.sendAsyncImpl(v, nil)
+}
+
+func (c *channelImpl) sendAsyncImpl(v interface{}, pair *valueCallbackPair) (ok bool) {
 	if c.closed {
 		panic("Closed channel")
+	}
+	for len(c.blockedReceives) > 0 {
+		blockedGet := c.blockedReceives[0]
+		c.blockedReceives = c.blockedReceives[1:]
+		// false from callback indicates that value wasn't consumed
+		if blockedGet(v, true) {
+			return true
+		}
 	}
 	if len(c.buffer) < c.size {
 		c.buffer = append(c.buffer, v)
 		return true
 	}
-	if len(c.blockedReceives) > 0 {
-		blockedGet := c.blockedReceives[0]
-		c.blockedReceives = c.blockedReceives[1:]
-		blockedGet(v)
-		return true
+	if pair != nil {
+		c.blockedSends = append(c.blockedSends, *pair)
 	}
 	return false
 }
 
 func (c *channelImpl) Close() {
 	c.closed = true
+	for i := 0; i < len(c.blockedReceives); i++ {
+		callback := c.blockedReceives[i]
+		callback(nil, false)
+	}
 	// All blocked sends are going to panic
 	for i := 0; i < len(c.blockedSends); i++ {
 		b := c.blockedSends[i]
@@ -516,18 +538,6 @@ func (s *coroutineState) NewNamedBufferedChannel(name string, size int) Channel 
 	return &channelImpl{name: name, size: size}
 }
 
-func (e *panicError) Error() string {
-	return fmt.Sprintf("%v", e.value)
-}
-
-func (e *panicError) Value() interface{} {
-	return e.value
-}
-
-func (e *panicError) StackTrace() string {
-	return e.stackTrace
-}
-
 func (d *dispatcherImpl) newCoroutine(ctx Context, f func(ctx Context)) {
 	d.newNamedCoroutine(ctx, fmt.Sprintf("%v", d.sequence+1), f)
 }
@@ -540,7 +550,7 @@ func (d *dispatcherImpl) newNamedCoroutine(ctx Context, name string, f func(ctx 
 		defer func() {
 			if r := recover(); r != nil {
 				st := getStackTrace(name, "panic", 3)
-				crt.panicError = &panicError{value: r, stackTrace: st}
+				crt.panicError = newPanicError(r, st)
 			}
 		}()
 		crt.initialYield(1, "")
@@ -643,22 +653,22 @@ func (d *dispatcherImpl) StackTrace() string {
 }
 
 func (s *selectorImpl) AddReceive(c Channel, f func(v interface{})) Selector {
-	s.cases = append(s.cases, selectCase{channel: c, receiveFunc: &f})
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveFunc: &f})
 	return s
 }
 
 func (s *selectorImpl) AddReceiveWithMoreFlag(c Channel, f func(v interface{}, more bool)) Selector {
-	s.cases = append(s.cases, selectCase{channel: c, receiveWithMoreFlagFunc: &f})
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveWithMoreFlagFunc: &f})
 	return s
 }
 
 func (s *selectorImpl) AddSend(c Channel, v interface{}, f func()) Selector {
-	s.cases = append(s.cases, selectCase{channel: c, sendFunc: &f, sendValue: &v})
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), sendFunc: &f, sendValue: &v})
 	return s
 }
 
-func (s *selectorImpl) AddFuture(future Future, f func(v interface{}, err error)) Selector {
-	s.cases = append(s.cases, selectCase{future: future, futureFunc: &f})
+func (s *selectorImpl) AddFuture(future Future, f func(future Future)) Selector {
+	s.cases = append(s.cases, &selectCase{future: future.(*futureImpl), futureFunc: &f})
 	return s
 }
 
@@ -668,46 +678,89 @@ func (s *selectorImpl) AddDefault(f func()) {
 
 func (s *selectorImpl) Select(ctx Context) {
 	state := getState(ctx)
-	for {
-		for _, pair := range s.cases {
-			if pair.receiveFunc != nil {
-				v, ok, more := pair.channel.ReceiveAsyncWithMoreFlag()
-				if ok || !more {
-					f := *pair.receiveFunc
+	var readyBranch func()
+	for _, pair := range s.cases {
+		if pair.receiveFunc != nil {
+			f := *pair.receiveFunc
+			callback := func(v interface{}, more bool) bool {
+				if readyBranch != nil {
+					return false
+				}
+				readyBranch = func() {
 					f(v)
-					state.unblocked()
-					return
 				}
-			} else if pair.receiveWithMoreFlagFunc != nil {
-				v, ok, more := pair.channel.ReceiveAsyncWithMoreFlag()
-				if ok || !more {
-					f := *pair.receiveWithMoreFlagFunc
+				return true
+			}
+
+			v, ok, more := pair.channel.receiveAsyncImpl(callback)
+			if ok || !more {
+				f(v)
+				return
+			}
+		} else if pair.receiveWithMoreFlagFunc != nil {
+			f := *pair.receiveWithMoreFlagFunc
+			callback := func(v interface{}, more bool) bool {
+				if readyBranch != nil {
+					return false
+				}
+				readyBranch = func() {
 					f(v, more)
-					state.unblocked()
-					return
 				}
-			} else if pair.sendFunc != nil {
-				ok := pair.channel.SendAsync(*pair.sendValue)
-				if ok {
-					f := *pair.sendFunc
-					f()
-					state.unblocked()
-					return
+				return true
+			}
+			v, ok, more := pair.channel.receiveAsyncImpl(callback)
+			if ok || !more {
+				f(v, more)
+				return
+			}
+		} else if pair.sendFunc != nil {
+			f := *pair.sendFunc
+			p := &valueCallbackPair{
+				value: *pair.sendValue,
+				callback: func() bool {
+					if readyBranch != nil {
+						return false
+					}
+					readyBranch = func() {
+						f()
+					}
+					return true
+				},
+			}
+			ok := pair.channel.sendAsyncImpl(*pair.sendValue, p)
+			if ok {
+				f()
+				return
+			}
+		} else if pair.futureFunc != nil {
+			p := pair
+			f := *p.futureFunc
+			callback := func(v interface{}, more bool) bool {
+				if readyBranch != nil {
+					return false
 				}
-			} else if pair.futureFunc != nil {
-				if pair.future.IsReady() {
-					f := *pair.futureFunc
-					f(pair.future.Get(ctx))
-					state.unblocked()
-					return
+				p.futureFunc = nil
+				readyBranch = func() {
+					f(p.future)
 				}
-			} else {
-				panic("Invalid case")
+				return true
+			}
+			_, ok, _ := p.future.getAsync(callback)
+			if ok {
+				p.futureFunc = nil
+				f(p.future)
+				return
 			}
 		}
-		if s.defaultFunc != nil {
-			f := *s.defaultFunc
-			f()
+	}
+	if s.defaultFunc != nil {
+		f := *s.defaultFunc
+		f()
+		return
+	}
+	for {
+		if readyBranch != nil {
+			readyBranch()
 			state.unblocked()
 			return
 		}
@@ -739,9 +792,38 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*
 			workflowFunc)
 	}
 
-	input, err := marshalFunctionArgs(args)
+	input, err := getHostEnvironment().encodeArgs(args)
 	if err != nil {
 		return nil, nil, err
 	}
 	return &WorkflowType{Name: fnName}, input, nil
+}
+
+// decodeFutureImpl
+type decodeFutureImpl struct {
+	futureImpl
+	fn interface{}
+}
+
+func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
+	_, more := d.futureImpl.channel.ReceiveWithMoreFlag(ctx)
+	if more {
+		panic("not closed")
+	}
+	if !d.futureImpl.ready {
+		panic("not ready")
+	}
+	if value == nil {
+		return d.futureImpl.err
+	}
+	rf := reflect.ValueOf(value)
+	if rf.Type().Kind() != reflect.Ptr {
+		return errors.New("value parameter is not a pointer")
+	}
+
+	err := deSerializeFunctionResult(d.fn, d.futureImpl.value.([]byte), value)
+	if err != nil {
+		return err
+	}
+	return d.futureImpl.err
 }

@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
@@ -17,6 +16,8 @@ import (
 	"github.com/uber-go/cadence-client/common/metrics"
 	"github.com/uber-go/cadence-client/common/util"
 	"github.com/uber-go/tally"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/context"
 )
 
@@ -26,7 +27,7 @@ type (
 	workflowExecutionEventHandler interface {
 		// Process a single event and return the assosciated decisions.
 		// Return List of decisions made, whether a decision is unhandled, any error.
-		ProcessEvent(event *s.HistoryEvent) ([]*s.Decision, bool, error)
+		ProcessEvent(event *s.HistoryEvent, isReplay bool) ([]*s.Decision, bool, error)
 		StackTrace() string
 		// Close for cleaning up resources on this event handler
 		Close()
@@ -46,11 +47,12 @@ type (
 type (
 	// workflowTaskHandlerImpl is the implementation of WorkflowTaskHandler
 	workflowTaskHandlerImpl struct {
-		workflowDefFactory workflowDefinitionFactory
-		metricsScope       tally.Scope
-		ppMgr              pressurePointMgr
-		logger             bark.Logger
-		identity           string
+		workflowDefFactory    workflowDefinitionFactory
+		metricsScope          tally.Scope
+		ppMgr                 pressurePointMgr
+		logger                *zap.Logger
+		identity              string
+		enableLoggingInReplay bool
 	}
 
 	// activityTaskHandlerImpl is the implementation of ActivityTaskHandler
@@ -60,7 +62,7 @@ type (
 		implementations map[ActivityType]activity
 		service         m.TChanWorkflowService
 		metricsScope    tally.Scope
-		logger          bark.Logger
+		logger          *zap.Logger
 	}
 
 	// history wrapper method to help information about events.
@@ -200,11 +202,13 @@ OrderEvents:
 func newWorkflowTaskHandler(factory workflowDefinitionFactory,
 	params workerExecutionParameters, ppMgr pressurePointMgr) WorkflowTaskHandler {
 	return &workflowTaskHandlerImpl{
-		workflowDefFactory: factory,
-		logger:             params.Logger,
-		ppMgr:              ppMgr,
-		metricsScope:       params.MetricsScope,
-		identity:           params.Identity}
+		workflowDefFactory:    factory,
+		logger:                params.Logger,
+		ppMgr:                 ppMgr,
+		metricsScope:          params.MetricsScope,
+		identity:              params.Identity,
+		enableLoggingInReplay: params.EnableLoggingInReplay,
+	}
 }
 
 // ProcessWorkflowTask processes each all the events of the workflow task.
@@ -232,14 +236,18 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		return nil, "", errors.New("nil TaskList in WorkflowExecutionStarted event")
 	}
 
-	wth.logger.Debugf("Processing New Workflow Task: Type=%s, PreviousStartedEventId=%d",
-		task.GetWorkflowType().GetName(), task.GetPreviousStartedEventId())
+	wth.logger.Debug("Processing New Workflow Task.",
+		zap.String(tagWorkflowType, task.GetWorkflowType().GetName()),
+		zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 
 	// Setup workflow Info
 	workflowInfo := &WorkflowInfo{
 		WorkflowType: flowWorkflowTypeFrom(*task.WorkflowType),
 		TaskListName: taskList.GetName(),
-		// workflowExecution
+		WorkflowExecution: WorkflowExecution{
+			ID:    *task.WorkflowExecution.WorkflowId,
+			RunID: *task.WorkflowExecution.RunId,
+		},
 	}
 
 	isWorkflowCompleted := false
@@ -253,7 +261,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	}
 
 	eventHandler := newWorkflowExecutionEventHandler(
-		workflowInfo, wth.workflowDefFactory, completeHandler, wth.logger)
+		workflowInfo, wth.workflowDefFactory, completeHandler, wth.logger, wth.enableLoggingInReplay)
 	defer eventHandler.Close()
 	reorderedHistory := newHistory(&workflowTask{task: task}, eventHandler.(*workflowExecutionEventHandlerImpl))
 	decisions := []*s.Decision{}
@@ -272,8 +280,6 @@ ProcessEvents:
 		}
 
 		for _, event := range reorderedEvents {
-			wth.logger.Debugf("ProcessEvent: Id=%d, EventType=%v", event.GetEventId(), event.GetEventType())
-
 			isInReplay := event.GetEventId() < reorderedHistory.LastNonReplayedID()
 			if isEventTypeRespondToDecision(event.GetEventType()) {
 				respondEvents = append(respondEvents, event)
@@ -288,7 +294,7 @@ ProcessEvents:
 				return nil, "", err
 			}
 
-			eventDecisions, unhandled, err := eventHandler.ProcessEvent(event)
+			eventDecisions, unhandled, err := eventHandler.ProcessEvent(event, isInReplay)
 			if err != nil {
 				return nil, "", err
 			}
@@ -314,7 +320,7 @@ ProcessEvents:
 
 	// check if decisions from reply matches to the history events
 	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
-		wth.logger.Warnf("replay and history match failed: %s", err)
+		wth.logger.Error("Replay and history match failed.", zap.Error(err))
 		return nil, "", err
 	}
 
@@ -544,8 +550,10 @@ func newActivityTaskHandler(activities []activity,
 		identity:        params.Identity,
 		implementations: implementations,
 		service:         service,
-		logger:          params.Logger,
-		metricsScope:    params.MetricsScope}
+		logger: params.Logger.With(
+			zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: params.Identity},
+			zapcore.Field{Key: tagTaskList, Type: zapcore.StringType, String: params.TaskList}),
+		metricsScope: params.MetricsScope}
 }
 
 type cadenceInvoker struct {
@@ -568,11 +576,12 @@ func newServiceInvoker(taskToken []byte, identity string, service m.TChanWorkflo
 
 // Execute executes an implementation of the activity.
 func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (interface{}, error) {
-	ath.logger.Debugf("[WorkflowID: %s] Execute activity: %s",
-		t.GetWorkflowExecution().GetWorkflowId(), t.GetActivityType().GetName())
+	ath.logger.Debug("activityTaskHandlerImpl.Execute",
+		zap.String(tagWorkflowID, t.GetWorkflowExecution().GetWorkflowId()),
+		zap.String(tagActivityType, t.GetActivityType().GetName()))
 
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service)
-	ctx := WithActivityTask(context.Background(), t, invoker)
+	ctx := WithActivityTask(context.Background(), t, invoker, ath.logger)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.implementations[flowActivityTypeFrom(activityType)]
 	if !ok {

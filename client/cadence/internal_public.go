@@ -8,9 +8,9 @@ package cadence
 // point of view only to access them from other packages.
 
 import (
-	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
+	"go.uber.org/zap"
 )
 
 type (
@@ -89,7 +89,7 @@ func NewActivityTaskWorker(
 // NewWorkflowTaskHandler creates an instance of a WorkflowTaskHandler from a decision poll response
 // using workflow functions registered through RegisterWorkflow
 // To be used to replay a workflow in a debugger.
-func NewWorkflowTaskHandler(identity string, logger bark.Logger) WorkflowTaskHandler {
+func NewWorkflowTaskHandler(identity string, logger *zap.Logger) WorkflowTaskHandler {
 	params := workerExecutionParameters{
 		Identity: identity,
 		Logger:   logger,
@@ -104,7 +104,7 @@ func NewWorkflowTaskHandler(identity string, logger bark.Logger) WorkflowTaskHan
 // using activity functions registered through RegisterActivity. service parameter is used for
 // heartbeating from activity implementation.
 // To be used to invoke registered functions for debugging purposes.
-func NewActivityTaskHandler(service m.TChanWorkflowService, identity string, logger bark.Logger) ActivityTaskHandler {
+func NewActivityTaskHandler(service m.TChanWorkflowService, identity string, logger *zap.Logger) ActivityTaskHandler {
 	params := workerExecutionParameters{
 		Identity: identity,
 		Logger:   logger,
@@ -134,20 +134,20 @@ func AddActivityRegistrationInterceptor(
 
 // SerializeFnArgs serializes an activity function arguments.
 func SerializeFnArgs(args ...interface{}) ([]byte, error) {
-	data, err := marshalFunctionArgs(args)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+	return getHostEnvironment().encodeArgs(args)
 }
 
 // DeserializeFnResults de-serializes a function results.
 // The input result doesn't include the error. The cadence server has result, error.
 // This is to de-serialize the result.
-func DeserializeFnResults(result []byte) (interface{}, error) {
-	var fr fnReturnSignature
-	if err := getHostEnvironment().Encoder().Unmarshal(result, &fr); err != nil {
-		return nil, err
-	}
-	return fr.Ret, nil
+func DeserializeFnResults(result []byte, to interface{}) error {
+	return getHostEnvironment().decodeArg(result, to)
+}
+
+// newDecodeFuture creates a new future as well as associated Settable that is used to set its value.
+// fn - the decoded value needs to be validated against a function.
+func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
+	impl := &decodeFutureImpl{
+		futureImpl{channel: NewChannel(ctx).(*channelImpl)}, fn}
+	return impl, impl
 }

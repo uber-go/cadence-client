@@ -259,6 +259,8 @@ func deSerializeFunctionResult(f interface{}, result []byte, to interface{}) err
 	fv := reflect.ValueOf(to)
 	if fv.IsValid() {
 		fv.Elem().SetBytes(result)
+	} else {
+		return errors.New("deSerializeFunctionResult: Unable to assign result to the type provided")
 	}
 
 	return nil

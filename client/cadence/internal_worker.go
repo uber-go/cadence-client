@@ -637,6 +637,7 @@ func (th *hostEnvImpl) encodeArgs(args []interface{}) ([]byte, error) {
 }
 
 // decode multiple values.
+// TODO: Unify this with decodeArgsTo
 func (th *hostEnvImpl) decodeArgs(data []byte) ([]interface{}, error) {
 	s := fnSignature{}
 	err := getHostEnvironment().decode(data, &s)
@@ -670,7 +671,7 @@ func (th *hostEnvImpl) decodeArgsTo(data []byte, to []interface{}) error {
 		return err
 	}
 	for i := 0; i < len(to); i++ {
-		vto := reflect.ValueOf(to[0])
+		vto := reflect.ValueOf(to[i])
 		if vto.IsValid() {
 			vto.Elem().Set(reflect.ValueOf(s.Args[i]))
 		}

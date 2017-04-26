@@ -4,6 +4,7 @@ package cadence
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -17,8 +18,6 @@ import (
 	"github.com/uber-go/cadence-client/common/util"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 )
 
 // interfaces
@@ -236,8 +235,10 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		return nil, "", errors.New("nil TaskList in WorkflowExecutionStarted event")
 	}
 
-	wth.logger.Debug("Processing New Workflow Task.",
+	wth.logger.Debug("Processing new workflow task.",
 		zap.String(tagWorkflowType, task.GetWorkflowType().GetName()),
+		zap.String(tagWorkflowID, task.GetWorkflowExecution().GetWorkflowId()),
+		zap.String(tagRunID, task.GetWorkflowExecution().GetRunId()),
 		zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 
 	// Setup workflow Info
@@ -320,7 +321,7 @@ ProcessEvents:
 
 	// check if decisions from reply matches to the history events
 	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
-		wth.logger.Error("Replay and history match failed.", zap.Error(err))
+		wth.logger.Error("Replay and history mismatch.", zap.Error(err))
 		return nil, "", err
 	}
 
@@ -495,6 +496,13 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(isWorkflowCompleted bool, u
 	if !unhandledDecision {
 		if err != nil {
 			// Workflow failures
+			wth.logger.Error("Workflow ERROR.", zap.Error(err))
+			//if _, ok := err.(PanicError); ok {
+			//
+			//	wth.logger.Error("Workflow panic.", zap.Error(err))
+			//} else {
+			//	wth.logger.Info("Workflow failed.", zap.Error(err))
+			//}
 			failDecision := createNewDecision(s.DecisionType_FailWorkflowExecution)
 			reason, details := getErrorDetails(err)
 			failDecision.FailWorkflowExecutionDecisionAttributes = &s.FailWorkflowExecutionDecisionAttributes{
@@ -550,10 +558,8 @@ func newActivityTaskHandler(activities []activity,
 		identity:        params.Identity,
 		implementations: implementations,
 		service:         service,
-		logger: params.Logger.With(
-			zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: params.Identity},
-			zapcore.Field{Key: tagTaskList, Type: zapcore.StringType, String: params.TaskList}),
-		metricsScope: params.MetricsScope}
+		logger:          params.Logger,
+		metricsScope:    params.MetricsScope}
 }
 
 type cadenceInvoker struct {
@@ -576,8 +582,9 @@ func newServiceInvoker(taskToken []byte, identity string, service m.TChanWorkflo
 
 // Execute executes an implementation of the activity.
 func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (interface{}, error) {
-	ath.logger.Debug("activityTaskHandlerImpl.Execute",
+	ath.logger.Debug("Processing new activity task",
 		zap.String(tagWorkflowID, t.GetWorkflowExecution().GetWorkflowId()),
+		zap.String(tagRunID, t.GetWorkflowExecution().GetRunId()),
 		zap.String(tagActivityType, t.GetActivityType().GetName()))
 
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service)

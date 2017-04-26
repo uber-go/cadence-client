@@ -637,14 +637,25 @@ func (th *hostEnvImpl) encodeArgs(args []interface{}) ([]byte, error) {
 }
 
 // decode multiple values.
-// TODO: Unify this with decodeArgsTo
-func (th *hostEnvImpl) decodeArgs(data []byte) ([]interface{}, error) {
-	s := fnSignature{}
-	err := getHostEnvironment().decode(data, &s)
-	if err != nil {
-		return nil, err
+func (th *hostEnvImpl) decodeArgs(fnType reflect.Type, data []byte) (result []reflect.Value, err error) {
+	var r []interface{}
+argsLoop:
+	for i := 0; i < fnType.NumIn(); i++ {
+		argT := fnType.In(i)
+		if i == 0 && (isActivityContext(argT) || isWorkflowContext(argT)) {
+			continue argsLoop
+		}
+		arg := reflect.New(argT).Interface()
+		r = append(r, arg)
 	}
-	return s.Args, nil
+	err = th.decodeArgsTo(data, r)
+	if err != nil {
+		return
+	}
+	for i := 0; i < len(r); i++ {
+		result = append(result, reflect.ValueOf(r[i]).Elem())
+	}
+	return
 }
 
 // decode multiple values in to a given structure.
@@ -748,30 +759,27 @@ type workflowExecutor struct {
 }
 
 func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
-	var args []interface{}
-	var err error
 	fnType := reflect.TypeOf(we.fn)
+	// Workflow context.
+	args := []reflect.Value{reflect.ValueOf(ctx)}
 
-	if fnType.NumIn() == 1 && isTypeByteSlice(fnType.In(0)) {
-		args = []interface{}{input}
+	if fnType.NumIn() > 1 && isTypeByteSlice(fnType.In(1)) {
+		// 0 - is workflow context.
+		// 1 ... input types.
+		args = append(args, reflect.ValueOf(input))
 	} else {
-		args, err = getHostEnvironment().decodeArgs(input)
+		decoded, err := getHostEnvironment().decodeArgs(fnType, input)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"Unable to decode the workflow function input bytes with error: %v, function name: %v",
 				err, we.name)
 		}
-	}
-
-	targetArgs := []reflect.Value{reflect.ValueOf(ctx)}
-	// rest of the parameters.
-	for _, arg := range args {
-		targetArgs = append(targetArgs, reflect.ValueOf(arg))
+		args = append(args, decoded...)
 	}
 
 	// Invoke the workflow with arguments.
 	fnValue := reflect.ValueOf(we.fn)
-	retValues := fnValue.Call(targetArgs)
+	retValues := fnValue.Call(args)
 	return validateFunctionAndGetResults(we.fn, retValues)
 }
 
@@ -786,36 +794,29 @@ func (ae *activityExecutor) ActivityType() ActivityType {
 }
 
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
-	var args []interface{}
-	var err error
 	fnType := reflect.TypeOf(ae.fn)
+	args := []reflect.Value{}
+
+	// activities optionally might not take context.
+	if fnType.NumIn() > 0 && isActivityContext(fnType.In(0)) {
+		args = append(args, reflect.ValueOf(ctx))
+	}
 
 	if fnType.NumIn() == 1 && isTypeByteSlice(fnType.In(0)) {
-		args = []interface{}{input}
+		args = append(args, reflect.ValueOf(input))
 	} else {
-		args, err = getHostEnvironment().decodeArgs(input)
+		decoded, err := getHostEnvironment().decodeArgs(fnType, input)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"Unable to decode the activity function input bytes with error: %v for function name: %v",
 				err, ae.name)
 		}
-	}
-
-	targetArgs := []reflect.Value{}
-	// activities optionally might not take context.
-
-	if fnType.NumIn() > 0 && isActivityContext(fnType.In(0)) {
-		targetArgs = append(targetArgs, reflect.ValueOf(ctx))
-	}
-
-	// rest of the parameters.
-	for _, arg := range args {
-		targetArgs = append(targetArgs, reflect.ValueOf(arg))
+		args = append(args, decoded...)
 	}
 
 	// Invoke the activity with arguments.
 	fnValue := reflect.ValueOf(ae.fn)
-	retValues := fnValue.Call(targetArgs)
+	retValues := fnValue.Call(args)
 	return validateFunctionAndGetResults(ae.fn, retValues)
 }
 

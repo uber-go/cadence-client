@@ -40,7 +40,7 @@ type (
 
 		// RecordActivityHeartbeat records heartbeat for an activity.
 		// details - is the progress you want to record along with heart beat for this activity.
-		RecordActivityHeartbeat(taskToken []byte, details interface{}) error
+		RecordActivityHeartbeat(taskToken []byte, details ...interface{}) error
 
 		// ListClosedWorkflow gets closed workflow executions based on request filters
 		// The errors it can throw:

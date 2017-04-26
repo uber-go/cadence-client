@@ -349,25 +349,3 @@ func (ab *activityOptions) WithActivityID(activityID string) ActivityOptions {
 	ab.activityID = common.StringPtr(activityID)
 	return ab
 }
-
-// Records the progress of activity
-type activityProgress struct {
-	Details interface{}
-}
-
-// encode the activity progress
-func encodeActivityProgress(details interface{}) ([]byte, error) {
-	if details == nil {
-		return nil, nil
-	}
-	ap := activityProgress{Details: details}
-	err := getHostEnvironment().registerType(reflect.TypeOf(details))
-	if err != nil {
-		return nil, err
-	}
-	data, err := getHostEnvironment().Encoder().Marshal(ap)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}

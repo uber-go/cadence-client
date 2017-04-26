@@ -156,8 +156,8 @@ func (wc *workflowClient) CompleteActivity(taskToken []byte, activityFunc interf
 }
 
 // RecordActivityHeartbeat records heartbeat for an activity.
-func (wc *workflowClient) RecordActivityHeartbeat(taskToken []byte, details interface{}) error {
-	data, err := encodeActivityProgress(details)
+func (wc *workflowClient) RecordActivityHeartbeat(taskToken []byte, details ...interface{}) error {
+	data, err := getHostEnvironment().encodeArgs(details)
 	if err != nil {
 		return err
 	}

@@ -252,7 +252,8 @@ func TestRecordActivityHeartbeat(t *testing.T) {
 			heartbeatRequest = args.Get(1).(*s.RecordActivityTaskHeartbeatRequest)
 		})
 
-	wfClient.RecordActivityHeartbeat(nil, nil)
+	wfClient.RecordActivityHeartbeat(nil)
+	wfClient.RecordActivityHeartbeat(nil, "testStack", "customerObjects", 4)
 	require.NotNil(t, heartbeatRequest)
 }
 

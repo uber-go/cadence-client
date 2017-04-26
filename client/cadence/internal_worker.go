@@ -33,7 +33,7 @@ var _ hostEnv = (*hostEnvImpl)(nil)
 type (
 
 	// WorkflowFactory function is used to create a workflow implementation object.
-	// It is needed as a workflow objbect is created on every decision.
+	// It is needed as a workflow object is created on every decision.
 	// To start a workflow instance use NewClient(...).StartWorkflow(...)
 	workflowFactory func(workflowType WorkflowType) (workflow, error)
 
@@ -66,7 +66,7 @@ type (
 
 	// Worker overrides.
 	workerOverrides struct {
-		workflowTaskHander  WorkflowTaskHandler
+		workflowTaskHandler WorkflowTaskHandler
 		activityTaskHandler ActivityTaskHandler
 	}
 
@@ -89,6 +89,9 @@ type (
 		MetricsScope tally.Scope
 
 		Logger *zap.Logger
+
+		// Enable logging in replay mode
+		EnableLoggingInReplay bool
 	}
 )
 
@@ -130,8 +133,8 @@ func newWorkflowWorkerInternal(
 	// Get a workflow task handler.
 	ensureRequiredParams(&params)
 	var taskHandler WorkflowTaskHandler
-	if overrides != nil && overrides.workflowTaskHander != nil {
-		taskHandler = overrides.workflowTaskHander
+	if overrides != nil && overrides.workflowTaskHandler != nil {
+		taskHandler = overrides.workflowTaskHandler
 	} else {
 		taskHandler = newWorkflowTaskHandler(factory, params, ppMgr)
 	}
@@ -248,6 +251,7 @@ type workerOptions struct {
 	identity                   string
 	metricsScope               tally.Scope
 	logger                     *zap.Logger
+	enableLoggingInReplay      bool
 	disableWorkflowWorker      bool
 	disableActivityWorker      bool
 	testTags                   map[string]map[string]string
@@ -285,6 +289,12 @@ func (wo *workerOptions) SetMetrics(metricsScope tally.Scope) WorkerOptions {
 // SetLogger sets the logger for the framework.
 func (wo *workerOptions) SetLogger(logger *zap.Logger) WorkerOptions {
 	wo.logger = logger
+	return wo
+}
+
+// SetEnableLoggingInReplay sets the logger for the framework.
+func (wo *workerOptions) SetEnableLoggingInReplay(enableLoggingInReplay bool) WorkerOptions {
+	wo.enableLoggingInReplay = enableLoggingInReplay
 	return wo
 }
 
@@ -865,6 +875,7 @@ func newAggregatedWorker(
 		Identity:                  wOptions.identity,
 		MetricsScope:              wOptions.metricsScope,
 		Logger:                    wOptions.logger,
+		EnableLoggingInReplay:     wOptions.enableLoggingInReplay,
 	}
 
 	processTestTags(wOptions, &workerParams)

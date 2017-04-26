@@ -314,13 +314,9 @@ func (wo *workerOptions) SetDisableActivityWorker(disable bool) WorkerOptions {
 	return wo
 }
 
-// WithValue sets value that can be retrieved by activity with the key.
-func (wo *workerOptions) WithValue(key, val interface{}) WorkerOptions {
-	if wo.userContext == nil {
-		wo.userContext = context.Background()
-	}
-
-	wo.userContext = context.WithValue(wo.userContext, key, val)
+// WithActivityContext sets context for activity
+func (wo *workerOptions) WithActivityContext(ctx context.Context) WorkerOptions {
+	wo.userContext = ctx
 	return wo
 }
 

@@ -1,6 +1,8 @@
 package cadence
 
 import (
+	"context"
+
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
@@ -56,8 +58,8 @@ type (
 		// default: false
 		SetDisableActivityWorker(disable bool) WorkerOptions
 
-		// Optional: set value that can be retrieved by activity with the key.
-		WithValue(key, val interface{}) WorkerOptions
+		// Optional: sets context for activity
+		WithActivityContext(ctx context.Context) WorkerOptions
 	}
 )
 

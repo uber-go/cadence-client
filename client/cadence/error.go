@@ -3,9 +3,9 @@ package cadence
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/uber-go/cadence-client/.gen/go/shared"
-	"reflect"
 )
 
 type (
@@ -48,7 +48,7 @@ type (
 	// current workflow as a fresh one.
 	ContinueAsNewError interface {
 		error
-		continueAsNewError()            // interface marker
+		continueAsNewError() // interface marker
 	}
 )
 
@@ -225,8 +225,8 @@ func assignValue(to []interface{}, from interface{}) {
 }
 
 type continueAsNewError struct {
-	wfn interface{}
-	args []interface{}
+	wfn     interface{}
+	args    []interface{}
 	options *wfEnvironmentOptions
 }
 
@@ -237,5 +237,3 @@ func (e *continueAsNewError) Error() string {
 
 // continueAsNewError is from continueAsNewError interface
 func (e *continueAsNewError) continueAsNewError() {}
-
-

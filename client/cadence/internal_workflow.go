@@ -5,13 +5,14 @@ package cadence
 import (
 	"errors"
 	"fmt"
-	"github.com/uber/cadence/common"
 	"reflect"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/uber/cadence/common"
 )
 
 type (

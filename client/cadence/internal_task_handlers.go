@@ -539,10 +539,10 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			continueAsNewDecision := createNewDecision(s.DecisionType_ContinueAsNewWorkflowExecution)
 			continueAsNewDecision.ContinueAsNewWorkflowExecutionDecisionAttributes = &s.ContinueAsNewWorkflowExecutionDecisionAttributes{
 				WorkflowType: workflowTypePtr(*contErr.options.workflowType),
-				Input: contErr.options.input,
-				TaskList: common.TaskListPtr(s.TaskList{Name: common.StringPtr(taskListName)}),
+				Input:        contErr.options.input,
+				TaskList:     common.TaskListPtr(s.TaskList{Name: common.StringPtr(taskListName)}),
 				ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionStartToCloseTimeoutSeconds),
-				TaskStartToCloseTimeoutSeconds: common.Int32Ptr(taskStartToCloseTimeoutSeconds),
+				TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(taskStartToCloseTimeoutSeconds),
 			}
 			decisions = append(decisions, continueAsNewDecision)
 		} else if err != nil {

@@ -43,12 +43,20 @@ type (
 		StackTrace() string  // Stack trace of a panicked coroutine
 		panicError()         // interface marker
 	}
+
+	// ContinueAsNewError contains information about how to continue the
+	// current workflow as a fresh one.
+	ContinueAsNewError interface {
+		error
+		continueAsNewError()            // interface marker
+	}
 )
 
 var _ ErrorWithDetails = (*errorWithDetails)(nil)
 var _ CanceledError = (*canceledError)(nil)
 var _ TimeoutError = (*timeoutError)(nil)
 var _ PanicError = (*panicError)(nil)
+var _ ContinueAsNewError = (*continueAsNewError)(nil)
 
 // ErrActivityResultPending is returned from activity's Execute method to indicate the activity is not completed when
 // Execute method returns. activity will be completed asynchronously when Client.CompleteActivity() is called.
@@ -84,6 +92,30 @@ func NewHeartbeatTimeoutError(details ...interface{}) TimeoutError {
 // NewCanceledError creates CanceledError instance
 func NewCanceledError(details ...interface{}) CanceledError {
 	return &canceledError{details: toByteSlice(details)}
+}
+
+// NewContinueAsNewError creates ContinueAsNewError instance
+// If the workflow main function returns this error then the current execution is ended and
+// a fresh workflow is started with options provided to this function.
+//  ctx - use context to override any options for the new workflow like execution time out, decision task time out, task list.
+//	  if not mentioned it would use the defaults that the current workflow is using.
+//        ctx := WithExecutionStartToCloseTimeout(ctx, 30 * time.Minute)
+//        ctx := WithTaskStartToCloseTimeout(ctx, time.Minute)
+//	  ctx := WithTaskList(ctx, "example-group")
+//  wfn - workflow function.
+//  args - arguments for the new workflow.
+//
+func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) ContinueAsNewError {
+	// Validate type and its arguments.
+	workflowType, input, err := getValidatedWorkerFunction(wfn, args)
+	if err != nil {
+		panic(err)
+	}
+	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
+	options := getWorkflowEnvOptions(ctx1)
+	options.workflowType = workflowType
+	options.input = input
+	return &continueAsNewError{wfn: wfn, args: args, options: options}
 }
 
 // errorWithDetails implements ErrorWithDetails
@@ -191,3 +223,19 @@ func assignValue(to []interface{}, from interface{}) {
 	vto := reflect.ValueOf(to[0])
 	vto.Elem().Set(reflect.ValueOf(from))
 }
+
+type continueAsNewError struct {
+	wfn interface{}
+	args []interface{}
+	options *wfEnvironmentOptions
+}
+
+// Error from error interface
+func (e *continueAsNewError) Error() string {
+	return "ContinueAsNew"
+}
+
+// continueAsNewError is from continueAsNewError interface
+func (e *continueAsNewError) continueAsNewError() {}
+
+

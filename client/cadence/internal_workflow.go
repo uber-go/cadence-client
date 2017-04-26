@@ -5,10 +5,12 @@ package cadence
 import (
 	"errors"
 	"fmt"
+	"github.com/uber/cadence/common"
 	"reflect"
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 )
 
@@ -797,4 +799,43 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*
 		return nil, nil, err
 	}
 	return &WorkflowType{Name: fnName}, input, nil
+}
+
+const workflowEnvOptionsContextKey = "wfEnvOptions"
+
+func getWorkflowEnvOptions(ctx Context) *wfEnvironmentOptions {
+	env := ctx.Value(workflowEnvOptionsContextKey)
+	if env != nil {
+		return env.(*wfEnvironmentOptions)
+	}
+	return nil
+}
+
+func setWorkflowEnvOptionsIfNotExist(ctx Context) Context {
+	if valCtx := getWorkflowEnvOptions(ctx); valCtx == nil {
+		return WithValue(ctx, workflowEnvOptionsContextKey, &wfEnvironmentOptions{})
+	}
+	return ctx
+}
+
+type wfEnvironmentOptions struct {
+	workflowType                        *WorkflowType
+	input                               []byte
+	taskListName                        *string
+	executionStartToCloseTimeoutSeconds *int32
+	taskStartToCloseTimeoutSeconds      *int32
+}
+
+// WithExecutionStartToCloseTimeout adds a workflow execution timeout to the context.
+func WithExecutionStartToCloseTimeout(ctx Context, d time.Duration) Context {
+	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
+	getWorkflowEnvOptions(ctx1).executionStartToCloseTimeoutSeconds = common.Int32Ptr(int32(d.Seconds()))
+	return ctx1
+}
+
+// WithTaskStartToCloseTimeout adds a decision timeout to the context.
+func WithTaskStartToCloseTimeout(ctx Context, d time.Duration) Context {
+	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
+	getWorkflowEnvOptions(ctx1).taskStartToCloseTimeoutSeconds = common.Int32Ptr(int32(d.Seconds()))
+	return ctx1
 }

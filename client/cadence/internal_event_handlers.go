@@ -54,9 +54,9 @@ type (
 	}
 )
 
-func wrapLogger(wc *workflowEnvironmentImpl) func(zapcore.Core) zapcore.Core {
+func wrapLogger(isReplay *bool, enableLoggingInReplay *bool) func(zapcore.Core) zapcore.Core {
 	return func(c zapcore.Core) zapcore.Core {
-		return &replayAwareZapCore{c, &wc.isReplay, &wc.enableLoggingInReplay}
+		return &replayAwareZapCore{c, isReplay, enableLoggingInReplay}
 	}
 }
 
@@ -90,7 +90,7 @@ func newWorkflowExecutionEventHandler(workflowInfo *WorkflowInfo, workflowDefini
 		zapcore.Field{Key: tagWorkflowType, Type: zapcore.StringType, String: workflowInfo.WorkflowType.Name},
 		zapcore.Field{Key: tagWorkflowID, Type: zapcore.StringType, String: workflowInfo.WorkflowExecution.ID},
 		zapcore.Field{Key: tagRunID, Type: zapcore.StringType, String: workflowInfo.WorkflowExecution.RunID},
-	).WithOptions(zap.WrapCore(wrapLogger(context)))
+	).WithOptions(zap.WrapCore(wrapLogger(&context.isReplay, &context.enableLoggingInReplay)))
 
 	return &workflowExecutionEventHandlerImpl{context, nil}
 }

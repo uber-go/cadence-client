@@ -147,7 +147,7 @@ func (wc *workflowClient) GetWorkflowHistory(workflowID string, runID string) (*
 // completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,
 // activity task failed event will be reported.
 func (wc *workflowClient) CompleteActivity(taskToken []byte, activityFunc interface{}, result interface{}, err error) error {
-	data, err0 := validateActivityFuncResults(activityFunc, result)
+	data, err0 := validateFunctionResults(activityFunc, result)
 	if err0 != nil {
 		return err0
 	}

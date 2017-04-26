@@ -151,7 +151,7 @@ func validateFunctionArgs(f interface{}, args []interface{}, isWorkflow bool) er
 	return nil
 }
 
-func validateActivityFuncResults(f interface{}, result interface{}) ([]byte, error) {
+func validateFunctionResults(f interface{}, result interface{}) ([]byte, error) {
 	fType := reflect.TypeOf(f)
 	switch fType.Kind() {
 	case reflect.String:
@@ -171,11 +171,7 @@ func validateActivityFuncResults(f interface{}, result interface{}) ([]byte, err
 		return nil, nil
 	}
 
-	fr := fnReturnSignature{Ret: result}
-	if err := getHostEnvironment().Encoder().Register(result); err != nil {
-		return nil, err
-	}
-	data, err := getHostEnvironment().Encoder().Marshal(fr)
+	data, err := getHostEnvironment().encodeArg(result)
 	if err != nil {
 		return nil, err
 	}

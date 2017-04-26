@@ -59,6 +59,16 @@ func GetActivityLogger(ctx context.Context) *zap.Logger {
 	return env.logger
 }
 
+// Value returns the value associated with this activity context for key.
+// The value was set by WithValue(key, val) on WorkerOptions which is used to start the activity worker.
+func Value(ctx context.Context, key interface{}) interface{} {
+	env := getActivityEnv(ctx)
+	if env.userContext == nil {
+		return nil
+	}
+	return env.userContext.Value(key)
+}
+
 // RecordActivityHeartbeat sends heartbeat for the currently executing activity
 // TODO: Implement automatic heartbeating with cancellation through ctx.
 func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) error {
@@ -84,6 +94,7 @@ func WithActivityTask(
 	task *shared.PollForActivityTaskResponse,
 	invoker ServiceInvoker,
 	logger *zap.Logger,
+	userContext context.Context,
 ) context.Context {
 	// TODO: Add activity start to close timeout to activity task and use it as the deadline
 	return context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
@@ -94,7 +105,8 @@ func WithActivityTask(
 		workflowExecution: WorkflowExecution{
 			RunID: *task.WorkflowExecution.RunId,
 			ID:    *task.WorkflowExecution.WorkflowId},
-		logger: logger,
+		logger:      logger,
+		userContext: userContext,
 	})
 }
 

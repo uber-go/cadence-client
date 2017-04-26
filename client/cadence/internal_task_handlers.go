@@ -63,6 +63,7 @@ type (
 		service         m.TChanWorkflowService
 		metricsScope    tally.Scope
 		logger          *zap.Logger
+		userContext     context.Context
 	}
 
 	// history wrapper method to help information about events.
@@ -553,7 +554,9 @@ func newActivityTaskHandler(activities []activity,
 		logger: params.Logger.With(
 			zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: params.Identity},
 			zapcore.Field{Key: tagTaskList, Type: zapcore.StringType, String: params.TaskList}),
-		metricsScope: params.MetricsScope}
+		metricsScope: params.MetricsScope,
+		userContext:  params.UserContext,
+	}
 }
 
 type cadenceInvoker struct {
@@ -581,7 +584,7 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (i
 		zap.String(tagActivityType, t.GetActivityType().GetName()))
 
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service)
-	ctx := WithActivityTask(context.Background(), t, invoker, ath.logger)
+	ctx := WithActivityTask(context.Background(), t, invoker, ath.logger, ath.userContext)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.implementations[flowActivityTypeFrom(activityType)]
 	if !ok {

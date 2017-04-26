@@ -55,6 +55,9 @@ type (
 		// Optional: Disable running activity workers.
 		// default: false
 		SetDisableActivityWorker(disable bool) WorkerOptions
+
+		// Optional: set value that can be retrieved by activity with the key.
+		WithValue(key, val interface{}) WorkerOptions
 	}
 )
 

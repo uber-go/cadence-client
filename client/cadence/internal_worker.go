@@ -92,6 +92,9 @@ type (
 
 		// Enable logging in replay mode
 		EnableLoggingInReplay bool
+
+		// Context to store user provided key/value pairs
+		UserContext context.Context
 	}
 )
 
@@ -255,6 +258,7 @@ type workerOptions struct {
 	disableWorkflowWorker      bool
 	disableActivityWorker      bool
 	testTags                   map[string]map[string]string
+	userContext                context.Context
 }
 
 // SetMaxConcurrentActivityExecutionSize sets the maximum concurrent activity executions this host can have.
@@ -307,6 +311,16 @@ func (wo *workerOptions) SetDisableWorkflowWorker(disable bool) WorkerOptions {
 // SetDisableActivityWorker disables running activity workers.
 func (wo *workerOptions) SetDisableActivityWorker(disable bool) WorkerOptions {
 	wo.disableActivityWorker = disable
+	return wo
+}
+
+// WithValue sets value that can be retrieved by activity with the key.
+func (wo *workerOptions) WithValue(key, val interface{}) WorkerOptions {
+	if wo.userContext == nil {
+		wo.userContext = context.Background()
+	}
+
+	wo.userContext = context.WithValue(wo.userContext, key, val)
 	return wo
 }
 
@@ -879,6 +893,7 @@ func newAggregatedWorker(
 		MetricsScope:              wOptions.metricsScope,
 		Logger:                    wOptions.logger,
 		EnableLoggingInReplay:     wOptions.enableLoggingInReplay,
+		UserContext:               wOptions.userContext,
 	}
 
 	processTestTags(wOptions, &workerParams)

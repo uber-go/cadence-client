@@ -141,7 +141,9 @@ func (wtp *workflowTaskPoller) PollAndProcessSingleTask() error {
 
 // Poll for a single workflow task from the service
 func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
-	wtp.logger.Debug("workflowTaskPoller::Poll")
+	if enableVerboseLogging {
+		wtp.logger.Debug("workflowTaskPoller::Poll")
+	}
 	request := &s.PollForDecisionTaskRequest{
 		Domain:   common.StringPtr(wtp.domain),
 		TaskList: common.TaskListPtr(s.TaskList{Name: common.StringPtr(wtp.taskListName)}),
@@ -175,7 +177,9 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service m.TChanWorkf
 
 // Poll for a single activity task from the service
 func (atp *activityTaskPoller) poll() (*activityTask, error) {
-	atp.logger.Debug("activityTaskPoller::Poll")
+	if enableVerboseLogging {
+		atp.logger.Debug("activityTaskPoller::Poll")
+	}
 	request := &s.PollForActivityTaskRequest{
 		Domain:   common.StringPtr(atp.domain),
 		TaskList: common.TaskListPtr(s.TaskList{Name: common.StringPtr(atp.taskListName)}),

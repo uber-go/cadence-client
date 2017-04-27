@@ -914,7 +914,7 @@ func newAggregatedWorker(
 					nil)
 			}
 		} else {
-			logger.Warn("Workflow worker is enabled but no workflow is registered. Plese use cadence.RegisterWorkflow() to register your workflow.")
+			logger.Warn("Workflow worker is enabled but no workflow is registered. Use cadence.RegisterWorkflow() to register your workflow.")
 		}
 	}
 
@@ -932,7 +932,7 @@ func newAggregatedWorker(
 				nil,
 			)
 		} else {
-			logger.Warn("Activity worker is enabled but no activity is registered. Please use cadence.RegisterActivity() to register your activity.")
+			logger.Warn("Activity worker is enabled but no activity is registered. Use cadence.RegisterActivity() to register your activity.")
 		}
 	}
 	return &aggregatedWorker{workflowWorker: workflowWorker, activityWorker: activityWorker}

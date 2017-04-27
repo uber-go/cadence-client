@@ -146,8 +146,8 @@ func DeserializeFnResults(result []byte, to interface{}) error {
 	return getHostEnvironment().decodeArg(result, to)
 }
 
-// SetEnableVerboseLogging sets the flag to enable or disable verbose logging. This is for internal use only.
-func SetEnableVerboseLogging(enable bool) {
+// EnableVerboseLogging enable or disable verbose logging. This is for internal use only.
+func EnableVerboseLogging(enable bool) {
 	enableVerboseLogging = enable
 }
 

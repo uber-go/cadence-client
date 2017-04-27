@@ -610,20 +610,39 @@ func newActivityTaskHandler(activities []activity,
 }
 
 type cadenceInvoker struct {
-	identity  string
-	service   m.TChanWorkflowService
-	taskToken []byte
+	identity      string
+	service       m.TChanWorkflowService
+	taskToken     []byte
+	cancelHandler func()
+	retryPolicy   backoff.RetryPolicy
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
-	return recordActivityHeartbeat(i.service, i.identity, i.taskToken, details)
+	err := recordActivityHeartbeat(i.service, i.identity, i.taskToken, details, i.retryPolicy)
+	if _, ok := err.(CanceledError); ok {
+		// We are asked to cancel. inform the activity about cancellation through context.
+		i.cancelHandler()
+		return nil
+	} else if isServiceTransientError(err) {
+		// We suppress this error to report to user for now and they will call again to heartbeat.
+		// TODO: In auto heart beating we will note down when they tried to last heartbeat.
+		return nil
+	}
+	return err
 }
 
-func newServiceInvoker(taskToken []byte, identity string, service m.TChanWorkflowService) ServiceInvoker {
+func newServiceInvoker(
+	taskToken []byte,
+	identity string,
+	service m.TChanWorkflowService,
+	cancelHandler func(),
+) ServiceInvoker {
 	return &cadenceInvoker{
-		taskToken: taskToken,
-		identity:  identity,
-		service:   service,
+		taskToken:     taskToken,
+		identity:      identity,
+		service:       service,
+		cancelHandler: cancelHandler,
+		retryPolicy:   serviceOperationRetryPolicy,
 	}
 }
 
@@ -634,8 +653,9 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (i
 		zap.String(tagRunID, t.GetWorkflowExecution().GetRunId()),
 		zap.String(tagActivityType, t.GetActivityType().GetName()))
 
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service)
-	ctx := WithActivityTask(context.Background(), t, invoker, ath.logger)
+	canCtx, cancel := context.WithCancel(context.Background())
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel)
+	ctx := WithActivityTask(canCtx, t, invoker, ath.logger)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.implementations[flowActivityTypeFrom(activityType)]
 	if !ok {
@@ -653,7 +673,12 @@ func createNewDecision(decisionType s.DecisionType) *s.Decision {
 	}
 }
 
-func recordActivityHeartbeat(service m.TChanWorkflowService, identity string, taskToken, details []byte) error {
+func recordActivityHeartbeat(
+	service m.TChanWorkflowService,
+	identity string,
+	taskToken, details []byte,
+	retryPolicy backoff.RetryPolicy,
+) error {
 	request := &s.RecordActivityTaskHeartbeatRequest{
 		TaskToken: taskToken,
 		Details:   details,
@@ -668,7 +693,7 @@ func recordActivityHeartbeat(service m.TChanWorkflowService, identity string, ta
 			var err error
 			heartbeatResponse, err = service.RecordActivityTaskHeartbeat(ctx, request)
 			return err
-		}, serviceOperationRetryPolicy, isServiceTransientError)
+		}, retryPolicy, isServiceTransientError)
 
 	if heartbeatErr == nil && heartbeatResponse != nil && heartbeatResponse.GetCancelRequested() {
 		return NewCanceledError()

@@ -60,6 +60,7 @@ func GetActivityLogger(ctx context.Context) *zap.Logger {
 }
 
 // RecordActivityHeartbeat sends heartbeat for the currently executing activity
+// This can return errors BadRequestError (or) EntityNotExistsError(the activity/workflow doesn't exist).
 // TODO: Implement automatic heartbeating with cancellation through ctx.
 func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) error {
 	data, err := getHostEnvironment().encodeArgs(details)

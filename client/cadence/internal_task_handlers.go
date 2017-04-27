@@ -588,7 +588,7 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (i
 	if rootCtx == nil {
 		rootCtx = context.Background()
 	}
-	ctx := WithActivityTask(rootCtx, t, invoker, ath.logger)
+	ctx := WithActivityTask(rootCtx, t, invoker, ath.logger, ath.userContext)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.implementations[flowActivityTypeFrom(activityType)]
 	if !ok {

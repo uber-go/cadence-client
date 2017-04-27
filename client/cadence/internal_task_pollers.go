@@ -225,7 +225,7 @@ func (atp *activityTaskPoller) PollAndProcessSingleTask() error {
 
 	reportErr := reportActivityComplete(atp.service, request)
 	if reportErr != nil {
-		atp.logger.Info("reportActivityComplete failed", zap.Error(reportErr))
+		atp.logger.Debug("reportActivityComplete failed", zap.Error(reportErr))
 	}
 
 	return reportErr

@@ -509,9 +509,9 @@ func TestExternalExampleWorkflow(t *testing.T) {
 type continueAsNewWorkflowTest struct{}
 
 func (w continueAsNewWorkflowTest) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ctx = WithTaskList(ctx, "newTaskList")
+	ctx = WithWorkflowTaskList(ctx, "newTaskList")
 	ctx = WithExecutionStartToCloseTimeout(ctx, time.Second)
-	ctx = WithTaskStartToCloseTimeout(ctx, time.Second)
+	ctx = WithWorkflowTaskStartToCloseTimeout(ctx, time.Second)
 	return nil, NewContinueAsNewError(ctx, "continueAsNewWorkflowTest", []byte("start"))
 }
 

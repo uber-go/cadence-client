@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/uber-go/cadence-client/.gen/go/shared"
-	"github.com/uber/cadence/common"
 )
 
 type (
@@ -139,12 +138,9 @@ func WithActivityOptions(ctx Context, options ActivityOptions) Context {
 
 // WithTaskList adds a task list to the context.
 func WithTaskList(ctx Context, name string) Context {
-	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
-	getWorkflowEnvOptions(ctx1).taskListName = common.StringPtr(name)
-
-	ctx2 := setActivityParametersIfNotExist(ctx1)
-	getActivityOptions(ctx2).TaskListName = name
-	return ctx2
+	ctx1 := setActivityParametersIfNotExist(ctx)
+	getActivityOptions(ctx1).TaskListName = name
+	return ctx1
 }
 
 // WithScheduleToCloseTimeout adds a timeout to the context.

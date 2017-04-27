@@ -9,10 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 	"unicode"
-
-	"github.com/uber/cadence/common"
 )
 
 type (
@@ -825,18 +822,4 @@ type wfEnvironmentOptions struct {
 	taskListName                        *string
 	executionStartToCloseTimeoutSeconds *int32
 	taskStartToCloseTimeoutSeconds      *int32
-}
-
-// WithExecutionStartToCloseTimeout adds a workflow execution timeout to the context.
-func WithExecutionStartToCloseTimeout(ctx Context, d time.Duration) Context {
-	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
-	getWorkflowEnvOptions(ctx1).executionStartToCloseTimeoutSeconds = common.Int32Ptr(int32(d.Seconds()))
-	return ctx1
-}
-
-// WithTaskStartToCloseTimeout adds a decision timeout to the context.
-func WithTaskStartToCloseTimeout(ctx Context, d time.Duration) Context {
-	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
-	getWorkflowEnvOptions(ctx1).taskStartToCloseTimeoutSeconds = common.Int32Ptr(int32(d.Seconds()))
-	return ctx1
 }

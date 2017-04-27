@@ -540,6 +540,11 @@ func testWorkflowReturnStructPtr(ctx Context, arg1 int) (result *testWorkflowRes
 	return &testWorkflowResult{}, nil
 }
 
+func testWorkflowReturnStructPtrPtr(ctx Context, arg1 int) (result **testWorkflowResult, err error) {
+	return nil, nil
+}
+
+
 func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	RegisterWorkflow(testWorkflowSample)
 	RegisterWorkflow(testWorkflowMultipleArgs)
@@ -548,6 +553,7 @@ func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	RegisterWorkflow(testWorkflowReturnString)
 	RegisterWorkflow(testWorkflowReturnStruct)
 	RegisterWorkflow(testWorkflowReturnStructPtr)
+	RegisterWorkflow(testWorkflowReturnStructPtrPtr)
 }
 
 type testErrorDetails struct {

@@ -530,10 +530,7 @@ func (th *hostEnvImpl) registerType(t reflect.Type) error {
 		t = reflect.TypeOf(t.Elem())
 	}
 	arg := reflect.Zero(t).Interface()
-	if err := th.Encoder().Register(arg); err != nil {
-		return fmt.Errorf("unable to register the message for encoding: %v", err)
-	}
-	return nil
+	return th.Encoder().Register(arg)
 }
 
 // Validate function parameters.

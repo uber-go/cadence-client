@@ -792,7 +792,7 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*
 			workflowFunc)
 	}
 
-	input, err := marshalFunctionArgs(args)
+	input, err := getHostEnvironment().encodeArgs(args)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -822,4 +822,33 @@ type wfEnvironmentOptions struct {
 	taskListName                        *string
 	executionStartToCloseTimeoutSeconds *int32
 	taskStartToCloseTimeoutSeconds      *int32
+}
+
+// decodeFutureImpl
+type decodeFutureImpl struct {
+	futureImpl
+	fn interface{}
+}
+
+func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
+	_, more := d.futureImpl.channel.ReceiveWithMoreFlag(ctx)
+	if more {
+		panic("not closed")
+	}
+	if !d.futureImpl.ready {
+		panic("not ready")
+	}
+	if value == nil {
+		return d.futureImpl.err
+	}
+	rf := reflect.ValueOf(value)
+	if rf.Type().Kind() != reflect.Ptr {
+		return errors.New("value parameter is not a pointer")
+	}
+
+	err := deSerializeFunctionResult(d.fn, d.futureImpl.value.([]byte), value)
+	if err != nil {
+		return err
+	}
+	return d.futureImpl.err
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/uber/cadence/common"
+	"go.uber.org/zap"
 )
 
 var (
@@ -167,7 +168,7 @@ func NewFuture(ctx Context) (Future, Settable) {
 // - returns Future with activity result or failure
 func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.
-	future, settable := NewFuture(ctx)
+	future, settable := newDecodeFuture(ctx, f)
 	activityType, input, err := getValidatedActivityFunction(f, args)
 	if err != nil {
 		settable.Set(nil, err)
@@ -184,11 +185,7 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	parameters.Input = input
 
 	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
-		result, serializeErr := deSerializeFunctionResult(f, r)
-		if serializeErr != nil {
-			e = serializeErr
-		}
-		settable.Set(result, e)
+		settable.Set(r, e)
 		executeDispatcher(ctx, getDispatcher(ctx))
 	})
 	Go(ctx, func(ctx Context) {
@@ -212,6 +209,11 @@ type WorkflowInfo struct {
 // GetWorkflowInfo extracts info of a current workflow from a context.
 func GetWorkflowInfo(ctx Context) *WorkflowInfo {
 	return getWorkflowEnvironment(ctx).WorkflowInfo()
+}
+
+// GetLogger returns a logger to be used in workflow's context
+func GetLogger(ctx Context) *zap.Logger {
+	return getWorkflowEnvironment(ctx).GetLogger()
 }
 
 // Now returns the current time when the decision is started or replayed.

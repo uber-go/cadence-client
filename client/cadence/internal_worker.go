@@ -33,7 +33,7 @@ var _ hostEnv = (*hostEnvImpl)(nil)
 type (
 
 	// WorkflowFactory function is used to create a workflow implementation object.
-	// It is needed as a workflow objbect is created on every decision.
+	// It is needed as a workflow object is created on every decision.
 	// To start a workflow instance use NewClient(...).StartWorkflow(...)
 	workflowFactory func(workflowType WorkflowType) (workflow, error)
 
@@ -89,6 +89,9 @@ type (
 		MetricsScope tally.Scope
 
 		Logger *zap.Logger
+
+		// Enable logging in replay mode
+		EnableLoggingInReplay bool
 	}
 )
 
@@ -248,6 +251,7 @@ type workerOptions struct {
 	identity                   string
 	metricsScope               tally.Scope
 	logger                     *zap.Logger
+	enableLoggingInReplay      bool
 	disableWorkflowWorker      bool
 	disableActivityWorker      bool
 	testTags                   map[string]map[string]string
@@ -285,6 +289,12 @@ func (wo *workerOptions) SetMetrics(metricsScope tally.Scope) WorkerOptions {
 // SetLogger sets the logger for the framework.
 func (wo *workerOptions) SetLogger(logger *zap.Logger) WorkerOptions {
 	wo.logger = logger
+	return wo
+}
+
+// SetEnableLoggingInReplay sets the logger for the framework.
+func (wo *workerOptions) SetEnableLoggingInReplay(enableLoggingInReplay bool) WorkerOptions {
+	wo.enableLoggingInReplay = enableLoggingInReplay
 	return wo
 }
 
@@ -491,31 +501,34 @@ func (th *hostEnvImpl) registerEncodingTypes(fnType reflect.Type) error {
 
 	// Register arguments.
 	for i := 0; i < fnType.NumIn(); i++ {
-		argType := fnType.In(i)
-		// Interfaces cannot be registered, their implementations should be
-		// https://golang.org/pkg/encoding/gob/#Register
-		if argType.Kind() != reflect.Interface {
-			arg := reflect.Zero(argType).Interface()
-			if err := th.Encoder().Register(arg); err != nil {
-				return fmt.Errorf("unable to register the message for encoding: %v", err)
-			}
+		err := th.registerType(fnType.In(i))
+		if err != nil {
+			return err
 		}
 	}
 	// Register return types.
 	// TODO: (Siva) We need register all concrete implementations of error, Either
 	// through pre-registry (or) at the time conversion.
 	for i := 0; i < fnType.NumOut(); i++ {
-		argType := fnType.Out(i)
-		// Interfaces cannot be registered, their implementations should be
-		// https://golang.org/pkg/encoding/gob/#Register
-		if argType.Kind() != reflect.Interface {
-			arg := reflect.Zero(argType).Interface()
-			if err := th.Encoder().Register(arg); err != nil {
-				return fmt.Errorf("unable to register the message for encoding: %v", err)
-			}
+		err := th.registerType(fnType.Out(i))
+		if err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+// register type with our encoder.
+func (th *hostEnvImpl) registerType(t reflect.Type) error {
+	// Interfaces cannot be registered, their implementations should be
+	// https://golang.org/pkg/encoding/gob/#Register
+	if t.Kind() != reflect.Interface {
+		arg := reflect.Zero(t).Interface()
+		if err := th.Encoder().Register(arg); err != nil {
+			return fmt.Errorf("unable to register the message for encoding: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -568,6 +581,166 @@ func (th *hostEnvImpl) getRegisteredActivities() []activity {
 	return result
 }
 
+// encode a single value.
+func (th *hostEnvImpl) encode(r interface{}) ([]byte, error) {
+	if isTypeByteSlice(reflect.TypeOf(r)) {
+		return r.([]byte), nil
+	}
+
+	// Interfaces cannot be registered, their implementations should be
+	// https://golang.org/pkg/encoding/gob/#Register
+	if rType := reflect.Indirect(reflect.ValueOf(r)).Type(); rType.Kind() != reflect.Interface {
+		t := reflect.Zero(rType).Interface()
+		if err := getHostEnvironment().Encoder().Register(t); err != nil {
+			return nil, err
+		}
+	}
+	data, err := getHostEnvironment().Encoder().Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// decode a single value.
+func (th *hostEnvImpl) decode(data []byte, to interface{}) error {
+	if isTypeByteSlice(reflect.TypeOf(to)) {
+		reflect.ValueOf(to).Elem().SetBytes(data)
+		return nil
+	}
+
+	// Interfaces cannot be registered, their implementations should be
+	// https://golang.org/pkg/encoding/gob/#Register
+	if toType := reflect.Indirect(reflect.ValueOf(to)).Type(); toType.Kind() != reflect.Interface {
+		t := reflect.Zero(toType).Interface()
+		if err := getHostEnvironment().Encoder().Register(t); err != nil {
+			return err
+		}
+	}
+	if err := getHostEnvironment().Encoder().Unmarshal(data, to); err != nil {
+		return err
+	}
+	return nil
+}
+
+// encode multiple values.
+// Option whether to by pass byte buffer.
+func (th *hostEnvImpl) encodeArgs(args []interface{}) ([]byte, error) {
+	if len(args) == 1 && isTypeByteSlice(reflect.TypeOf(args[0])) {
+		return args[0].([]byte), nil
+	}
+
+	for i := 0; i < len(args); i++ {
+		// Interfaces cannot be registered, their implementations should be
+		// https://golang.org/pkg/encoding/gob/#Register
+		if rType := reflect.Indirect(reflect.ValueOf(args[0])).Type(); rType.Kind() != reflect.Interface {
+			t := reflect.Zero(rType).Interface()
+			if err := getHostEnvironment().Encoder().Register(t); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	s := fnSignature{Args: args}
+	input, err := getHostEnvironment().encode(s)
+	if err != nil {
+		return nil, err
+	}
+	return input, nil
+}
+
+// decode multiple values.
+func (th *hostEnvImpl) decodeArgs(fnType reflect.Type, data []byte) (result []reflect.Value, err error) {
+	var r []interface{}
+argsLoop:
+	for i := 0; i < fnType.NumIn(); i++ {
+		argT := fnType.In(i)
+		if i == 0 && (isActivityContext(argT) || isWorkflowContext(argT)) {
+			continue argsLoop
+		}
+		arg := reflect.New(argT).Interface()
+		r = append(r, arg)
+	}
+	err = th.decodeArgsTo(data, r)
+	if err != nil {
+		return
+	}
+	for i := 0; i < len(r); i++ {
+		result = append(result, reflect.ValueOf(r[i]).Elem())
+	}
+	return
+}
+
+// decode multiple values in to a given structure.
+func (th *hostEnvImpl) decodeArgsTo(data []byte, to []interface{}) error {
+	if len(to) == 1 && isTypeByteSlice(reflect.TypeOf(to[0])) {
+		reflect.ValueOf(to[0]).Elem().SetBytes(data)
+		return nil
+	}
+
+	for i := 0; i < len(to); i++ {
+		// Interfaces cannot be registered, their implementations should be
+		// https://golang.org/pkg/encoding/gob/#Register
+		if rType := reflect.Indirect(reflect.ValueOf(to[0])).Type(); rType.Kind() != reflect.Interface {
+			t := reflect.Zero(rType).Interface()
+			if err := getHostEnvironment().Encoder().Register(t); err != nil {
+				return err
+			}
+		}
+	}
+
+	s := fnSignature{}
+	err := getHostEnvironment().decode(data, &s)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < len(to); i++ {
+		vto := reflect.ValueOf(to[i])
+		if vto.IsValid() {
+			vto.Elem().Set(reflect.ValueOf(s.Args[i]))
+		}
+	}
+	return nil
+}
+
+// encode single value(like return parameter).
+func (th *hostEnvImpl) encodeArg(arg interface{}) ([]byte, error) {
+	if isTypeByteSlice(reflect.TypeOf(arg)) {
+		return arg.([]byte), nil
+	}
+
+	s := fnReturnSignature{Ret: arg}
+	input, err := getHostEnvironment().encode(s)
+	if err != nil {
+		return nil, err
+	}
+	return input, nil
+}
+
+// decode single value(like return parameter).
+func (th *hostEnvImpl) decodeArg(data []byte, to interface{}) error {
+	if isTypeByteSlice(reflect.TypeOf(to)) {
+		reflect.ValueOf(to).Elem().SetBytes(data)
+		return nil
+	}
+
+	s := fnReturnSignature{}
+	err := getHostEnvironment().decode(data, &s)
+	if err != nil {
+		return err
+	}
+	fv := reflect.ValueOf(to)
+	if fv.IsValid() {
+		fv.Elem().Set(reflect.ValueOf(s.Ret))
+	}
+	return nil
+}
+
+func isTypeByteSlice(inType reflect.Type) bool {
+	r := reflect.TypeOf(([]byte)(nil))
+	return inType == r || inType == reflect.PtrTo(r)
+}
+
 var once sync.Once
 
 // Singleton to hold the host registration details.
@@ -599,22 +772,27 @@ type workflowExecutor struct {
 }
 
 func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
-	var fs fnSignature
-	if err := getHostEnvironment().Encoder().Unmarshal(input, &fs); err != nil {
-		return nil, fmt.Errorf(
-			"Unable to decode the workflow function input bytes with error: %v, function name: %v",
-			err, we.name)
-	}
+	fnType := reflect.TypeOf(we.fn)
+	// Workflow context.
+	args := []reflect.Value{reflect.ValueOf(ctx)}
 
-	targetArgs := []reflect.Value{reflect.ValueOf(ctx)}
-	// rest of the parameters.
-	for _, arg := range fs.Args {
-		targetArgs = append(targetArgs, reflect.ValueOf(arg))
+	if fnType.NumIn() > 1 && isTypeByteSlice(fnType.In(1)) {
+		// 0 - is workflow context.
+		// 1 ... input types.
+		args = append(args, reflect.ValueOf(input))
+	} else {
+		decoded, err := getHostEnvironment().decodeArgs(fnType, input)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"Unable to decode the workflow function input bytes with error: %v, function name: %v",
+				err, we.name)
+		}
+		args = append(args, decoded...)
 	}
 
 	// Invoke the workflow with arguments.
 	fnValue := reflect.ValueOf(we.fn)
-	retValues := fnValue.Call(targetArgs)
+	retValues := fnValue.Call(args)
 	return validateFunctionAndGetResults(we.fn, retValues)
 }
 
@@ -629,27 +807,29 @@ func (ae *activityExecutor) ActivityType() ActivityType {
 }
 
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
-	var fs fnSignature
-	if err := getHostEnvironment().Encoder().Unmarshal(input, &fs); err != nil {
-		return nil, fmt.Errorf(
-			"Unable to decode the activity function input bytes with error: %v for function name: %v",
-			err, ae.name)
+	fnType := reflect.TypeOf(ae.fn)
+	args := []reflect.Value{}
+
+	// activities optionally might not take context.
+	if fnType.NumIn() > 0 && isActivityContext(fnType.In(0)) {
+		args = append(args, reflect.ValueOf(ctx))
 	}
 
-	targetArgs := []reflect.Value{}
-	// activities optionally might not take context.
-	fnType := reflect.TypeOf(ae.fn)
-	if fnType.NumIn() > 0 && isActivityContext(fnType.In(0)) {
-		targetArgs = append(targetArgs, reflect.ValueOf(ctx))
-	}
-	// rest of the parameters.
-	for _, arg := range fs.Args {
-		targetArgs = append(targetArgs, reflect.ValueOf(arg))
+	if fnType.NumIn() == 1 && isTypeByteSlice(fnType.In(0)) {
+		args = append(args, reflect.ValueOf(input))
+	} else {
+		decoded, err := getHostEnvironment().decodeArgs(fnType, input)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"Unable to decode the activity function input bytes with error: %v for function name: %v",
+				err, ae.name)
+		}
+		args = append(args, decoded...)
 	}
 
 	// Invoke the activity with arguments.
 	fnValue := reflect.ValueOf(ae.fn)
-	retValues := fnValue.Call(targetArgs)
+	retValues := fnValue.Call(args)
 	return validateFunctionAndGetResults(ae.fn, retValues)
 }
 
@@ -698,6 +878,7 @@ func newAggregatedWorker(
 		Identity:                  wOptions.identity,
 		MetricsScope:              wOptions.metricsScope,
 		Logger:                    wOptions.logger,
+		EnableLoggingInReplay:     wOptions.enableLoggingInReplay,
 	}
 
 	processTestTags(wOptions, &workerParams)

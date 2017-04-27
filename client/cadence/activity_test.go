@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
-	"github.com/uber-go/cadence-client/mocks"
-	"github.com/uber-go/cadence-client/common/backoff"
 	"github.com/uber-go/cadence-client/common"
+	"github.com/uber-go/cadence-client/common/backoff"
+	"github.com/uber-go/cadence-client/mocks"
 )
 
 func TestActivityHeartbeat(t *testing.T) {
@@ -58,4 +58,3 @@ func TestActivityHeartbeat_CancelRequested(t *testing.T) {
 	<-ctx.Done()
 	require.Equal(t, ctx.Err(), context.Canceled)
 }
-

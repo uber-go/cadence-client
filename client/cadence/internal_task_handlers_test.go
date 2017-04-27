@@ -257,7 +257,7 @@ func (s *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 		nil,
 		"Test_Cadence_Invoker",
 		mockService,
-		func(){})
+		func() {})
 
 	heartbeatErr := cadenceInvoker.Heartbeat(nil)
 	s.NotNil(heartbeatErr)

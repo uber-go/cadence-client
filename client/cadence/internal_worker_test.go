@@ -547,9 +547,7 @@ func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	RegisterWorkflow(testWorkflowReturnInt)
 	RegisterWorkflow(testWorkflowReturnString)
 	RegisterWorkflow(testWorkflowReturnStruct)
-	// TODO: Gob doesn't resolve pointers to full package hence conflicts with out pointer registration
-	//err = RegisterWorkflow(testWorkflowReturnStructPtr)
-	//require.NoError(t, err)
+	RegisterWorkflow(testWorkflowReturnStructPtr)
 }
 
 type testErrorDetails struct {

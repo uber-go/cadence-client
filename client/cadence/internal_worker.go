@@ -694,6 +694,11 @@ func (th *hostEnvImpl) encodeArg(arg interface{}) ([]byte, error) {
 		return arg.([]byte), nil
 	}
 
+	err := th.registerType(reflect.TypeOf(arg))
+	if err != nil {
+		return nil, err
+	}
+
 	s := fnReturnSignature{Ret: arg}
 	input, err := getHostEnvironment().encode(s)
 	if err != nil {
@@ -709,8 +714,13 @@ func (th *hostEnvImpl) decodeArg(data []byte, to interface{}) error {
 		return nil
 	}
 
+	err := th.registerType(reflect.TypeOf(to))
+	if err != nil {
+		return err
+	}
+
 	s := fnReturnSignature{}
-	err := getHostEnvironment().decode(data, &s)
+	err = getHostEnvironment().decode(data, &s)
 	if err != nil {
 		return err
 	}

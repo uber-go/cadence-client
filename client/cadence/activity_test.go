@@ -34,7 +34,9 @@ func TestActivityHeartbeat_InternalError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	invoker := newServiceInvoker([]byte("task-token"), "identity", service, cancel)
 	invoker.(*cadenceInvoker).retryPolicy = p
-	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{serviceInvoker: invoker})
+	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
+		serviceInvoker: invoker,
+		logger:         getLogger()})
 
 	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
 		Return(nil, s.NewInternalServiceError())
@@ -46,7 +48,9 @@ func TestActivityHeartbeat_CancelRequested(t *testing.T) {
 	service := new(mocks.TChanWorkflowService)
 	ctx, cancel := context.WithCancel(context.Background())
 	invoker := newServiceInvoker([]byte("task-token"), "identity", service, cancel)
-	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{serviceInvoker: invoker})
+	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
+		serviceInvoker: invoker,
+		logger:         getLogger()})
 
 	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
 		Return(&s.RecordActivityTaskHeartbeatResponse{CancelRequested: common.BoolPtr(true)}, nil).Once()
@@ -60,7 +64,9 @@ func TestActivityHeartbeat_EntityNotExist(t *testing.T) {
 	service := new(mocks.TChanWorkflowService)
 	ctx, cancel := context.WithCancel(context.Background())
 	invoker := newServiceInvoker([]byte("task-token"), "identity", service, cancel)
-	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{serviceInvoker: invoker})
+	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
+		serviceInvoker: invoker,
+		logger:         getLogger()})
 
 	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
 		Return(&s.RecordActivityTaskHeartbeatResponse{}, s.NewEntityNotExistsError()).Once()
@@ -69,4 +75,3 @@ func TestActivityHeartbeat_EntityNotExist(t *testing.T) {
 	<-ctx.Done()
 	require.Equal(t, ctx.Err(), context.Canceled)
 }
-

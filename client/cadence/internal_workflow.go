@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+
+	"go.uber.org/zap"
 )
 
 type (
@@ -276,10 +278,9 @@ func getDispatcher(ctx Context) dispatcher {
 func executeDispatcher(ctx Context, dispatcher dispatcher) {
 	panicErr := dispatcher.ExecuteUntilAllBlocked()
 	if panicErr != nil {
-		getWorkflowEnvironment(ctx).Complete(
-			nil,
-			NewErrorWithDetails(panicErr.Error(), []byte(panicErr.StackTrace())),
-		)
+		env := getWorkflowEnvironment(ctx)
+		env.GetLogger().Error("Dispatcher panic.", zap.Error(panicErr))
+		env.Complete(nil, NewErrorWithDetails(panicErr.Error(), []byte(panicErr.StackTrace())))
 		return
 	}
 	rp := *getWorkflowResultPointerPointer(ctx)
@@ -797,6 +798,31 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*
 		return nil, nil, err
 	}
 	return &WorkflowType{Name: fnName}, input, nil
+}
+
+const workflowEnvOptionsContextKey = "wfEnvOptions"
+
+func getWorkflowEnvOptions(ctx Context) *wfEnvironmentOptions {
+	env := ctx.Value(workflowEnvOptionsContextKey)
+	if env != nil {
+		return env.(*wfEnvironmentOptions)
+	}
+	return nil
+}
+
+func setWorkflowEnvOptionsIfNotExist(ctx Context) Context {
+	if valCtx := getWorkflowEnvOptions(ctx); valCtx == nil {
+		return WithValue(ctx, workflowEnvOptionsContextKey, &wfEnvironmentOptions{})
+	}
+	return ctx
+}
+
+type wfEnvironmentOptions struct {
+	workflowType                        *WorkflowType
+	input                               []byte
+	taskListName                        *string
+	executionStartToCloseTimeoutSeconds *int32
+	taskStartToCloseTimeoutSeconds      *int32
 }
 
 // decodeFutureImpl

@@ -150,8 +150,7 @@ func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityPar
 
 	wc.logger.Debug("ExectueActivity",
 		zap.String(tagActivityID, scheduleTaskAttr.GetActivityId()),
-		zap.String(tagActivityType, scheduleTaskAttr.GetActivityType().GetName()),
-		zap.String(tagTaskList, scheduleTaskAttr.GetTaskList().GetName()))
+		zap.String(tagActivityType, scheduleTaskAttr.GetActivityType().GetName()))
 
 	return &activityInfo{activityID: scheduleTaskAttr.GetActivityId()}
 }
@@ -240,9 +239,11 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(event *m.HistoryEvent
 	}
 
 	weh.isReplay = isReplay
-	weh.logger.Debug("ProcessEvent",
-		zap.Int64(tagEventID, event.GetEventId()),
-		zap.String(tagEventType, event.GetEventType().String()))
+	if enableVerboseLogging {
+		weh.logger.Debug("ProcessEvent",
+			zap.Int64(tagEventID, event.GetEventId()),
+			zap.String(tagEventType, event.GetEventType().String()))
+	}
 
 	unhandledDecision := false
 
@@ -316,6 +317,10 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(event *m.HistoryEvent
 		// No Operation:
 		// As we always cancel the timer immediately if asked, we don't wait for it.
 	case m.EventType_CancelTimerFailed:
+		// No Operation.
+
+	case m.EventType_ContinueAsNewWorkflowExecutionFailed:
+	case m.EventType_WorkflowExecutionContinuedAsNew:
 		// No Operation.
 
 	default:

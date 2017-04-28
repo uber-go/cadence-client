@@ -533,13 +533,14 @@ func (th *hostEnvImpl) registerEncodingTypes(fnType reflect.Type) error {
 func (th *hostEnvImpl) registerType(t reflect.Type) error {
 	// Interfaces cannot be registered, their implementations should be
 	// https://golang.org/pkg/encoding/gob/#Register
-	if t.Kind() != reflect.Interface {
-		arg := reflect.Zero(t).Interface()
-		if err := th.Encoder().Register(arg); err != nil {
-			return fmt.Errorf("unable to register the message for encoding: %v", err)
-		}
+	if t.Kind() == reflect.Interface {
+		return nil
 	}
-	return nil
+	if t.Kind() == reflect.Ptr {
+		t = reflect.TypeOf(t.Elem())
+	}
+	arg := reflect.Zero(t).Interface()
+	return th.Encoder().Register(arg)
 }
 
 // Validate function parameters.
@@ -597,13 +598,9 @@ func (th *hostEnvImpl) encode(r interface{}) ([]byte, error) {
 		return r.([]byte), nil
 	}
 
-	// Interfaces cannot be registered, their implementations should be
-	// https://golang.org/pkg/encoding/gob/#Register
-	if rType := reflect.Indirect(reflect.ValueOf(r)).Type(); rType.Kind() != reflect.Interface {
-		t := reflect.Zero(rType).Interface()
-		if err := getHostEnvironment().Encoder().Register(t); err != nil {
-			return nil, err
-		}
+	err := th.registerType(reflect.TypeOf(r))
+	if err != nil {
+		return nil, err
 	}
 	data, err := getHostEnvironment().Encoder().Marshal(r)
 	if err != nil {
@@ -619,13 +616,9 @@ func (th *hostEnvImpl) decode(data []byte, to interface{}) error {
 		return nil
 	}
 
-	// Interfaces cannot be registered, their implementations should be
-	// https://golang.org/pkg/encoding/gob/#Register
-	if toType := reflect.Indirect(reflect.ValueOf(to)).Type(); toType.Kind() != reflect.Interface {
-		t := reflect.Zero(toType).Interface()
-		if err := getHostEnvironment().Encoder().Register(t); err != nil {
-			return err
-		}
+	err := th.registerType(reflect.TypeOf(to))
+	if err != nil {
+		return err
 	}
 	if err := getHostEnvironment().Encoder().Unmarshal(data, to); err != nil {
 		return err
@@ -641,13 +634,9 @@ func (th *hostEnvImpl) encodeArgs(args []interface{}) ([]byte, error) {
 	}
 
 	for i := 0; i < len(args); i++ {
-		// Interfaces cannot be registered, their implementations should be
-		// https://golang.org/pkg/encoding/gob/#Register
-		if rType := reflect.Indirect(reflect.ValueOf(args[0])).Type(); rType.Kind() != reflect.Interface {
-			t := reflect.Zero(rType).Interface()
-			if err := getHostEnvironment().Encoder().Register(t); err != nil {
-				return nil, err
-			}
+		err := th.registerType(reflect.TypeOf(args[i]))
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -689,13 +678,9 @@ func (th *hostEnvImpl) decodeArgsTo(data []byte, to []interface{}) error {
 	}
 
 	for i := 0; i < len(to); i++ {
-		// Interfaces cannot be registered, their implementations should be
-		// https://golang.org/pkg/encoding/gob/#Register
-		if rType := reflect.Indirect(reflect.ValueOf(to[0])).Type(); rType.Kind() != reflect.Interface {
-			t := reflect.Zero(rType).Interface()
-			if err := getHostEnvironment().Encoder().Register(t); err != nil {
-				return err
-			}
+		err := th.registerType(reflect.TypeOf(to[i]))
+		if err != nil {
+			return err
 		}
 	}
 
@@ -763,9 +748,6 @@ func getHostEnvironment() *hostEnvImpl {
 			activityFuncMap: make(map[string]interface{}),
 			encoding:        gobEncoding{},
 		}
-		// TODO: Find a better way to register.
-		fn := fnSignature{}
-		thImpl.encoding.Register(fn.Args)
 	})
 	return thImpl
 }
@@ -892,28 +874,40 @@ func newAggregatedWorker(
 		UserContext:               wOptions.userContext,
 	}
 
+	ensureRequiredParams(&workerParams)
+	workerParams.Logger = workerParams.Logger.With(
+		zapcore.Field{Key: tagDomain, Type: zapcore.StringType, String: domain},
+		zapcore.Field{Key: tagTaskList, Type: zapcore.StringType, String: groupName},
+		zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: workerParams.Identity},
+	)
+	logger := workerParams.Logger
+
 	processTestTags(wOptions, &workerParams)
 
 	env := getHostEnvironment()
 	// workflow factory.
 	var workflowWorker Worker
-	if !wOptions.disableWorkflowWorker && env.lenWorkflowFns() > 0 {
-		workflowFactory := newRegisteredWorkflowFactory()
-		if wOptions.testTags != nil && len(wOptions.testTags) > 0 {
-			workflowWorker = newWorkflowWorkerWithPressurePoints(
-				workflowFactory,
-				service,
-				domain,
-				workerParams,
-				wOptions.testTags,
-			)
+	if !wOptions.disableWorkflowWorker {
+		if env.lenWorkflowFns() > 0 {
+			workflowFactory := newRegisteredWorkflowFactory()
+			if wOptions.testTags != nil && len(wOptions.testTags) > 0 {
+				workflowWorker = newWorkflowWorkerWithPressurePoints(
+					workflowFactory,
+					service,
+					domain,
+					workerParams,
+					wOptions.testTags,
+				)
+			} else {
+				workflowWorker = newWorkflowWorker(
+					getWorkflowDefinitionFactory(workflowFactory),
+					service,
+					domain,
+					workerParams,
+					nil)
+			}
 		} else {
-			workflowWorker = newWorkflowWorker(
-				getWorkflowDefinitionFactory(workflowFactory),
-				service,
-				domain,
-				workerParams,
-				nil)
+			logger.Warn("Workflow worker is enabled but no workflow is registered. Use cadence.RegisterWorkflow() to register your workflow.")
 		}
 	}
 
@@ -930,6 +924,8 @@ func newAggregatedWorker(
 				workerParams,
 				nil,
 			)
+		} else {
+			logger.Warn("Activity worker is enabled but no activity is registered. Use cadence.RegisterActivity() to register your activity.")
 		}
 	}
 	return &aggregatedWorker{workflowWorker: workflowWorker, activityWorker: activityWorker}

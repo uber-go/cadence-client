@@ -60,15 +60,18 @@ func GetActivityLogger(ctx context.Context) *zap.Logger {
 }
 
 // RecordActivityHeartbeat sends heartbeat for the currently executing activity
-// This can return errors BadRequestError (or) EntityNotExistsError(the activity/workflow doesn't exist).
-// TODO: Implement automatic heartbeating with cancellation through ctx.
-func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) error {
+// If the activity is either cancelled (or) workflow/activity doesn't exist then we would cancel
+// the context with error context.Canceled.
+// 	TODO: we don't have a way to distinguish between the two cases when context is cancelled because
+// 	the cancel handler is not settable.
+// 	TODO: Implement automatic heartbeating with cancellation through ctx.
+func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 	data, err := getHostEnvironment().encodeArgs(details)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	env := getActivityEnv(ctx)
-	return env.serviceInvoker.Heartbeat(data)
+	env.serviceInvoker.Heartbeat(data)
 }
 
 // ServiceInvoker abstracts calls to the Cadence service from an activity implementation.

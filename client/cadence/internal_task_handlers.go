@@ -619,15 +619,21 @@ type cadenceInvoker struct {
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
 	err := recordActivityHeartbeat(i.service, i.identity, i.taskToken, details, i.retryPolicy)
-	if _, ok := err.(CanceledError); ok {
+
+	switch err.(type) {
+	case CanceledError:
+		// We are asked to cancel. inform the activity about cancellation through context.
 		// We are asked to cancel. inform the activity about cancellation through context.
 		i.cancelHandler()
-		return nil
-	} else if isServiceTransientError(err) {
-		// We suppress this error to report to user for now and they will call again to heartbeat.
-		// TODO: In auto heart beating we will note down when they tried to last heartbeat.
-		return nil
+
+	case *s.EntityNotExistsError:
+		// We will pass these through as cancellation for now but something we can change
+		// later when we have setter on cancel handler.
+		i.cancelHandler()
 	}
+
+	// We don't want to bubble temporary errors to the user.
+	// This error won't be return to user check RecordActivityHeartbeat().
 	return err
 }
 

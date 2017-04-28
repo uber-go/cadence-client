@@ -22,8 +22,7 @@ func TestActivityHeartbeat(t *testing.T) {
 	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
 		Return(&s.RecordActivityTaskHeartbeatResponse{}, nil).Once()
 
-	err := RecordActivityHeartbeat(ctx, "testDetails")
-	require.NoError(t, err)
+	RecordActivityHeartbeat(ctx, "testDetails")
 }
 
 func TestActivityHeartbeat_InternalError(t *testing.T) {
@@ -40,8 +39,7 @@ func TestActivityHeartbeat_InternalError(t *testing.T) {
 	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
 		Return(nil, s.NewInternalServiceError())
 
-	err := RecordActivityHeartbeat(ctx, "testDetails")
-	require.NoError(t, err)
+	RecordActivityHeartbeat(ctx, "testDetails")
 }
 
 func TestActivityHeartbeat_CancelRequested(t *testing.T) {
@@ -53,8 +51,22 @@ func TestActivityHeartbeat_CancelRequested(t *testing.T) {
 	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
 		Return(&s.RecordActivityTaskHeartbeatResponse{CancelRequested: common.BoolPtr(true)}, nil).Once()
 
-	err := RecordActivityHeartbeat(ctx, "testDetails")
-	require.NoError(t, err)
+	RecordActivityHeartbeat(ctx, "testDetails")
 	<-ctx.Done()
 	require.Equal(t, ctx.Err(), context.Canceled)
 }
+
+func TestActivityHeartbeat_EntityNotExist(t *testing.T) {
+	service := new(mocks.TChanWorkflowService)
+	ctx, cancel := context.WithCancel(context.Background())
+	invoker := newServiceInvoker([]byte("task-token"), "identity", service, cancel)
+	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{serviceInvoker: invoker})
+
+	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
+		Return(&s.RecordActivityTaskHeartbeatResponse{}, s.NewEntityNotExistsError()).Once()
+
+	RecordActivityHeartbeat(ctx, "testDetails")
+	<-ctx.Done()
+	require.Equal(t, ctx.Err(), context.Canceled)
+}
+

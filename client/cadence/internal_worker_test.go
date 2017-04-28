@@ -230,13 +230,13 @@ func TestCompleteActivity(t *testing.T) {
 			failedRequest = args.Get(1).(*s.RespondActivityTaskFailedRequest)
 		})
 
-	wfClient.CompleteActivity(nil, "testFunc", nil, nil)
+	wfClient.CompleteActivity(nil, nil, nil)
 	require.NotNil(t, completedRequest)
 
-	wfClient.CompleteActivity(nil, "testFunc", nil, NewCanceledError())
+	wfClient.CompleteActivity(nil, nil, NewCanceledError())
 	require.NotNil(t, canceledRequest)
 
-	wfClient.CompleteActivity(nil, "testFunc", nil, errors.New(""))
+	wfClient.CompleteActivity(nil, nil, errors.New(""))
 	require.NotNil(t, failedRequest)
 }
 

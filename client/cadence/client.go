@@ -34,9 +34,9 @@ type (
 		// activity task failed event will be reported.
 		// An activity implementation should use GetActivityInfo(ctx).TaskToken function to get task token to use for completion.
 		// Example:-
-		//  	CompleteActivity(token, getGreetingsFunc, "Hello", nil)
-		//      CompleteActivity(token, "getGreetingsFunc", "Hello", nil)
-		CompleteActivity(taskToken []byte, activityFunc interface{}, result interface{}, err error) error
+		//  	CompleteActivity(token, "Hello", nil)
+		//      CompleteActivity(token, "Hello", nil)
+		CompleteActivity(taskToken []byte, result interface{}, err error) error
 
 		// RecordActivityHeartbeat records heartbeat for an activity.
 		// details - is the progress you want to record along with heart beat for this activity.

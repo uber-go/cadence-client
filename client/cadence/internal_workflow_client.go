@@ -8,6 +8,7 @@ import (
 	"github.com/uber-go/cadence-client/common/backoff"
 	"github.com/uber-go/cadence-client/common/metrics"
 	"github.com/uber-go/tally"
+	"errors"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -147,6 +148,10 @@ func (wc *workflowClient) GetWorkflowHistory(workflowID string, runID string) (*
 // completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,
 // activity task failed event will be reported.
 func (wc *workflowClient) CompleteActivity(taskToken []byte, result interface{}, err error) error {
+	if taskToken == nil {
+		return errors.New("invalid task token provided")
+	}
+
 	var data []byte
 	if result != nil {
 		var err0 error

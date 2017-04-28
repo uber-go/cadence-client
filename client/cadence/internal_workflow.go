@@ -35,7 +35,7 @@ type (
 		err     error
 		ready   bool
 		channel *channelImpl
-		chained []*futureImpl // Futures that are chained to this one
+		chained []asyncFuture // Futures that are chained to this one
 	}
 
 	// Dispatcher is a container of a set of coroutines.
@@ -125,6 +125,15 @@ type (
 		// If Future is ready returns its value immediately.
 		// If not registers callback which is called when it is ready.
 		GetAsync(callback receiveCallback) (v interface{}, ok bool, err error)
+
+		// This future will added to list of dependency futures.
+		ChainFuture(f Future)
+
+		// Gets the current value and error.
+		// Make sure this is called once the future is ready.
+		GetValueAndError() (v interface{}, err error)
+
+		Set(value interface{}, err error)
 	}
 )
 
@@ -229,23 +238,28 @@ func (f *futureImpl) Chain(future Future) {
 	if f.ready {
 		panic("already set")
 	}
-	var ch *futureImpl
-	var ok bool
-	if ch, ok = future.(*futureImpl); !ok {
-		if dF, ok := future.(*decodeFutureImpl); ok {
-			ch = dF.futureImpl
-		} else {
-			panic("cannot chain Future that wasn't created with cadence.NewFuture/newDecodeFuture")
-		}
+
+	ch, ok := future.(asyncFuture)
+	if !ok {
+		panic("cannot chain Future that wasn't created with cadence.NewFuture")
 	}
 	if !ch.IsReady() {
-		ch.chained = append(ch.chained, f)
+		ch.ChainFuture(f)
 		return
 	}
-	f.value = ch.value
-	f.err = ch.err
+	val, err := ch.GetValueAndError()
+	f.value = val
+	f.err = err
 	f.ready = true
 	return
+}
+
+func (f *futureImpl) ChainFuture(future Future) {
+	f.chained = append(f.chained, future.(asyncFuture))
+}
+
+func (f *futureImpl) GetValueAndError() (interface{}, error) {
+	return f.value, f.err
 }
 
 func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) {
@@ -682,7 +696,11 @@ func (s *selectorImpl) AddSend(c Channel, v interface{}, f func()) Selector {
 }
 
 func (s *selectorImpl) AddFuture(future Future, f func(future Future)) Selector {
-	s.cases = append(s.cases, &selectCase{future: future.(asyncFuture), futureFunc: &f})
+	asyncF, ok := future.(asyncFuture)
+	if !ok {
+		panic("cannot chain Future that wasn't created with cadence.NewFuture")
+	}
+	s.cases = append(s.cases, &selectCase{future: asyncF, futureFunc: &f})
 	return s
 }
 

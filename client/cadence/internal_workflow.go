@@ -83,7 +83,7 @@ type (
 
 		sendFunc   *func()         // function to call when channel accepted a message. nil for receive case.
 		sendValue  *interface{}    // value to send to the channel. Used only for send case.
-		future     *futureImpl     // Used for future case
+		future     Future          // Used for future case
 		futureFunc *func(f Future) // function to call when Future is ready
 	}
 
@@ -221,9 +221,14 @@ func (f *futureImpl) Chain(future Future) {
 	if f.ready {
 		panic("already set")
 	}
-	ch, ok := future.(*futureImpl)
-	if !ok {
-		panic("cannot chain Future that wasn't created with cadence.NewFuture")
+	var ch *futureImpl
+	var ok bool
+	if ch, ok = future.(*futureImpl); !ok {
+		if dF, ok := future.(*decodeFutureImpl); ok {
+			ch = dF.futureImpl
+		} else {
+			panic("cannot chain Future that wasn't created with cadence.NewFuture/newDecodeFuture")
+		}
 	}
 	if !ch.IsReady() {
 		ch.chained = append(ch.chained, f)
@@ -669,7 +674,7 @@ func (s *selectorImpl) AddSend(c Channel, v interface{}, f func()) Selector {
 }
 
 func (s *selectorImpl) AddFuture(future Future, f func(future Future)) Selector {
-	s.cases = append(s.cases, &selectCase{future: future.(*futureImpl), futureFunc: &f})
+	s.cases = append(s.cases, &selectCase{future: future, futureFunc: &f})
 	return s
 }
 
@@ -746,8 +751,13 @@ func (s *selectorImpl) Select(ctx Context) {
 				}
 				return true
 			}
-			_, ok, _ := p.future.getAsync(callback)
-			if ok {
+			var ready bool
+			if decodeFuture, ok := p.future.(*decodeFutureImpl); ok {
+				_, ready, _ = decodeFuture.getAsync(callback)
+			} else {
+				_, ready, _ = p.future.(*futureImpl).getAsync(callback)
+			}
+			if ready {
 				p.futureFunc = nil
 				f(p.future)
 				return
@@ -827,7 +837,7 @@ type wfEnvironmentOptions struct {
 
 // decodeFutureImpl
 type decodeFutureImpl struct {
-	futureImpl
+	*futureImpl
 	fn interface{}
 }
 

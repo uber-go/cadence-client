@@ -18,6 +18,7 @@ type (
 	syncWorkflowDefinition struct {
 		workflow   workflow
 		dispatcher dispatcher
+		ctx        Context
 	}
 
 	workflowResult struct {
@@ -263,17 +264,20 @@ func (f *futureImpl) GetValueAndError() (interface{}, error) {
 }
 
 func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) {
-	ctx := WithValue(background, workflowEnvironmentContextKey, env)
+	d.ctx = WithValue(background, workflowEnvironmentContextKey, env)
 	var resultPtr *workflowResult
-	ctx = WithValue(ctx, workflowResultContextKey, &resultPtr)
+	d.ctx = WithValue(d.ctx, workflowResultContextKey, &resultPtr)
 
-	d.dispatcher = newDispatcher(ctx, func(ctx Context) {
+	d.dispatcher = newDispatcher(d.ctx, func(ctx Context) {
 		r := &workflowResult{}
 		r.workflowResult, r.error = d.workflow.Execute(ctx, input)
 		rpp := getWorkflowResultPointerPointer(ctx)
 		*rpp = r
 	})
-	executeDispatcher(ctx, d.dispatcher)
+}
+
+func (d *syncWorkflowDefinition) OnDecisionTaskStarted() {
+	executeDispatcher(d.ctx, d.dispatcher)
 }
 
 func (d *syncWorkflowDefinition) StackTrace() string {

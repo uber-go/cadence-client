@@ -164,7 +164,7 @@ OrderEvents:
 				// Set replay clock.
 				ts := time.Unix(0, event.GetTimestamp())
 				eh.eventsHandler.workflowEnvironmentImpl.SetCurrentReplayTime(ts)
-				eh.currentIndex++ // Sine we already processed the current event
+				eh.currentIndex++ // Since we already processed the current event
 				decisionStartedEvent = event
 				break OrderEvents
 			}
@@ -287,12 +287,12 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 ProcessEvents:
 	for {
 		reorderedEvents := reorderedHistory.NextDecisionEvents()
+
 		if len(reorderedEvents) == 0 {
 			break ProcessEvents
 		}
-
+		isInReplay := reorderedEvents[0].GetEventId() < reorderedHistory.LastNonReplayedID()
 		for i, event := range reorderedEvents {
-			isInReplay := event.GetEventId() < reorderedHistory.LastNonReplayedID()
 			isLast := !isInReplay && i == len(reorderedEvents)-1
 			if isEventTypeRespondToDecision(event.GetEventType()) {
 				respondEvents = append(respondEvents, event)
@@ -330,7 +330,6 @@ ProcessEvents:
 			}
 		}
 	}
-
 	// check if decisions from reply matches to the history events
 	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
 		wth.logger.Error("Replay and history mismatch.", zap.Error(err))

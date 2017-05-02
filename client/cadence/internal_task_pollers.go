@@ -3,23 +3,21 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"context"
 	"time"
-
-	"github.com/uber-common/bark"
-	"github.com/uber-go/tally"
 
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/common/backoff"
 	"github.com/uber-go/cadence-client/common/metrics"
+	"github.com/uber-go/tally"
+	"go.uber.org/zap"
 )
 
 const (
 	pollTaskServiceTimeOut    = 3 * time.Minute // Server long poll is 1 * Minutes + delta
 	respondTaskServiceTimeOut = 10 * time.Second
-
-	tagTaskListName = "taskListName"
 
 	retryServiceOperationInitialInterval    = time.Millisecond
 	retryServiceOperationMaxInterval        = 4 * time.Second
@@ -44,7 +42,7 @@ type (
 		service      m.TChanWorkflowService
 		taskHandler  WorkflowTaskHandler
 		metricsScope tally.Scope
-		logger       bark.Logger
+		logger       *zap.Logger
 	}
 
 	// activityTaskPoller implements polling/processing a workflow task
@@ -55,7 +53,7 @@ type (
 		service      m.TChanWorkflowService
 		taskHandler  ActivityTaskHandler
 		metricsScope tally.Scope
-		logger       bark.Logger
+		logger       *zap.Logger
 	}
 )
 
@@ -131,7 +129,7 @@ func (wtp *workflowTaskPoller) PollAndProcessSingleTask() error {
 			defer cancel()
 			err1 := wtp.service.RespondDecisionTaskCompleted(ctx, completedRequest)
 			if err1 != nil {
-				wtp.logger.Debugf("RespondDecisionTaskCompleted: Failed with error: %+v", err1)
+				wtp.logger.Debug("RespondDecisionTaskCompleted failed.", zap.Error(err1))
 			}
 			return err1
 		}, serviceOperationRetryPolicy, isServiceTransientError)
@@ -144,7 +142,9 @@ func (wtp *workflowTaskPoller) PollAndProcessSingleTask() error {
 
 // Poll for a single workflow task from the service
 func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
-	wtp.logger.Debug("workflowTaskPoller::Poll")
+	if enableVerboseLogging {
+		wtp.logger.Debug("workflowTaskPoller::Poll")
+	}
 	request := &s.PollForDecisionTaskRequest{
 		Domain:   common.StringPtr(wtp.domain),
 		TaskList: common.TaskListPtr(s.TaskList{Name: common.StringPtr(wtp.taskListName)}),
@@ -178,6 +178,9 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service m.TChanWorkf
 
 // Poll for a single activity task from the service
 func (atp *activityTaskPoller) poll() (*activityTask, error) {
+	if enableVerboseLogging {
+		atp.logger.Debug("activityTaskPoller::Poll")
+	}
 	request := &s.PollForActivityTaskRequest{
 		Domain:   common.StringPtr(atp.domain),
 		TaskList: common.TaskListPtr(s.TaskList{Name: common.StringPtr(atp.taskListName)}),
@@ -227,7 +230,7 @@ func (atp *activityTaskPoller) PollAndProcessSingleTask() error {
 
 	reportErr := reportActivityComplete(atp.service, request)
 	if reportErr != nil {
-		atp.logger.Debugf("reportActivityComplete: Failed with error: %+v", reportErr)
+		atp.logger.Debug("reportActivityComplete failed", zap.Error(reportErr))
 	}
 
 	return reportErr
@@ -278,7 +281,7 @@ func convertActivityResultToRespondRequest(identity string, taskToken, result []
 	}
 
 	reason, details := getErrorDetails(err)
-	if _, ok := err.(CanceledError); ok {
+	if _, ok := err.(CanceledError); ok || err == context.Canceled {
 		return &s.RespondActivityTaskCanceledRequest{
 			TaskToken: taskToken,
 			Details:   details,

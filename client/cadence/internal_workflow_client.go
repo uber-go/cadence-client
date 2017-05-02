@@ -1,6 +1,7 @@
 package cadence
 
 import (
+	"errors"
 	"github.com/pborman/uuid"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
@@ -111,6 +112,30 @@ func (wc *workflowClient) CancelWorkflow(workflowID string, runID string) error 
 		}, serviceOperationRetryPolicy, isServiceTransientError)
 }
 
+// TerminateWorkflow terminates a workflow execution.
+// workflowID is required, other parameters are optional.
+// If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
+func (wc *workflowClient) TerminateWorkflow(workflowID string, runID string, reason string, details []byte) error {
+	request := &s.TerminateWorkflowExecutionRequest{
+		Domain: common.StringPtr(wc.domain),
+		WorkflowExecution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      common.StringPtr(runID),
+		},
+		Reason:   common.StringPtr(reason),
+		Identity: common.StringPtr(wc.identity),
+	}
+
+	err := backoff.Retry(
+		func() error {
+			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+			defer cancel()
+			return wc.workflowService.TerminateWorkflowExecution(ctx, request)
+		}, serviceOperationRetryPolicy, isServiceTransientError)
+
+	return err
+}
+
 // GetWorkflowHistory gets history of a particular workflow.
 func (wc *workflowClient) GetWorkflowHistory(workflowID string, runID string) (*s.History, error) {
 	request := &s.GetWorkflowExecutionHistoryRequest{
@@ -141,14 +166,78 @@ func (wc *workflowClient) GetWorkflowHistory(workflowID string, runID string) (*
 // should be called when that activity is completed with the actual result and error. If err is nil, activity task
 // completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,
 // activity task failed event will be reported.
-func (wc *workflowClient) CompleteActivity(taskToken, result []byte, err error) error {
-	request := convertActivityResultToRespondRequest(wc.identity, taskToken, result, err)
+func (wc *workflowClient) CompleteActivity(taskToken []byte, result interface{}, err error) error {
+	if taskToken == nil {
+		return errors.New("invalid task token provided")
+	}
+
+	var data []byte
+	if result != nil {
+		var err0 error
+		data, err0 = getHostEnvironment().encodeArg(result)
+		if err0 != nil {
+			return err0
+		}
+	}
+	request := convertActivityResultToRespondRequest(wc.identity, taskToken, data, err)
 	return reportActivityComplete(wc.workflowService, request)
 }
 
 // RecordActivityHeartbeat records heartbeat for an activity.
-func (wc *workflowClient) RecordActivityHeartbeat(taskToken, details []byte) error {
-	return recordActivityHeartbeat(wc.workflowService, wc.identity, taskToken, details)
+func (wc *workflowClient) RecordActivityHeartbeat(taskToken []byte, details ...interface{}) error {
+	data, err := getHostEnvironment().encodeArgs(details)
+	if err != nil {
+		return err
+	}
+	return recordActivityHeartbeat(wc.workflowService, wc.identity, taskToken, data, serviceOperationRetryPolicy)
+}
+
+// ListClosedWorkflow gets closed workflow executions based on request filters
+// The errors it can throw:
+//  - BadRequestError
+//  - InternalServiceError
+//  - EntityNotExistError
+func (wc *workflowClient) ListClosedWorkflow(request *s.ListClosedWorkflowExecutionsRequest) (*s.ListClosedWorkflowExecutionsResponse, error) {
+	if len(request.GetDomain()) == 0 {
+		request.Domain = common.StringPtr(wc.domain)
+	}
+	var response *s.ListClosedWorkflowExecutionsResponse
+	err := backoff.Retry(
+		func() error {
+			var err1 error
+			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+			defer cancel()
+			response, err1 = wc.workflowService.ListClosedWorkflowExecutions(ctx, request)
+			return err1
+		}, serviceOperationRetryPolicy, isServiceTransientError)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// ListClosedWorkflow gets open workflow executions based on request filters
+// The errors it can throw:
+//  - BadRequestError
+//  - InternalServiceError
+//  - EntityNotExistError
+func (wc *workflowClient) ListOpenWorkflow(request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error) {
+	if len(request.GetDomain()) == 0 {
+		request.Domain = common.StringPtr(wc.domain)
+	}
+	var response *s.ListOpenWorkflowExecutionsResponse
+	err := backoff.Retry(
+		func() error {
+			var err1 error
+			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+			defer cancel()
+			response, err1 = wc.workflowService.ListOpenWorkflowExecutions(ctx, request)
+			return err1
+		}, serviceOperationRetryPolicy, isServiceTransientError)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 // Register a domain with cadence server
@@ -156,15 +245,7 @@ func (wc *workflowClient) RecordActivityHeartbeat(taskToken, details []byte) err
 //	- DomainAlreadyExistsError
 //	- BadRequestError
 //	- InternalServiceError
-func (dc *domainClient) Register(options DomainRegistrationOptions) error {
-	request := &s.RegisterDomainRequest{
-		Name:                                   common.StringPtr(options.Name),
-		OwnerEmail:                             common.StringPtr(options.OwnerEmail),
-		Description:                            common.StringPtr(options.Description),
-		WorkflowExecutionRetentionPeriodInDays: common.Int32Ptr(options.WorkflowExecutionRetentionPeriodInDays),
-		EmitMetric:                             common.BoolPtr(options.EmitMetric),
-	}
-
+func (dc *domainClient) Register(request *s.RegisterDomainRequest) error {
 	return backoff.Retry(
 		func() error {
 			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)

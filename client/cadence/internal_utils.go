@@ -49,12 +49,19 @@ func workflowExecutionPtr(t WorkflowExecution) *s.WorkflowExecution {
 
 // getErrorDetails gets reason and details.
 func getErrorDetails(err error) (string, []byte) {
-	if wErr, ok := err.(Error); ok {
-		return wErr.Reason(), wErr.Details()
+	var details []byte
+	if wErr, ok := err.(ErrorWithDetails); ok {
+		wErr.Details(&details)
+		return wErr.Reason(), details
 	}
 	if wErr, ok := err.(CanceledError); ok {
-		return "canceled", wErr.Details()
+		wErr.Details(&details)
+		return "canceled", details
 	}
+	if wErr, ok := err.(PanicError); ok {
+		return err.Error(), []byte(wErr.StackTrace())
+	}
+
 	return err.Error(), []byte("")
 }
 

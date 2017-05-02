@@ -31,6 +31,11 @@ type (
 		//	- InternalServiceError
 		CancelWorkflow(workflowID string, runID string) error
 
+		// TerminateWorkflow terminates a workflow execution.
+		// workflowID is required, other parameters are optional.
+		// If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
+		TerminateWorkflow(workflowID string, runID string, reason string, details []byte) error
+
 		// GetWorkflowHistory gets history of a particular workflow.
 		// The errors it can throw:
 		//	- EntityNotExistsError
@@ -45,10 +50,31 @@ type (
 		// completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,
 		// activity task failed event will be reported.
 		// An activity implementation should use GetActivityInfo(ctx).TaskToken function to get task token to use for completion.
-		CompleteActivity(taskToken, result []byte, err error) error
+		// Example:-
+		//	To complete with a result.
+		//  	CompleteActivity(token, "Done", nil)
+		//	To fail the activity with an error.
+		//      CompleteActivity(token, nil, NewErrorWithDetails("reason", details)
+		// The activity can fail with below errors ErrorWithDetails, TimeoutError, CanceledError.
+		CompleteActivity(taskToken []byte, result interface{}, err error) error
 
 		// RecordActivityHeartbeat records heartbeat for an activity.
-		RecordActivityHeartbeat(taskToken, details []byte) error
+		// details - is the progress you want to record along with heart beat for this activity.
+		RecordActivityHeartbeat(taskToken []byte, details ...interface{}) error
+
+		// ListClosedWorkflow gets closed workflow executions based on request filters
+		// The errors it can throw:
+		//  - BadRequestError
+		//  - InternalServiceError
+		//  - EntityNotExistError
+		ListClosedWorkflow(request *s.ListClosedWorkflowExecutionsRequest) (*s.ListClosedWorkflowExecutionsResponse, error)
+
+		// ListClosedWorkflow gets open workflow executions based on request filters
+		// The errors it can throw:
+		//  - BadRequestError
+		//  - InternalServiceError
+		//  - EntityNotExistError
+		ListOpenWorkflow(request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error)
 	}
 
 	// ClientOptions are optional parameters for Client creation.
@@ -73,7 +99,7 @@ type (
 		//	- DomainAlreadyExistsError
 		//	- BadRequestError
 		//	- InternalServiceError
-		Register(options DomainRegistrationOptions) error
+		Register(request *s.RegisterDomainRequest) error
 
 		// Describe a domain. The domain has two part of information.
 		// DomainInfo - Which has Name, Status, Description, Owner Email.
@@ -92,15 +118,6 @@ type (
 		//	- BadRequestError
 		//	- InternalServiceError
 		Update(name string, domainInfo *s.UpdateDomainInfo, domainConfig *s.DomainConfiguration) error
-	}
-
-	// DomainRegistrationOptions describes all the options that can be specified for registering a domain.
-	DomainRegistrationOptions struct {
-		Name                                   string
-		Description                            string
-		OwnerEmail                             string
-		WorkflowExecutionRetentionPeriodInDays int32
-		EmitMetric                             bool
 	}
 )
 

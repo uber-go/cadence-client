@@ -4,12 +4,12 @@ package cadence
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
-	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
@@ -17,7 +17,7 @@ import (
 	"github.com/uber-go/cadence-client/common/metrics"
 	"github.com/uber-go/cadence-client/common/util"
 	"github.com/uber-go/tally"
-	"golang.org/x/net/context"
+	"go.uber.org/zap"
 )
 
 // interfaces
@@ -26,7 +26,7 @@ type (
 	workflowExecutionEventHandler interface {
 		// Process a single event and return the assosciated decisions.
 		// Return List of decisions made, whether a decision is unhandled, any error.
-		ProcessEvent(event *s.HistoryEvent) ([]*s.Decision, bool, error)
+		ProcessEvent(event *s.HistoryEvent, isReplay bool) ([]*s.Decision, bool, error)
 		StackTrace() string
 		// Close for cleaning up resources on this event handler
 		Close()
@@ -46,11 +46,12 @@ type (
 type (
 	// workflowTaskHandlerImpl is the implementation of WorkflowTaskHandler
 	workflowTaskHandlerImpl struct {
-		workflowDefFactory workflowDefinitionFactory
-		metricsScope       tally.Scope
-		ppMgr              pressurePointMgr
-		logger             bark.Logger
-		identity           string
+		workflowDefFactory    workflowDefinitionFactory
+		metricsScope          tally.Scope
+		ppMgr                 pressurePointMgr
+		logger                *zap.Logger
+		identity              string
+		enableLoggingInReplay bool
 	}
 
 	// activityTaskHandlerImpl is the implementation of ActivityTaskHandler
@@ -60,7 +61,8 @@ type (
 		implementations map[ActivityType]activity
 		service         m.TChanWorkflowService
 		metricsScope    tally.Scope
-		logger          bark.Logger
+		logger          *zap.Logger
+		userContext     context.Context
 	}
 
 	// history wrapper method to help information about events.
@@ -79,6 +81,15 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 		currentIndex:      0,
 		historyEventsSize: len(task.task.History.Events),
 	}
+}
+
+// Get workflow start attributes.
+func (eh *history) GetWorkflowStartedAttr() (*s.WorkflowExecutionStartedEventAttributes, error) {
+	events := eh.workflowTask.task.History.Events
+	if len(events) == 0 || events[0].GetEventType() != s.EventType_WorkflowExecutionStarted {
+		return nil, errors.New("unable to find WorkflowExecutionStartedEventAttributes in the history")
+	}
+	return events[0].WorkflowExecutionStartedEventAttributes, nil
 }
 
 // Get last non replayed event ID.
@@ -200,11 +211,13 @@ OrderEvents:
 func newWorkflowTaskHandler(factory workflowDefinitionFactory,
 	params workerExecutionParameters, ppMgr pressurePointMgr) WorkflowTaskHandler {
 	return &workflowTaskHandlerImpl{
-		workflowDefFactory: factory,
-		logger:             params.Logger,
-		ppMgr:              ppMgr,
-		metricsScope:       params.MetricsScope,
-		identity:           params.Identity}
+		workflowDefFactory:    factory,
+		logger:                params.Logger,
+		ppMgr:                 ppMgr,
+		metricsScope:          params.MetricsScope,
+		identity:              params.Identity,
+		enableLoggingInReplay: params.EnableLoggingInReplay,
+	}
 }
 
 // ProcessWorkflowTask processes each all the events of the workflow task.
@@ -232,14 +245,20 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		return nil, "", errors.New("nil TaskList in WorkflowExecutionStarted event")
 	}
 
-	wth.logger.Debugf("Processing New Workflow Task: Type=%s, PreviousStartedEventId=%d",
-		task.GetWorkflowType().GetName(), task.GetPreviousStartedEventId())
+	wth.logger.Debug("Processing new workflow task.",
+		zap.String(tagWorkflowType, task.GetWorkflowType().GetName()),
+		zap.String(tagWorkflowID, task.GetWorkflowExecution().GetWorkflowId()),
+		zap.String(tagRunID, task.GetWorkflowExecution().GetRunId()),
+		zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 
 	// Setup workflow Info
 	workflowInfo := &WorkflowInfo{
 		WorkflowType: flowWorkflowTypeFrom(*task.WorkflowType),
 		TaskListName: taskList.GetName(),
-		// workflowExecution
+		WorkflowExecution: WorkflowExecution{
+			ID:    *task.WorkflowExecution.WorkflowId,
+			RunID: *task.WorkflowExecution.RunId,
+		},
 	}
 
 	isWorkflowCompleted := false
@@ -253,7 +272,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	}
 
 	eventHandler := newWorkflowExecutionEventHandler(
-		workflowInfo, wth.workflowDefFactory, completeHandler, wth.logger)
+		workflowInfo, wth.workflowDefFactory, completeHandler, wth.logger, wth.enableLoggingInReplay)
 	defer eventHandler.Close()
 	reorderedHistory := newHistory(&workflowTask{task: task}, eventHandler.(*workflowExecutionEventHandlerImpl))
 	decisions := []*s.Decision{}
@@ -272,8 +291,6 @@ ProcessEvents:
 		}
 
 		for _, event := range reorderedEvents {
-			wth.logger.Debugf("ProcessEvent: Id=%d, EventType=%v", event.GetEventId(), event.GetEventType())
-
 			isInReplay := event.GetEventId() < reorderedHistory.LastNonReplayedID()
 			if isEventTypeRespondToDecision(event.GetEventType()) {
 				respondEvents = append(respondEvents, event)
@@ -288,7 +305,7 @@ ProcessEvents:
 				return nil, "", err
 			}
 
-			eventDecisions, unhandled, err := eventHandler.ProcessEvent(event)
+			eventDecisions, unhandled, err := eventHandler.ProcessEvent(event, isInReplay)
 			if err != nil {
 				return nil, "", err
 			}
@@ -314,12 +331,21 @@ ProcessEvents:
 
 	// check if decisions from reply matches to the history events
 	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
-		wth.logger.Warnf("replay and history match failed: %s", err)
+		wth.logger.Error("Replay and history mismatch.", zap.Error(err))
 		return nil, "", err
 	}
 
-	eventDecisions := wth.completeWorkflow(
-		isWorkflowCompleted, unhandledDecision, completionResult, failure)
+	startAttributes, err := reorderedHistory.GetWorkflowStartedAttr()
+	if err != nil {
+		wth.logger.Error("Unable to read workflow start attributes.", zap.Error(err))
+		return nil, "", err
+	}
+	eventDecisions, err := wth.completeWorkflow(
+		isWorkflowCompleted, unhandledDecision, completionResult, failure, startAttributes)
+	if err != nil {
+		wth.logger.Error("Complete workflow failed.", zap.Error(err))
+		return nil, "", err
+	}
 	if len(eventDecisions) > 0 {
 		decisions = append(decisions, eventDecisions...)
 		if wth.metricsScope != nil {
@@ -491,8 +517,8 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		eventAttributes := e.GetRequestCancelExternalWorkflowExecutionInitiatedEventAttributes()
 		decisionAttributes := d.GetRequestCancelExternalWorkflowExecutionDecisionAttributes()
 		if eventAttributes.GetDomain() != decisionAttributes.GetDomain() ||
-			eventAttributes.GetWorkflowId() != decisionAttributes.GetWorkflowId() ||
-			eventAttributes.GetRunId() != decisionAttributes.GetRunId() {
+			eventAttributes.GetWorkflowExecution().GetWorkflowId() != decisionAttributes.GetWorkflowId() ||
+			eventAttributes.GetWorkflowExecution().GetRunId() != decisionAttributes.GetRunId() {
 			return false
 		}
 
@@ -519,7 +545,8 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	unhandledDecision bool,
 	completionResult []byte,
 	err error,
-) []*s.Decision {
+	startAttributes *s.WorkflowExecutionStartedEventAttributes,
+) ([]*s.Decision, error) {
 	decisions := []*s.Decision{}
 	if !unhandledDecision {
 		if err == ErrCanceled {
@@ -529,6 +556,40 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 				Details: completionResult,
 			}
 			decisions = append(decisions, cancelDecision)
+		} else if contErr, ok := err.(*continueAsNewError); ok {
+			// Continue as new error.
+
+			// Get workflow start attributes.
+			// task list name.
+			var taskListName string
+			if contErr.options.taskListName != nil {
+				taskListName = *contErr.options.taskListName
+			} else {
+				taskListName = startAttributes.TaskList.GetName()
+			}
+
+			// timeouts.
+			var executionStartToCloseTimeoutSeconds, taskStartToCloseTimeoutSeconds int32
+			if contErr.options.executionStartToCloseTimeoutSeconds != nil {
+				executionStartToCloseTimeoutSeconds = *contErr.options.executionStartToCloseTimeoutSeconds
+			} else {
+				executionStartToCloseTimeoutSeconds = startAttributes.GetExecutionStartToCloseTimeoutSeconds()
+			}
+			if contErr.options.taskStartToCloseTimeoutSeconds != nil {
+				taskStartToCloseTimeoutSeconds = *contErr.options.taskStartToCloseTimeoutSeconds
+			} else {
+				taskStartToCloseTimeoutSeconds = startAttributes.GetTaskStartToCloseTimeoutSeconds()
+			}
+
+			continueAsNewDecision := createNewDecision(s.DecisionType_ContinueAsNewWorkflowExecution)
+			continueAsNewDecision.ContinueAsNewWorkflowExecutionDecisionAttributes = &s.ContinueAsNewWorkflowExecutionDecisionAttributes{
+				WorkflowType: workflowTypePtr(*contErr.options.workflowType),
+				Input:        contErr.options.input,
+				TaskList:     common.TaskListPtr(s.TaskList{Name: common.StringPtr(taskListName)}),
+				ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionStartToCloseTimeoutSeconds),
+				TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(taskStartToCloseTimeoutSeconds),
+			}
+			decisions = append(decisions, continueAsNewDecision)
 		} else if err != nil {
 			// Workflow failures
 			failDecision := createNewDecision(s.DecisionType_FailWorkflowExecution)
@@ -547,7 +608,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			decisions = append(decisions, completeDecision)
 		}
 	}
-	return decisions
+	return decisions, nil
 }
 
 func (wth *workflowTaskHandlerImpl) executeAnyPressurePoints(event *s.HistoryEvent, isInReplay bool) error {
@@ -591,36 +652,79 @@ func newActivityTaskHandler(activities []activity,
 }
 
 type cadenceInvoker struct {
-	identity  string
-	service   m.TChanWorkflowService
-	taskToken []byte
+	identity      string
+	service       m.TChanWorkflowService
+	taskToken     []byte
+	cancelHandler func()
+	retryPolicy   backoff.RetryPolicy
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
-	return recordActivityHeartbeat(i.service, i.identity, i.taskToken, details)
+	err := recordActivityHeartbeat(i.service, i.identity, i.taskToken, details, i.retryPolicy)
+
+	switch err.(type) {
+	case CanceledError:
+		// We are asked to cancel. inform the activity about cancellation through context.
+		// We are asked to cancel. inform the activity about cancellation through context.
+		i.cancelHandler()
+
+	case *s.EntityNotExistsError:
+		// We will pass these through as cancellation for now but something we can change
+		// later when we have setter on cancel handler.
+		i.cancelHandler()
+	}
+
+	// We don't want to bubble temporary errors to the user.
+	// This error won't be return to user check RecordActivityHeartbeat().
+	return err
 }
 
-func newServiceInvoker(taskToken []byte, identity string, service m.TChanWorkflowService) ServiceInvoker {
+func newServiceInvoker(
+	taskToken []byte,
+	identity string,
+	service m.TChanWorkflowService,
+	cancelHandler func(),
+) ServiceInvoker {
 	return &cadenceInvoker{
-		taskToken: taskToken,
-		identity:  identity,
-		service:   service,
+		taskToken:     taskToken,
+		identity:      identity,
+		service:       service,
+		cancelHandler: cancelHandler,
+		retryPolicy:   serviceOperationRetryPolicy,
 	}
 }
 
 // Execute executes an implementation of the activity.
-func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (interface{}, error) {
-	ath.logger.Debugf("[WorkflowID: %s] Execute activity: %s",
-		t.GetWorkflowExecution().GetWorkflowId(), t.GetActivityType().GetName())
+func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (result interface{}, err error) {
+	ath.logger.Debug("Processing new activity task",
+		zap.String(tagWorkflowID, t.GetWorkflowExecution().GetWorkflowId()),
+		zap.String(tagRunID, t.GetWorkflowExecution().GetRunId()),
+		zap.String(tagActivityType, t.GetActivityType().GetName()))
 
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service)
-	ctx := WithActivityTask(context.Background(), t, invoker)
+	rootCtx := ath.userContext
+	if rootCtx == nil {
+		rootCtx = context.Background()
+	}
+	canCtx, cancel := context.WithCancel(rootCtx)
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel)
+	ctx := WithActivityTask(canCtx, t, invoker, ath.logger, ath.userContext)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.implementations[flowActivityTypeFrom(activityType)]
 	if !ok {
 		// Couldn't find the activity implementation.
 		return nil, fmt.Errorf("No implementation for activityType=%v", activityType.GetName())
 	}
+
+	// panic handler
+	defer func() {
+		if p := recover(); p != nil {
+			topLine := fmt.Sprintf("activity for %s [panic]:", ath.taskListName)
+			st := getStackTraceRaw(topLine, 7, 0)
+			ath.logger.Error("Activity panic.", zap.String("PanicStack", st))
+			panicErr := newPanicError(p, st)
+			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr), nil
+		}
+	}()
 
 	output, err := activityImplementation.Execute(ctx, t.GetInput())
 	return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, output, err), nil
@@ -632,7 +736,12 @@ func createNewDecision(decisionType s.DecisionType) *s.Decision {
 	}
 }
 
-func recordActivityHeartbeat(service m.TChanWorkflowService, identity string, taskToken, details []byte) error {
+func recordActivityHeartbeat(
+	service m.TChanWorkflowService,
+	identity string,
+	taskToken, details []byte,
+	retryPolicy backoff.RetryPolicy,
+) error {
 	request := &s.RecordActivityTaskHeartbeatRequest{
 		TaskToken: taskToken,
 		Details:   details,
@@ -647,7 +756,7 @@ func recordActivityHeartbeat(service m.TChanWorkflowService, identity string, ta
 			var err error
 			heartbeatResponse, err = service.RecordActivityTaskHeartbeat(ctx, request)
 			return err
-		}, serviceOperationRetryPolicy, isServiceTransientError)
+		}, retryPolicy, isServiceTransientError)
 
 	if heartbeatErr == nil && heartbeatResponse != nil && heartbeatResponse.GetCancelRequested() {
 		return NewCanceledError()

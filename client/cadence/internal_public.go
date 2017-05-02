@@ -8,9 +8,9 @@ package cadence
 // point of view only to access them from other packages.
 
 import (
-	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
+	"go.uber.org/zap"
 )
 
 type (
@@ -30,6 +30,8 @@ type (
 		Execute(task *s.PollForActivityTaskResponse) (interface{}, error)
 	}
 )
+
+var enableVerboseLogging bool
 
 // NewWorkerOptionsInternal creates an instance of worker options with default values.
 func NewWorkerOptionsInternal(testTags map[string]map[string]string) WorkerOptions {
@@ -80,6 +82,8 @@ func NewActivityTaskWorker(
 		Identity:                  wOptions.identity,
 		MetricsScope:              wOptions.metricsScope,
 		Logger:                    wOptions.logger,
+		EnableLoggingInReplay:     wOptions.enableLoggingInReplay,
+		UserContext:               wOptions.userContext,
 	}
 
 	processTestTags(wOptions, &workerParams)
@@ -89,7 +93,7 @@ func NewActivityTaskWorker(
 // NewWorkflowTaskHandler creates an instance of a WorkflowTaskHandler from a decision poll response
 // using workflow functions registered through RegisterWorkflow
 // To be used to replay a workflow in a debugger.
-func NewWorkflowTaskHandler(identity string, logger bark.Logger) WorkflowTaskHandler {
+func NewWorkflowTaskHandler(identity string, logger *zap.Logger) WorkflowTaskHandler {
 	params := workerExecutionParameters{
 		Identity: identity,
 		Logger:   logger,
@@ -104,7 +108,7 @@ func NewWorkflowTaskHandler(identity string, logger bark.Logger) WorkflowTaskHan
 // using activity functions registered through RegisterActivity. service parameter is used for
 // heartbeating from activity implementation.
 // To be used to invoke registered functions for debugging purposes.
-func NewActivityTaskHandler(service m.TChanWorkflowService, identity string, logger bark.Logger) ActivityTaskHandler {
+func NewActivityTaskHandler(service m.TChanWorkflowService, identity string, logger *zap.Logger) ActivityTaskHandler {
 	params := workerExecutionParameters{
 		Identity: identity,
 		Logger:   logger,
@@ -130,4 +134,29 @@ func AddWorkflowRegistrationInterceptor(
 func AddActivityRegistrationInterceptor(
 	i func(name string, activity interface{}) (string, interface{})) {
 	getHostEnvironment().AddActivityRegistrationInterceptor(i)
+}
+
+// SerializeFnArgs serializes an activity function arguments.
+func SerializeFnArgs(args ...interface{}) ([]byte, error) {
+	return getHostEnvironment().encodeArgs(args)
+}
+
+// DeserializeFnResults de-serializes a function results.
+// The input result doesn't include the error. The cadence server has result, error.
+// This is to de-serialize the result.
+func DeserializeFnResults(result []byte, to interface{}) error {
+	return getHostEnvironment().decodeArg(result, to)
+}
+
+// EnableVerboseLogging enable or disable verbose logging. This is for internal use only.
+func EnableVerboseLogging(enable bool) {
+	enableVerboseLogging = enable
+}
+
+// newDecodeFuture creates a new future as well as associated Settable that is used to set its value.
+// fn - the decoded value needs to be validated against a function.
+func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
+	impl := &decodeFutureImpl{
+		&futureImpl{channel: NewChannel(ctx).(*channelImpl)}, fn}
+	return impl, impl
 }

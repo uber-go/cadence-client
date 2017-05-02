@@ -3,19 +3,19 @@ package cadence
 import (
 	"testing"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"github.com/uber-common/bark"
 	m "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
+	"github.com/uber-go/cadence-client/common/util"
 	"github.com/uber-go/cadence-client/mocks"
+	"go.uber.org/zap"
 )
 
 type (
 	TaskHandlersTestSuite struct {
 		suite.Suite
-		logger bark.Logger
+		logger *zap.Logger
 	}
 )
 
@@ -24,9 +24,8 @@ func (s *TaskHandlersTestSuite) SetupTest() {
 }
 
 func (s *TaskHandlersTestSuite) SetupSuite() {
-	log2 := log.New()
-	//log2.Level = log.DebugLevel
-	s.logger = bark.NewLoggerFromLogrus(log2)
+	logger, _ := zap.NewDevelopment()
+	s.logger = logger
 }
 
 func TestTaskHandlersTestSuite(t *testing.T) {
@@ -83,6 +82,10 @@ func createWorkflowTask(events []*m.HistoryEvent, previousStartEventID int64) *m
 		PreviousStartedEventId: common.Int64Ptr(previousStartEventID),
 		WorkflowType:           workflowTypePtr(WorkflowType{"testWorkflow"}),
 		History:                &m.History{Events: events},
+		WorkflowExecution: &m.WorkflowExecution{
+			WorkflowId: common.StringPtr("fake-workflow-id"),
+			RunId:      common.StringPtr("fake-run-id"),
+		},
 	}
 }
 
@@ -246,15 +249,15 @@ func (s *TaskHandlersTestSuite) TestHeartBeat_NoError() {
 }
 
 func (s *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
-	mockService := mocks.TChanWorkflowService{}
+	mockService := &mocks.TChanWorkflowService{}
 	entityNotExistsError := &m.EntityNotExistsError{}
 	mockService.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).Return(nil, entityNotExistsError)
 
-	cadenceInvoker := &cadenceInvoker{
-		identity:  "Test_Cadence_Invoker",
-		service:   &mockService,
-		taskToken: nil,
-	}
+	cadenceInvoker := newServiceInvoker(
+		nil,
+		"Test_Cadence_Invoker",
+		mockService,
+		func() {})
 
 	heartbeatErr := cadenceInvoker.Heartbeat(nil)
 	s.NotNil(heartbeatErr)
@@ -262,26 +265,8 @@ func (s *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 	s.True(ok, "heartbeatErr must be EntityNotExistsError.")
 }
 
-func (s *TaskHandlersTestSuite) TestHeartBeat_CancelledError() {
-	mockService := mocks.TChanWorkflowService{}
-	cancelRequested := true
-	heartbeatResponse := m.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
-	mockService.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).Return(&heartbeatResponse, nil)
-
-	cadenceInvoker := &cadenceInvoker{
-		identity:  "Test_Cadence_Invoker",
-		service:   &mockService,
-		taskToken: nil,
-	}
-
-	heartbeatErr := cadenceInvoker.Heartbeat(nil)
-	s.NotNil(heartbeatErr)
-	_, ok := (heartbeatErr).(CanceledError)
-	s.True(ok, "heartbeatErr must be CanceledError.")
-}
-
 func (s *TaskHandlersTestSuite) printAllDecisions(decisions []*m.Decision) {
-	for i, d := range decisions {
-		s.logger.Infof("Decision: %v: %+v", i, d)
+	for _, d := range decisions {
+		s.logger.Info(util.DecisionToString(d))
 	}
 }

@@ -868,6 +868,7 @@ type wfEnvironmentOptions struct {
 	taskListName                        *string
 	executionStartToCloseTimeoutSeconds *int32
 	taskStartToCloseTimeoutSeconds      *int32
+	domain                              *string
 }
 
 // decodeFutureImpl

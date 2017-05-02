@@ -45,6 +45,7 @@ type (
 		logger                         *zap.Logger
 		isReplay                       bool // flag to indicate if workflow is in replay mode
 		enableLoggingInReplay          bool // flag to indicate if workflow should enable logging in replay mode
+		isWorkflowCancelRequested      bool // if the workflow cancel is requested.
 	}
 
 	// wrapper around zapcore.Core that will be aware of replay
@@ -183,8 +184,16 @@ func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityPar
 func (wc *workflowEnvironmentImpl) RequestCancelActivity(activityID string) {
 	handler, ok := wc.scheduledActivities[activityID]
 	if !ok {
+		wc.logger.Debug("RequestCancelActivity failed because the activity ID doesn't exist.",
+			zap.String(tagActivityID, activityID))
 		return
 	}
+	if wc.isWorkflowCancelRequested {
+		wc.logger.Debug("RequestCancelActivity is not sent because workflow has cancel requested.",
+			zap.String(tagActivityID, activityID))
+		return
+	}
+
 	requestCancelAttr := &m.RequestCancelActivityTaskDecisionAttributes{
 		ActivityId: common.StringPtr(activityID)}
 
@@ -240,6 +249,11 @@ func (wc *workflowEnvironmentImpl) RequestCancelTimer(timerID string) {
 		wc.logger.Debug("RequestCancelTimer failed, TimerID not exists.", zap.String(tagTimerID, timerID))
 		return
 	}
+	if wc.isWorkflowCancelRequested {
+		wc.logger.Debug("RequestCancelTimer is not sent because workflow has cancel requested.", zap.String(tagTimerID, timerID))
+		return
+	}
+
 	cancelTimerAttr := &m.CancelTimerDecisionAttributes{TimerId: common.StringPtr(timerID)}
 	decision := wc.CreateNewDecision(m.DecisionType_CancelTimer)
 	decision.CancelTimerDecisionAttributes = cancelTimerAttr
@@ -518,4 +532,5 @@ func (weh *workflowExecutionEventHandlerImpl) handleTimerFired(
 func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionCancelRequested(
 	attributes *m.WorkflowExecutionCancelRequestedEventAttributes) {
 	weh.cancelHandler()
+	weh.isWorkflowCancelRequested = true
 }

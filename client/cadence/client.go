@@ -16,7 +16,7 @@ type (
 		//     StartWorkflow(options, "workflowTypeName", input)
 		//     or
 		//     StartWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
-		// The errors it can throw:
+		// The errors it can return:
 		//	- EntityNotExistsError
 		//	- BadRequestError
 		//	- WorkflowExecutionAlreadyStartedError
@@ -25,7 +25,7 @@ type (
 		// CancelWorkflow cancels a workflow in execution
 		// - workflow ID of the workflow.
 		// - runID can be optional if not specified it will pick the latest execution of that workflow ID.
-		// The errors it can throw:
+		// The errors it can return:
 		//	- EntityNotExistsError
 		//	- BadRequestError
 		//	- InternalServiceError
@@ -34,10 +34,14 @@ type (
 		// TerminateWorkflow terminates a workflow execution.
 		// workflowID is required, other parameters are optional.
 		// If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
+		// The errors it can return:
+		//	- EntityNotExistsError
+		//	- BadRequestError
+		//	- InternalServiceError
 		TerminateWorkflow(workflowID string, runID string, reason string, details []byte) error
 
 		// GetWorkflowHistory gets history of a particular workflow.
-		// The errors it can throw:
+		// The errors it can return:
 		//	- EntityNotExistsError
 		//	- BadRequestError
 		//	- InternalServiceError
@@ -60,17 +64,20 @@ type (
 
 		// RecordActivityHeartbeat records heartbeat for an activity.
 		// details - is the progress you want to record along with heart beat for this activity.
+		// The errors it can return:
+		//	- EntityNotExistsError
+		//	- InternalServiceError
 		RecordActivityHeartbeat(taskToken []byte, details ...interface{}) error
 
 		// ListClosedWorkflow gets closed workflow executions based on request filters
-		// The errors it can throw:
+		// The errors it can return:
 		//  - BadRequestError
 		//  - InternalServiceError
 		//  - EntityNotExistError
 		ListClosedWorkflow(request *s.ListClosedWorkflowExecutionsRequest) (*s.ListClosedWorkflowExecutionsResponse, error)
 
 		// ListClosedWorkflow gets open workflow executions based on request filters
-		// The errors it can throw:
+		// The errors it can return:
 		//  - BadRequestError
 		//  - InternalServiceError
 		//  - EntityNotExistError

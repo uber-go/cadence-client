@@ -530,8 +530,10 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 		eventAttributes := e.GetWorkflowExecutionCanceledEventAttributes()
 		decisionAttributes := d.GetCancelWorkflowExecutionDecisionAttributes()
-		if bytes.Compare(eventAttributes.GetDetails(), decisionAttributes.GetDetails()) != 0 {
-			return false
+		if strictMode {
+			if bytes.Compare(eventAttributes.GetDetails(), decisionAttributes.GetDetails()) != 0 {
+				return false
+			}
 		}
 		return true
 

@@ -587,6 +587,10 @@ func TestCancelWorkflow(t *testing.T) {
 type cancelWorkflowAfterActivityTest struct{}
 
 func (w cancelWorkflowAfterActivityTest) Execute(ctx Context, input []byte) ([]byte, error) {
+	// The workflow cancellation should handle activity and timer cancellation
+	// not to propagate those decisions.
+
+	// schedule an activity.
 	ctx = WithActivityOptions(ctx, NewActivityOptions().
 		WithTaskList("exampleTaskList").
 		WithScheduleToStartTimeout(10*time.Second).
@@ -598,8 +602,8 @@ func (w cancelWorkflowAfterActivityTest) Execute(ctx Context, input []byte) ([]b
 		return nil, err
 	}
 
-	ctx2, _ := WithCancel(ctx)
-	err2 := Sleep(ctx2, 1)
+	// schedule a timer
+	err2 := Sleep(ctx, 1)
 	if err2 != nil {
 		return nil, err2
 	}

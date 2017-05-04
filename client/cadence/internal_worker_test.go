@@ -471,7 +471,7 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 	ctx := &mockWorkflowEnvironment{}
 	workflowComplete := make(chan struct{}, 1)
 
-	cbProcessor := newAsyncTestCallbackProcessor()
+	cbProcessor := newAsyncTestCallbackProcessor(w.OnDecisionTaskStarted)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
 
@@ -505,7 +505,7 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 	}).Once()
 
 	w.Execute(ctx, []byte(""))
-
+	w.OnDecisionTaskStarted()
 	c := cbProcessor.ProcessOrWait(workflowComplete)
 	require.True(t, c, "Workflow failed to complete")
 	ctx.AssertExpectations(t)

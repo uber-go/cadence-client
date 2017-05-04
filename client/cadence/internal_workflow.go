@@ -19,6 +19,7 @@ type (
 		workflow   workflow
 		dispatcher dispatcher
 		cancel     CancelFunc
+		rootCtx    Context
 	}
 
 	workflowResult struct {
@@ -264,11 +265,11 @@ func (f *futureImpl) GetValueAndError() (interface{}, error) {
 }
 
 func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) {
-	ctx := WithValue(background, workflowEnvironmentContextKey, env)
+	d.rootCtx = WithValue(background, workflowEnvironmentContextKey, env)
 	var resultPtr *workflowResult
-	ctx = WithValue(ctx, workflowResultContextKey, &resultPtr)
+	d.rootCtx = WithValue(d.rootCtx, workflowResultContextKey, &resultPtr)
 
-	d.dispatcher = newDispatcher(ctx, func(ctx Context) {
+	d.dispatcher = newDispatcher(d.rootCtx, func(ctx Context) {
 		ctx, d.cancel = WithCancel(ctx)
 		r := &workflowResult{}
 		r.workflowResult, r.error = d.workflow.Execute(ctx, input)
@@ -276,14 +277,15 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 		*rpp = r
 	})
 
-	getWorkflowEnvironment(ctx).RegisterCancel(func() {
+	getWorkflowEnvironment(d.rootCtx).RegisterCancel(func() {
 		// It is ok to call this method multiple times.
 		// it doesn't do anything new, the context remains cancelled.
 		d.cancel()
-		executeDispatcher(ctx, d.dispatcher)
 	})
+}
 
-	executeDispatcher(ctx, d.dispatcher)
+func (d *syncWorkflowDefinition) OnDecisionTaskStarted() {
+	executeDispatcher(d.rootCtx, d.dispatcher)
 }
 
 func (d *syncWorkflowDefinition) StackTrace() string {

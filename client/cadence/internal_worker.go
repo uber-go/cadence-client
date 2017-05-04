@@ -614,7 +614,7 @@ func (th *hostEnvImpl) encode(r []interface{}) ([]byte, error) {
 	return data, nil
 }
 
-// decode a single value.
+// decode a set of values.
 func (th *hostEnvImpl) decode(data []byte, to []interface{}) error {
 	if len(to) == 1 && isTypeByteSlice(reflect.TypeOf(to[0])) {
 		reflect.ValueOf(to[0]).Elem().SetBytes(data)
@@ -636,7 +636,7 @@ func (th *hostEnvImpl) decode(data []byte, to []interface{}) error {
 
 // encode multiple arguments(arguments to a function).
 func (th *hostEnvImpl) encodeArgs(args []interface{}) ([]byte, error) {
-	return getHostEnvironment().encode(args)
+	return th.encode(args)
 }
 
 // decode multiple arguments(arguments to a function).
@@ -663,12 +663,12 @@ argsLoop:
 
 // encode single value(like return parameter).
 func (th *hostEnvImpl) encodeArg(arg interface{}) ([]byte, error) {
-	return getHostEnvironment().encode([]interface{}{arg})
+	return th.encode([]interface{}{arg})
 }
 
 // decode single value(like return parameter).
 func (th *hostEnvImpl) decodeArg(data []byte, to interface{}) error {
-	return getHostEnvironment().decode(data, []interface{}{to})
+	return th.decode(data, []interface{}{to})
 }
 
 func isTypeByteSlice(inType reflect.Type) bool {
@@ -942,20 +942,24 @@ func (g gobEncoding) Register(obj interface{}) error {
 func (g gobEncoding) Marshal(objs []interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
-	for _, obj := range objs {
+	for i, obj := range objs {
 		if err := enc.Encode(obj); err != nil {
-			return nil, fmt.Errorf("unable to encode with gob: %v", err)
+			return nil, fmt.Errorf(
+				"unable to encode argument: %d, %v, with gob error: %v", i, reflect.TypeOf(obj), err)
 		}
 	}
 	return buf.Bytes(), nil
 }
 
 // Unmarshal decodes a byte array into the passed in objects
+// TODO: To deal with different number of arguments, may be encode number of arguments as a first value as well.
+// so we can decode if a ssubset of them are asked.
 func (g gobEncoding) Unmarshal(data []byte, objs []interface{}) error {
 	dec := gob.NewDecoder(bytes.NewBuffer(data))
-	for _, obj := range objs {
+	for i, obj := range objs {
 		if err := dec.Decode(obj); err != nil {
-			return fmt.Errorf("unable to decode with gob: %v", err)
+			return fmt.Errorf(
+				"unable to decode argument: %d, %v, with gob error: %v", i, reflect.TypeOf(obj), err)
 		}
 	}
 	return nil

@@ -34,12 +34,17 @@ type (
 		workflowTimerClient
 		WorkflowInfo() *WorkflowInfo
 		Complete(result []byte, err error)
+		RegisterCancel(handler func())
+		RequestCancelWorkflow(domainName, workflowID, runID string) error
 		GetLogger() *zap.Logger
 	}
 
 	// WorkflowDefinition wraps the code that can execute a workflow.
 	workflowDefinition interface {
 		Execute(env workflowEnvironment, input []byte)
+		// Called for each non timed out startDecision event.
+		// Executed after all history events since the previous decision are applied to workflowDefinition
+		OnDecisionTaskStarted()
 		StackTrace() string // Stack trace of all coroutines owned by the Dispatcher instance
 		Close()
 	}

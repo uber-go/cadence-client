@@ -186,7 +186,6 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 
 	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
 		settable.Set(r, e)
-		executeDispatcher(ctx, getDispatcher(ctx))
 	})
 	Go(ctx, func(ctx Context) {
 		if ctx.Done() == nil {
@@ -236,7 +235,6 @@ func NewTimer(ctx Context, d time.Duration) Future {
 
 	t := getWorkflowEnvironment(ctx).NewTimer(d, func(r []byte, e error) {
 		settable.Set(nil, e)
-		executeDispatcher(ctx, getDispatcher(ctx))
 	})
 	if t != nil {
 		Go(ctx, func(ctx Context) {
@@ -262,6 +260,27 @@ func Sleep(ctx Context, d time.Duration) (err error) {
 	t := NewTimer(ctx, d)
 	err = t.Get(ctx, nil)
 	return
+}
+
+// RequestCancelWorkflow can be used to request cancellation of an external workflow.
+// - workflowID - name of the workflow ID.
+// - runID 	- Optional - indicates the instance of a workflow.
+// You can specify the domain of the workflow using the context like
+//	ctx := WithWorkflowDomain(ctx, "domain-name")
+func RequestCancelWorkflow(ctx Context, workflowID, runID string) error {
+	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
+	options := getWorkflowEnvOptions(ctx1)
+	if options.domain == nil {
+		return errors.New("need a valid domain")
+	}
+	return getWorkflowEnvironment(ctx).RequestCancelWorkflow(*options.domain, workflowID, runID)
+}
+
+// WithWorkflowDomain adds a domain to the context.
+func WithWorkflowDomain(ctx Context, name string) Context {
+	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
+	getWorkflowEnvOptions(ctx1).domain = common.StringPtr(name)
+	return ctx1
 }
 
 // WithWorkflowTaskList adds a task list to the context.

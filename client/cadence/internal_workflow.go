@@ -18,6 +18,8 @@ type (
 	syncWorkflowDefinition struct {
 		workflow   workflow
 		dispatcher dispatcher
+		cancel     CancelFunc
+		rootCtx    Context
 	}
 
 	workflowResult struct {
@@ -263,17 +265,27 @@ func (f *futureImpl) GetValueAndError() (interface{}, error) {
 }
 
 func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) {
-	ctx := WithValue(background, workflowEnvironmentContextKey, env)
+	d.rootCtx = WithValue(background, workflowEnvironmentContextKey, env)
 	var resultPtr *workflowResult
-	ctx = WithValue(ctx, workflowResultContextKey, &resultPtr)
+	d.rootCtx = WithValue(d.rootCtx, workflowResultContextKey, &resultPtr)
 
-	d.dispatcher = newDispatcher(ctx, func(ctx Context) {
+	d.dispatcher = newDispatcher(d.rootCtx, func(ctx Context) {
+		ctx, d.cancel = WithCancel(ctx)
 		r := &workflowResult{}
 		r.workflowResult, r.error = d.workflow.Execute(ctx, input)
 		rpp := getWorkflowResultPointerPointer(ctx)
 		*rpp = r
 	})
-	executeDispatcher(ctx, d.dispatcher)
+
+	getWorkflowEnvironment(d.rootCtx).RegisterCancel(func() {
+		// It is ok to call this method multiple times.
+		// it doesn't do anything new, the context remains cancelled.
+		d.cancel()
+	})
+}
+
+func (d *syncWorkflowDefinition) OnDecisionTaskStarted() {
+	executeDispatcher(d.rootCtx, d.dispatcher)
 }
 
 func (d *syncWorkflowDefinition) StackTrace() string {
@@ -306,7 +318,7 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 	panicErr := dispatcher.ExecuteUntilAllBlocked()
 	if panicErr != nil {
 		env := getWorkflowEnvironment(ctx)
-		env.GetLogger().Error("Dispatcher panic.", zap.Error(panicErr))
+		env.GetLogger().Error("Dispatcher panic.", zap.String("PanicStack", panicErr.StackTrace()))
 		env.Complete(nil, NewErrorWithDetails(panicErr.Error(), []byte(panicErr.StackTrace())))
 		return
 	}
@@ -479,16 +491,20 @@ func (s *coroutineState) yield(status string) {
 }
 
 func getStackTrace(coroutineName, status string, stackDepth int) string {
+	top := fmt.Sprintf("coroutine %s [%s]:", coroutineName, status)
+	// Omit top stackDepth frames + top status line.
+	// Omit bottom two frames which is wrapping of coroutine in a goroutine.
+	return getStackTraceRaw(top, stackDepth*2+1, 4)
+}
+
+func getStackTraceRaw(top string, omitTop, omitBottom int) string {
 	stack := stackBuf[:runtime.Stack(stackBuf[:], false)]
 	rawStack := fmt.Sprintf("%s", strings.TrimRightFunc(string(stack), unicode.IsSpace))
 	if disableCleanStackTraces {
 		return rawStack
 	}
 	lines := strings.Split(rawStack, "\n")
-	// Omit top stackDepth frames + top status line.
-	// Omit bottom two frames which is wrapping of coroutine in a goroutine.
-	lines = lines[stackDepth*2+1 : len(lines)-4]
-	top := fmt.Sprintf("coroutine %s [%s]:", coroutineName, status)
+	lines = lines[omitTop : len(lines)-omitBottom]
 	lines = append([]string{top}, lines...)
 	return strings.Join(lines, "\n")
 }
@@ -526,7 +542,7 @@ func (s *coroutineState) stackTrace() string {
 	}
 	stackCh := make(chan string, 1)
 	s.unblock <- func(status string, stackDepth int) bool {
-		stackCh <- getStackTrace(s.name, status, stackDepth+1)
+		stackCh <- getStackTrace(s.name, status, stackDepth+2)
 		return true
 	}
 	return <-stackCh
@@ -577,7 +593,7 @@ func (d *dispatcherImpl) newNamedCoroutine(ctx Context, name string, f func(ctx 
 		defer crt.close()
 		defer func() {
 			if r := recover(); r != nil {
-				st := getStackTrace(name, "panic", 3)
+				st := getStackTrace(name, "panic", 4)
 				crt.panicError = newPanicError(r, st)
 			}
 		}()
@@ -854,6 +870,7 @@ type wfEnvironmentOptions struct {
 	taskListName                        *string
 	executionStartToCloseTimeoutSeconds *int32
 	taskStartToCloseTimeoutSeconds      *int32
+	domain                              *string
 }
 
 // decodeFutureImpl

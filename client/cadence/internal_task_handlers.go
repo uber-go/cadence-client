@@ -26,7 +26,7 @@ type (
 	workflowExecutionEventHandler interface {
 		// Process a single event and return the assosciated decisions.
 		// Return List of decisions made, whether a decision is unhandled, any error.
-		ProcessEvent(event *s.HistoryEvent, isReplay bool) ([]*s.Decision, bool, error)
+		ProcessEvent(event *s.HistoryEvent, isReplay bool, isLast bool) ([]*s.Decision, bool, error)
 		StackTrace() string
 		// Close for cleaning up resources on this event handler
 		Close()
@@ -125,12 +125,22 @@ func (eh *history) IsDecisionEvent(eventType s.EventType) bool {
 	}
 }
 
-func (eh *history) NextEvents() []*s.HistoryEvent {
-	return eh.getNextEvents()
-}
-
-func (eh *history) getNextEvents() []*s.HistoryEvent {
-
+// NextDecisionEvents returns events that there processed as new by the next decision.
+// It also reorders events that were added to a history during outgoing decision. Without
+// such reordering determinism is broken.
+// For Ex: (pseudo code)
+//   ResultA := Schedule_Activity_A
+//   ResultB := Schedule_Activity_B
+//   if ResultB.IsReady() { panic error }
+//   ResultC := Schedule_Activity_C(ResultA)
+// If both A and B activities complete then we could have two different paths, Either Scheduling C (or) Panic'ing.
+// Workflow events:
+// 	Workflow_Start, DecisionStart1, DecisionComplete1, A_Schedule, B_Schedule, A_Complete,
+//      DecisionStart2, B_Complete, DecisionComplete2, C_Schedule.
+// B_Complete happened concurrent to execution of the decision(2), where C_Schedule is a result made
+// by execution of decision(2).
+// To maintain determinism the concurrent decisions are moved to the one after the decisions made by current decision.
+func (eh *history) NextDecisionEvents() []*s.HistoryEvent {
 	if eh.currentIndex == eh.historyEventsSize {
 		return []*s.HistoryEvent{}
 	}
@@ -139,21 +149,9 @@ func (eh *history) getNextEvents() []*s.HistoryEvent {
 	reorderedEvents := []*s.HistoryEvent{}
 	history := eh.workflowTask.task.History
 
-	// We need to re-order the events so the decider always sees in the same order.
-	// For Ex: (pseudo code)
-	//   ResultA := Schedule_Activity_A
-	//   ResultB := Schedule_Activity_B
-	//   if ResultB.IsReady() { panic error }
-	//   ResultC := Schedule_Activity_C(ResultA)
-	// If both A and B activities complete then we could have two different paths, Either Scheduling C (or) Panic'ing.
-	// Workflow events:
-	// 	Workflow_Start, DecisionStart1, DecisionComplete1, A_Schedule, B_Schedule, A_Complete,
-	//      DecisionStart2, B_Complete, DecisionComplete2, C_Schedule.
-	// B_Complete happened concurrent to execution of the decision(2), where C_Schedule is a result made by execution of decision(2).
-	// One way to address is: Move all concurrent decisions to one after the decisions made by current decision.
-
 	decisionStartToCompletionEvents := []*s.HistoryEvent{}
 	decisionCompletionToStartEvents := []*s.HistoryEvent{}
+	var decisionStartedEvent *s.HistoryEvent
 	concurrentToDecision := true
 	lastDecisionIndex := -1
 
@@ -166,7 +164,8 @@ OrderEvents:
 				// Set replay clock.
 				ts := time.Unix(0, event.GetTimestamp())
 				eh.eventsHandler.workflowEnvironmentImpl.SetCurrentReplayTime(ts)
-				eh.currentIndex++ // Sine we already processed the current event
+				eh.currentIndex++ // Since we already processed the current event
+				decisionStartedEvent = event
 				break OrderEvents
 			}
 
@@ -203,7 +202,9 @@ OrderEvents:
 	if lastDecisionIndex+1 < len(decisionCompletionToStartEvents) {
 		reorderedEvents = append(reorderedEvents, decisionCompletionToStartEvents[lastDecisionIndex+1:]...)
 	}
-
+	if decisionStartedEvent != nil {
+		reorderedEvents = append(reorderedEvents, decisionStartedEvent)
+	}
 	return reorderedEvents
 }
 
@@ -285,13 +286,14 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	// Process events
 ProcessEvents:
 	for {
-		reorderedEvents := reorderedHistory.NextEvents()
+		reorderedEvents := reorderedHistory.NextDecisionEvents()
+
 		if len(reorderedEvents) == 0 {
 			break ProcessEvents
 		}
-
-		for _, event := range reorderedEvents {
-			isInReplay := event.GetEventId() < reorderedHistory.LastNonReplayedID()
+		isInReplay := reorderedEvents[0].GetEventId() < reorderedHistory.LastNonReplayedID()
+		for i, event := range reorderedEvents {
+			isLast := !isInReplay && i == len(reorderedEvents)-1
 			if isEventTypeRespondToDecision(event.GetEventType()) {
 				respondEvents = append(respondEvents, event)
 			}
@@ -305,7 +307,7 @@ ProcessEvents:
 				return nil, "", err
 			}
 
-			eventDecisions, unhandled, err := eventHandler.ProcessEvent(event, isInReplay)
+			eventDecisions, unhandled, err := eventHandler.ProcessEvent(event, isInReplay, isLast)
 			if err != nil {
 				return nil, "", err
 			}
@@ -328,7 +330,6 @@ ProcessEvents:
 			}
 		}
 	}
-
 	// check if decisions from reply matches to the history events
 	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
 		wth.logger.Error("Replay and history mismatch.", zap.Error(err))
@@ -384,6 +385,10 @@ func isEventTypeRespondToDecision(t s.EventType) bool {
 	case s.EventType_WorkflowExecutionFailed:
 		return true
 	case s.EventType_MarkerRecorded:
+		return true
+	case s.EventType_RequestCancelExternalWorkflowExecutionInitiated:
+		return true
+	case s.EventType_WorkflowExecutionCanceled:
 		return true
 	default:
 		return false
@@ -505,17 +510,56 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 
 		return true
+
+	case s.DecisionType_RequestCancelExternalWorkflowExecution:
+		if e.GetEventType() != s.EventType_RequestCancelExternalWorkflowExecutionInitiated {
+			return false
+		}
+		eventAttributes := e.GetRequestCancelExternalWorkflowExecutionInitiatedEventAttributes()
+		decisionAttributes := d.GetRequestCancelExternalWorkflowExecutionDecisionAttributes()
+		if eventAttributes.GetDomain() != decisionAttributes.GetDomain() ||
+			eventAttributes.GetWorkflowExecution().GetWorkflowId() != decisionAttributes.GetWorkflowId() ||
+			eventAttributes.GetWorkflowExecution().GetRunId() != decisionAttributes.GetRunId() {
+			return false
+		}
+
+		return true
+
+	case s.DecisionType_CancelWorkflowExecution:
+		if e.GetEventType() != s.EventType_WorkflowExecutionCanceled {
+			return false
+		}
+		eventAttributes := e.GetWorkflowExecutionCanceledEventAttributes()
+		decisionAttributes := d.GetCancelWorkflowExecutionDecisionAttributes()
+		if strictMode {
+			if bytes.Compare(eventAttributes.GetDetails(), decisionAttributes.GetDetails()) != 0 {
+				return false
+			}
+		}
+		return true
+
 	}
 
 	return false
 }
 
 func (wth *workflowTaskHandlerImpl) completeWorkflow(
-	isWorkflowCompleted bool, unhandledDecision bool, completionResult []byte,
-	err error, startAttributes *s.WorkflowExecutionStartedEventAttributes) ([]*s.Decision, error) {
+	isWorkflowCompleted bool,
+	unhandledDecision bool,
+	completionResult []byte,
+	err error,
+	startAttributes *s.WorkflowExecutionStartedEventAttributes,
+) ([]*s.Decision, error) {
 	decisions := []*s.Decision{}
 	if !unhandledDecision {
-		if contErr, ok := err.(*continueAsNewError); ok {
+		if err == ErrCanceled {
+			// Workflow cancelled
+			cancelDecision := createNewDecision(s.DecisionType_CancelWorkflowExecution)
+			cancelDecision.CancelWorkflowExecutionDecisionAttributes = &s.CancelWorkflowExecutionDecisionAttributes{
+				Details: completionResult,
+			}
+			decisions = append(decisions, cancelDecision)
+		} else if contErr, ok := err.(*continueAsNewError); ok {
 			// Continue as new error.
 
 			// Get workflow start attributes.
@@ -654,7 +698,7 @@ func newServiceInvoker(
 }
 
 // Execute executes an implementation of the activity.
-func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (interface{}, error) {
+func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (result interface{}, err error) {
 	ath.logger.Debug("Processing new activity task",
 		zap.String(tagWorkflowID, t.GetWorkflowExecution().GetWorkflowId()),
 		zap.String(tagRunID, t.GetWorkflowExecution().GetRunId()),
@@ -666,13 +710,24 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (i
 	}
 	canCtx, cancel := context.WithCancel(rootCtx)
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel)
-	ctx := WithActivityTask(canCtx, t, invoker, ath.logger, ath.userContext)
+	ctx := WithActivityTask(canCtx, t, invoker, ath.logger)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.implementations[flowActivityTypeFrom(activityType)]
 	if !ok {
 		// Couldn't find the activity implementation.
 		return nil, fmt.Errorf("No implementation for activityType=%v", activityType.GetName())
 	}
+
+	// panic handler
+	defer func() {
+		if p := recover(); p != nil {
+			topLine := fmt.Sprintf("activity for %s [panic]:", ath.taskListName)
+			st := getStackTraceRaw(topLine, 7, 0)
+			ath.logger.Error("Activity panic.", zap.String("PanicStack", st))
+			panicErr := newPanicError(p, st)
+			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr), nil
+		}
+	}()
 
 	output, err := activityImplementation.Execute(ctx, t.GetInput())
 	return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, output, err), nil

@@ -2,7 +2,6 @@ package cadence
 
 import (
 	"errors"
-
 	"github.com/pborman/uuid"
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
@@ -92,6 +91,25 @@ func (wc *workflowClient) StartWorkflow(
 		ID:    options.ID,
 		RunID: response.GetRunId()}
 	return executionInfo, nil
+}
+
+// CancelWorkflow cancels a workflow in execution.
+func (wc *workflowClient) CancelWorkflow(workflowID string, runID string) error {
+	request := &s.RequestCancelWorkflowExecutionRequest{
+		Domain: common.StringPtr(wc.domain),
+		WorkflowExecution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      common.StringPtr(runID),
+		},
+		Identity: common.StringPtr(wc.identity),
+	}
+
+	return backoff.Retry(
+		func() error {
+			ctx, cancel := common.NewTChannelContext(respondTaskServiceTimeOut, common.RetryDefaultOptions)
+			defer cancel()
+			return wc.workflowService.RequestCancelWorkflowExecution(ctx, request)
+		}, serviceOperationRetryPolicy, isServiceTransientError)
 }
 
 // TerminateWorkflow terminates a workflow execution.

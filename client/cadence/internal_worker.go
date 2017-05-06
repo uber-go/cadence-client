@@ -400,14 +400,12 @@ func (th *hostEnvImpl) RegisterWorkflow(af interface{}) error {
 	if _, ok := th.getWorkflowFn(fnName); ok {
 		return fmt.Errorf("workflow type \"%v\" is already registered", fnName)
 	}
-	fmt.Printf("RegisterWorkflow: %v\n", fnName)
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
 	fnName, af = th.invokeInterceptors(fnName, af, th.workflowRegistrationInterceptors)
 	th.addWorkflowFn(fnName, af)
-	fmt.Printf("RegisterWorkflow: %v\n", fnName)
 	return nil
 }
 
@@ -422,14 +420,12 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	if _, ok := th.getActivityFn(fnName); ok {
 		return fmt.Errorf("activity type \"%v\" is already registered", fnName)
 	}
-	fmt.Printf("RegisterActivity: %v\n", fnName)
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
 	fnName, af = th.invokeInterceptors(fnName, af, th.activityRegistrationInterceptors)
 	th.addActivityFn(fnName, af)
-	fmt.Printf("RegisterActivity: %v\n", fnName)
 	return nil
 }
 

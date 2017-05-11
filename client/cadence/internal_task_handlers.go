@@ -25,8 +25,8 @@ type (
 	// workflowExecutionEventHandler process a single event.
 	workflowExecutionEventHandler interface {
 		// Process a single event and return the assosciated decisions.
-		// Return List of decisions made, whether a decision is unhandled, any error.
-		ProcessEvent(event *s.HistoryEvent, isReplay bool, isLast bool) ([]*s.Decision, bool, error)
+		// Return List of decisions made, any error.
+		ProcessEvent(event *s.HistoryEvent, isReplay bool, isLast bool) ([]*s.Decision, error)
 		StackTrace() string
 		// Close for cleaning up resources on this event handler
 		Close()
@@ -287,7 +287,6 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	decisions := []*s.Decision{}
 	replayDecisions := []*s.Decision{}
 	respondEvents := []*s.HistoryEvent{}
-	unhandledDecision := false
 
 	startTime := time.Now()
 
@@ -315,12 +314,9 @@ ProcessEvents:
 				return nil, "", err
 			}
 
-			eventDecisions, unhandled, err := eventHandler.ProcessEvent(event, isInReplay, isLast)
+			eventDecisions, err := eventHandler.ProcessEvent(event, isInReplay, isLast)
 			if err != nil {
 				return nil, "", err
-			}
-			if unhandled {
-				unhandledDecision = unhandled
 			}
 
 			if eventDecisions != nil {
@@ -350,7 +346,7 @@ ProcessEvents:
 		return nil, "", err
 	}
 	eventDecisions, err := wth.completeWorkflow(
-		isWorkflowCompleted, unhandledDecision, completionResult, failure, startAttributes)
+		isWorkflowCompleted, completionResult, failure, startAttributes)
 	if err != nil {
 		wth.logger.Error("Complete workflow failed.", zap.Error(err))
 		return nil, "", err
@@ -553,71 +549,68 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 
 func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	isWorkflowCompleted bool,
-	unhandledDecision bool,
 	completionResult []byte,
 	err error,
 	startAttributes *s.WorkflowExecutionStartedEventAttributes,
 ) ([]*s.Decision, error) {
 	decisions := []*s.Decision{}
-	if !unhandledDecision {
-		if err == ErrCanceled {
-			// Workflow cancelled
-			cancelDecision := createNewDecision(s.DecisionType_CancelWorkflowExecution)
-			cancelDecision.CancelWorkflowExecutionDecisionAttributes = &s.CancelWorkflowExecutionDecisionAttributes{
-				Details: completionResult,
-			}
-			decisions = append(decisions, cancelDecision)
-		} else if contErr, ok := err.(*continueAsNewError); ok {
-			// Continue as new error.
-
-			// Get workflow start attributes.
-			// task list name.
-			var taskListName string
-			if contErr.options.taskListName != nil {
-				taskListName = *contErr.options.taskListName
-			} else {
-				taskListName = startAttributes.TaskList.GetName()
-			}
-
-			// timeouts.
-			var executionStartToCloseTimeoutSeconds, taskStartToCloseTimeoutSeconds int32
-			if contErr.options.executionStartToCloseTimeoutSeconds != nil {
-				executionStartToCloseTimeoutSeconds = *contErr.options.executionStartToCloseTimeoutSeconds
-			} else {
-				executionStartToCloseTimeoutSeconds = startAttributes.GetExecutionStartToCloseTimeoutSeconds()
-			}
-			if contErr.options.taskStartToCloseTimeoutSeconds != nil {
-				taskStartToCloseTimeoutSeconds = *contErr.options.taskStartToCloseTimeoutSeconds
-			} else {
-				taskStartToCloseTimeoutSeconds = startAttributes.GetTaskStartToCloseTimeoutSeconds()
-			}
-
-			continueAsNewDecision := createNewDecision(s.DecisionType_ContinueAsNewWorkflowExecution)
-			continueAsNewDecision.ContinueAsNewWorkflowExecutionDecisionAttributes = &s.ContinueAsNewWorkflowExecutionDecisionAttributes{
-				WorkflowType: workflowTypePtr(*contErr.options.workflowType),
-				Input:        contErr.options.input,
-				TaskList:     common.TaskListPtr(s.TaskList{Name: common.StringPtr(taskListName)}),
-				ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionStartToCloseTimeoutSeconds),
-				TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(taskStartToCloseTimeoutSeconds),
-			}
-			decisions = append(decisions, continueAsNewDecision)
-		} else if err != nil {
-			// Workflow failures
-			failDecision := createNewDecision(s.DecisionType_FailWorkflowExecution)
-			reason, details := getErrorDetails(err)
-			failDecision.FailWorkflowExecutionDecisionAttributes = &s.FailWorkflowExecutionDecisionAttributes{
-				Reason:  common.StringPtr(reason),
-				Details: details,
-			}
-			decisions = append(decisions, failDecision)
-		} else if isWorkflowCompleted {
-			// Workflow completion
-			completeDecision := createNewDecision(s.DecisionType_CompleteWorkflowExecution)
-			completeDecision.CompleteWorkflowExecutionDecisionAttributes = &s.CompleteWorkflowExecutionDecisionAttributes{
-				Result_: completionResult,
-			}
-			decisions = append(decisions, completeDecision)
+	if err == ErrCanceled {
+		// Workflow cancelled
+		cancelDecision := createNewDecision(s.DecisionType_CancelWorkflowExecution)
+		cancelDecision.CancelWorkflowExecutionDecisionAttributes = &s.CancelWorkflowExecutionDecisionAttributes{
+			Details: completionResult,
 		}
+		decisions = append(decisions, cancelDecision)
+	} else if contErr, ok := err.(*continueAsNewError); ok {
+		// Continue as new error.
+
+		// Get workflow start attributes.
+		// task list name.
+		var taskListName string
+		if contErr.options.taskListName != nil {
+			taskListName = *contErr.options.taskListName
+		} else {
+			taskListName = startAttributes.TaskList.GetName()
+		}
+
+		// timeouts.
+		var executionStartToCloseTimeoutSeconds, taskStartToCloseTimeoutSeconds int32
+		if contErr.options.executionStartToCloseTimeoutSeconds != nil {
+			executionStartToCloseTimeoutSeconds = *contErr.options.executionStartToCloseTimeoutSeconds
+		} else {
+			executionStartToCloseTimeoutSeconds = startAttributes.GetExecutionStartToCloseTimeoutSeconds()
+		}
+		if contErr.options.taskStartToCloseTimeoutSeconds != nil {
+			taskStartToCloseTimeoutSeconds = *contErr.options.taskStartToCloseTimeoutSeconds
+		} else {
+			taskStartToCloseTimeoutSeconds = startAttributes.GetTaskStartToCloseTimeoutSeconds()
+		}
+
+		continueAsNewDecision := createNewDecision(s.DecisionType_ContinueAsNewWorkflowExecution)
+		continueAsNewDecision.ContinueAsNewWorkflowExecutionDecisionAttributes = &s.ContinueAsNewWorkflowExecutionDecisionAttributes{
+			WorkflowType: workflowTypePtr(*contErr.options.workflowType),
+			Input:        contErr.options.input,
+			TaskList:     common.TaskListPtr(s.TaskList{Name: common.StringPtr(taskListName)}),
+			ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionStartToCloseTimeoutSeconds),
+			TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(taskStartToCloseTimeoutSeconds),
+		}
+		decisions = append(decisions, continueAsNewDecision)
+	} else if err != nil {
+		// Workflow failures
+		failDecision := createNewDecision(s.DecisionType_FailWorkflowExecution)
+		reason, details := getErrorDetails(err)
+		failDecision.FailWorkflowExecutionDecisionAttributes = &s.FailWorkflowExecutionDecisionAttributes{
+			Reason:  common.StringPtr(reason),
+			Details: details,
+		}
+		decisions = append(decisions, failDecision)
+	} else if isWorkflowCompleted {
+		// Workflow completion
+		completeDecision := createNewDecision(s.DecisionType_CompleteWorkflowExecution)
+		completeDecision.CompleteWorkflowExecutionDecisionAttributes = &s.CompleteWorkflowExecutionDecisionAttributes{
+			Result_: completionResult,
+		}
+		decisions = append(decisions, completeDecision)
 	}
 	return decisions, nil
 }

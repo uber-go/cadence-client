@@ -276,9 +276,9 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	event *m.HistoryEvent,
 	isReplay bool,
 	isLast bool,
-) ([]*m.Decision, bool, error) {
+) ([]*m.Decision, error) {
 	if event == nil {
-		return nil, false, errors.New("nil event provided")
+		return nil, errors.New("nil event provided")
 	}
 
 	weh.isReplay = isReplay
@@ -288,13 +288,11 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 			zap.String(tagEventType, event.GetEventType().String()))
 	}
 
-	unhandledDecision := false
-
 	switch event.GetEventType() {
 	case m.EventType_WorkflowExecutionStarted:
 		err := weh.handleWorkflowExecutionStarted(event.WorkflowExecutionStartedEventAttributes)
 		if err != nil {
-			return nil, unhandledDecision, err
+			return nil, err
 		}
 
 	case m.EventType_WorkflowExecutionCompleted:
@@ -320,19 +318,19 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	case m.EventType_ActivityTaskCompleted:
 		err := weh.handleActivityTaskCompleted(event.ActivityTaskCompletedEventAttributes)
 		if err != nil {
-			return nil, unhandledDecision, err
+			return nil, err
 		}
 
 	case m.EventType_ActivityTaskFailed:
 		err := weh.handleActivityTaskFailed(event.ActivityTaskFailedEventAttributes)
 		if err != nil {
-			return nil, unhandledDecision, err
+			return nil, err
 		}
 
 	case m.EventType_ActivityTaskTimedOut:
 		err := weh.handleActivityTaskTimedOut(event.ActivityTaskTimedOutEventAttributes)
 		if err != nil {
-			return nil, unhandledDecision, err
+			return nil, err
 		}
 
 	case m.EventType_ActivityTaskCancelRequested:
@@ -343,7 +341,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	case m.EventType_ActivityTaskCanceled:
 		err := weh.handleActivityTaskCanceled(event.ActivityTaskCanceledEventAttributes)
 		if err != nil {
-			return nil, unhandledDecision, err
+			return nil, err
 		}
 
 	case m.EventType_TimerStarted:
@@ -351,7 +349,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	case m.EventType_TimerFired:
 		err := weh.handleTimerFired(event.TimerFiredEventAttributes)
 		if err != nil {
-			return nil, unhandledDecision, err
+			return nil, err
 		}
 
 	case m.EventType_TimerCanceled:
@@ -373,7 +371,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		// No Operation.
 
 	default:
-		return nil, unhandledDecision, fmt.Errorf("missing event handler for event type: %v", event)
+		return nil, fmt.Errorf("missing event handler for event type: %v", event)
 	}
 
 	// Invoke any pending post event hooks that have been added while processing the event.
@@ -391,7 +389,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		weh.workflowDefinition.OnDecisionTaskStarted()
 	}
 
-	return weh.SwapExecuteDecisions([]*m.Decision{}), unhandledDecision, nil
+	return weh.SwapExecuteDecisions([]*m.Decision{}), nil
 }
 
 func (weh *workflowExecutionEventHandlerImpl) StackTrace() string {

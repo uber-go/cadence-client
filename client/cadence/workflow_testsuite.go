@@ -27,11 +27,11 @@ const (
 )
 
 type (
-	// EncodedResult is type alias used to encapsulate/extract encoded result from workflow/activity.
-	EncodedResult []byte
+	// EncodedValue is type alias used to encapsulate/extract encoded result from workflow/activity.
+	EncodedValue []byte
 
-	// EncodedArgs is a type alias used to encapsulate/extract encoded arguments from workflow/activity.
-	EncodedArgs []byte
+	// EncodedValues is a type alias used to encapsulate/extract encoded arguments from workflow/activity.
+	EncodedValues []byte
 
 	timerHandle struct {
 		callback resultHandler
@@ -86,15 +86,15 @@ type (
 		scheduledActivities map[string]*activityHandle
 		scheduledTimers     map[string]*timerHandle
 
-		onActivityStartedListener func(ctx context.Context, args EncodedArgs, activityType string)
-		onActivityEndedListener   func(result EncodedResult, err error, activityType string)
+		onActivityStartedListener func(ctx context.Context, args EncodedValues, activityType string)
+		onActivityEndedListener   func(result EncodedValue, err error, activityType string)
 		onTimerScheduledListener  func(timerID string, duration time.Duration)
 		onTimerFiredListener      func(timerID string)
 		onTimerCancelledListener  func(timerID string)
 
 		callbackChannel chan callbackHandle
 		isTestCompleted bool
-		testResult      EncodedResult
+		testResult      EncodedValue
 		testError       error
 
 		autoStartDecisionTask  bool
@@ -108,13 +108,13 @@ type (
 	}
 )
 
-// GetResult extract data from encoded data to desired value type. valuePtr is pointer to the actual result struct.
-func (b EncodedResult) GetResult(valuePtr interface{}) error {
+// Get extract data from encoded data to desired value type. valuePtr is pointer to the actual value type.
+func (b EncodedValue) Get(valuePtr interface{}) error {
 	return getHostEnvironment().decodeArg(b, valuePtr)
 }
 
-// GetArgs extract arguments from encoded data to desired value type. valuePtrs are pointers to the actual arguments.
-func (b EncodedArgs) GetArgs(valuePtrs ...interface{}) error {
+// Get extract values from encoded data to desired value type. valuePtrs are pointers to the actual value types.
+func (b EncodedValues) Get(valuePtrs ...interface{}) error {
 	return getHostEnvironment().decode(b, valuePtrs)
 }
 
@@ -204,7 +204,8 @@ func (s *WorkflowTestSuite) NewTestWorkflowEnvironment() *TestWorkflowEnvironmen
 	return env
 }
 
-// RegisterWorkflow register a workflow
+// RegisterWorkflow registers a workflow that could be used by tests of this WorkflowTestSuite instance. All workflow registered
+// via cadence.RegisterWorkflow() are still valid and will be available to all tests of all instance of WorkflowTestSuite.
 func (s *WorkflowTestSuite) RegisterWorkflow(workflowFunc interface{}) {
 	err := s.hostEnv.RegisterWorkflow(workflowFunc)
 	if err != nil {
@@ -212,7 +213,14 @@ func (s *WorkflowTestSuite) RegisterWorkflow(workflowFunc interface{}) {
 	}
 }
 
-// RegisterActivity register an activity with given task list
+// RegisterActivity registers an activity with given task list that could be used by tests of this WorkflowTestSuite instance
+// for that given tasklist. Activities registered via cadence.RegisterActivity() are still valid and will be available
+// to all tests of all instances of WorkflowTestSuite for any tasklist. However, if an activity is registered via this
+// WorkflowTestSuite.RegisterActivity() with a given tasklist, that activity will only be visible to that registered tasklist
+// in tests of this WorkflowTestSuite instance, even if that activity was also registered via cadence.RegisterActivity().
+// Example: ActivityA, ActivityB are registered via cadence.RegisterActivity(). These 2 activities will be visible to all
+// tests of any instance of WorkflowTestSuite. If testSuite1 register ActivityA to task-list-1, then ActivityA will only
+// be visible to task-list-1 for tests of testSuite1, and ActivityB will be visible to all tasklist for tests of testSuite1.
 func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}, taskList string) {
 	fnName := getFunctionName(activityFn)
 
@@ -235,13 +243,13 @@ func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}, taskList st
 
 // ExecuteWorkflow executes a workflow, wait until workflow complete or idleTimeout. It returns whether workflow is completed,
 // the workflow result, and error. Returned isCompleted could be false if the workflow is blocked by activity or timer and
-// cannot make progress within idleTimeout. If isCompleted is true, caller should use EncodedResult.GetResult() to extract
+// cannot make progress within idleTimeout. If isCompleted is true, caller should use EncodedValue.Get() to extract
 // strong typed result value.
 func (s *WorkflowTestSuite) ExecuteWorkflow(
 	idleTimeout time.Duration,
 	workflowFn interface{},
 	args ...interface{},
-) (isCompleted bool, result EncodedResult, err error) {
+) (isCompleted bool, result EncodedValue, err error) {
 	env := s.StartWorkflow(workflowFn, args...)
 	env.StartDispatcherLoop(idleTimeout)
 	return env.IsTestCompleted(), env.GetTestResult(), env.GetTestError()
@@ -316,11 +324,11 @@ func (env *TestWorkflowEnvironment) Override(activityFn, fakeActivityFn interfac
 }
 
 // ExecuteActivity executes an activity. The tested activity will be executed synchronously in the calling goroutinue.
-// Caller should use EncodedResult.GetResult() to extract strong typed result value.
-func (env *TestWorkflowEnvironment) ExecuteActivity(activityFn interface{}, args ...interface{}) (EncodedResult, error) {
+// Caller should use EncodedValue.Get() to extract strong typed result value.
+func (env *TestWorkflowEnvironment) ExecuteActivity(activityFn interface{}, args ...interface{}) (EncodedValue, error) {
 	fnName := getFunctionName(activityFn)
 
-	input, err := env.testSuite.hostEnv.encodeArgs(args)
+	input, err := getHostEnvironment().encodeArgs(args)
 	if err != nil {
 		panic(err)
 	}
@@ -343,7 +351,7 @@ func (env *TestWorkflowEnvironment) ExecuteActivity(activityFn interface{}, args
 	case *shared.RespondActivityTaskFailedRequest:
 		return nil, NewErrorWithDetails(*request.Reason, request.Details)
 	case *shared.RespondActivityTaskCompletedRequest:
-		return EncodedResult(request.Result_), nil
+		return EncodedValue(request.Result_), nil
 	default:
 		// will never happen
 		return nil, fmt.Errorf("unsupported respond type %T", result)
@@ -403,12 +411,12 @@ func (t *TestWorkflowEnvironment) EnableClockFastForwardWhenBlockedByTimer(enabl
 }
 
 // SetOnActivityStartedListener sets a listener that will be called when an activity task started.
-func (t *TestWorkflowEnvironment) SetOnActivityStartedListener(listener func(ctx context.Context, args EncodedArgs, activityType string)) {
+func (t *TestWorkflowEnvironment) SetOnActivityStartedListener(listener func(ctx context.Context, args EncodedValues, activityType string)) {
 	t.onActivityStartedListener = listener
 }
 
 // SetOnActivityEndedListener sets a listener that will be called when an activity task ended.
-func (t *TestWorkflowEnvironment) SetOnActivityEndedListener(listener func(result EncodedResult, err error, activityType string)) {
+func (t *TestWorkflowEnvironment) SetOnActivityEndedListener(listener func(result EncodedValue, err error, activityType string)) {
 	t.onActivityEndedListener = listener
 }
 
@@ -548,7 +556,7 @@ func (t *TestWorkflowEnvironment) complete(result []byte, err error) {
 		return
 	}
 	t.isTestCompleted = true
-	t.testResult = EncodedResult(result)
+	t.testResult = EncodedValue(result)
 	t.testError = err
 
 	if err == ErrCanceled && t.workflowCancelHandler != nil {
@@ -562,7 +570,7 @@ func (t *TestWorkflowEnvironment) IsTestCompleted() bool {
 }
 
 // GetTestResult return the encoded result from test workflow
-func (t *TestWorkflowEnvironment) GetTestResult() EncodedResult {
+func (t *TestWorkflowEnvironment) GetTestResult() EncodedValue {
 	return t.testResult
 }
 
@@ -671,7 +679,7 @@ func (t *TestWorkflowEnvironment) handleActivityResult(activityID string, result
 	}
 
 	if t.onActivityEndedListener != nil {
-		t.onActivityEndedListener(EncodedResult(blob), err, activityType)
+		t.onActivityEndedListener(EncodedValue(blob), err, activityType)
 	}
 	if t.autoStartDecisionTask {
 		t.StartDecisionTask()
@@ -682,7 +690,7 @@ func (t *TestWorkflowEnvironment) handleActivityResult(activityID string, result
 func (a *activityExecutorWrapper) Execute(ctx context.Context, input []byte) ([]byte, error) {
 	if a.env.onActivityStartedListener != nil {
 		a.env.postCallback(func() {
-			a.env.onActivityStartedListener(ctx, EncodedArgs(input), a.ActivityType().Name)
+			a.env.onActivityStartedListener(ctx, EncodedValues(input), a.ActivityType().Name)
 		}, false)
 	}
 	return a.activity.Execute(ctx, input)

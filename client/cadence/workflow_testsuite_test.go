@@ -41,7 +41,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityOverride() {
 	s.True(env.IsTestCompleted())
 	s.NoError(env.GetTestError())
 	var result string
-	err := env.GetTestResult().GetResult(&result)
+	err := env.GetTestResult().Get(&result)
 	s.NoError(err)
 	s.Equal("fake_world", result)
 }
@@ -67,9 +67,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 	env := s.StartWorkflowPart(workflowPart)
 
 	var activityCalls []string
-	env.SetOnActivityStartedListener(func(ctx context.Context, args EncodedArgs, activityType string) {
+	env.SetOnActivityStartedListener(func(ctx context.Context, args EncodedValues, activityType string) {
 		var input string
-		s.NoError(args.GetArgs(&input))
+		s.NoError(args.Get(&input))
 		activityCalls = append(activityCalls, fmt.Sprintf("%s:%s", activityType, input))
 	})
 	expectedCalls := []string{
@@ -156,7 +156,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask(
 
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
-	env.SetOnActivityEndedListener(func(EncodedResult, error, string) {
+	env.SetOnActivityEndedListener(func(EncodedValue, error, string) {
 		wg.Done()
 	})
 	env.SetOnTimerScheduledListener(func(timerID string, duration time.Duration) {
@@ -175,7 +175,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask(
 	s.NoError(env.GetTestError())
 	s.NotNil(env.GetTestResult())
 	var result string
-	err := env.GetTestResult().GetResult(&result)
+	err := env.GetTestResult().Get(&result)
 	s.NoError(err)
 	s.Equal("hello_controlled_execution", result)
 }
@@ -209,7 +209,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 	blob, err := env.ExecuteActivity(activityWithUserContext, testKey)
 	s.NoError(err)
 	var value string
-	blob.GetResult(&value)
+	blob.Get(&value)
 	s.Equal(testValue, value)
 }
 
@@ -234,7 +234,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
 	s.True(env.IsTestCompleted())
 	s.NoError(env.GetTestError())
 	var result string
-	err = env.GetTestResult().GetResult(&result)
+	err = env.GetTestResult().Get(&result)
 	s.NoError(err)
 	s.Equal("async_complete", result)
 }

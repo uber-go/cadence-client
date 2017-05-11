@@ -109,6 +109,8 @@ func (eh *history) IsNextDecisionFailed(startIndex int) bool {
 			return false
 		case s.EventType_DecisionTaskTimedOut:
 			return true
+		case s.EventType_DecisionTaskFailed:
+			return true
 		}
 	}
 	return false

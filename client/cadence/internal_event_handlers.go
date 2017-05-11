@@ -296,19 +296,21 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		}
 
 	case m.EventType_WorkflowExecutionCompleted:
-	// No Operation
+		// No Operation
 	case m.EventType_WorkflowExecutionFailed:
-	// No Operation
+		// No Operation
 	case m.EventType_WorkflowExecutionTimedOut:
-	// TODO:
+		// No Operation
 	case m.EventType_DecisionTaskScheduled:
-	// No Operation
+		// No Operation
 	case m.EventType_DecisionTaskStarted:
 		weh.workflowDefinition.OnDecisionTaskStarted()
 	case m.EventType_DecisionTaskTimedOut:
-	// TODO:
+		// No Operation
+	case m.EventType_DecisionTaskFailed:
+		// No Operation
 	case m.EventType_DecisionTaskCompleted:
-	// TODO:
+		// No Operation
 	case m.EventType_ActivityTaskScheduled:
 		attributes := event.ActivityTaskScheduledEventAttributes
 		weh.scheduledEventIDToActivityID[event.GetEventId()] = attributes.GetActivityId()

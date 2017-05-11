@@ -57,7 +57,7 @@ type (
 
 	taskListSpecificActivity struct {
 		fn        interface{}
-		taskLists map[string]bool
+		taskLists map[string]struct{}
 	}
 
 	// WorkflowTestSuite is the test suite to run unit tests for workflow/activity.
@@ -227,10 +227,10 @@ func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}, taskList st
 
 	taskListActivity, ok := s.taskListSpecificActivities[fnName]
 	if !ok {
-		taskListActivity = &taskListSpecificActivity{fn: activityFn, taskLists: make(map[string]bool)}
+		taskListActivity = &taskListSpecificActivity{fn: activityFn, taskLists: make(map[string]struct{})}
 		s.taskListSpecificActivities[fnName] = taskListActivity
 	}
-	taskListActivity.taskLists[taskList] = true
+	taskListActivity.taskLists[taskList] = struct{}{}
 }
 
 // ExecuteWorkflow executes a workflow, wait until workflow complete or idleTimeout. It returns whether workflow is completed,

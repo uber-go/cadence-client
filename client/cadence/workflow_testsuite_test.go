@@ -16,13 +16,20 @@ const testTaskList = "test-task-list"
 
 type WorkflowTestSuiteUnitTest struct {
 	WorkflowTestSuite
-	clock *clock.Mock
+	clock           *clock.Mock
+	activityOptions ActivityOptions
 }
 
 func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 	s.clock = clock.NewMock()
-	s.RegisterWorkflow(testWorkflowHello)
+	s.activityOptions = NewActivityOptions().
+		WithTaskList(testTaskList).
+		WithScheduleToCloseTimeout(time.Minute).
+		WithScheduleToStartTimeout(time.Minute).
+		WithStartToCloseTimeout(time.Minute).
+		WithHeartbeatTimeout(time.Second * 20)
 	s.RegisterActivity(testActivityHello, testTaskList)
+	s.RegisterActivity(testActivityWithSleep, testTaskList)
 }
 
 func TestUnitTestSuite(t *testing.T) {
@@ -35,7 +42,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityOverride() {
 	}
 
 	env := s.StartWorkflow(testWorkflowHello)
-	env.Override(testActivityHello, fakeActivity)
+	env.OverrideActivity(testActivityHello, fakeActivity)
 	env.StartDispatcherLoop(time.Second)
 
 	s.True(env.IsTestCompleted())
@@ -47,13 +54,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityOverride() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
-	workflowPart := func(ctx Context) error {
-		ctx = WithActivityOptions(ctx, NewActivityOptions().
-			WithTaskList(testTaskList).
-			WithScheduleToCloseTimeout(time.Minute).
-			WithScheduleToStartTimeout(time.Minute).
-			WithStartToCloseTimeout(time.Minute).
-			WithHeartbeatTimeout(time.Second*20))
+	workflowFn := func(ctx Context) error {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
 
 		for i := 1; i <= 3; i++ {
 			err := ExecuteActivity(ctx, testActivityHello, fmt.Sprintf("msg%d", i)).Get(ctx, nil)
@@ -64,7 +66,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 		return nil
 	} // END of workflow code
 
-	env := s.StartWorkflowPart(workflowPart)
+	env := s.StartWorkflow(workflowFn)
 
 	var activityCalls []string
 	env.SetOnActivityStartedListener(func(ctx context.Context, args EncodedValues, activityType string) {
@@ -111,7 +113,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_TimerWorkflow_ClockAutoFastForward() {
 		return nil
 	}
 
-	env := s.StartWorkflowPart(workflowFn)
+	env := s.StartWorkflow(workflowFn)
 	env.StartDispatcherLoop(time.Second)
 
 	s.True(env.IsTestCompleted())
@@ -120,15 +122,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_TimerWorkflow_ClockAutoFastForward() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask() {
-	workflowPart := func(ctx Context) (string, error) {
+	workflowFn := func(ctx Context) (string, error) {
 		f1 := NewTimer(ctx, time.Second*2)
-		ctx = WithActivityOptions(ctx, NewActivityOptions().
-			WithTaskList(testTaskList).
-			WithScheduleToCloseTimeout(time.Minute).
-			WithScheduleToStartTimeout(time.Minute).
-			WithStartToCloseTimeout(time.Minute).
-			WithHeartbeatTimeout(time.Second*20))
-
+		ctx = WithActivityOptions(ctx, s.activityOptions)
 		f2 := ExecuteActivity(ctx, testActivityHello, "controlled_execution")
 
 		timerErr := f1.Get(ctx, nil) // wait until timer fires
@@ -149,7 +145,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask(
 		return activityResult, nil
 	} // END of workflow code
 
-	env := s.StartWorkflowPart(workflowPart)
+	env := s.StartWorkflow(workflowFn)
 	env.SetClock(s.clock)
 	env.EnableAutoStartDecisionTask(false)              // manually control the execution
 	env.EnableClockFastForwardWhenBlockedByTimer(false) // disable auto clock fast forward
@@ -181,8 +177,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask(
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowActivityCancellation() {
-	s.RegisterWorkflow(testWorkflowActivityCancellation)
-	s.RegisterActivity(testActivityWithSleep, testTaskList)
 	env := s.StartWorkflow(testWorkflowActivityCancellation)
 	env.StartDispatcherLoop(time.Second)
 
@@ -221,7 +215,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
 	}
 
 	env := s.StartWorkflow(testWorkflowHello)
-	env.Override(testActivityHello, fakeActivity)
+	env.OverrideActivity(testActivityHello, fakeActivity)
 	env.StartDispatcherLoop(time.Millisecond)
 
 	s.False(env.IsTestCompleted())

@@ -206,8 +206,8 @@ func (s *WorkflowTestSuite) NewTestWorkflowEnvironment() *TestWorkflowEnvironmen
 
 // RegisterWorkflow registers a workflow that could be used by tests of this WorkflowTestSuite instance. All workflow registered
 // via cadence.RegisterWorkflow() are still valid and will be available to all tests of all instance of WorkflowTestSuite.
-func (s *WorkflowTestSuite) RegisterWorkflow(workflowFunc interface{}) {
-	err := s.hostEnv.RegisterWorkflow(workflowFunc)
+func (s *WorkflowTestSuite) RegisterWorkflow(workflowFn interface{}) {
+	err := s.hostEnv.RegisterWorkflow(workflowFn)
 	if err != nil {
 		panic(err)
 	}
@@ -241,17 +241,16 @@ func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}, taskList st
 	taskListActivity.taskLists[taskList] = struct{}{}
 }
 
-// ExecuteWorkflow executes a workflow, wait until workflow complete or idleTimeout. It returns whether workflow is completed,
-// the workflow result, and error. Returned isCompleted could be false if the workflow is blocked by activity or timer and
-// cannot make progress within idleTimeout. If isCompleted is true, caller should use EncodedValue.Get() to extract
-// strong typed result value.
+// ExecuteWorkflow executes a workflow, wait until workflow complete. It returns whether workflow is completed, the
+// workflow result, and error. Returned isCompleted could be false if the workflow is blocked by activity or timer and
+// cannot make progress. If isCompleted is true, caller should use EncodedValue.Get() to extract strong typed result value.
 func (s *WorkflowTestSuite) ExecuteWorkflow(
-	idleTimeout time.Duration,
 	workflowFn interface{},
 	args ...interface{},
 ) (isCompleted bool, result EncodedValue, err error) {
 	env := s.StartWorkflow(workflowFn, args...)
-	env.StartDispatcherLoop(idleTimeout)
+	// hard code idleTimeout to 1 minute, for use cases that needs more precisely control, use StartWorkflow().
+	env.StartDispatcherLoop(time.Minute)
 	return env.IsTestCompleted(), env.GetTestResult(), env.GetTestError()
 }
 
@@ -263,6 +262,11 @@ func (s *WorkflowTestSuite) StartWorkflow(workflowFn interface{}, args ...interf
 	case reflect.String:
 		workflowType = workflowFn.(string)
 	case reflect.Func:
+		// auto register workflow if it is not already registered
+		fnName := getFunctionName(workflowFn)
+		if _, ok := s.hostEnv.getWorkflowFn(fnName); !ok {
+			s.RegisterWorkflow(workflowFn)
+		}
 		workflowType = getFunctionName(workflowFn)
 	default:
 		panic("unsupported workflowFn")
@@ -290,20 +294,9 @@ func (s *WorkflowTestSuite) StartWorkflow(workflowFn interface{}, args ...interf
 	return env
 }
 
-// StartWorkflowPart wraps a function and test it just as if it is a workflow. You don's need to register workflowPartFn.
-func (s *WorkflowTestSuite) StartWorkflowPart(workflowPartFn interface{}, args ...interface{}) *TestWorkflowEnvironment {
-	// auto register workflow
-	fnName := getFunctionName(workflowPartFn)
-	if _, ok := s.hostEnv.getWorkflowFn(fnName); !ok {
-		s.RegisterWorkflow(workflowPartFn)
-	}
-
-	return s.StartWorkflow(workflowPartFn, args)
-}
-
-// Override overrides an actual activity with a fake activity. The fake activity will be invoked in place where the
+// OverrideActivity overrides an actual activity with a fake activity. The fake activity will be invoked in place where the
 // actual activity should have been invoked.
-func (env *TestWorkflowEnvironment) Override(activityFn, fakeActivityFn interface{}) {
+func (env *TestWorkflowEnvironment) OverrideActivity(activityFn, fakeActivityFn interface{}) {
 	// verify both functions are valid activity func
 	actualFnType := reflect.TypeOf(activityFn)
 	if err := validateFnFormat(actualFnType, false); err != nil {

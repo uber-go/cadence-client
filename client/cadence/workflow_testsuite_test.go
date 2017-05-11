@@ -21,9 +21,6 @@ type WorkflowTestSuiteUnitTest struct {
 
 func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 	s.clock = clock.NewMock()
-}
-
-func (s *WorkflowTestSuiteUnitTest) SetupTest() {
 	s.RegisterWorkflow(testWorkflowHello)
 	s.RegisterActivity(testActivityHello, testTaskList)
 }
@@ -36,9 +33,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityOverride() {
 	fakeActivity := func(ctx context.Context, msg string) (string, error) {
 		return "fake_" + msg, nil
 	}
-	s.Override(testActivityHello, fakeActivity)
 
 	env := s.StartWorkflow(testWorkflowHello)
+	env.Override(testActivityHello, fakeActivity)
 	env.StartDispatcherLoop(time.Second)
 
 	s.True(env.IsTestCompleted())
@@ -123,7 +120,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_TimerWorkflow_ClockAutoFastForward() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask() {
-	s.SetClock(s.clock)
 	workflowPart := func(ctx Context) (string, error) {
 		f1 := NewTimer(ctx, time.Second*2)
 		ctx = WithActivityOptions(ctx, NewActivityOptions().
@@ -154,6 +150,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask(
 	} // END of workflow code
 
 	env := s.StartWorkflowPart(workflowPart)
+	env.SetClock(s.clock)
 	env.EnableAutoStartDecisionTask(false)              // manually control the execution
 	env.EnableClockFastForwardWhenBlockedByTimer(false) // disable auto clock fast forward
 
@@ -197,7 +194,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 	testKey, testValue := "test_key", "test_value"
 	userCtx := context.WithValue(context.Background(), testKey, testValue)
 	workerOptions := NewWorkerOptions().WithActivityContext(userCtx)
-	s.SetWorkerOption(workerOptions)
 
 	// inline activity using value passing through user context.
 	activityWithUserContext := func(ctx context.Context, keyName string) (string, error) {
@@ -208,7 +204,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 		return "", errors.New("value not found from ctx")
 	}
 
-	blob, err := s.ExecuteActivity(activityWithUserContext, testKey)
+	env := s.NewTestWorkflowEnvironment()
+	env.SetWorkerOption(workerOptions)
+	blob, err := env.ExecuteActivity(activityWithUserContext, testKey)
 	s.NoError(err)
 	var value string
 	blob.GetResult(&value)
@@ -221,9 +219,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
 		activityInfo = GetActivityInfo(ctx)
 		return "", ErrActivityResultPending
 	}
-	s.Override(testActivityHello, fakeActivity)
 
 	env := s.StartWorkflow(testWorkflowHello)
+	env.Override(testActivityHello, fakeActivity)
 	env.StartDispatcherLoop(time.Millisecond)
 
 	s.False(env.IsTestCompleted())

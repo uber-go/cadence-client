@@ -65,16 +65,12 @@ type (
 		suite.Suite
 		hostEnv                    *hostEnvImpl
 		taskListSpecificActivities map[string]*taskListSpecificActivity
-		overrodeActivities         map[string]interface{} // map of registered-fnName -> fakeActivityFn
-
-		service       m.TChanWorkflowService
-		workerOptions WorkerOptions
-		logger        *zap.Logger
-		clock         clock.Clock
 	}
 
+	// TestWorkflowEnvironment is the environment that runs the workflow/activity unit tests.
 	TestWorkflowEnvironment struct {
-		testSuite *WorkflowTestSuite
+		testSuite          *WorkflowTestSuite
+		overrodeActivities map[string]interface{} // map of registered-fnName -> fakeActivityFn
 
 		service       m.TChanWorkflowService
 		workerOptions WorkerOptions
@@ -125,13 +121,14 @@ func (b EncodedArgs) GetArgs(valuePtrs ...interface{}) error {
 // SetT sets the testing.T instance. This method is called by testify to setup the testing.T for test suite.
 func (s *WorkflowTestSuite) SetT(t *testing.T) {
 	s.Suite.SetT(t)
-	s.hostEnv = &hostEnvImpl{
-		workflowFuncMap: make(map[string]interface{}),
-		activityFuncMap: make(map[string]interface{}),
-		encoding:        gobEncoding{},
+	if s.hostEnv == nil {
+		s.hostEnv = &hostEnvImpl{
+			workflowFuncMap: make(map[string]interface{}),
+			activityFuncMap: make(map[string]interface{}),
+			encoding:        gobEncoding{},
+		}
+		s.taskListSpecificActivities = make(map[string]*taskListSpecificActivity)
 	}
-	s.taskListSpecificActivities = make(map[string]*taskListSpecificActivity)
-	s.overrodeActivities = make(map[string]interface{})
 }
 
 // NewWorkflowTestSuite creates a WorkflowTestSuite
@@ -143,41 +140,15 @@ func NewWorkflowTestSuite() *WorkflowTestSuite {
 			encoding:        gobEncoding{},
 		},
 		taskListSpecificActivities: make(map[string]*taskListSpecificActivity),
-		overrodeActivities:         make(map[string]interface{}),
 	}
 }
 
-// SetLogger sets the logger for WorkflowTestSuite
-func (s *WorkflowTestSuite) SetLogger(logger *zap.Logger) *WorkflowTestSuite {
-	s.logger = logger
-	return s
-}
-
-// SetService sets the m.TChanWorkflowService for WorkflowTestSuite
-func (s *WorkflowTestSuite) SetService(service m.TChanWorkflowService) *WorkflowTestSuite {
-	s.service = service
-	return s
-}
-
-// SetClock sets the clock that will be used for WorkflowTestSuite
-func (s *WorkflowTestSuite) SetClock(clock clock.Clock) *WorkflowTestSuite {
-	s.clock = clock
-	return s
-}
-
-// SetWorkerOption sets the WorkerOptions for WorkflowTestSuite
-func (s *WorkflowTestSuite) SetWorkerOption(options WorkerOptions) *WorkflowTestSuite {
-	s.workerOptions = options
-	return s
-}
-
-func (s *WorkflowTestSuite) newTestWorkflowEnvironment() *TestWorkflowEnvironment {
+// NewTestWorkflowEnvironment create a new instance of TestWorkflowEnvironment
+func (s *WorkflowTestSuite) NewTestWorkflowEnvironment() *TestWorkflowEnvironment {
 	env := &TestWorkflowEnvironment{
-		testSuite:     s,
-		service:       s.service,
-		workerOptions: s.workerOptions,
-		logger:        s.logger,
-		clock:         s.clock,
+		testSuite: s,
+
+		overrodeActivities: make(map[string]interface{}),
 
 		workflowInfo: &WorkflowInfo{
 			WorkflowExecution: WorkflowExecution{
@@ -262,28 +233,6 @@ func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}, taskList st
 	taskListActivity.taskLists[taskList] = true
 }
 
-// Override overrides an actual activity with a fake activity. The fake activity will be invoked in place where the
-// actual activity should have been invoked.
-func (s *WorkflowTestSuite) Override(activityFn, fakeActivityFn interface{}) {
-	// verify both functions are valid activity func
-	actualFnType := reflect.TypeOf(activityFn)
-	if err := validateFnFormat(actualFnType, false); err != nil {
-		panic(err)
-	}
-	fakeFnType := reflect.TypeOf(fakeActivityFn)
-	if err := validateFnFormat(fakeFnType, false); err != nil {
-		panic(err)
-	}
-
-	// verify signature of registeredActivityFn and fakeActivityFn are the same.
-	if actualFnType != fakeFnType {
-		panic("activityFn and fakeActivityFn have different func signature")
-	}
-
-	fnName := getFunctionName(activityFn)
-	s.overrodeActivities[fnName] = fakeActivityFn
-}
-
 // ExecuteWorkflow executes a workflow, wait until workflow complete or idleTimeout. It returns whether workflow is completed,
 // the workflow result, and error. Returned isCompleted could be false if the workflow is blocked by activity or timer and
 // cannot make progress within idleTimeout. If isCompleted is true, caller should use EncodedResult.GetResult() to extract
@@ -296,42 +245,6 @@ func (s *WorkflowTestSuite) ExecuteWorkflow(
 	env := s.StartWorkflow(workflowFn, args...)
 	env.StartDispatcherLoop(idleTimeout)
 	return env.IsTestCompleted(), env.GetTestResult(), env.GetTestError()
-}
-
-// ExecuteActivity executes an activity. The tested activity will be executed synchronously in the calling goroutinue.
-// Caller should use EncodedResult.GetResult() to extract strong typed result value.
-func (s *WorkflowTestSuite) ExecuteActivity(activityFn interface{}, args ...interface{}) (EncodedResult, error) {
-	fnName := getFunctionName(activityFn)
-
-	input, err := s.hostEnv.encodeArgs(args)
-	if err != nil {
-		panic(err)
-	}
-
-	task := newTestActivityTask(
-		defaultTestWorkflowID,
-		defaultTestRunID,
-		"0",
-		fnName,
-		input,
-	)
-
-	// ensure activityFn is registered to defaultTestTaskList
-	s.RegisterActivity(activityFn, defaultTestTaskList)
-	env := s.newTestWorkflowEnvironment()
-	taskHandler := env.newTestActivityTaskHandler(defaultTestTaskList)
-	result, err := taskHandler.Execute(task)
-	switch request := result.(type) {
-	case *shared.RespondActivityTaskCanceledRequest:
-		return nil, NewCanceledError(request.Details)
-	case *shared.RespondActivityTaskFailedRequest:
-		return nil, NewErrorWithDetails(*request.Reason, request.Details)
-	case *shared.RespondActivityTaskCompletedRequest:
-		return EncodedResult(request.Result_), nil
-	default:
-		// will never happen
-		return nil, fmt.Errorf("unsupported respond type %T", result)
-	}
 }
 
 // StartWorkflow creates a new TestWorkflowEnvironment that is prepared and ready to run the given workflow.
@@ -347,7 +260,7 @@ func (s *WorkflowTestSuite) StartWorkflow(workflowFn interface{}, args ...interf
 		panic("unsupported workflowFn")
 	}
 
-	env := s.newTestWorkflowEnvironment()
+	env := s.NewTestWorkflowEnvironment()
 	env.workflowInfo.WorkflowType.Name = workflowType
 	factory := getWorkflowDefinitionFactory(s.hostEnv.newRegisteredWorkflowFactory())
 	workflowDefinition, err := factory(env.workflowInfo.WorkflowType)
@@ -371,31 +284,94 @@ func (s *WorkflowTestSuite) StartWorkflow(workflowFn interface{}, args ...interf
 
 // StartWorkflowPart wraps a function and test it just as if it is a workflow. You don's need to register workflowPartFn.
 func (s *WorkflowTestSuite) StartWorkflowPart(workflowPartFn interface{}, args ...interface{}) *TestWorkflowEnvironment {
-	fnType := reflect.TypeOf(workflowPartFn)
-	if fnType.Kind() != reflect.Func ||
-		fnType.NumIn() == 0 ||
-		fnType.In(0) != reflect.TypeOf((*Context)(nil)).Elem() {
-		panic("workflowPartFn has to be a function with cadence.Context as its first input parameter")
-	}
-
-	workflowWrapperFn := func(ctx Context, args []interface{}) ([]byte, error) {
-		valueArgs := []reflect.Value{reflect.ValueOf(ctx)}
-		for _, arg := range args {
-			valueArgs = append(valueArgs, reflect.ValueOf(arg))
-		}
-
-		fnValue := reflect.ValueOf(workflowPartFn)
-		retValues := fnValue.Call(valueArgs)
-		return validateFunctionAndGetResults(workflowPartFn, retValues)
-	}
-
-	// register wrapper workflow if it has not been registered yet.
-	fnName := getFunctionName(workflowWrapperFn)
+	// auto register workflow
+	fnName := getFunctionName(workflowPartFn)
 	if _, ok := s.hostEnv.getWorkflowFn(fnName); !ok {
-		s.RegisterWorkflow(workflowWrapperFn)
+		s.RegisterWorkflow(workflowPartFn)
 	}
 
-	return s.StartWorkflow(workflowWrapperFn, args)
+	return s.StartWorkflow(workflowPartFn, args)
+}
+
+// Override overrides an actual activity with a fake activity. The fake activity will be invoked in place where the
+// actual activity should have been invoked.
+func (env *TestWorkflowEnvironment) Override(activityFn, fakeActivityFn interface{}) {
+	// verify both functions are valid activity func
+	actualFnType := reflect.TypeOf(activityFn)
+	if err := validateFnFormat(actualFnType, false); err != nil {
+		panic(err)
+	}
+	fakeFnType := reflect.TypeOf(fakeActivityFn)
+	if err := validateFnFormat(fakeFnType, false); err != nil {
+		panic(err)
+	}
+
+	// verify signature of registeredActivityFn and fakeActivityFn are the same.
+	if actualFnType != fakeFnType {
+		panic("activityFn and fakeActivityFn have different func signature")
+	}
+
+	fnName := getFunctionName(activityFn)
+	env.overrodeActivities[fnName] = fakeActivityFn
+}
+
+// ExecuteActivity executes an activity. The tested activity will be executed synchronously in the calling goroutinue.
+// Caller should use EncodedResult.GetResult() to extract strong typed result value.
+func (env *TestWorkflowEnvironment) ExecuteActivity(activityFn interface{}, args ...interface{}) (EncodedResult, error) {
+	fnName := getFunctionName(activityFn)
+
+	input, err := env.testSuite.hostEnv.encodeArgs(args)
+	if err != nil {
+		panic(err)
+	}
+
+	task := newTestActivityTask(
+		defaultTestWorkflowID,
+		defaultTestRunID,
+		"0",
+		fnName,
+		input,
+	)
+
+	// ensure activityFn is registered to defaultTestTaskList
+	env.testSuite.RegisterActivity(activityFn, defaultTestTaskList)
+	taskHandler := env.newTestActivityTaskHandler(defaultTestTaskList)
+	result, err := taskHandler.Execute(task)
+	switch request := result.(type) {
+	case *shared.RespondActivityTaskCanceledRequest:
+		return nil, NewCanceledError(request.Details)
+	case *shared.RespondActivityTaskFailedRequest:
+		return nil, NewErrorWithDetails(*request.Reason, request.Details)
+	case *shared.RespondActivityTaskCompletedRequest:
+		return EncodedResult(request.Result_), nil
+	default:
+		// will never happen
+		return nil, fmt.Errorf("unsupported respond type %T", result)
+	}
+}
+
+// SetLogger sets the logger for TestWorkflowEnvironment
+func (env *TestWorkflowEnvironment) SetLogger(logger *zap.Logger) *TestWorkflowEnvironment {
+	env.logger = logger
+	return env
+}
+
+// SetService sets the m.TChanWorkflowService for TestWorkflowEnvironment
+func (env *TestWorkflowEnvironment) SetService(service m.TChanWorkflowService) *TestWorkflowEnvironment {
+	env.service = service
+	return env
+}
+
+// SetClock sets the clock that will be used for TestWorkflowEnvironment
+func (env *TestWorkflowEnvironment) SetClock(clock clock.Clock) *TestWorkflowEnvironment {
+	env.clock = clock
+	return env
+}
+
+// SetWorkerOption sets the WorkerOptions for WorkflowTestSuite
+func (env *TestWorkflowEnvironment) SetWorkerOption(options WorkerOptions) *TestWorkflowEnvironment {
+	env.workerOptions = options
+	return env
 }
 
 // StartDecisionTask will trigger OnDecisionTaskStart() on the workflow which will execute the dispatcher until all
@@ -754,7 +730,7 @@ func (t *TestWorkflowEnvironment) newTestActivityTaskHandler(taskList string) Ac
 
 func (t *TestWorkflowEnvironment) wrapActivity(a activity) *activityExecutorWrapper {
 	fnName := a.ActivityType().Name
-	if overrideFn, ok := t.testSuite.overrodeActivities[fnName]; ok {
+	if overrideFn, ok := t.overrodeActivities[fnName]; ok {
 		// override activity
 		a = &activityExecutor{name: fnName, fn: overrideFn}
 	}

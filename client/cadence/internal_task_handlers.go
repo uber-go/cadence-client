@@ -100,10 +100,10 @@ func (eh *history) LastNonReplayedID() int64 {
 	return *eh.workflowTask.task.PreviousStartedEventId
 }
 
-func (eh *history) IsNextDecisionFailed(startIndex int) bool {
+func (eh *history) IsNextDecisionFailed() bool {
 	events := eh.workflowTask.task.History.Events
 	eventsSize := len(events)
-	for i := startIndex; i < eventsSize; i++ {
+	for i := eh.currentIndex; i < eventsSize; i++ {
 		switch events[i].GetEventType() {
 		case s.EventType_DecisionTaskCompleted:
 			return false
@@ -116,7 +116,7 @@ func (eh *history) IsNextDecisionFailed(startIndex int) bool {
 	return false
 }
 
-func (eh *history) IsDecisionEvent(eventType s.EventType) bool {
+func isDecisionEvent(eventType s.EventType) bool {
 	switch eventType {
 	case s.EventType_WorkflowExecutionCompleted, s.EventType_WorkflowExecutionFailed, s.EventType_WorkflowExecutionTimedOut:
 		return true
@@ -162,7 +162,7 @@ OrderEvents:
 		event := history.Events[eh.currentIndex]
 		switch event.GetEventType() {
 		case s.EventType_DecisionTaskStarted:
-			if !eh.IsNextDecisionFailed(eh.currentIndex) {
+			if !eh.IsNextDecisionFailed() {
 				// Set replay clock.
 				ts := time.Unix(0, event.GetTimestamp())
 				eh.eventsHandler.workflowEnvironmentImpl.SetCurrentReplayTime(ts)
@@ -181,7 +181,7 @@ OrderEvents:
 			if concurrentToDecision {
 				decisionStartToCompletionEvents = append(decisionStartToCompletionEvents, event)
 			} else {
-				if eh.IsDecisionEvent(event.GetEventType()) {
+				if isDecisionEvent(event.GetEventType()) {
 					lastDecisionIndex = len(decisionCompletionToStartEvents)
 				}
 				decisionCompletionToStartEvents = append(decisionCompletionToStartEvents, event)

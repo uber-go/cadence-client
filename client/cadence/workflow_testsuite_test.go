@@ -47,11 +47,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityOverride() {
 
 	env.ExecuteWorkflow(testWorkflowHello)
 
-	s.True(env.IsTestCompleted())
-	s.NoError(env.GetTestError())
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 	var result string
-	err := env.GetTestResult().Get(&result)
-	s.NoError(err)
+	env.GetWorkflowResult(&result)
 	s.Equal("fake_world", result)
 }
 
@@ -71,7 +70,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 	env := s.NewTestWorkflowEnvironment()
 
 	var activityCalls []string
-	env.SetOnActivityStartedListener(func(ctx context.Context, args EncodedValues, activityType string) {
+	env.SetOnActivityStartedListener(func(ctx context.Context, args EncodedValues) {
+		activityType := GetActivityInfo(ctx).ActivityType.Name
 		var input string
 		s.NoError(args.Get(&input))
 		activityCalls = append(activityCalls, fmt.Sprintf("%s:%s", activityType, input))
@@ -83,8 +83,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 	}
 
 	env.ExecuteWorkflow(workflowFn)
-	s.True(env.IsTestCompleted())
-	s.NoError(env.GetTestError())
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 	s.Equal(expectedCalls, activityCalls)
 }
 
@@ -118,8 +118,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_TimerWorkflow_ClockAutoFastForward() {
 	env := s.NewTestWorkflowEnvironment()
 	env.ExecuteWorkflow(workflowFn)
 
-	s.True(env.IsTestCompleted())
-	s.NoError(env.GetTestError())
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 	s.Equal([]string{"t2", "t3", "t1", "t4"}, firedTimerRecord)
 }
 
@@ -163,14 +163,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowManualMoveClock() {
 		}()
 	})
 
-	isCompleted, encodedResult, err := env.ExecuteWorkflow(workflowFn)
+	err := env.ExecuteWorkflow(workflowFn)
+	s.NoError(err)
 
-	s.True(isCompleted)
-	s.NoError(err)
-	s.NotNil(encodedResult)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 	var result string
-	err = encodedResult.Get(&result)
-	s.NoError(err)
+	env.GetWorkflowResult(&result)
 	s.Equal("hello_controlled_execution", result)
 }
 
@@ -215,8 +214,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowActivityCancellation() {
 	})
 	env.ExecuteWorkflow(workflowFn)
 
-	s.True(env.IsTestCompleted())
-	s.NoError(env.GetTestError())
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 	s.Equal(2, counter) // assert listener get called twice
 }
 
@@ -244,39 +243,26 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
+	env := s.NewTestWorkflowEnvironment()
 	var activityInfo ActivityInfo
 	fakeActivity := func(ctx context.Context, msg string) (string, error) {
 		activityInfo = GetActivityInfo(ctx)
-		wg.Done()
+		env.RegisterDelayedCallback(func() {
+			err := env.CompleteActivity(activityInfo.TaskToken, "async_complete", nil)
+			s.NoError(err)
+		}, time.Minute)
 		return "", ErrActivityResultPending
 	}
 
-	env := s.NewTestWorkflowEnvironment()
 	env.OverrideActivity(testActivityHello, fakeActivity)
-	env.SetIdleTimeout(time.Millisecond) // don't waist time waiting
-	env.StartWorkflow(testWorkflowHello) // workflow won't complete, as the fakeActivity returns ErrActivityResultPending
+	env.SetIdleTimeout(time.Second * 2) // don't waist time waiting
 
-	err := env.Execute()
-	s.False(env.IsTestCompleted()) // not completed yet
-	s.NotNil(err)                  // t.Execute returns error
-
-	wg.Wait() // make sure activity get called
-	s.NotEmpty(activityInfo.TaskToken)
-
-	// now do manual complete
-	err = env.CompleteActivity(activityInfo.TaskToken, "async_complete", nil)
-	s.NoError(err)
-
-	err = env.Execute() // resume workflow execution, this time, it should finish
-	s.NoError(err)
-	s.True(env.IsTestCompleted())
-	s.NoError(env.GetTestError())
+	env.ExecuteWorkflow(testWorkflowHello) // workflow won't complete, as the fakeActivity returns ErrActivityResultPending
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 
 	var result string
-	err = env.GetTestResult().Get(&result)
-	s.NoError(err)
+	env.GetWorkflowResult(&result)
 	s.Equal("async_complete", result)
 }
 
@@ -297,19 +283,18 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowCancellation() {
 	// workflow, which will terminate the whole workflow.
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
-	}, time.Second)
+	}, time.Hour)
 
 	var activityErr error
 	env.SetOnActivityEndedListener(func(result EncodedValue, err error, activityType string) {
 		activityErr = err
 	})
 
-	env.StartWorkflow(workflowFn)
-	env.Execute()
+	env.ExecuteWorkflow(workflowFn)
 
-	s.True(env.IsTestCompleted())
-	s.NotNil(env.GetTestError())
-	_, ok := env.GetTestError().(CanceledError)
+	s.True(env.IsWorkflowCompleted())
+	s.NotNil(env.GetWorkflowError())
+	_, ok := env.GetWorkflowError().(CanceledError)
 	s.True(ok)
 
 	// verify activity was cancelled as well.

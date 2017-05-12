@@ -63,6 +63,7 @@ type (
 	// WorkflowTestSuite is the test suite to run unit tests for workflow/activity.
 	WorkflowTestSuite struct {
 		suite.Suite
+		logger                     *zap.Logger
 		hostEnv                    *hostEnvImpl
 		taskListSpecificActivities map[string]*taskListSpecificActivity
 	}
@@ -96,7 +97,7 @@ type (
 		scheduledActivities map[string]*activityHandle
 		scheduledTimers     map[string]*timerHandle
 
-		onActivityStartedListener func(ctx context.Context, args EncodedValues, activityType string)
+		onActivityStartedListener func(ctx context.Context, args EncodedValues)
 		onActivityEndedListener   func(result EncodedValue, err error, activityType string)
 		onTimerScheduledListener  func(timerID string, duration time.Duration)
 		onTimerFiredListener      func(timerID string)
@@ -147,7 +148,7 @@ func NewWorkflowTestSuite() *WorkflowTestSuite {
 	}
 }
 
-// NewTestWorkflowEnvironment creates a new instance of testWorkflowEnvironmentImpl. You can use the returned testWorkflowEnvironmentImpl
+// NewTestWorkflowEnvironment creates a new instance of TestWorkflowEnvironment. You can use the returned TestWorkflowEnvironment
 // to run your workflow in the test environment.
 func (s *WorkflowTestSuite) NewTestWorkflowEnvironment() *TestWorkflowEnvironment {
 	return &TestWorkflowEnvironment{impl: s.newTestWorkflowEnvironmentImpl()}
@@ -162,6 +163,7 @@ func (s *WorkflowTestSuite) NewTestActivityEnvironment() *TestActivityEnviornmen
 func (s *WorkflowTestSuite) newTestWorkflowEnvironmentImpl() *testWorkflowEnvironmentImpl {
 	env := &testWorkflowEnvironmentImpl{
 		testSuite: s,
+		logger:    s.logger,
 
 		overrodeActivities: make(map[string]interface{}),
 
@@ -174,11 +176,12 @@ func (s *WorkflowTestSuite) newTestWorkflowEnvironmentImpl() *testWorkflowEnviro
 			TaskListName: defaultTestTaskList,
 		},
 
-		locker:                 &sync.Mutex{},
-		scheduledActivities:    make(map[string]*activityHandle),
-		scheduledTimers:        make(map[string]*timerHandle),
-		callbackChannel:        make(chan callbackHandle, 1000),
-		idleTimeout:            time.Second * 3,
+		locker:              &sync.Mutex{},
+		scheduledActivities: make(map[string]*activityHandle),
+		scheduledTimers:     make(map[string]*timerHandle),
+		callbackChannel:     make(chan callbackHandle, 1000),
+		idleTimeout:         time.Second * 3,
+
 		enableFastForwardClock: true,
 	}
 
@@ -221,6 +224,7 @@ func (s *WorkflowTestSuite) newTestWorkflowEnvironmentImpl() *testWorkflowEnviro
 
 // RegisterWorkflow registers a workflow that could be used by tests of this WorkflowTestSuite instance. All workflow registered
 // via cadence.RegisterWorkflow() are still valid and will be available to all tests of all instance of WorkflowTestSuite.
+// Workflow registration is only required if you are invoking workflow by name.
 func (s *WorkflowTestSuite) RegisterWorkflow(workflowFn interface{}) {
 	err := s.hostEnv.RegisterWorkflow(workflowFn)
 	if err != nil {
@@ -254,6 +258,21 @@ func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}, taskList st
 		s.taskListSpecificActivities[fnName] = taskListActivity
 	}
 	taskListActivity.taskLists[taskList] = struct{}{}
+}
+
+// SetLogger sets the logger for this WorkflowTestSuite
+func (t *WorkflowTestSuite) SetLogger(logger *zap.Logger) {
+	t.logger = logger
+}
+
+// EnableClockFastForwardWhenBlockedByTimer enables auto clock fast forward when dispatcher is blocked by timer.
+// This flag is ignored if the autoStartDecisionTask is set to false.
+// Default is true. If you set this flag to false, your timer will be fired by below 2 cases:
+//  1) Use real clock, and timer is fired when time goes by.
+//  2) Use mock clock, and you need to manually move forward mock clock to fire timer.
+func (t *TestWorkflowEnvironment) EnableClockFastForwardWhenBlockedByTimer(enable bool) *TestWorkflowEnvironment {
+	t.impl.enableFastForwardClock = enable
+	return t
 }
 
 // ExecuteActivity executes an activity. The tested activity will be executed synchronously in the calling goroutinue.
@@ -292,36 +311,23 @@ func (t *TestActivityEnviornment) ExecuteActivity(activityFn interface{}, args .
 	}
 }
 
-// SetLogger sets logger that will be used by TestActivityEnviornment
-func (t *TestActivityEnviornment) SetLogger(logger *zap.Logger) *TestActivityEnviornment {
-	t.impl.logger = logger
-	return t
-}
-
-// SetWorkerOption sets the WorkerOptions that will be use by TestActivityEnviornment.
+// SetWorkerOption sets the WorkerOptions that will be use by TestActivityEnviornment. TestActivityEnviornment will
+// use options set by SetIdentity(), SetMetrics(), and WithActivityContext() on the WorkerOptions. Other options are ignored.
 func (t *TestActivityEnviornment) SetWorkerOption(options WorkerOptions) *TestActivityEnviornment {
 	t.impl.workerOptions = options
 	return t
 }
 
-// ExecuteWorkflow executes a workflow, wait until workflow complete. It returns whether workflow is completed, the
-// workflow result, and error. Returned isCompleted could be false if the workflow is blocked by activity or timer and
-// cannot make progress. If isCompleted is true, caller should use EncodedValue.Get() to extract strong typed result value.
-func (t *TestWorkflowEnvironment) ExecuteWorkflow(workflowFn interface{}, args ...interface{},
-) (isCompleted bool, result EncodedValue, err error) {
+// ExecuteWorkflow executes a workflow, wait until workflow complete. It returns nil if workflow completed. Otherwise,
+// it returns error if workflow is blocked and cannot complete.
+func (t *TestWorkflowEnvironment) ExecuteWorkflow(workflowFn interface{}, args ...interface{}) error {
 	env := t.impl
-	env.StartWorkflow(workflowFn, args...)
+	env.startWorkflow(workflowFn, args...)
 	executeErr := env.Execute()
 	if executeErr != nil {
-		return false, nil, executeErr
+		return executeErr
 	}
-	return env.isTestCompleted, env.testResult, env.testError
-}
-
-// StartWorkflow setup a workflow to be run in this TestWorkflowEnvironment. It does not immediately execute workflow code.
-// You need to call TestWorkflowEnvironment.Execute() to start the workflow execution.
-func (t *TestWorkflowEnvironment) StartWorkflow(workflowFn interface{}, args ...interface{}) {
-	t.impl.StartWorkflow(workflowFn, args...)
+	return nil
 }
 
 // OverrideActivity overrides an actual activity with a fake activity. The fake activity will be invoked in place where the
@@ -330,13 +336,11 @@ func (t *TestWorkflowEnvironment) OverrideActivity(activityFn, fakeActivityFn in
 	t.impl.OverrideActivity(activityFn, fakeActivityFn)
 }
 
-// SetLogger sets the logger for TestWorkflowEnvironment
-func (t *TestWorkflowEnvironment) SetLogger(logger *zap.Logger) *TestWorkflowEnvironment {
-	t.impl.logger = logger
-	return t
+func (t *TestWorkflowEnvironment) Now() time.Time {
+	return t.impl.Now()
 }
 
-// SetWorkflowService sets the m.TChanWorkflowService for testWorkflowEnvironmentImpl
+// SetWorkflowService sets the m.TChanWorkflowService for TestWorkflowEnvironment
 func (t *TestWorkflowEnvironment) SetWorkflowService(service m.TChanWorkflowService) *TestWorkflowEnvironment {
 	t.impl.service = service
 	return t
@@ -348,14 +352,16 @@ func (t *TestWorkflowEnvironment) SetClock(clock clock.Clock) *TestWorkflowEnvir
 	return t
 }
 
-// SetWorkerOption sets the WorkerOptions for WorkflowTestSuite
+// SetWorkerOption sets the WorkerOptions for TestWorkflowEnvironment. TestWorkflowEnvironment will use options set by
+// SetIdentity(), SetMetrics(), and WithActivityContext() on the WorkerOptions. Other options are ignored.
 func (t *TestWorkflowEnvironment) SetWorkerOption(options WorkerOptions) *TestWorkflowEnvironment {
 	t.impl.workerOptions = options
 	return t
 }
 
-// SetIdleTimeout sets the idle timeout for this testWorkflowEnvironmentImpl. Idle means workflow is blocked and cannot make
-// progress. This could happen if workflow is waiting for something, like activity result, timer, or signal.
+// SetIdleTimeout sets the idle timeout for this TestWorkflowEnvironment. Idle means workflow is blocked and cannot make
+// progress. This could happen if workflow is waiting for something, like activity result, timer, or signal. This is
+// real wall clock time, not the workflow time (a.k.a not cadence.Now() time).
 func (t *TestWorkflowEnvironment) SetIdleTimeout(idleTimeout time.Duration) *TestWorkflowEnvironment {
 	t.impl.idleTimeout = idleTimeout
 	return t
@@ -363,7 +369,7 @@ func (t *TestWorkflowEnvironment) SetIdleTimeout(idleTimeout time.Duration) *Tes
 
 // SetOnActivityStartedListener sets a listener that will be called when an activity task started.
 func (t *TestWorkflowEnvironment) SetOnActivityStartedListener(
-	listener func(ctx context.Context, args EncodedValues, activityType string)) *TestWorkflowEnvironment {
+	listener func(ctx context.Context, args EncodedValues)) *TestWorkflowEnvironment {
 	t.impl.onActivityStartedListener = listener
 	return t
 }
@@ -382,7 +388,7 @@ func (t *TestWorkflowEnvironment) SetOnTimerScheduledListener(
 	return t
 }
 
-// SetOnTimerFiredListener sets a listener that will be called when a timer is fired
+// SetOnTimerFiredListener sets a listener that will be called after a timer is fired.
 func (t *TestWorkflowEnvironment) SetOnTimerFiredListener(listener func(timerID string)) *TestWorkflowEnvironment {
 	t.impl.onTimerFiredListener = listener
 	return t
@@ -394,33 +400,21 @@ func (t *TestWorkflowEnvironment) SetOnTimerCancelledListener(listener func(time
 	return t
 }
 
-// EnableClockFastForwardWhenBlockedByTimer enables auto clock fast forward when dispatcher is blocked by timer.
-// This flag is ignored if the autoStartDecisionTask is set to false.
-// Default is true. If you set this flag to false, your timer will be fired by below 2 cases:
-//  1) Use real clock, and timer is fired when time goes by.
-//  2) Use mock clock, and you need to manually move forward mock clock to fire timer.
-func (t *TestWorkflowEnvironment) EnableClockFastForwardWhenBlockedByTimer(enable bool) *TestWorkflowEnvironment {
-	t.impl.enableFastForwardClock = enable
-	return t
-}
-
-// Execute starts workflow execution. It returns error if workflow cannot complete, or nil if workflow completed.
-func (t *TestWorkflowEnvironment) Execute() error {
-	return t.impl.Execute()
-}
-
-// IsTestCompleted check if test is completed or not
-func (t *TestWorkflowEnvironment) IsTestCompleted() bool {
+// IsWorkflowCompleted check if test is completed or not
+func (t *TestWorkflowEnvironment) IsWorkflowCompleted() bool {
 	return t.impl.isTestCompleted
 }
 
-// GetTestResult return the encoded result from test workflow
-func (t *TestWorkflowEnvironment) GetTestResult() EncodedValue {
-	return t.impl.testResult
+// GetWorkflowResult return the encoded result from test workflow
+func (t *TestWorkflowEnvironment) GetWorkflowResult(valuePtr interface{}) {
+	s, r := t.impl.testSuite, t.impl.testResult
+	s.NotNil(r)
+	err := r.Get(valuePtr)
+	s.NoError(err)
 }
 
-// GetTestError return the error from test workflow
-func (t *TestWorkflowEnvironment) GetTestError() error {
+// GetWorkflowError return the error from test workflow
+func (t *TestWorkflowEnvironment) GetWorkflowError() error {
 	return t.impl.testError
 }
 
@@ -429,6 +423,7 @@ func (t *TestWorkflowEnvironment) CompleteActivity(taskToken []byte, result inte
 	return t.impl.CompleteActivity(taskToken, result, err)
 }
 
+// CancelWorkflow cancels the currently running test workflow.
 func (t *TestWorkflowEnvironment) CancelWorkflow() {
 	t.impl.RequestCancelWorkflow("test-domain",
 		t.impl.workflowInfo.WorkflowExecution.ID,
@@ -437,12 +432,12 @@ func (t *TestWorkflowEnvironment) CancelWorkflow() {
 
 // RegisterDelayedCallback creates a new timer with specified delayDuration using workflow clock (not wall clock). When
 // the timer fires, the callback will be called. By default, this test suite uses mock clock which automatically move
-// forward to fire next timer when workflow is blocked.
+// forward to fire next timer when workflow is blocked. You can use this API to make some event happen at desired time.
 func (t *TestWorkflowEnvironment) RegisterDelayedCallback(callback func(), delayDuration time.Duration) {
 	t.impl.registerDelayedCallback(callback, delayDuration)
 }
 
-func (env *testWorkflowEnvironmentImpl) StartWorkflow(workflowFn interface{}, args ...interface{}) {
+func (env *testWorkflowEnvironmentImpl) startWorkflow(workflowFn interface{}, args ...interface{}) {
 	s := env.testSuite
 	var workflowType string
 	fnType := reflect.TypeOf(workflowFn)
@@ -510,7 +505,7 @@ func (env *testWorkflowEnvironmentImpl) startDecisionTask() {
 
 func (env *testWorkflowEnvironmentImpl) Execute() error {
 	if env.workflowDef == nil {
-		return errors.New("nothing to execute, you need to call StartWorkflow() before you execute")
+		return errors.New("nothing to execute, you need to call startWorkflow() before you execute")
 	}
 	// kick off the initial decision task
 	env.startDecisionTask()
@@ -545,9 +540,11 @@ func (env *testWorkflowEnvironmentImpl) Execute() error {
 }
 
 func (env *testWorkflowEnvironmentImpl) registerDelayedCallback(f func(), delayDuration time.Duration) {
-	env.NewTimer(delayDuration, func(result []byte, err error) {
-		f()
-	})
+	env.postCallback(func() {
+		env.NewTimer(delayDuration, func(result []byte, err error) {
+			f()
+		})
+	}, true)
 }
 
 func (env *testWorkflowEnvironmentImpl) processCallback(c callbackHandle) {
@@ -578,14 +575,14 @@ func (env *testWorkflowEnvironmentImpl) autoFireNextTimer() bool {
 		}
 	}
 
-	mockClock, ok := env.clock.(*clock.Mock)
-	if !ok {
-		panic("configured clock does not support fast forward, must use a mock clock for fast forward")
-	}
 	d := tofire.duration
 	env.logger.Debug("Auto fire timer", zap.Int(tagTimerID, tofire.timerId), zap.Duration("Duration", tofire.duration))
 
 	// Move mock clock forward, this will fire the timer, and the timer callback will remove timer from scheduledTimers.
+	mockClock, ok := env.clock.(*clock.Mock)
+	if !ok {
+		panic("configured clock does not support fast forward, must use a mock clock for fast forward")
+	}
 	mockClock.Add(d)
 
 	// reduce all pending timer's duration by d
@@ -760,7 +757,7 @@ func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, 
 func (a *activityExecutorWrapper) Execute(ctx context.Context, input []byte) ([]byte, error) {
 	if a.env.onActivityStartedListener != nil {
 		a.env.postCallback(func() {
-			a.env.onActivityStartedListener(ctx, EncodedValues(input), a.ActivityType().Name)
+			a.env.onActivityStartedListener(ctx, EncodedValues(input))
 		}, false)
 	}
 	return a.activity.Execute(ctx, input)
@@ -772,11 +769,8 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 		TaskList:     taskList,
 		Identity:     wOptions.identity,
 		MetricsScope: wOptions.metricsScope,
-		Logger:       wOptions.logger,
+		Logger:       env.logger,
 		UserContext:  wOptions.userContext,
-	}
-	if params.Logger == nil && env.logger != nil {
-		params.Logger = env.logger
 	}
 	ensureRequiredParams(&params)
 

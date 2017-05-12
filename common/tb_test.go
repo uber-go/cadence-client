@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber-go/cadence-client/client/cadence"
 )
 
 type (

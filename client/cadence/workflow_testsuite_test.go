@@ -10,6 +10,7 @@ import (
 
 	"github.com/facebookgo/clock"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
 )
 
 const testTaskList = "test-task-list"
@@ -29,7 +30,7 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 		WithStartToCloseTimeout(time.Minute).
 		WithHeartbeatTimeout(time.Second * 20)
 	s.RegisterActivity(testActivityHello, testTaskList)
-	s.RegisterActivity(testActivityWithSleep, testTaskList)
+	s.RegisterActivity(testActivityHeartbeat, testTaskList)
 }
 
 func TestUnitTestSuite(t *testing.T) {
@@ -41,9 +42,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityOverride() {
 		return "fake_" + msg, nil
 	}
 
-	env := s.StartWorkflow(testWorkflowHello)
+	env := s.NewTestWorkflowEnvironment()
 	env.OverrideActivity(testActivityHello, fakeActivity)
-	env.StartDispatcherLoop(time.Second)
+
+	env.ExecuteWorkflow(testWorkflowHello)
 
 	s.True(env.IsTestCompleted())
 	s.NoError(env.GetTestError())
@@ -66,7 +68,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 		return nil
 	} // END of workflow code
 
-	env := s.StartWorkflow(workflowFn)
+	env := s.NewTestWorkflowEnvironment()
 
 	var activityCalls []string
 	env.SetOnActivityStartedListener(func(ctx context.Context, args EncodedValues, activityType string) {
@@ -80,7 +82,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 		"github.com/uber-go/cadence-client/client/cadence.testActivityHello:msg3",
 	}
 
-	env.StartDispatcherLoop(time.Second)
+	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsTestCompleted())
 	s.NoError(env.GetTestError())
 	s.Equal(expectedCalls, activityCalls)
@@ -113,15 +115,15 @@ func (s *WorkflowTestSuiteUnitTest) Test_TimerWorkflow_ClockAutoFastForward() {
 		return nil
 	}
 
-	env := s.StartWorkflow(workflowFn)
-	env.StartDispatcherLoop(time.Second)
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsTestCompleted())
 	s.NoError(env.GetTestError())
 	s.Equal([]string{"t2", "t3", "t1", "t4"}, firedTimerRecord)
 }
 
-func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask() {
+func (s *WorkflowTestSuiteUnitTest) Test_WorkflowManualMoveClock() {
 	workflowFn := func(ctx Context) (string, error) {
 		f1 := NewTimer(ctx, time.Second*2)
 		ctx = WithActivityOptions(ctx, s.activityOptions)
@@ -133,7 +135,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask(
 		}
 
 		if !f2.IsReady() {
-			return "", errors.New("activity is not ready yet")
+			return "", errors.New("activity is not completed when timer fired")
 		}
 
 		var activityResult string
@@ -145,43 +147,77 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowPartWithControlledDecisionTask(
 		return activityResult, nil
 	} // END of workflow code
 
-	env := s.StartWorkflow(workflowFn)
+	env := s.NewTestWorkflowEnvironment()
 	env.SetClock(s.clock)
-	env.EnableAutoStartDecisionTask(false)              // manually control the execution
-	env.EnableClockFastForwardWhenBlockedByTimer(false) // disable auto clock fast forward
+	env.EnableClockFastForwardWhenBlockedByTimer(false) // disable auto move clock
 
 	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(1)
 	env.SetOnActivityEndedListener(func(EncodedValue, error, string) {
 		wg.Done()
 	})
 	env.SetOnTimerScheduledListener(func(timerID string, duration time.Duration) {
-		s.clock.Add(duration)
-		wg.Done()
+		go func() {
+			wg.Wait()
+			s.clock.Add(duration)
+		}()
 	})
 
-	go func() {
-		wg.Wait()
-		env.StartDecisionTask() // start a new decision task after the activity is done and the timer is fired.
-	}()
+	isCompleted, encodedResult, err := env.ExecuteWorkflow(workflowFn)
 
-	env.StartDispatcherLoop(time.Second)
-
-	s.True(env.IsTestCompleted())
-	s.NoError(env.GetTestError())
-	s.NotNil(env.GetTestResult())
+	s.True(isCompleted)
+	s.NoError(err)
+	s.NotNil(encodedResult)
 	var result string
-	err := env.GetTestResult().Get(&result)
+	err = encodedResult.Get(&result)
 	s.NoError(err)
 	s.Equal("hello_controlled_execution", result)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowActivityCancellation() {
-	env := s.StartWorkflow(testWorkflowActivityCancellation)
-	env.StartDispatcherLoop(time.Second)
+	workflowFn := func(ctx Context) (string, error) {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+
+		ctx, cancelHandler := WithCancel(ctx)
+		f1 := ExecuteActivity(ctx, testActivityHeartbeat, "msg1", time.Millisecond) // fast activity
+		f2 := ExecuteActivity(ctx, testActivityHeartbeat, "msg2", time.Second*3)    // slow activity
+
+		selector := NewSelector(ctx)
+		selector.AddFuture(f1, func(f Future) {
+			cancelHandler()
+		}).AddFuture(f2, func(f Future) {
+			cancelHandler()
+		})
+
+		selector.Select(ctx)
+		err := f2.Get(ctx, nil)
+		if _, ok := err.(CanceledError); !ok {
+			return "", err
+		}
+
+		GetLogger(ctx).Info("testWorkflowActivityCancellation completed.")
+		return "result from testWorkflowActivityCancellation", nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	counter := 0
+	env.SetOnActivityEndedListener(func(result EncodedValue, err error, activityType string) {
+		if err != nil {
+			// assert err is CancelErr
+			_, ok := err.(CanceledError)
+			s.True(ok)
+		} else {
+			var msg string
+			result.Get(&msg)
+			s.Equal("ok_msg1", msg) // assert that fast activity finished
+		}
+		counter++
+	})
+	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsTestCompleted())
 	s.NoError(env.GetTestError())
+	s.Equal(2, counter) // assert listener get called twice
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
@@ -198,7 +234,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 		return "", errors.New("value not found from ctx")
 	}
 
-	env := s.NewTestWorkflowEnvironment()
+	env := s.NewTestActivityEnvironment()
 	env.SetWorkerOption(workerOptions)
 	blob, err := env.ExecuteActivity(activityWithUserContext, testKey)
 	s.NoError(err)
@@ -208,29 +244,78 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
 	var activityInfo ActivityInfo
 	fakeActivity := func(ctx context.Context, msg string) (string, error) {
 		activityInfo = GetActivityInfo(ctx)
+		wg.Done()
 		return "", ErrActivityResultPending
 	}
 
-	env := s.StartWorkflow(testWorkflowHello)
+	env := s.NewTestWorkflowEnvironment()
 	env.OverrideActivity(testActivityHello, fakeActivity)
-	env.StartDispatcherLoop(time.Millisecond)
+	env.SetIdleTimeout(time.Millisecond) // don't waist time waiting
+	env.StartWorkflow(testWorkflowHello) // workflow won't complete, as the fakeActivity returns ErrActivityResultPending
 
-	s.False(env.IsTestCompleted())
-	s.NotNil(activityInfo)
+	err := env.Execute()
+	s.False(env.IsTestCompleted()) // not completed yet
+	s.NotNil(err)                  // t.Execute returns error
 
-	err := env.CompleteActivity(activityInfo.TaskToken, "async_complete", nil)
+	wg.Wait() // make sure activity get called
+	s.NotEmpty(activityInfo.TaskToken)
+
+	// now do manual complete
+	err = env.CompleteActivity(activityInfo.TaskToken, "async_complete", nil)
 	s.NoError(err)
-	env.StartDispatcherLoop(time.Millisecond * 10)
 
+	err = env.Execute() // resume workflow execution, this time, it should finish
+	s.NoError(err)
 	s.True(env.IsTestCompleted())
 	s.NoError(env.GetTestError())
+
 	var result string
 	err = env.GetTestResult().Get(&result)
 	s.NoError(err)
 	s.Equal("async_complete", result)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_WorkflowCancellation() {
+	workflowFn := func(ctx Context) error {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+		f := ExecuteActivity(ctx, testActivityHeartbeat, "msg1", time.Second*10)
+		err := f.Get(ctx, nil) // wait for result
+		return err
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.SetIdleTimeout(time.Minute)
+
+	// Register a delayed callback using workflow timer internally. By default, the test suite enables the auto clock
+	// forwarding when workflow is blocked. So, when the workflow is blocked on the testActivityHeartbeat activity, the
+	// mock clock will auto forward and fires timer which calls our registered callback. Our callback would cancel the
+	// workflow, which will terminate the whole workflow.
+	env.RegisterDelayedCallback(func() {
+		env.CancelWorkflow()
+	}, time.Second)
+
+	var activityErr error
+	env.SetOnActivityEndedListener(func(result EncodedValue, err error, activityType string) {
+		activityErr = err
+	})
+
+	env.StartWorkflow(workflowFn)
+	env.Execute()
+
+	s.True(env.IsTestCompleted())
+	s.NotNil(env.GetTestError())
+	_, ok := env.GetTestError().(CanceledError)
+	s.True(ok)
+
+	// verify activity was cancelled as well.
+	s.NotNil(activityErr)
+	_, ok = activityErr.(CanceledError)
+	s.True(ok)
 }
 
 func testWorkflowHello(ctx Context) (string, error) {
@@ -253,45 +338,28 @@ func testActivityHello(ctx context.Context, msg string) (string, error) {
 	return "hello" + "_" + msg, nil
 }
 
-func testWorkflowActivityCancellation(ctx Context) (string, error) {
-	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithTaskList(testTaskList).
-		WithScheduleToCloseTimeout(time.Minute).
-		WithScheduleToStartTimeout(time.Minute).
-		WithStartToCloseTimeout(time.Minute).
-		WithHeartbeatTimeout(time.Second*20))
+func testActivityHeartbeat(ctx context.Context, msg string, waitTime time.Duration) (string, error) {
+	GetActivityLogger(ctx).Info("testActivityHeartbeat start",
+		zap.String("msg", msg), zap.Duration("waitTime", waitTime))
 
-	ctx, cancelHandler := WithCancel(ctx)
-	f1 := ExecuteActivity(ctx, testActivityWithSleep, "msg1", 0)
-	f2 := ExecuteActivity(ctx, testActivityWithSleep, "msg2", 5000)
+	currWaitTime := time.Duration(0)
+	for currWaitTime < waitTime {
+		RecordActivityHeartbeat(ctx)
+		select {
+		case <-ctx.Done():
+			// We have been cancelled.
+			return "", ctx.Err()
+		default:
+			// We are not cancelled yet.
+		}
 
-	selector := NewSelector(ctx)
-	selector.AddFuture(f1, func(f Future) {
-		cancelHandler()
-	}).AddFuture(f2, func(f Future) {
-		cancelHandler()
-	})
-
-	selector.Select(ctx)
-
-	GetLogger(ctx).Info("testWorkflowActivityCancellation completed.")
-	return "result from testWorkflowActivityCancellation", nil
-}
-
-func testActivityWithSleep(ctx context.Context, msg string, sleepMs int) error {
-	GetActivityLogger(ctx).Sugar().Infof("testActivityWithSleep %s, sleep %dms", msg, sleepMs)
-
-	time.Sleep(time.Millisecond * time.Duration(sleepMs))
-
-	RecordActivityHeartbeat(ctx)
-
-	select {
-	case <-ctx.Done():
-		// We have been cancelled.
-		return ctx.Err()
-	default:
-		// We are not cancelled yet.
+		sleepDuration := time.Second
+		if currWaitTime+sleepDuration > waitTime {
+			sleepDuration = waitTime - currWaitTime
+		}
+		time.Sleep(sleepDuration)
+		currWaitTime += sleepDuration
 	}
 
-	return nil
+	return "ok_" + msg, nil
 }

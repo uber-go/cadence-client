@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/facebookgo/clock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 )
@@ -16,20 +15,18 @@ const testTaskList = "test-task-list"
 
 type WorkflowTestSuiteUnitTest struct {
 	WorkflowTestSuite
-	clock           *clock.Mock
 	activityOptions ActivityOptions
 }
 
 func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
-	s.clock = clock.NewMock()
 	s.activityOptions = NewActivityOptions().
 		WithTaskList(testTaskList).
 		WithScheduleToCloseTimeout(time.Minute).
 		WithScheduleToStartTimeout(time.Minute).
 		WithStartToCloseTimeout(time.Minute).
 		WithHeartbeatTimeout(time.Second * 20)
-	s.RegisterActivity(testActivityHello, testTaskList)
-	s.RegisterActivity(testActivityHeartbeat, testTaskList)
+	s.RegisterActivity(testActivityHello)
+	s.RegisterActivity(testActivityHeartbeat)
 }
 
 func TestUnitTestSuite(t *testing.T) {
@@ -150,8 +147,7 @@ func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowManualMoveClock() {
 	} // END of workflow code
 
 	env := s.NewTestWorkflowEnvironment()
-	err := env.ExecuteWorkflow(workflowFn)
-	s.NoError(err)
+	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())

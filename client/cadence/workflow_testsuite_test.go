@@ -119,7 +119,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_TimerWorkflow_ClockAutoFastForward() {
 	s.Equal([]string{"t2", "t3", "t1", "t4"}, firedTimerRecord)
 }
 
-func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowManualMoveClock() {
+func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowAutoForwardClock() {
 	/**
 	TODO: update this test once we update the test workflow clock implementation.
 	*/

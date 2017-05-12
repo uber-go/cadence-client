@@ -223,8 +223,8 @@ func (t *TestActivityEnviornment) SetWorkerOption(options WorkerOptions) *TestAc
 	return t
 }
 
-// ExecuteWorkflow executes a workflow, wait until workflow complete. It returns nil if workflow completed. Otherwise,
-// it returns error if workflow is blocked and cannot complete.
+// ExecuteWorkflow executes a workflow, wait until workflow complete. It will fail the test if workflow is blocked and
+// cannot complete within TestTimeout (set by SetTestTimeout()).
 func (t *TestWorkflowEnvironment) ExecuteWorkflow(workflowFn interface{}, args ...interface{}) {
 	t.impl.executeWorkflow(workflowFn, args...)
 }
@@ -319,9 +319,11 @@ func (t *TestWorkflowEnvironment) CancelWorkflow() {
 		t.impl.workflowInfo.WorkflowExecution.RunID)
 }
 
+//
 // RegisterDelayedCallback creates a new timer with specified delayDuration using workflow clock (not wall clock). When
 // the timer fires, the callback will be called. By default, this test suite uses mock clock which automatically move
-// forward to fire next timer when workflow is blocked. You can use this API to make some event happen at desired time.
+// forward to fire next timer when workflow is blocked. You can use this API to make some event (like activity completion,
+// signal or workflow cancellation) at desired time.
 func (t *TestWorkflowEnvironment) RegisterDelayedCallback(callback func(), delayDuration time.Duration) {
 	t.impl.registerDelayedCallback(callback, delayDuration)
 }

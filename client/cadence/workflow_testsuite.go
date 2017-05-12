@@ -17,6 +17,7 @@ import (
 	"github.com/uber-go/cadence-client/common"
 	"github.com/uber-go/cadence-client/mocks"
 	"github.com/uber/tchannel-go/thrift"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
 
@@ -86,16 +87,17 @@ type (
 		service       m.TChanWorkflowService
 		workerOptions WorkerOptions
 		logger        *zap.Logger
-		clock         clock.Clock
+		clock         *clock.Mock
 
 		workflowInfo          *WorkflowInfo
 		workflowDef           workflowDefinition
 		counterID             int
 		workflowCancelHandler func()
 
-		locker              *sync.Mutex
-		scheduledActivities map[string]*activityHandle
-		scheduledTimers     map[string]*timerHandle
+		locker               *sync.Mutex
+		scheduledActivities  map[string]*activityHandle
+		scheduledTimers      map[string]*timerHandle
+		runningActivityCount atomic.Int32
 
 		onActivityStartedListener func(ctx context.Context, args EncodedValues)
 		onActivityEndedListener   func(result EncodedValue, err error, activityType string)
@@ -104,12 +106,10 @@ type (
 		onTimerCancelledListener  func(timerID string)
 
 		callbackChannel chan callbackHandle
-		idleTimeout     time.Duration
+		testTimeout     time.Duration
 		isTestCompleted bool
 		testResult      EncodedValue
 		testError       error
-
-		enableFastForwardClock bool
 	}
 )
 
@@ -180,9 +180,7 @@ func (s *WorkflowTestSuite) newTestWorkflowEnvironmentImpl() *testWorkflowEnviro
 		scheduledActivities: make(map[string]*activityHandle),
 		scheduledTimers:     make(map[string]*timerHandle),
 		callbackChannel:     make(chan callbackHandle, 1000),
-		idleTimeout:         time.Second * 3,
-
-		enableFastForwardClock: true,
+		testTimeout:         time.Second * 3,
 	}
 
 	if env.logger == nil {
@@ -215,9 +213,7 @@ func (s *WorkflowTestSuite) newTestWorkflowEnvironmentImpl() *testWorkflowEnviro
 		env.workerOptions = NewWorkerOptions().SetLogger(env.logger)
 	}
 
-	if env.clock == nil {
-		env.clock = clock.NewMock()
-	}
+	env.clock = clock.NewMock()
 
 	return env
 }
@@ -265,16 +261,6 @@ func (t *WorkflowTestSuite) SetLogger(logger *zap.Logger) {
 	t.logger = logger
 }
 
-// EnableClockFastForwardWhenBlockedByTimer enables auto clock fast forward when dispatcher is blocked by timer.
-// This flag is ignored if the autoStartDecisionTask is set to false.
-// Default is true. If you set this flag to false, your timer will be fired by below 2 cases:
-//  1) Use real clock, and timer is fired when time goes by.
-//  2) Use mock clock, and you need to manually move forward mock clock to fire timer.
-func (t *TestWorkflowEnvironment) EnableClockFastForwardWhenBlockedByTimer(enable bool) *TestWorkflowEnvironment {
-	t.impl.enableFastForwardClock = enable
-	return t
-}
-
 // ExecuteActivity executes an activity. The tested activity will be executed synchronously in the calling goroutinue.
 // Caller should use EncodedValue.Get() to extract strong typed result value.
 func (t *TestActivityEnviornment) ExecuteActivity(activityFn interface{}, args ...interface{}) (EncodedValue, error) {
@@ -298,6 +284,9 @@ func (t *TestActivityEnviornment) ExecuteActivity(activityFn interface{}, args .
 	env.testSuite.RegisterActivity(activityFn, defaultTestTaskList)
 	taskHandler := env.newTestActivityTaskHandler(defaultTestTaskList)
 	result, err := taskHandler.Execute(task)
+	if err != nil {
+		panic(err)
+	}
 	switch request := result.(type) {
 	case *shared.RespondActivityTaskCanceledRequest:
 		return nil, NewCanceledError(request.Details)
@@ -323,9 +312,9 @@ func (t *TestActivityEnviornment) SetWorkerOption(options WorkerOptions) *TestAc
 func (t *TestWorkflowEnvironment) ExecuteWorkflow(workflowFn interface{}, args ...interface{}) error {
 	env := t.impl
 	env.startWorkflow(workflowFn, args...)
-	executeErr := env.Execute()
-	if executeErr != nil {
-		return executeErr
+	testTimeoutErr := env.startMainLoop()
+	if testTimeoutErr != nil {
+		return testTimeoutErr
 	}
 	return nil
 }
@@ -336,6 +325,7 @@ func (t *TestWorkflowEnvironment) OverrideActivity(activityFn, fakeActivityFn in
 	t.impl.OverrideActivity(activityFn, fakeActivityFn)
 }
 
+// Now returns the current workflow time (a.k.a cadence.Now() time) of this TestWorkflowEnvironment.
 func (t *TestWorkflowEnvironment) Now() time.Time {
 	return t.impl.Now()
 }
@@ -346,12 +336,6 @@ func (t *TestWorkflowEnvironment) SetWorkflowService(service m.TChanWorkflowServ
 	return t
 }
 
-// SetClock sets the clock that will be used for testWorkflowEnvironmentImpl
-func (t *TestWorkflowEnvironment) SetClock(clock clock.Clock) *TestWorkflowEnvironment {
-	t.impl.clock = clock
-	return t
-}
-
 // SetWorkerOption sets the WorkerOptions for TestWorkflowEnvironment. TestWorkflowEnvironment will use options set by
 // SetIdentity(), SetMetrics(), and WithActivityContext() on the WorkerOptions. Other options are ignored.
 func (t *TestWorkflowEnvironment) SetWorkerOption(options WorkerOptions) *TestWorkflowEnvironment {
@@ -359,11 +343,11 @@ func (t *TestWorkflowEnvironment) SetWorkerOption(options WorkerOptions) *TestWo
 	return t
 }
 
-// SetIdleTimeout sets the idle timeout for this TestWorkflowEnvironment. Idle means workflow is blocked and cannot make
-// progress. This could happen if workflow is waiting for something, like activity result, timer, or signal. This is
-// real wall clock time, not the workflow time (a.k.a not cadence.Now() time).
-func (t *TestWorkflowEnvironment) SetIdleTimeout(idleTimeout time.Duration) *TestWorkflowEnvironment {
-	t.impl.idleTimeout = idleTimeout
+// SetTestTimeout sets the wall clock timeout for this workflow test run. When test timeout happen, it means workflow is
+// blocked and cannot make progress. This could happen if workflow is waiting for something, like activity result, timer,
+//  or signal. This is real wall clock time, not the workflow time (a.k.a cadence.Now() time).
+func (t *TestWorkflowEnvironment) SetTestTimeout(idleTimeout time.Duration) *TestWorkflowEnvironment {
+	t.impl.testTimeout = idleTimeout
 	return t
 }
 
@@ -503,7 +487,7 @@ func (env *testWorkflowEnvironmentImpl) startDecisionTask() {
 	env.postCallback(func() {}, true /* to start decision task */)
 }
 
-func (env *testWorkflowEnvironmentImpl) Execute() error {
+func (env *testWorkflowEnvironmentImpl) startMainLoop() error {
 	if env.workflowDef == nil {
 		return errors.New("nothing to execute, you need to call startWorkflow() before you execute")
 	}
@@ -527,12 +511,12 @@ func (env *testWorkflowEnvironmentImpl) Execute() error {
 				select {
 				case c := <-env.callbackChannel:
 					env.processCallback(c)
-				case <-time.After(env.idleTimeout):
+				case <-time.After(env.testTimeout):
 					st := env.workflowDef.StackTrace()
 					env.logger.Debug("Dispatcher idle timeout.",
-						zap.Duration("IdleTimeout", env.idleTimeout),
+						zap.Duration("TestTimeout", env.testTimeout),
 						zap.String("DispatcherStack", st))
-					return fmt.Errorf("Workflow cannot complete. Timeout: %v, WorkflowStack: %v", env.idleTimeout, st)
+					return fmt.Errorf("Workflow cannot complete. Timeout: %v, WorkflowStack: %v", env.testTimeout, st)
 				}
 			}
 		}
@@ -560,7 +544,8 @@ func (env *testWorkflowEnvironmentImpl) processCallback(c callbackHandle) {
 }
 
 func (env *testWorkflowEnvironmentImpl) autoFireNextTimer() bool {
-	if !env.enableFastForwardClock || len(env.scheduledTimers) == 0 {
+	if len(env.scheduledTimers) == 0 || env.runningActivityCount.Load() > 0 {
+		// do not auto forward workflow clock if there is running activities.
 		return false
 	}
 
@@ -579,11 +564,7 @@ func (env *testWorkflowEnvironmentImpl) autoFireNextTimer() bool {
 	env.logger.Debug("Auto fire timer", zap.Int(tagTimerID, tofire.timerId), zap.Duration("Duration", tofire.duration))
 
 	// Move mock clock forward, this will fire the timer, and the timer callback will remove timer from scheduledTimers.
-	mockClock, ok := env.clock.(*clock.Mock)
-	if !ok {
-		panic("configured clock does not support fast forward, must use a mock clock for fast forward")
-	}
-	mockClock.Add(d)
+	env.clock.Add(d)
 
 	// reduce all pending timer's duration by d
 	for _, t := range env.scheduledTimers {
@@ -691,6 +672,7 @@ func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivi
 	taskHandler := env.newTestActivityTaskHandler(parameters.TaskListName)
 	activityHandle := &activityHandle{callback: callback, activityType: parameters.ActivityType.Name}
 	env.scheduledActivities[activityInfo.activityID] = activityHandle
+	env.runningActivityCount.Inc()
 
 	// activity runs in separate goroutinue outside of workflow dispatcher
 	go func() {
@@ -702,6 +684,7 @@ func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivi
 		env.postCallback(func() {
 			env.handleActivityResult(activityInfo.activityID, result, parameters.ActivityType.Name)
 		}, false /* do not auto schedule decision task, because activity might be still pending */)
+		env.runningActivityCount.Dec()
 	}()
 
 	return activityInfo

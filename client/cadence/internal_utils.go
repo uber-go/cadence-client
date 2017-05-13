@@ -10,7 +10,52 @@ import (
 
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"github.com/uber-go/cadence-client/common"
+	"github.com/uber/tchannel-go"
+	"golang.org/x/net/context"
 )
+
+// versionHeaderName refers to the name of the
+// tchannel / http header that contains the client
+// library version
+const versionHeaderName = "cadence-client-version"
+
+// default tchannel rpc call timeout
+const defaultRpcTimeout = 10 * time.Second
+
+// retryNeverOptions - Never retry the connection
+var retryNeverOptions = &tchannel.RetryOptions{
+	RetryOn: tchannel.RetryNever,
+}
+
+// retryDefaultOptions - retry with default options.
+var retryDefaultOptions = &tchannel.RetryOptions{
+	RetryOn: tchannel.RetryDefault,
+}
+
+// sets the rpc timeout for a tchannel context
+func tchanTimeout(timeout time.Duration) func(builder *tchannel.ContextBuilder) {
+	return func(b *tchannel.ContextBuilder) {
+		b.SetTimeout(timeout)
+	}
+}
+
+// sets the retry option for a tchannel context
+func tchanRetryOption(retryOpt *tchannel.RetryOptions) func(builder *tchannel.ContextBuilder) {
+	return func(b *tchannel.ContextBuilder) {
+		b.SetRetryOptions(retryOpt)
+	}
+}
+
+// newTChannelContext - Get a tchannel context
+func newTChannelContext(options ...func(builder *tchannel.ContextBuilder)) (tchannel.ContextWithHeaders, context.CancelFunc) {
+	builder := tchannel.NewContextBuilder(defaultRpcTimeout)
+	builder.SetRetryOptions(retryDefaultOptions)
+	builder.AddHeader(versionHeaderName, LibraryVersion)
+	for _, opt := range options {
+		opt(builder)
+	}
+	return builder.Build()
+}
 
 // GetWorkerIdentity gets a default identity for the worker.
 func getWorkerIdentity(tasklistName string) string {

@@ -94,7 +94,7 @@ package %v
 // behavior change
 const LibraryVersion = "%v"
 
-// GitSHA the git tag corresponding to this library
+// GitSHA is the git tag corresponding to this library
 const GitSHA = "%v"
 `
 	return fmt.Sprintf(fmtString, license, cfg.pkgname, cfg.version, cfg.gitSHA)

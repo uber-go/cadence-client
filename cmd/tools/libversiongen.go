@@ -11,9 +11,11 @@ import (
 // file that contains the source version header
 const licenseFilePath = "LICENSE"
 
-var outputFilePerms = os.FileMode(0644)
-var semVerRegex = regexp.MustCompile("^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$")
-var shaRegex = regexp.MustCompile("[0-9a-f]{40}$")
+var (
+	outputFilePerms = os.FileMode(0644)
+	semVerRegex     = regexp.MustCompile("^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$")
+	shaRegex        = regexp.MustCompile("[0-9a-f]{40}$")
+)
 
 type config struct {
 	version        string // semver string for this lib

@@ -206,7 +206,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowActivityCancellation() {
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 	testKey, testValue := "test_key", "test_value"
 	userCtx := context.WithValue(context.Background(), testKey, testValue)
-	workerOptions := NewWorkerOptions().WithActivityContext(userCtx)
+	workerOptions := WorkerOptions{}
+	workerOptions.ActivityContext = userCtx
 
 	// inline activity using value passing through user context.
 	activityWithUserContext := func(ctx context.Context, keyName string) (string, error) {

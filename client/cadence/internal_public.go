@@ -33,17 +33,6 @@ type (
 
 var enableVerboseLogging = false
 
-// NewWorkerOptionsInternal creates an instance of worker options with default values.
-func NewWorkerOptionsInternal(testTags map[string]map[string]string) WorkerOptions {
-	return &workerOptions{
-		maxConcurrentActivityExecutionSize: defaultMaxConcurrentActivityExecutionSize,
-		maxActivityExecutionRate:           defaultMaxActivityExecutionRate,
-		autoHeartBeatForActivities:         false,
-		testTags:                           testTags,
-		// Defaults for metrics, identity, logger is filled in by the WorkflowWorker APIs.
-	}
-}
-
 // NewWorkflowTaskWorker returns an instance of a workflow task handler worker.
 // To be used by framework level code that requires access to the original workflow task.
 func NewWorkflowTaskWorker(
@@ -53,16 +42,16 @@ func NewWorkflowTaskWorker(
 	taskList string,
 	options WorkerOptions,
 ) (worker Worker) {
-	wOptions := options.(*workerOptions)
+	wOptions := fillWorkerOptionsDefaults(options)
 	workerParams := workerExecutionParameters{
 		TaskList:                  taskList,
 		ConcurrentPollRoutineSize: defaultConcurrentPollRoutineSize,
-		Identity:                  wOptions.identity,
-		MetricsScope:              wOptions.metricsScope,
-		Logger:                    wOptions.logger,
+		Identity:                  wOptions.Identity,
+		MetricsScope:              wOptions.MetricsScope,
+		Logger:                    wOptions.Logger,
 	}
 
-	processTestTags(wOptions, &workerParams)
+	processTestTags(&wOptions, &workerParams)
 	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, workerParams)
 }
 
@@ -75,18 +64,18 @@ func NewActivityTaskWorker(
 	taskList string,
 	options WorkerOptions,
 ) Worker {
-	wOptions := options.(*workerOptions)
+	wOptions := fillWorkerOptionsDefaults(options)
 	workerParams := workerExecutionParameters{
 		TaskList:                  taskList,
 		ConcurrentPollRoutineSize: defaultConcurrentPollRoutineSize,
-		Identity:                  wOptions.identity,
-		MetricsScope:              wOptions.metricsScope,
-		Logger:                    wOptions.logger,
-		EnableLoggingInReplay:     wOptions.enableLoggingInReplay,
-		UserContext:               wOptions.userContext,
+		Identity:                  wOptions.Identity,
+		MetricsScope:              wOptions.MetricsScope,
+		Logger:                    wOptions.Logger,
+		EnableLoggingInReplay:     wOptions.EnableLoggingInReplay,
+		UserContext:               wOptions.ActivityContext,
 	}
 
-	processTestTags(wOptions, &workerParams)
+	processTestTags(&wOptions, &workerParams)
 	return newActivityTaskWorker(taskHandler, service, domain, workerParams)
 }
 

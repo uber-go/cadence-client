@@ -198,7 +198,8 @@ func TestCreateWorker(t *testing.T) {
 	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 
 	// Configure worker options.
-	workerOptions := NewWorkerOptions().SetMaxActivityExecutionRate(20)
+	workerOptions := WorkerOptions{}
+	workerOptions.MaxActivityExecutionRate = 20
 
 	// Start Worker.
 	worker := NewWorker(

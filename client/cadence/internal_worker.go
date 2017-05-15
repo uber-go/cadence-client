@@ -26,7 +26,6 @@ const (
 )
 
 // Assert that structs do indeed implement the interfaces
-var _ WorkerOptions = (*workerOptions)(nil)
 var _ Worker = (*aggregatedWorker)(nil)
 var _ hostEnv = (*hostEnvImpl)(nil)
 
@@ -242,88 +241,6 @@ func (aw *activityWorker) Start() error {
 // Shutdown the worker.
 func (aw *activityWorker) Stop() {
 	aw.worker.Stop()
-}
-
-// workerOptions stores all host-specific parameters that cadence can use to run the workflows
-// and activities and if they need any rate limiting.
-type workerOptions struct {
-	maxConcurrentActivityExecutionSize int
-	maxActivityExecutionRate           float32
-	// TODO: Move heart beating to per activity options when they are exposed.
-	autoHeartBeatForActivities bool
-	identity                   string
-	metricsScope               tally.Scope
-	logger                     *zap.Logger
-	enableLoggingInReplay      bool
-	disableWorkflowWorker      bool
-	disableActivityWorker      bool
-	testTags                   map[string]map[string]string
-	userContext                context.Context
-}
-
-// SetMaxConcurrentActivityExecutionSize sets the maximum concurrent activity executions this host can have.
-func (wo *workerOptions) SetMaxConcurrentActivityExecutionSize(size int) WorkerOptions {
-	wo.maxConcurrentActivityExecutionSize = size
-	return wo
-}
-
-// SetMaxActivityExecutionRate sets the rate limiting on number of activities that can be executed.
-func (wo *workerOptions) SetMaxActivityExecutionRate(requestPerSecond float32) WorkerOptions {
-	wo.maxActivityExecutionRate = requestPerSecond
-	return wo
-}
-
-func (wo *workerOptions) SetAutoHeartBeat(auto bool) WorkerOptions {
-	wo.autoHeartBeatForActivities = auto
-	return wo
-}
-
-// SetIdentity identifies the host for debugging.
-func (wo *workerOptions) SetIdentity(identity string) WorkerOptions {
-	wo.identity = identity
-	return wo
-}
-
-// SetMetrics is the metrics that the client can use to report.
-func (wo *workerOptions) SetMetrics(metricsScope tally.Scope) WorkerOptions {
-	wo.metricsScope = metricsScope
-	return wo
-}
-
-// SetLogger sets the logger for the framework.
-func (wo *workerOptions) SetLogger(logger *zap.Logger) WorkerOptions {
-	wo.logger = logger
-	return wo
-}
-
-// SetEnableLoggingInReplay sets the logger for the framework.
-func (wo *workerOptions) SetEnableLoggingInReplay(enableLoggingInReplay bool) WorkerOptions {
-	wo.enableLoggingInReplay = enableLoggingInReplay
-	return wo
-}
-
-// SetDisableWorkflowWorker disables running workflow workers.
-func (wo *workerOptions) SetDisableWorkflowWorker(disable bool) WorkerOptions {
-	wo.disableWorkflowWorker = disable
-	return wo
-}
-
-// SetDisableActivityWorker disables running activity workers.
-func (wo *workerOptions) SetDisableActivityWorker(disable bool) WorkerOptions {
-	wo.disableActivityWorker = disable
-	return wo
-}
-
-// WithActivityContext sets context for activity
-func (wo *workerOptions) WithActivityContext(ctx context.Context) WorkerOptions {
-	wo.userContext = ctx
-	return wo
-}
-
-// SetTestTags test tags for worker.
-func (wo *workerOptions) SetTestTags(tags map[string]map[string]string) WorkerOptions {
-	wo.testTags = tags
-	return wo
 }
 
 type workerFunc func(ctx Context, input []byte) ([]byte, error)
@@ -798,15 +715,15 @@ func newAggregatedWorker(
 	groupName string,
 	options WorkerOptions,
 ) (worker Worker) {
-	wOptions := options.(*workerOptions)
+	wOptions := fillWorkerOptionsDefaults(options)
 	workerParams := workerExecutionParameters{
 		TaskList:                  groupName,
 		ConcurrentPollRoutineSize: defaultConcurrentPollRoutineSize,
-		Identity:                  wOptions.identity,
-		MetricsScope:              wOptions.metricsScope,
-		Logger:                    wOptions.logger,
-		EnableLoggingInReplay:     wOptions.enableLoggingInReplay,
-		UserContext:               wOptions.userContext,
+		Identity:                  wOptions.Identity,
+		MetricsScope:              wOptions.MetricsScope,
+		Logger:                    wOptions.Logger,
+		EnableLoggingInReplay:     wOptions.EnableLoggingInReplay,
+		UserContext:               wOptions.ActivityContext,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -817,21 +734,21 @@ func newAggregatedWorker(
 	)
 	logger := workerParams.Logger
 
-	processTestTags(wOptions, &workerParams)
+	processTestTags(&wOptions, &workerParams)
 
 	env := getHostEnvironment()
 	// workflow factory.
 	var workflowWorker Worker
-	if !wOptions.disableWorkflowWorker {
+	if !wOptions.DisableWorkflowWorker {
 		if env.lenWorkflowFns() > 0 {
 			workflowFactory := newRegisteredWorkflowFactory()
-			if wOptions.testTags != nil && len(wOptions.testTags) > 0 {
+			if wOptions.TestTags != nil && len(wOptions.TestTags) > 0 {
 				workflowWorker = newWorkflowWorkerWithPressurePoints(
 					workflowFactory,
 					service,
 					domain,
 					workerParams,
-					wOptions.testTags,
+					wOptions.TestTags,
 				)
 			} else {
 				workflowWorker = newWorkflowWorker(
@@ -849,7 +766,7 @@ func newAggregatedWorker(
 	// activity types.
 	var activityWorker Worker
 
-	if !wOptions.disableActivityWorker {
+	if !wOptions.DisableActivityWorker {
 		activityTypes := env.getRegisteredActivities()
 		if len(activityTypes) > 0 {
 			activityWorker = newActivityWorker(
@@ -881,9 +798,9 @@ func newRegisteredWorkflowFactory() workflowFactory {
 	return getHostEnvironment().newRegisteredWorkflowFactory()
 }
 
-func processTestTags(wOptions *workerOptions, ep *workerExecutionParameters) {
-	if wOptions.testTags != nil {
-		if paramsOverride, ok := wOptions.testTags[workerOptionsConfig]; ok {
+func processTestTags(wOptions *WorkerOptions, ep *workerExecutionParameters) {
+	if wOptions.TestTags != nil {
+		if paramsOverride, ok := wOptions.TestTags[workerOptionsConfig]; ok {
 			for key, val := range paramsOverride {
 				switch key {
 				case workerOptionsConfigConcurrentPollRoutineSize:
@@ -976,4 +893,14 @@ func getWorkflowDefinitionFactory(factory workflowFactory) workflowDefinitionFac
 		}
 		return newWorkflowDefinition(wd), nil
 	}
+}
+
+func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
+	if options.MaxConcurrentActivityExecutionSize == 0 {
+		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
+	}
+	if options.MaxActivityExecutionRate == 0 {
+		options.MaxActivityExecutionRate = defaultMaxActivityExecutionRate
+	}
+	return options
 }

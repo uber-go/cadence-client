@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/uber-go/cadence-client/common"
 	"go.uber.org/zap"
 )
 
@@ -87,11 +88,12 @@ type helloWorldActivityWorkflow struct {
 }
 
 func (w *helloWorldActivityWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithScheduleToStartTimeout(10*time.Second).
-		WithStartToCloseTimeout(5*time.Second).
-		WithScheduleToCloseTimeout(10*time.Second))
-	ctx1 := WithActivityOptions(ctx, NewActivityOptions().(*activityOptions).WithActivityID("id1"))
+	ao := ActivityOptions{}
+	ao.ScheduleToStartTimeout = 10 * time.Second
+	ao.StartToCloseTimeout = 5 * time.Second
+	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ao.ActivityID = common.StringPtr("id1")
+	ctx1 := WithActivityOptions(ctx, ao)
 	f := ExecuteActivity(ctx1, "testAct", input)
 	var r1 []byte
 	err = f.Get(ctx, &r1)
@@ -151,22 +153,25 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	var result1, result2 []byte
 	var err1, err2 error
 
-	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithScheduleToStartTimeout(10*time.Second).
-		WithStartToCloseTimeout(5*time.Second).
-		WithScheduleToCloseTimeout(10*time.Second))
+	ao := ActivityOptions{}
+	ao.ScheduleToStartTimeout = 10 * time.Second
+	ao.StartToCloseTimeout = 5 * time.Second
+	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ctx = WithActivityOptions(ctx, ao)
 
 	c1 := NewChannel(ctx)
 	c2 := NewChannel(ctx)
 	Go(ctx, func(ctx Context) {
-		ctx1 := WithActivityOptions(ctx, NewActivityOptions().(*activityOptions).WithActivityID("id1"))
+		ao.ActivityID = common.StringPtr("id1")
+		ctx1 := WithActivityOptions(ctx, ao)
 		f := ExecuteActivity(ctx1, "testAct")
 		err1 = f.Get(ctx, &result1)
 		require.NoError(w.t, err1, err1)
 		c1.Send(ctx, true)
 	})
 	Go(ctx, func(ctx Context) {
-		ctx2 := WithActivityOptions(ctx, NewActivityOptions().(*activityOptions).WithActivityID("id2"))
+		ao.ActivityID = common.StringPtr("id2")
+		ctx2 := WithActivityOptions(ctx, ao)
 		f := ExecuteActivity(ctx2, "testAct")
 		err1 := f.Get(ctx, &result2)
 		require.NoError(w.t, err1, err1)
@@ -372,15 +377,18 @@ type testActivityCancelWorkflow struct {
 }
 
 func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithScheduleToStartTimeout(10*time.Second).
-		WithStartToCloseTimeout(5*time.Second).
-		WithScheduleToCloseTimeout(10*time.Second))
+	ao := ActivityOptions{}
+	ao.ScheduleToStartTimeout = 10 * time.Second
+	ao.StartToCloseTimeout = 5 * time.Second
+	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ctx = WithActivityOptions(ctx, ao)
 
 	// Sync cancellation
 	ctx1, c1 := WithCancel(ctx)
 	defer c1()
-	ctx1 = WithActivityOptions(ctx1, NewActivityOptions().(*activityOptions).WithActivityID("id1"))
+
+	ao.ActivityID = common.StringPtr("id1")
+	ctx1 = WithActivityOptions(ctx1, ao)
 	f := ExecuteActivity(ctx1, "testAct")
 	var res1 []byte
 	err1 := f.Get(ctx, &res1)
@@ -389,7 +397,8 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 
 	// Async Cancellation (Callback completes before cancel)
 	ctx2, c2 := WithCancel(ctx)
-	ctx2 = WithActivityOptions(ctx2, NewActivityOptions().(*activityOptions).WithActivityID("id2"))
+	ao.ActivityID = common.StringPtr("id2")
+	ctx2 = WithActivityOptions(ctx2, ao)
 	f = ExecuteActivity(ctx2, "testAct")
 	c2()
 	var res2 []byte
@@ -399,7 +408,8 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 
 	// Async Cancellation (Callback doesn't complete)
 	ctx3, c3 := WithCancel(ctx)
-	ctx3 = WithActivityOptions(ctx3, NewActivityOptions().(*activityOptions).WithActivityID("id3"))
+	ao.ActivityID = common.StringPtr("id3")
+	ctx3 = WithActivityOptions(ctx3, ao)
 	f3 := ExecuteActivity(ctx3, "testAct")
 	c3()
 	var res3 []byte
@@ -473,12 +483,12 @@ type sayGreetingActivityRequest struct {
 // Greetings Workflow Decider.
 func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	// Get Greeting.
-
-	ctx1 := WithActivityOptions(ctx, NewActivityOptions().
-		WithTaskList("exampleTaskList").
-		WithScheduleToStartTimeout(10*time.Second).
-		WithStartToCloseTimeout(5*time.Second).
-		WithScheduleToCloseTimeout(10*time.Second))
+	ao := ActivityOptions{}
+	ao.TaskList = "exampleTaskList"
+	ao.ScheduleToStartTimeout = 10 * time.Second
+	ao.StartToCloseTimeout = 5 * time.Second
+	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ctx1 := WithActivityOptions(ctx, ao)
 
 	f := ExecuteActivity(ctx1, "getGreetingActivity", input)
 	var greetResult []byte
@@ -614,11 +624,12 @@ func (w cancelWorkflowAfterActivityTest) Execute(ctx Context, input []byte) ([]b
 	// not to propagate those decisions.
 
 	// schedule an activity.
-	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithTaskList("exampleTaskList").
-		WithScheduleToStartTimeout(10*time.Second).
-		WithStartToCloseTimeout(5*time.Second).
-		WithScheduleToCloseTimeout(10*time.Second))
+	ao := ActivityOptions{}
+	ao.TaskList = "exampleTaskList"
+	ao.ScheduleToStartTimeout = 10 * time.Second
+	ao.StartToCloseTimeout = 5 * time.Second
+	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ctx = WithActivityOptions(ctx, ao)
 
 	err := ExecuteActivity(ctx, "testActivity", input).Get(ctx, nil)
 	if err != nil {

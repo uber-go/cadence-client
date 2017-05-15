@@ -19,12 +19,13 @@ type WorkflowTestSuiteUnitTest struct {
 }
 
 func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
-	s.activityOptions = NewActivityOptions().
-		WithTaskList(testTaskList).
-		WithScheduleToCloseTimeout(time.Minute).
-		WithScheduleToStartTimeout(time.Minute).
-		WithStartToCloseTimeout(time.Minute).
-		WithHeartbeatTimeout(time.Second * 20)
+	ao := ActivityOptions{}
+	ao.TaskList = testTaskList
+	ao.ScheduleToStartTimeout = time.Minute
+	ao.StartToCloseTimeout = time.Minute
+	ao.ScheduleToCloseTimeout = time.Minute
+	ao.HeartbeatTimeout = 20 * time.Second
+	s.activityOptions = ao
 	s.RegisterActivity(testActivityHello)
 	s.RegisterActivity(testActivityHeartbeat)
 }
@@ -293,12 +294,13 @@ func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowCancellation() {
 }
 
 func testWorkflowHello(ctx Context) (string, error) {
-	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithTaskList(testTaskList).
-		WithScheduleToCloseTimeout(time.Minute).
-		WithScheduleToStartTimeout(time.Minute).
-		WithStartToCloseTimeout(time.Minute).
-		WithHeartbeatTimeout(time.Second*20))
+	ao := ActivityOptions{}
+	ao.TaskList = testTaskList
+	ao.ScheduleToStartTimeout = time.Minute
+	ao.StartToCloseTimeout = time.Minute
+	ao.ScheduleToCloseTimeout = time.Minute
+	ao.HeartbeatTimeout = 20 * time.Second
+	ctx = WithActivityOptions(ctx, ao)
 
 	var result string
 	err := ExecuteActivity(ctx, testActivityHello, "world").Get(ctx, &result)

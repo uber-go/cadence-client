@@ -78,11 +78,12 @@ func getLogger() *zap.Logger {
 }
 
 func testReplayWorkflow(ctx Context) error {
-	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithTaskList("testTaskList").
-		WithScheduleToStartTimeout(time.Second).
-		WithStartToCloseTimeout(time.Second).
-		WithScheduleToCloseTimeout(time.Second))
+	ao := ActivityOptions{}
+	ao.TaskList = "testTaskList"
+	ao.ScheduleToStartTimeout = time.Second
+	ao.StartToCloseTimeout = time.Second
+	ao.ScheduleToCloseTimeout = time.Second
+	ctx = WithActivityOptions(ctx, ao)
 	err := ExecuteActivity(ctx, "testActivity").Get(ctx, nil)
 	if err != nil {
 		getLogger().Error("activity failed with error.", zap.Error(err))
@@ -305,11 +306,12 @@ type activitiesCallingOptionsWorkflow struct {
 }
 
 func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithTaskList("exampleTaskList").
-		WithScheduleToStartTimeout(10*time.Second).
-		WithStartToCloseTimeout(5*time.Second).
-		WithScheduleToCloseTimeout(10*time.Second))
+	ao := ActivityOptions{}
+	ao.TaskList = "exampleTaskList"
+	ao.ScheduleToStartTimeout = 10 * time.Second
+	ao.StartToCloseTimeout = 5 * time.Second
+	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ctx = WithActivityOptions(ctx, ao)
 
 	// By functions.
 	err = ExecuteActivity(ctx, testActivityByteArgs, input).Get(ctx, nil)

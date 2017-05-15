@@ -63,7 +63,7 @@ libversion_gen: ./cmd/tools/libversiongen.go
 bins: libversion_gen thriftc
 	go build -i -o cadence-client main.go
 
-bins_nothrift: gen_ver glide
+bins_nothrift: libversion_gen glide
 	go build -i -o cadence-client main.go
 
 test: bins

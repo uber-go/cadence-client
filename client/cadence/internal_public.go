@@ -173,7 +173,9 @@ func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
 	return impl, impl
 }
 
-const testTagsContextKey = "testTags"
+type contextKey string
+
+const testTagsContextKey = contextKey("testTags")
 
 // getTestTags returns the test tags in the context.
 func getTestTags(ctx context.Context) map[string]map[string]string {

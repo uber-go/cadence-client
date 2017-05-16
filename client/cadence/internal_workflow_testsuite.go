@@ -287,10 +287,12 @@ func (env *testWorkflowEnvironmentImpl) startMainLoop() {
 				case c := <-env.callbackChannel:
 					env.processCallback(c)
 				case <-time.After(env.testTimeout):
-					errMsg := fmt.Sprintf("test timeout: %v, workflow stack: %v",
+					// not able to complete workflow within test timeout, workflow likely stuck somewhere,
+					// check workflow stack for more details.
+					panicMsg := fmt.Sprintf("test timeout: %v, workflow stack: %v",
 						env.testTimeout, env.workflowDef.StackTrace())
-					env.logger.Info(errMsg)
-					return
+					env.logger.Info(panicMsg)
+					panic(panicMsg)
 				}
 			}
 		}

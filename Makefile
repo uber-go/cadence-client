@@ -57,7 +57,7 @@ clean_thrift:
 thriftc: clean_thrift glide $(THRIFT_GEN_SRC)
 
 copyright: ./cmd/tools/copyright/licensegen.go
-	go run ./cmd/tools/copyright/licensegen.go
+	go run ./cmd/tools/copyright/licensegen.go --verifyOnly
 
 libversion_gen: ./cmd/tools/libversiongen.go
     	# auto-generate const for libversion and git-sha

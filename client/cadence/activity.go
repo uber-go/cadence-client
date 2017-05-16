@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/uber-go/cadence-client/.gen/go/shared"
+	"github.com/uber-go/cadence-client/common"
 	"go.uber.org/zap"
 )
 
@@ -113,7 +114,7 @@ func WithActivityTask(
 type ActivityOptions struct {
 	// TaskList that the activity needs to be scheduled on.
 	// optional: The default task list with the same name as the workflow task list.
-	TaskList *string
+	TaskList string
 
 	// ScheduleToCloseTimeout - The end to end time out for the activity needed.
 	// The zero value of this uses default value.
@@ -135,21 +136,21 @@ type ActivityOptions struct {
 
 	// WaitForCancellation - Whether to wait for cancelled activity to be completed(
 	// activity can be failed, completed, cancel accepted)
-	// Optional: default nil(taken as false)
-	WaitForCancellation *bool
+	// Optional: default false
+	WaitForCancellation bool
 
 	// ActivityID - Business level activity ID, this is not needed for most of the cases if you have
 	// to specify this then talk to cadence team. This is something will be done in future.
-	// Optional: default nil
-	ActivityID *string
+	// Optional: default empty string
+	ActivityID string
 }
 
 // WithActivityOptions adds all options to the context.
 func WithActivityOptions(ctx Context, options ActivityOptions) Context {
 	ctx1 := setActivityParametersIfNotExist(ctx)
 	eap := getActivityOptions(ctx1)
-	if options.TaskList != nil && *options.TaskList != "" {
-		eap.TaskListName = *options.TaskList
+	if options.TaskList != "" {
+		eap.TaskListName = options.TaskList
 	}
 	if options.ScheduleToCloseTimeout != 0 {
 		eap.ScheduleToCloseTimeoutSeconds = int32(options.ScheduleToCloseTimeout.Seconds())
@@ -163,11 +164,9 @@ func WithActivityOptions(ctx Context, options ActivityOptions) Context {
 	if options.HeartbeatTimeout != 0 {
 		eap.HeartbeatTimeoutSeconds = int32(options.HeartbeatTimeout.Seconds())
 	}
-	if options.WaitForCancellation != nil {
-		eap.WaitForCancellation = *options.WaitForCancellation
-	}
-	if options.ActivityID != nil {
-		eap.ActivityID = options.ActivityID
+	eap.WaitForCancellation = options.WaitForCancellation
+	if options.ActivityID != "" {
+		eap.ActivityID = common.StringPtr(options.ActivityID)
 	}
 	return ctx1
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/uber-go/cadence-client/common"
 	"go.uber.org/zap"
 )
 
@@ -92,7 +91,7 @@ func (w *helloWorldActivityWorkflow) Execute(ctx Context, input []byte) (result 
 	ao := ActivityOptions{
 		ScheduleToStartTimeout: 10 * time.Second,
 		StartToCloseTimeout:    5 * time.Second,
-		ActivityID:             common.StringPtr("id1"),
+		ActivityID:             "id1",
 	}
 	ctx1 := WithActivityOptions(ctx, ao)
 	f := ExecuteActivity(ctx1, "testAct", input)
@@ -164,7 +163,7 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	c1 := NewChannel(ctx)
 	c2 := NewChannel(ctx)
 	Go(ctx, func(ctx Context) {
-		ao.ActivityID = common.StringPtr("id1")
+		ao.ActivityID = "id1"
 		ctx1 := WithActivityOptions(ctx, ao)
 		f := ExecuteActivity(ctx1, "testAct")
 		err1 = f.Get(ctx, &result1)
@@ -172,7 +171,7 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 		c1.Send(ctx, true)
 	})
 	Go(ctx, func(ctx Context) {
-		ao.ActivityID = common.StringPtr("id2")
+		ao.ActivityID = "id2"
 		ctx2 := WithActivityOptions(ctx, ao)
 		f := ExecuteActivity(ctx2, "testAct")
 		err1 := f.Get(ctx, &result2)
@@ -393,7 +392,7 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 	ctx1, c1 := WithCancel(ctx)
 	defer c1()
 
-	ao.ActivityID = common.StringPtr("id1")
+	ao.ActivityID = "id1"
 	ctx1 = WithActivityOptions(ctx1, ao)
 	f := ExecuteActivity(ctx1, "testAct")
 	var res1 []byte
@@ -403,7 +402,7 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 
 	// Async Cancellation (Callback completes before cancel)
 	ctx2, c2 := WithCancel(ctx)
-	ao.ActivityID = common.StringPtr("id2")
+	ao.ActivityID = "id2"
 	ctx2 = WithActivityOptions(ctx2, ao)
 	f = ExecuteActivity(ctx2, "testAct")
 	c2()
@@ -414,7 +413,7 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 
 	// Async Cancellation (Callback doesn't complete)
 	ctx3, c3 := WithCancel(ctx)
-	ao.ActivityID = common.StringPtr("id3")
+	ao.ActivityID = "id3"
 	ctx3 = WithActivityOptions(ctx3, ao)
 	f3 := ExecuteActivity(ctx3, "testAct")
 	c3()

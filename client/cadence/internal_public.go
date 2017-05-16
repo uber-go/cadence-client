@@ -167,6 +167,7 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 }
 
 // WithTestTags - is used for internal cadence use to pass any test tags.
+// TODO: Build the tags on top of the context and pass it around instead of map of maps.
 func WithTestTags(ctx context.Context, testTags map[string]map[string]string) context.Context {
 	return context.WithValue(ctx, testTagsContextKey, testTags)
 }

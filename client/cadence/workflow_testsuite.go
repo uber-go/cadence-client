@@ -2,7 +2,6 @@ package cadence
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -119,10 +118,10 @@ func (t *TestActivityEnviornment) SetWorkerOption(options WorkerOptions) *TestAc
 	return t
 }
 
-// ExecuteWorkflow executes a workflow, wait until workflow complete. It returns nil if workflow completed, otherwise
-// error if workflow is blocked and cannot complete within TestTimeout (set by SetTestTimeout()).
-func (t *TestWorkflowEnvironment) ExecuteWorkflow(workflowFn interface{}, args ...interface{}) error {
-	return t.impl.executeWorkflow(workflowFn, args...)
+// ExecuteWorkflow executes a workflow, wait until workflow complete. It will fail the test if workflow is blocked and
+// cannot complete within TestTimeout (set by SetTestTimeout()).
+func (t *TestWorkflowEnvironment) ExecuteWorkflow(workflowFn interface{}, args ...interface{}) {
+	t.impl.executeWorkflow(workflowFn, args...)
 }
 
 // OverrideActivity overrides an actual activity with a fake activity. The fake activity will be invoked in place where the
@@ -193,7 +192,7 @@ func (t *TestWorkflowEnvironment) IsWorkflowCompleted() bool {
 // GetWorkflowResult extracts the encoded result from test workflow, it returns error if the extraction failed.
 func (t *TestWorkflowEnvironment) GetWorkflowResult(valuePtr interface{}) error {
 	if !t.impl.isTestCompleted {
-		return errors.New("workflow is not completed")
+		panic("workflow is not completed")
 	}
 	if t.impl.testResult == nil {
 		return nil

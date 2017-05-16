@@ -34,5 +34,5 @@ package cadence
 // behavior change
 const LibraryVersion = "v0.1.0"
 
-// GitSHA the git tag corresponding to this library
-const GitSHA = "c5db58f94094d114a2996890be18ca385e5d7d89"
+// GitSHA is the git tag corresponding to this library
+const GitSHA = "b309ad8cdc82fd4ee67d56fe98afcb114b6e3c6d"

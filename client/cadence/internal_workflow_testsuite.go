@@ -525,7 +525,7 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 		Identity:     wOptions.Identity,
 		MetricsScope: wOptions.MetricsScope,
 		Logger:       env.logger,
-		UserContext:  wOptions.ActivityContext,
+		UserContext:  wOptions.UserContext,
 	}
 	ensureRequiredParams(&params)
 

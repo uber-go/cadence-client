@@ -723,7 +723,7 @@ func newAggregatedWorker(
 		MetricsScope:              wOptions.MetricsScope,
 		Logger:                    wOptions.Logger,
 		EnableLoggingInReplay:     wOptions.EnableLoggingInReplay,
-		UserContext:               wOptions.ActivityContext,
+		UserContext:               wOptions.UserContext,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -742,13 +742,14 @@ func newAggregatedWorker(
 	if !wOptions.DisableWorkflowWorker {
 		if env.lenWorkflowFns() > 0 {
 			workflowFactory := newRegisteredWorkflowFactory()
-			if wOptions.TestTags != nil && len(wOptions.TestTags) > 0 {
+			testTags := getTestTags(wOptions.UserContext)
+			if testTags != nil && len(testTags) > 0 {
 				workflowWorker = newWorkflowWorkerWithPressurePoints(
 					workflowFactory,
 					service,
 					domain,
 					workerParams,
-					wOptions.TestTags,
+					testTags,
 				)
 			} else {
 				workflowWorker = newWorkflowWorker(
@@ -799,8 +800,9 @@ func newRegisteredWorkflowFactory() workflowFactory {
 }
 
 func processTestTags(wOptions *WorkerOptions, ep *workerExecutionParameters) {
-	if wOptions.TestTags != nil {
-		if paramsOverride, ok := wOptions.TestTags[workerOptionsConfig]; ok {
+	testTags := getTestTags(wOptions.UserContext)
+	if testTags != nil {
+		if paramsOverride, ok := testTags[workerOptionsConfig]; ok {
 			for key, val := range paramsOverride {
 				switch key {
 				case workerOptionsConfigConcurrentPollRoutineSize:

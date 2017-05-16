@@ -48,7 +48,8 @@ type (
 		// default: default logger provided.
 		Logger *zap.Logger
 
-		// Optional: Enable logging in replay
+		// Optional: Enable logging in replay. This will enable the workflow decider code to log during
+		// the replay mode as well. This will be too verbose and often repeated logs.
 		// default: false
 		EnableLoggingInReplay bool
 
@@ -60,11 +61,9 @@ type (
 		// default: false
 		DisableActivityWorker bool
 
-		// Optional: sets context for activity
-		ActivityContext context.Context
-
-		// Optional: This is only internal cadence use, users doesn't need to set this.
-		TestTags map[string]map[string]string
+		// Optional: sets context for activity. The context can be used to pass any configuration to activity
+		// like common logger for all activities.
+		UserContext context.Context
 	}
 )
 

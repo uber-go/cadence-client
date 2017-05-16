@@ -8,6 +8,8 @@ package cadence
 // point of view only to access them from other packages.
 
 import (
+	"context"
+
 	m "github.com/uber-go/cadence-client/.gen/go/cadence"
 	s "github.com/uber-go/cadence-client/.gen/go/shared"
 	"go.uber.org/zap"
@@ -72,7 +74,7 @@ func NewActivityTaskWorker(
 		MetricsScope:              wOptions.MetricsScope,
 		Logger:                    wOptions.Logger,
 		EnableLoggingInReplay:     wOptions.EnableLoggingInReplay,
-		UserContext:               wOptions.ActivityContext,
+		UserContext:               wOptions.UserContext,
 	}
 
 	processTestTags(&wOptions, &workerParams)
@@ -149,4 +151,22 @@ func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
 	impl := &decodeFutureImpl{
 		&futureImpl{channel: NewChannel(ctx).(*channelImpl)}, fn}
 	return impl, impl
+}
+
+const testTagsContextKey = "testTags"
+
+// getTestTags returns the test tags in the context.
+func getTestTags(ctx context.Context) map[string]map[string]string {
+	if ctx != nil {
+		env := ctx.Value(testTagsContextKey)
+		if env != nil {
+			return env.(map[string]map[string]string)
+		}
+	}
+	return nil
+}
+
+// WithTestTags - is used for internal cadence use to pass any test tags.
+func WithTestTags(ctx context.Context, testTags map[string]map[string]string) context.Context {
+	return context.WithValue(ctx, testTagsContextKey, testTags)
 }

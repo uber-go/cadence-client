@@ -289,7 +289,7 @@ func (env *testWorkflowEnvironmentImpl) startMainLoop() error {
 				case <-time.After(env.testTimeout):
 					errMsg := fmt.Sprintf("test timeout: %v, workflow dispatcher stack: %v",
 						env.testTimeout, env.workflowDef.StackTrace())
-					env.logger.Error(errMsg)
+					env.logger.Info(errMsg)
 					return errors.New(errMsg)
 				}
 			}

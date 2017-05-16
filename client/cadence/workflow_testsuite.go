@@ -2,10 +2,9 @@ package cadence
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
-
-	"errors"
 
 	"go.uber.org/zap"
 )

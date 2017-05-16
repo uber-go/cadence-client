@@ -121,7 +121,7 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) Co
 	}
 	options := getWorkflowEnvOptions(ctx)
 	if options == nil {
-		panic("invalid worker environment options provided")
+		panic("context is missing required options for continue as new")
 	}
 	if options.taskListName == nil || *options.taskListName == "" {
 		panic("invalid task list provided")

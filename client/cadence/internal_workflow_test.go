@@ -89,11 +89,11 @@ type helloWorldActivityWorkflow struct {
 }
 
 func (w *helloWorldActivityWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ao := ActivityOptions{}
-	ao.ScheduleToStartTimeout = 10 * time.Second
-	ao.StartToCloseTimeout = 5 * time.Second
-	ao.ScheduleToCloseTimeout = 10 * time.Second
-	ao.ActivityID = common.StringPtr("id1")
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
+		ActivityID:             common.StringPtr("id1"),
+	}
 	ctx1 := WithActivityOptions(ctx, ao)
 	f := ExecuteActivity(ctx1, "testAct", input)
 	var r1 []byte
@@ -155,10 +155,10 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	var result1, result2 []byte
 	var err1, err2 error
 
-	ao := ActivityOptions{}
-	ao.ScheduleToStartTimeout = 10 * time.Second
-	ao.StartToCloseTimeout = 5 * time.Second
-	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
+	}
 	ctx = WithActivityOptions(ctx, ao)
 
 	c1 := NewChannel(ctx)
@@ -383,10 +383,10 @@ type testActivityCancelWorkflow struct {
 }
 
 func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ao := ActivityOptions{}
-	ao.ScheduleToStartTimeout = 10 * time.Second
-	ao.StartToCloseTimeout = 5 * time.Second
-	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
+	}
 	ctx = WithActivityOptions(ctx, ao)
 
 	// Sync cancellation
@@ -490,10 +490,10 @@ type sayGreetingActivityRequest struct {
 // Greetings Workflow Decider.
 func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	// Get Greeting.
-	ao := ActivityOptions{}
-	ao.ScheduleToStartTimeout = 10 * time.Second
-	ao.StartToCloseTimeout = 5 * time.Second
-	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
+	}
 	ctx1 := WithActivityOptions(ctx, ao)
 
 	f := ExecuteActivity(ctx1, "getGreetingActivity", input)
@@ -630,10 +630,10 @@ func (w cancelWorkflowAfterActivityTest) Execute(ctx Context, input []byte) ([]b
 	// not to propagate those decisions.
 
 	// schedule an activity.
-	ao := ActivityOptions{}
-	ao.ScheduleToStartTimeout = 10 * time.Second
-	ao.StartToCloseTimeout = 5 * time.Second
-	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
+	}
 	ctx = WithActivityOptions(ctx, ao)
 
 	err := ExecuteActivity(ctx, "testActivity", input).Get(ctx, nil)

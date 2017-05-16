@@ -112,11 +112,12 @@ func WithActivityTask(
 // be stored inside of a context.
 type ActivityOptions struct {
 	// TaskList that the activity needs to be scheduled on.
-	// optional: The default task list that the workflow is schedule
-	TaskList string
+	// optional: The default task list with the same name as the workflow task list.
+	TaskList *string
 
 	// ScheduleToCloseTimeout - The end to end time out for the activity needed.
-	// Mandatory: No default.
+	// The zero value of this uses default value.
+	// Optional: The default value is the sum of ScheduleToStartTimeout and StartToCloseTimeout
 	ScheduleToCloseTimeout time.Duration
 
 	// ScheduleToStartTimeout - The queue time out before the activity starts executed.
@@ -147,8 +148,8 @@ type ActivityOptions struct {
 func WithActivityOptions(ctx Context, options ActivityOptions) Context {
 	ctx1 := setActivityParametersIfNotExist(ctx)
 	eap := getActivityOptions(ctx1)
-	if options.TaskList != "" {
-		eap.TaskListName = options.TaskList
+	if options.TaskList != nil && *options.TaskList != "" {
+		eap.TaskListName = *options.TaskList
 	}
 	if options.ScheduleToCloseTimeout != 0 {
 		eap.ScheduleToCloseTimeoutSeconds = int32(options.ScheduleToCloseTimeout.Seconds())

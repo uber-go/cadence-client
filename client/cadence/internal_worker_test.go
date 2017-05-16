@@ -78,10 +78,10 @@ func getLogger() *zap.Logger {
 }
 
 func testReplayWorkflow(ctx Context) error {
-	ao := ActivityOptions{}
-	ao.ScheduleToStartTimeout = time.Second
-	ao.StartToCloseTimeout = time.Second
-	ao.ScheduleToCloseTimeout = time.Second
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: time.Second,
+		StartToCloseTimeout:    time.Second,
+	}
 	ctx = WithActivityOptions(ctx, ao)
 	err := ExecuteActivity(ctx, "testActivity").Get(ctx, nil)
 	if err != nil {
@@ -125,7 +125,7 @@ func TestDecisionTaskHandler(t *testing.T) {
 		PreviousStartedEventId: common.Int64Ptr(5),
 	}
 
-	r := NewWorkflowTaskHandler("test-domain", "identity", logger)
+	r := NewWorkflowTaskHandler(testDomain, "identity", logger)
 	_, stackTrace, err := r.ProcessWorkflowTask(task, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, stackTrace, stackTrace)
@@ -306,10 +306,10 @@ type activitiesCallingOptionsWorkflow struct {
 }
 
 func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ao := ActivityOptions{}
-	ao.ScheduleToStartTimeout = 10 * time.Second
-	ao.StartToCloseTimeout = 5 * time.Second
-	ao.ScheduleToCloseTimeout = 10 * time.Second
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
+	}
 	ctx = WithActivityOptions(ctx, ao)
 
 	// By functions.

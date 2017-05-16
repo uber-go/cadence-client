@@ -19,12 +19,11 @@ type WorkflowTestSuiteUnitTest struct {
 }
 
 func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
-	ao := ActivityOptions{}
-	ao.ScheduleToStartTimeout = time.Minute
-	ao.StartToCloseTimeout = time.Minute
-	ao.ScheduleToCloseTimeout = time.Minute
-	ao.HeartbeatTimeout = 20 * time.Second
-	s.activityOptions = ao
+	s.activityOptions = ActivityOptions{
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+		HeartbeatTimeout:       20 * time.Second,
+	}
 	s.RegisterActivity(testActivityHello)
 	s.RegisterActivity(testActivityHeartbeat)
 }
@@ -206,7 +205,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 	testKey, testValue := "test_key", "test_value"
 	userCtx := context.WithValue(context.Background(), testKey, testValue)
 	workerOptions := WorkerOptions{}
-	workerOptions.ActivityContext = userCtx
+	workerOptions.UserContext = userCtx
 
 	// inline activity using value passing through user context.
 	activityWithUserContext := func(ctx context.Context, keyName string) (string, error) {
@@ -294,11 +293,11 @@ func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowCancellation() {
 }
 
 func testWorkflowHello(ctx Context) (string, error) {
-	ao := ActivityOptions{}
-	ao.ScheduleToStartTimeout = time.Minute
-	ao.StartToCloseTimeout = time.Minute
-	ao.ScheduleToCloseTimeout = time.Minute
-	ao.HeartbeatTimeout = 20 * time.Second
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+		HeartbeatTimeout:       20 * time.Second,
+	}
 	ctx = WithActivityOptions(ctx, ao)
 
 	var result string

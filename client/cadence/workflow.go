@@ -152,12 +152,13 @@ func NewFuture(ctx Context) (Future, Settable) {
 //  - Context can be used to pass the settings for this activity.
 // 	For example: task list that this need to be routed, timeouts that need to be configured.
 //	Use ActivityOptions to pass down the options.
-//			ao := ActivityOptions{}
-//			ao.TaskList = "exampleTaskList"
-//			ao.ScheduleToStartTimeout = 10 * time.Second
-//			ao.StartToCloseTimeout = 5 * time.Second
-//			ao.ScheduleToCloseTimeout = 10 * time.Second
-//			ao.HeartbeatTimeout = 0
+//			ao := ActivityOptions{
+// 				TaskList: "exampleTaskList",
+// 				ScheduleToStartTimeout: 10 * time.Second,
+// 				StartToCloseTimeout: 5 * time.Second,
+// 				ScheduleToCloseTimeout: 10 * time.Second,
+// 				HeartbeatTimeout: 0,
+// 			}
 //			ctx1 := WithActivityOptions(ctx, ao)
 //			or
 //			ctx1 := WithTaskList(ctx, "exampleTaskList")

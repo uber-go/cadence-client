@@ -35,4 +35,4 @@ package cadence
 const LibraryVersion = "v0.1.0"
 
 // GitSHA is the git tag corresponding to this library
-const GitSHA = "b309ad8cdc82fd4ee67d56fe98afcb114b6e3c6d"
+const GitSHA = "9948eeecf72175e9d54683bcd6314d55a7376195"

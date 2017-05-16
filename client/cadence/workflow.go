@@ -180,7 +180,9 @@ func NewFuture(ctx Context) (Future, Settable) {
 // 				HeartbeatTimeout: 0,
 // 			}
 //			ctx1 := WithActivityOptions(ctx, ao)
-//			or
+//
+//			or to override a single option
+//
 //			ctx1 := WithTaskList(ctx, "exampleTaskList")
 //  - f - Either a activity name or a function that is getting scheduled.
 //  - args - The arguments that need to be passed to the function represented by 'f'.

@@ -122,7 +122,7 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 		p.ScheduleToCloseTimeoutSeconds = p.ScheduleToStartTimeoutSeconds + p.StartToCloseTimeoutSeconds
 	}
 	if p.HeartbeatTimeoutSeconds < 0 {
-		return nil, errors.New("missing or negative HeartbeatTimeoutSeconds")
+		return nil, errors.New("invalid negative HeartbeatTimeoutSeconds")
 	}
 
 	return p, nil

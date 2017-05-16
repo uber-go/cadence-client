@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"go.uber.org/zap"
@@ -268,6 +269,14 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	d.rootCtx = WithValue(background, workflowEnvironmentContextKey, env)
 	var resultPtr *workflowResult
 	d.rootCtx = WithValue(d.rootCtx, workflowResultContextKey, &resultPtr)
+
+	// Set default values for the workflow execution.
+	wInfo := env.WorkflowInfo()
+	d.rootCtx = WithWorkflowDomain(d.rootCtx, wInfo.Domain)
+	d.rootCtx = WithWorkflowTaskList(d.rootCtx, wInfo.TaskListName)
+	d.rootCtx = WithExecutionStartToCloseTimeout(d.rootCtx, time.Duration(wInfo.ExecutionStartToCloseTimeoutSeconds)*time.Second)
+	d.rootCtx = WithWorkflowTaskStartToCloseTimeout(d.rootCtx, time.Duration(wInfo.TaskStartToCloseTimeoutSeconds)*time.Second)
+	d.rootCtx = WithTaskList(d.rootCtx, wInfo.TaskListName)
 
 	d.dispatcher = newDispatcher(d.rootCtx, func(ctx Context) {
 		ctx, d.cancel = WithCancel(ctx)

@@ -100,7 +100,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, params, nil)
+	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, "test-domain", params, nil)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 	s.NoError(err)
 	s.NotNil(response)
@@ -129,7 +129,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, params, nil)
+	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, "test-domain", params, nil)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 
 	s.NoError(err)
@@ -165,7 +165,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, params, nil)
+	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, "test-domain", params, nil)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 
 	s.NotNil(err)
@@ -192,7 +192,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityTask() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(twdFactory, params, nil)
+	taskHandler := newWorkflowTaskHandler(twdFactory, "test-domain", params, nil)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 
 	s.NoError(err)
@@ -225,7 +225,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, params, ppMgr)
+	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, "test-domain", params, ppMgr)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 
 	s.Error(err)

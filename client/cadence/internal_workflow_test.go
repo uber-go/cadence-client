@@ -79,6 +79,7 @@ func TestHelloWorldWorkflow(t *testing.T) {
 	w := newWorkflowDefinition(&helloWorldWorklfow{t: t})
 	ctx := &mockWorkflowEnvironment{}
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", []byte("Hello World!"), nil).Return().Once()
 	w.Execute(ctx, []byte("Hello"))
 }
@@ -126,6 +127,7 @@ func TestSingleActivityWorkflow(t *testing.T) {
 	cbProcessor := newAsyncTestCallbackProcessor(w.OnDecisionTaskStarted)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
 		//result := args.Get(0).([]byte)
 		//require.Contains(t, string(result), "Hello World!")
@@ -220,6 +222,7 @@ func TestSplitJoinActivityWorkflow(t *testing.T) {
 	}).Twice()
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", []byte("Hello Flow!"), nil).Return().Run(func(args mock.Arguments) {
 		workflowComplete <- struct{}{}
 	}).Once()
@@ -244,6 +247,7 @@ func TestWorkflowPanic(t *testing.T) {
 		cbProcessor.Add(callback, []byte("test"), nil)
 	}).Twice()
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", []byte(nil), mock.Anything).Return().Run(func(args mock.Arguments) {
 		resultErr := args.Get(1).(ErrorWithDetails)
 		require.EqualValues(t, "simulated", resultErr.Reason())
@@ -278,6 +282,7 @@ func TestClockWorkflow(t *testing.T) {
 
 	ctx.On("Now").Return(time.Now()).Once()
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", []byte("workflow-completed"), nil).Return().Once()
 	w.Execute(ctx, []byte("Hello"))
 	w.OnDecisionTaskStarted()
@@ -358,6 +363,7 @@ func TestTimerWorkflow(t *testing.T) {
 	}).Twice()
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
 		result := args.Get(0).([]byte)
 		require.Equal(t, "workflow-completed", string(result))
@@ -454,6 +460,7 @@ func TestActivityCancellation(t *testing.T) {
 	}).Times(3)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
 		result := args.Get(0).([]byte)
 		require.Equal(t, "workflow-completed", string(result))
@@ -534,6 +541,7 @@ func TestExternalExampleWorkflow(t *testing.T) {
 	}).Times(3)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
 		workflowComplete <- struct{}{}
 	}).Once()
@@ -549,9 +557,6 @@ func TestExternalExampleWorkflow(t *testing.T) {
 type continueAsNewWorkflowTest struct{}
 
 func (w continueAsNewWorkflowTest) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ctx = WithWorkflowTaskList(ctx, "newTaskList")
-	ctx = WithExecutionStartToCloseTimeout(ctx, time.Second)
-	ctx = WithWorkflowTaskStartToCloseTimeout(ctx, time.Second)
 	return nil, NewContinueAsNewError(ctx, "continueAsNewWorkflowTest", []byte("start"))
 }
 
@@ -563,6 +568,7 @@ func TestContinueAsNewWorkflow(t *testing.T) {
 	cbProcessor := newAsyncTestCallbackProcessor(w.OnDecisionTaskStarted)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "newTaskList", Domain: "d", ExecutionStartToCloseTimeoutSeconds: 1, TaskStartToCloseTimeoutSeconds: 1}).Once()
 	ctx.On("Complete", []byte(nil), mock.Anything).Return().Run(func(args mock.Arguments) {
 		resultErr := args.Get(1).(*continueAsNewError)
 		require.EqualValues(t, "continueAsNewWorkflowTest", resultErr.options.workflowType.Name)
@@ -606,6 +612,7 @@ func TestCancelWorkflow(t *testing.T) {
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {
 		cancelHandler = args.Get(0).(func())
 	}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 
 	w.Execute(ctx, []byte("test Cancel"))
 	w.OnDecisionTaskStarted()
@@ -676,6 +683,7 @@ func TestCancelWorkflowAfterActivity(t *testing.T) {
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {
 		cancelHandler = args.Get(0).(func())
 	}).Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 
 	w.Execute(ctx, []byte("test Cancel"))
 	w.OnDecisionTaskStarted()

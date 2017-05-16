@@ -82,13 +82,14 @@ func NewActivityTaskWorker(
 // NewWorkflowTaskHandler creates an instance of a WorkflowTaskHandler from a decision poll response
 // using workflow functions registered through RegisterWorkflow
 // To be used to replay a workflow in a debugger.
-func NewWorkflowTaskHandler(identity string, logger *zap.Logger) WorkflowTaskHandler {
+func NewWorkflowTaskHandler(domain string, identity string, logger *zap.Logger) WorkflowTaskHandler {
 	params := workerExecutionParameters{
 		Identity: identity,
 		Logger:   logger,
 	}
 	return newWorkflowTaskHandler(
 		getWorkflowDefinitionFactory(newRegisteredWorkflowFactory()),
+		domain,
 		params,
 		nil)
 }

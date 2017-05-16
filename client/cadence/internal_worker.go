@@ -138,7 +138,7 @@ func newWorkflowWorkerInternal(
 	if overrides != nil && overrides.workflowTaskHandler != nil {
 		taskHandler = overrides.workflowTaskHandler
 	} else {
-		taskHandler = newWorkflowTaskHandler(factory, params, ppMgr)
+		taskHandler = newWorkflowTaskHandler(factory, domain, params, ppMgr)
 	}
 	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params)
 }

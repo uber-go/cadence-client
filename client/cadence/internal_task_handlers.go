@@ -46,6 +46,7 @@ type (
 type (
 	// workflowTaskHandlerImpl is the implementation of WorkflowTaskHandler
 	workflowTaskHandlerImpl struct {
+		domain                string
 		workflowDefFactory    workflowDefinitionFactory
 		metricsScope          tally.Scope
 		ppMgr                 pressurePointMgr
@@ -211,10 +212,11 @@ OrderEvents:
 }
 
 // newWorkflowTaskHandler returns an implementation of workflow task handler.
-func newWorkflowTaskHandler(factory workflowDefinitionFactory,
+func newWorkflowTaskHandler(factory workflowDefinitionFactory, domain string,
 	params workerExecutionParameters, ppMgr pressurePointMgr) WorkflowTaskHandler {
 	return &workflowTaskHandlerImpl{
 		workflowDefFactory:    factory,
+		domain:                domain,
 		logger:                params.Logger,
 		ppMgr:                 ppMgr,
 		metricsScope:          params.MetricsScope,
@@ -270,6 +272,9 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 			ID:    *task.WorkflowExecution.WorkflowId,
 			RunID: *task.WorkflowExecution.RunId,
 		},
+		ExecutionStartToCloseTimeoutSeconds: attributes.GetExecutionStartToCloseTimeoutSeconds(),
+		TaskStartToCloseTimeoutSeconds:      attributes.GetTaskStartToCloseTimeoutSeconds(),
+		Domain: wth.domain,
 	}
 
 	isWorkflowCompleted := false

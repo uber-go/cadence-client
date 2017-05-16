@@ -202,9 +202,12 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 
 // WorkflowInfo information about currently executing workflow
 type WorkflowInfo struct {
-	WorkflowExecution WorkflowExecution
-	WorkflowType      WorkflowType
-	TaskListName      string
+	WorkflowExecution                   WorkflowExecution
+	WorkflowType                        WorkflowType
+	TaskListName                        string
+	ExecutionStartToCloseTimeoutSeconds int32
+	TaskStartToCloseTimeoutSeconds      int32
+	Domain                              string
 }
 
 // GetWorkflowInfo extracts info of a current workflow from a context.

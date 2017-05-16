@@ -27,11 +27,13 @@ const (
 
 type (
 	timerHandle struct {
-		callback  resultHandler
-		timer     *clock.Timer
-		wallTimer *clock.Timer
-		duration  time.Duration
-		timerID   int
+		callback       resultHandler
+		timer          *clock.Timer
+		wallTimer      *clock.Timer
+		duration       time.Duration
+		mockTimeToFire time.Time
+		wallTimeToFire time.Time
+		timerID        int
 	}
 
 	activityHandle struct {
@@ -340,24 +342,22 @@ func (env *testWorkflowEnvironmentImpl) autoFireNextTimer() bool {
 	for _, t := range env.scheduledTimers {
 		if nextTimer == nil {
 			nextTimer = t
-		} else if t.duration < nextTimer.duration ||
-			(t.duration == nextTimer.duration && t.timerID < nextTimer.timerID) {
+		} else if t.mockTimeToFire.Before(nextTimer.mockTimeToFire) ||
+			(t.mockTimeToFire.Equal(nextTimer.mockTimeToFire) && t.timerID < nextTimer.timerID) {
 			nextTimer = t
 		}
 	}
 
 	// function to fire timer
 	fireTimer := func(th *timerHandle) {
-		d := th.duration
-		env.logger.Debug("Auto fire timer", zap.Int(tagTimerID, th.timerID), zap.Duration("Duration", th.duration))
+		skipDuration := th.mockTimeToFire.Sub(env.mockClock.Now())
+		env.logger.Debug("Auto fire timer",
+			zap.Int(tagTimerID, th.timerID),
+			zap.Duration("TimerDuration", th.duration),
+			zap.Duration("TimeSkipped", skipDuration))
 
 		// Move mockClock forward, this will fire the timer, and the timer callback will remove timer from scheduledTimers.
-		env.mockClock.Add(d)
-
-		// reduce all pending timer's duration by d
-		for _, t := range env.scheduledTimers {
-			t.duration -= d
-		}
+		env.mockClock.Add(skipDuration)
 	}
 
 	// fire timer if there is no running activity
@@ -370,8 +370,24 @@ func (env *testWorkflowEnvironmentImpl) autoFireNextTimer() bool {
 		return true
 	}
 
+	durationToFire := nextTimer.mockTimeToFire.Sub(env.mockClock.Now())
+	wallTimeToFire := env.wallClock.Now().Add(durationToFire)
+
+	if nextTimer.wallTimer != nil && nextTimer.wallTimeToFire.Before(wallTimeToFire) {
+		// nextTimer already set, meaning we already have a wall clock timer for the nextTimer setup earlier. And the
+		// previously scheduled wall time to fire is before the wallTimeToFire calculated this time. This could happen
+		// if workflow was blocked while there was activity running, and when that activity completed, there are some
+		// other activities still running while the nextTimer is still that same nextTimer. In that case, we should not
+		// reset the wall time to fire for the nextTimer.
+		return false
+	}
+	if nextTimer.wallTimer != nil {
+		// wallTimer was scheduled, but the wall time to fire should be earlier based on current calculation.
+		nextTimer.wallTimer.Stop()
+	}
+
 	// there is running activities, we would fire next timer only if wall time passed by nextTimer duration.
-	nextTimer.wallTimer = env.wallClock.AfterFunc(nextTimer.duration, func() {
+	nextTimer.wallTimeToFire, nextTimer.wallTimer = wallTimeToFire, env.wallClock.AfterFunc(durationToFire, func() {
 		// make sure it is running in the main loop
 		env.postCallback(func() {
 			// now fire the timer if it is not already fired.
@@ -636,7 +652,14 @@ func (env *testWorkflowEnvironmentImpl) NewTimer(d time.Duration, callback resul
 			}
 		}, true)
 	})
-	env.scheduledTimers[timerInfo.timerID] = &timerHandle{timer: timer, callback: callback, duration: d, timerID: nextID}
+	env.scheduledTimers[timerInfo.timerID] = &timerHandle{
+		callback:       callback,
+		timer:          timer,
+		mockTimeToFire: env.mockClock.Now().Add(d),
+		wallTimeToFire: env.wallClock.Now().Add(d),
+		duration:       d,
+		timerID:        nextID,
+	}
 	if env.onTimerScheduledListener != nil {
 		env.onTimerScheduledListener(timerInfo.timerID, d)
 	}

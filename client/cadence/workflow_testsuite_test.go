@@ -158,6 +158,46 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowAutoForwardClock() {
 	s.Equal("hello_controlled_execution", result)
 }
 
+func (s *WorkflowTestSuiteUnitTest) Test_WorkflowMixedClock() {
+	workflowFn := func(ctx Context) (string, error) {
+		// Schedule a long timer.
+		t1 := NewTimer(ctx, time.Minute)
+
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+		// Schedule 2 activities, one returns immediately, the other will take 10s to run.
+		f1 := ExecuteActivity(ctx, testActivityHello, "controlled_execution")
+		f2Ctx, f2Cancel := WithCancel(ctx)
+		f2 := ExecuteActivity(f2Ctx, testActivityHeartbeat, time.Second*10)
+
+		err := f1.Get(ctx, nil)
+		if err != nil {
+			return "", nil
+		}
+
+		// Schedule a short timer after f1 completed.
+		t2 := NewTimer(ctx, time.Millisecond)
+		NewSelector(ctx).AddFuture(t2, func(f Future) {
+			// when t2 fires, we would cancel f2
+			if !f2.IsReady() {
+				f2Cancel()
+			}
+		}).Select(ctx)
+
+		t1.Get(ctx, nil) // wait for the long timer to fire.
+
+		return "expected", nil
+	} // END of workflow code
+
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var result string
+	env.GetWorkflowResult(&result)
+	s.Equal("expected", result)
+}
+
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowActivityCancellation() {
 	workflowFn := func(ctx Context) error {
 		ctx = WithActivityOptions(ctx, s.activityOptions)
@@ -259,7 +299,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowCancellation() {
 	env := s.NewTestWorkflowEnvironment()
 	// Register a delayed callback using workflow timer internally. The callback will be called when workflow clock passed
 	// by the specified delay duration. The test suite enables the auto clock forwarding when workflow is blocked and no
-	// activities is running. However, if there is running activities, test suite's workflow clock will move forward at
+	// activities are running. However, if there are running activities, test suite's workflow clock will move forward at
 	// the real wall clock pace. In this test case, the activity is configured to run for 10s, so the workflow will be
 	// blocked. But after 1ms, the registered callback will be invoked, which will request to cancel the workflow.
 	env.RegisterDelayedCallback(func() {

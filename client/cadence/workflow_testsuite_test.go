@@ -20,7 +20,6 @@ type WorkflowTestSuiteUnitTest struct {
 
 func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 	ao := ActivityOptions{}
-	ao.TaskList = testTaskList
 	ao.ScheduleToStartTimeout = time.Minute
 	ao.StartToCloseTimeout = time.Minute
 	ao.ScheduleToCloseTimeout = time.Minute
@@ -296,7 +295,6 @@ func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowCancellation() {
 
 func testWorkflowHello(ctx Context) (string, error) {
 	ao := ActivityOptions{}
-	ao.TaskList = testTaskList
 	ao.ScheduleToStartTimeout = time.Minute
 	ao.StartToCloseTimeout = time.Minute
 	ao.ScheduleToCloseTimeout = time.Minute

@@ -79,7 +79,6 @@ func getLogger() *zap.Logger {
 
 func testReplayWorkflow(ctx Context) error {
 	ao := ActivityOptions{}
-	ao.TaskList = "testTaskList"
 	ao.ScheduleToStartTimeout = time.Second
 	ao.StartToCloseTimeout = time.Second
 	ao.ScheduleToCloseTimeout = time.Second
@@ -308,7 +307,6 @@ type activitiesCallingOptionsWorkflow struct {
 
 func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	ao := ActivityOptions{}
-	ao.TaskList = "exampleTaskList"
 	ao.ScheduleToStartTimeout = 10 * time.Second
 	ao.StartToCloseTimeout = 5 * time.Second
 	ao.ScheduleToCloseTimeout = 10 * time.Second

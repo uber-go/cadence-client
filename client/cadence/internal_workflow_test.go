@@ -491,7 +491,6 @@ type sayGreetingActivityRequest struct {
 func (w greetingsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
 	// Get Greeting.
 	ao := ActivityOptions{}
-	ao.TaskList = "exampleTaskList"
 	ao.ScheduleToStartTimeout = 10 * time.Second
 	ao.StartToCloseTimeout = 5 * time.Second
 	ao.ScheduleToCloseTimeout = 10 * time.Second
@@ -632,7 +631,6 @@ func (w cancelWorkflowAfterActivityTest) Execute(ctx Context, input []byte) ([]b
 
 	// schedule an activity.
 	ao := ActivityOptions{}
-	ao.TaskList = "exampleTaskList"
 	ao.ScheduleToStartTimeout = 10 * time.Second
 	ao.StartToCloseTimeout = 5 * time.Second
 	ao.ScheduleToCloseTimeout = 10 * time.Second

@@ -160,7 +160,7 @@ func (env *testWorkflowEnvironmentImpl) setActivityTaskList(tasklist string, act
 	}
 }
 
-func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, args ...interface{}) {
+func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, args ...interface{}) error {
 	s := env.testSuite
 	var workflowType string
 	fnType := reflect.TypeOf(workflowFn)
@@ -197,7 +197,7 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, 
 	}
 	env.workflowDef.Execute(env, input)
 
-	env.startMainLoop()
+	return env.startMainLoop()
 }
 
 func (env *testWorkflowEnvironmentImpl) executeActivity(
@@ -265,7 +265,7 @@ func (env *testWorkflowEnvironmentImpl) startDecisionTask() {
 	env.postCallback(func() {}, true /* to start decision task */)
 }
 
-func (env *testWorkflowEnvironmentImpl) startMainLoop() {
+func (env *testWorkflowEnvironmentImpl) startMainLoop() error {
 	// kick off the initial decision task
 	env.startDecisionTask()
 
@@ -279,7 +279,7 @@ func (env *testWorkflowEnvironmentImpl) startMainLoop() {
 			// nothing to process, main thread is blocked at this moment, now check if we should auto fire next timer
 			if !env.autoFireNextTimer() {
 				if env.isTestCompleted {
-					return
+					return nil
 				}
 
 				// no timer to fire, wait for things to do or timeout.
@@ -287,8 +287,10 @@ func (env *testWorkflowEnvironmentImpl) startMainLoop() {
 				case c := <-env.callbackChannel:
 					env.processCallback(c)
 				case <-time.After(env.testTimeout):
-					panicMsg := fmt.Sprintf("test timeout: %v, %v", env.testTimeout, env.workflowDef.StackTrace())
-					panic(panicMsg)
+					errMsg := fmt.Sprintf("test timeout: %v, workflow dispatcher stack: %v",
+						env.testTimeout, env.workflowDef.StackTrace())
+					env.logger.Error(errMsg)
+					return errors.New(errMsg)
 				}
 			}
 		}

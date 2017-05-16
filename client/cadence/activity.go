@@ -169,25 +169,14 @@ type ActivityOptions struct {
 func WithActivityOptions(ctx Context, options ActivityOptions) Context {
 	ctx1 := setActivityParametersIfNotExist(ctx)
 	eap := getActivityOptions(ctx1)
-	if options.TaskList != "" {
-		eap.TaskListName = options.TaskList
-	}
-	if options.ScheduleToCloseTimeout != 0 {
-		eap.ScheduleToCloseTimeoutSeconds = int32(options.ScheduleToCloseTimeout.Seconds())
-	}
-	if options.StartToCloseTimeout != 0 {
-		eap.StartToCloseTimeoutSeconds = int32(options.StartToCloseTimeout.Seconds())
-	}
-	if options.ScheduleToStartTimeout != 0 {
-		eap.ScheduleToStartTimeoutSeconds = int32(options.ScheduleToStartTimeout.Seconds())
-	}
-	if options.HeartbeatTimeout != 0 {
-		eap.HeartbeatTimeoutSeconds = int32(options.HeartbeatTimeout.Seconds())
-	}
+
+	eap.TaskListName = options.TaskList
+	eap.ScheduleToCloseTimeoutSeconds = int32(options.ScheduleToCloseTimeout.Seconds())
+	eap.StartToCloseTimeoutSeconds = int32(options.StartToCloseTimeout.Seconds())
+	eap.ScheduleToStartTimeoutSeconds = int32(options.ScheduleToStartTimeout.Seconds())
+	eap.HeartbeatTimeoutSeconds = int32(options.HeartbeatTimeout.Seconds())
 	eap.WaitForCancellation = options.WaitForCancellation
-	if options.ActivityID != "" {
-		eap.ActivityID = common.StringPtr(options.ActivityID)
-	}
+	eap.ActivityID = common.StringPtr(options.ActivityID)
 	return ctx1
 }
 

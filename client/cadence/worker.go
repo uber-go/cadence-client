@@ -68,7 +68,9 @@ type (
 		// default: default logger provided.
 		Logger *zap.Logger
 
-		// Optional: Enable logging in replay. This will enable the workflow decider code to log during
+		// Optional: Enable logging in replay.
+		// In the decider you can use Cadence.GetLogger(ctx) to access logger that is replay aware.
+		// This will enable workflow decider code to log during
 		// the replay mode as well. This will be too verbose and often repeated logs.
 		// default: false
 		EnableLoggingInReplay bool

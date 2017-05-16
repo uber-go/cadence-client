@@ -1,3 +1,23 @@
+// Copyright (c) 2017 Uber Technologies, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package cadence
 
 import (
@@ -30,7 +50,7 @@ type (
 		callback resultHandler
 		timer    *clock.Timer
 		duration time.Duration
-		timerId  int
+		timerID  int
 	}
 
 	activityHandle struct {
@@ -74,11 +94,13 @@ type (
 		scheduledTimers      map[string]*timerHandle
 		runningActivityCount atomic.Int32
 
-		onActivityStartedListener func(ctx context.Context, args EncodedValues)
-		onActivityEndedListener   func(result EncodedValue, err error, activityType string)
-		onTimerScheduledListener  func(timerID string, duration time.Duration)
-		onTimerFiredListener      func(timerID string)
-		onTimerCancelledListener  func(timerID string)
+		onActivityStartedListener   func(activityInfo *ActivityInfo, ctx context.Context, args EncodedValues)
+		onActivityCompletedListener func(activityInfo *ActivityInfo, result EncodedValue, err error)
+		onActivityCancelledListener func(activityInfo *ActivityInfo)
+		onActivityHeartbeatListener func(activityInfo *ActivityInfo, details EncodedValues)
+		onTimerScheduledListener    func(timerID string, duration time.Duration)
+		onTimerFiredListener        func(timerID string)
+		onTimerCancelledListener    func(timerID string)
 
 		callbackChannel chan callbackHandle
 		testTimeout     time.Duration
@@ -122,13 +144,20 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 	mockHeartbeatFn := func(c thrift.Context, r *shared.RecordActivityTaskHeartbeatRequest) error {
 		activityID := string(r.TaskToken)
 		env.locker.Lock() // need lock as this is running in activity worker's goroutinue
-		_, ok := env.scheduledActivities[activityID]
+		activityHandle, ok := env.scheduledActivities[activityID]
 		env.locker.Unlock()
 		if !ok {
 			env.logger.Debug("RecordActivityTaskHeartbeat: ActivityID not found, could be already completed or cancelled.",
 				zap.String(tagActivityID, activityID))
 			return shared.NewEntityNotExistsError()
 		}
+		activityInfo := env.getActivityInfo(activityID, activityHandle.activityType)
+		env.postCallback(func() {
+			if env.onActivityHeartbeatListener != nil {
+				env.onActivityHeartbeatListener(activityInfo, EncodedValues(r.Details))
+			}
+		}, false)
+
 		env.logger.Debug("RecordActivityTaskHeartbeat", zap.String(tagActivityID, activityID))
 		return nil
 	}
@@ -287,8 +316,11 @@ func (env *testWorkflowEnvironmentImpl) startMainLoop() {
 				case c := <-env.callbackChannel:
 					env.processCallback(c)
 				case <-time.After(env.testTimeout):
-					st := env.workflowDef.StackTrace()
-					env.testSuite.FailNow("Test timeout.", "TestTimeout: %v, DispatcherStack: %v", env.testTimeout, st)
+					// not able to complete workflow within test timeout, workflow likely stuck somewhere,
+					// check workflow stack for more details.
+					panicMsg := fmt.Sprintf("test timeout: %v, workflow stack: %v",
+						env.testTimeout, env.workflowDef.StackTrace())
+					panic(panicMsg)
 				}
 			}
 		}
@@ -327,13 +359,13 @@ func (env *testWorkflowEnvironmentImpl) autoFireNextTimer() bool {
 		if tofire == nil {
 			tofire = t
 		} else if t.duration < tofire.duration ||
-			(t.duration == tofire.duration && t.timerId < tofire.timerId) {
+			(t.duration == tofire.duration && t.timerID < tofire.timerID) {
 			tofire = t
 		}
 	}
 
 	d := tofire.duration
-	env.logger.Debug("Auto fire timer", zap.Int(tagTimerID, tofire.timerId), zap.Duration("Duration", tofire.duration))
+	env.logger.Debug("Auto fire timer", zap.Int(tagTimerID, tofire.timerID), zap.Duration("Duration", tofire.duration))
 
 	// Move mock clock forward, this will fire the timer, and the timer callback will remove timer from scheduledTimers.
 	env.clock.Add(d)
@@ -355,13 +387,13 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelActivity(activityID string)
 		env.logger.Debug("RequestCancelActivity failed, Activity not exists or already completed.", zap.String(tagActivityID, activityID))
 		return
 	}
+	activityInfo := env.getActivityInfo(activityID, handle.activityType)
 	env.logger.Debug("RequestCancelActivity", zap.String(tagActivityID, activityID))
 	delete(env.scheduledActivities, activityID)
 	env.postCallback(func() {
-		cancelledErr := NewCanceledError()
-		handle.callback(nil, cancelledErr)
-		if env.onActivityEndedListener != nil {
-			env.onActivityEndedListener(nil, cancelledErr, handle.activityType)
+		handle.callback(nil, NewCanceledError())
+		if env.onActivityCancelledListener != nil {
+			env.onActivityCancelledListener(activityInfo)
 		}
 	}, true)
 }
@@ -431,7 +463,7 @@ func (env *testWorkflowEnvironmentImpl) GetLogger() *zap.Logger {
 }
 
 func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParameters, callback resultHandler) *activityInfo {
-	activityInfo := &activityInfo{fmt.Sprintf("%d", env.nextId())}
+	activityInfo := &activityInfo{fmt.Sprintf("%d", env.nextID())}
 
 	task := newTestActivityTask(
 		defaultTestWorkflowID,
@@ -465,11 +497,12 @@ func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivi
 func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, result interface{}, activityType string) {
 	env.logger.Debug(fmt.Sprintf("handleActivityResult: %T.", result),
 		zap.String(tagActivityID, activityID), zap.String(tagActivityType, activityType))
+	activityInfo := env.getActivityInfo(activityID, activityType)
 	if result == nil {
-		// In case activity returns ErrActivityResultPending, the respond will be nil, and we don's need to do anything.
+		// In case activity returns ErrActivityResultPending, the respond will be nil, and we don't need to do anything.
 		// Activity will need to complete asynchronously using CompleteActivity().
-		if env.onActivityEndedListener != nil {
-			env.onActivityEndedListener(nil, ErrActivityResultPending, activityType)
+		if env.onActivityCompletedListener != nil {
+			env.onActivityCompletedListener(activityInfo, nil, ErrActivityResultPending)
 		}
 		return
 	}
@@ -501,8 +534,8 @@ func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, 
 		panic(fmt.Sprintf("unsupported respond type %T", result))
 	}
 
-	if env.onActivityEndedListener != nil {
-		env.onActivityEndedListener(EncodedValue(blob), err, activityType)
+	if env.onActivityCompletedListener != nil {
+		env.onActivityCompletedListener(activityInfo, EncodedValue(blob), err)
 	}
 
 	env.startDecisionTask()
@@ -510,9 +543,10 @@ func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, 
 
 // Execute executes the activity code. This is the wrapper where we call ActivityTaskStartedListener hook.
 func (a *activityExecutorWrapper) Execute(ctx context.Context, input []byte) ([]byte, error) {
+	activityInfo := GetActivityInfo(ctx)
 	if a.env.onActivityStartedListener != nil {
 		a.env.postCallback(func() {
-			a.env.onActivityStartedListener(ctx, EncodedValues(input))
+			a.env.onActivityStartedListener(&activityInfo, ctx, EncodedValues(input))
 		}, false)
 	}
 	return a.activity.Execute(ctx, input)
@@ -584,8 +618,8 @@ func newTestActivityTask(workflowID, runID, activityID, activityType string, inp
 }
 
 func (env *testWorkflowEnvironmentImpl) NewTimer(d time.Duration, callback resultHandler) *timerInfo {
-	nextId := env.nextId()
-	timerInfo := &timerInfo{fmt.Sprintf("%d", nextId)}
+	nextID := env.nextID()
+	timerInfo := &timerInfo{fmt.Sprintf("%d", nextID)}
 	timer := env.clock.AfterFunc(d, func() {
 		env.postCallback(func() {
 			delete(env.scheduledTimers, timerInfo.timerID)
@@ -595,7 +629,7 @@ func (env *testWorkflowEnvironmentImpl) NewTimer(d time.Duration, callback resul
 			}
 		}, true)
 	})
-	env.scheduledTimers[timerInfo.timerID] = &timerHandle{timer: timer, callback: callback, duration: d, timerId: nextId}
+	env.scheduledTimers[timerInfo.timerID] = &timerHandle{timer: timer, callback: callback, duration: d, timerID: nextID}
 	if env.onTimerScheduledListener != nil {
 		env.onTimerScheduledListener(timerInfo.timerID, d)
 	}
@@ -619,10 +653,19 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelWorkflow(domainName, workfl
 	return nil
 }
 
-func (env *testWorkflowEnvironmentImpl) nextId() int {
+func (env *testWorkflowEnvironmentImpl) nextID() int {
 	activityID := env.counterID
 	env.counterID++
 	return activityID
+}
+
+func (env *testWorkflowEnvironmentImpl) getActivityInfo(activityID, activityType string) *ActivityInfo {
+	return &ActivityInfo{
+		ActivityID:        activityID,
+		ActivityType:      ActivityType{Name: activityType},
+		TaskToken:         []byte(activityID),
+		WorkflowExecution: env.workflowInfo.WorkflowExecution,
+	}
 }
 
 // make sure interface is implemented

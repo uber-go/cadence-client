@@ -1,3 +1,23 @@
+// Copyright (c) 2017 Uber Technologies, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package cadence
 
 import (
@@ -14,6 +34,7 @@ import (
 const testTaskList = "test-task-list"
 
 type WorkflowTestSuiteUnitTest struct {
+	suite.Suite
 	WorkflowTestSuite
 	activityOptions ActivityOptions
 }
@@ -65,11 +86,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 	env := s.NewTestWorkflowEnvironment()
 
 	var activityCalls []string
-	env.SetOnActivityStartedListener(func(ctx context.Context, args EncodedValues) {
-		activityType := GetActivityInfo(ctx).ActivityType.Name
+	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args EncodedValues) {
 		var input string
 		s.NoError(args.Get(&input))
-		activityCalls = append(activityCalls, fmt.Sprintf("%s:%s", activityType, input))
+		activityCalls = append(activityCalls, fmt.Sprintf("%s:%s", activityInfo.ActivityType.Name, input))
 	})
 	expectedCalls := []string{
 		"github.com/uber-go/cadence-client/client/cadence.testActivityHello:msg1",
@@ -118,7 +138,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_TimerWorkflow_ClockAutoFastForward() {
 	s.Equal([]string{"t2", "t3", "t1", "t4"}, firedTimerRecord)
 }
 
-func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowAutoForwardClock() {
+func (s *WorkflowTestSuiteUnitTest) xTestWorkflowAutoForwardClock() {
 	/**
 	TODO: update this test once we update the test workflow clock implementation.
 	*/
@@ -156,49 +176,46 @@ func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowAutoForwardClock() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowActivityCancellation() {
-	workflowFn := func(ctx Context) (string, error) {
+	workflowFn := func(ctx Context) error {
 		ctx = WithActivityOptions(ctx, s.activityOptions)
 
 		ctx, cancelHandler := WithCancel(ctx)
-		f1 := ExecuteActivity(ctx, testActivityHeartbeat, "msg1", time.Millisecond) // fast activity
-		f2 := ExecuteActivity(ctx, testActivityHeartbeat, "msg2", time.Second*3)    // slow activity
+		f1 := ExecuteActivity(ctx, testActivityHeartbeat, "fast", time.Millisecond) // fast activity
+		f2 := ExecuteActivity(ctx, testActivityHeartbeat, "slow", time.Second*3)    // slow activity
 
-		selector := NewSelector(ctx)
-		selector.AddFuture(f1, func(f Future) {
+		NewSelector(ctx).AddFuture(f1, func(f Future) {
 			cancelHandler()
 		}).AddFuture(f2, func(f Future) {
 			cancelHandler()
-		})
+		}).Select(ctx)
 
-		selector.Select(ctx)
-		err := f2.Get(ctx, nil)
+		err := f2.Get(ctx, nil) // verify slow activity is cancelled
 		if _, ok := err.(CanceledError); !ok {
-			return "", err
+			return err
 		}
-
-		GetLogger(ctx).Info("testWorkflowActivityCancellation completed.")
-		return "result from testWorkflowActivityCancellation", nil
+		return nil
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	counter := 0
-	env.SetOnActivityEndedListener(func(result EncodedValue, err error, activityType string) {
-		if err != nil {
-			// assert err is CancelErr
-			_, ok := err.(CanceledError)
-			s.True(ok)
-		} else {
-			var msg string
-			result.Get(&msg)
-			s.Equal("ok_msg1", msg) // assert that fast activity finished
-		}
-		counter++
+	activityMap := make(map[string]string) // msg -> activityID
+	var completedActivityID, cancelledActivityID string
+	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args EncodedValues) {
+		var msg string
+		s.NoError(args.Get(&msg))
+		activityMap[msg] = activityInfo.ActivityID
+	})
+	env.SetOnActivityCompletedListener(func(activityInfo *ActivityInfo, result EncodedValue, err error) {
+		completedActivityID = activityInfo.ActivityID
+	})
+	env.SetOnActivityCancelledListener(func(activityInfo *ActivityInfo) {
+		cancelledActivityID = activityInfo.ActivityID
 	})
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
-	s.Equal(2, counter) // assert listener get called twice
+	s.Equal(activityMap["fast"], completedActivityID)
+	s.Equal(activityMap["slow"], cancelledActivityID)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
@@ -249,7 +266,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
 	s.Equal("async_complete", result)
 }
 
-func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowCancellation() {
+func (s *WorkflowTestSuiteUnitTest) xTestWorkflowCancellation() {
 	/**
 	TODO: fix test workflow clock implementation.
 	This test is not working for now because current implementation only auto forward clock for timer when there is no
@@ -274,21 +291,11 @@ func (s *WorkflowTestSuiteUnitTest) xTest_WorkflowCancellation() {
 		env.CancelWorkflow()
 	}, time.Hour)
 
-	var activityErr error
-	env.SetOnActivityEndedListener(func(result EncodedValue, err error, activityType string) {
-		activityErr = err
-	})
-
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
 	s.NotNil(env.GetWorkflowError())
 	_, ok := env.GetWorkflowError().(CanceledError)
-	s.True(ok)
-
-	// verify activity was cancelled as well.
-	s.NotNil(activityErr)
-	_, ok = activityErr.(CanceledError)
 	s.True(ok)
 }
 
@@ -335,5 +342,5 @@ func testActivityHeartbeat(ctx context.Context, msg string, waitTime time.Durati
 		currWaitTime += sleepDuration
 	}
 
-	return "ok_" + msg, nil
+	return "heartbeat_" + msg, nil
 }

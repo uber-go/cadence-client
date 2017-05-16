@@ -27,10 +27,11 @@ const (
 
 type (
 	timerHandle struct {
-		callback resultHandler
-		timer    *clock.Timer
-		duration time.Duration
-		timerID  int
+		callback  resultHandler
+		timer     *clock.Timer
+		wallTimer *clock.Timer
+		duration  time.Duration
+		timerID   int
 	}
 
 	activityHandle struct {
@@ -62,7 +63,8 @@ type (
 		service       m.TChanWorkflowService
 		workerOptions WorkerOptions
 		logger        *zap.Logger
-		clock         *clock.Mock
+		mockClock     *clock.Mock
+		wallClock     clock.Clock
 
 		workflowInfo          *WorkflowInfo
 		workflowDef           workflowDefinition
@@ -151,7 +153,8 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 		env.workerOptions = NewWorkerOptions().SetLogger(env.logger)
 	}
 
-	env.clock = clock.NewMock()
+	env.mockClock = clock.NewMock()
+	env.wallClock = clock.New()
 
 	return env
 }
@@ -328,33 +331,57 @@ func (env *testWorkflowEnvironmentImpl) processCallback(c callbackHandle) {
 }
 
 func (env *testWorkflowEnvironmentImpl) autoFireNextTimer() bool {
-	if len(env.scheduledTimers) == 0 || env.runningActivityCount.Load() > 0 {
-		// do not auto forward workflow clock if there is running activities.
+	if len(env.scheduledTimers) == 0 {
 		return false
 	}
 
 	// find next timer
-	var tofire *timerHandle
+	var nextTimer *timerHandle
 	for _, t := range env.scheduledTimers {
-		if tofire == nil {
-			tofire = t
-		} else if t.duration < tofire.duration ||
-			(t.duration == tofire.duration && t.timerID < tofire.timerID) {
-			tofire = t
+		if nextTimer == nil {
+			nextTimer = t
+		} else if t.duration < nextTimer.duration ||
+			(t.duration == nextTimer.duration && t.timerID < nextTimer.timerID) {
+			nextTimer = t
 		}
 	}
 
-	d := tofire.duration
-	env.logger.Debug("Auto fire timer", zap.Int(tagTimerID, tofire.timerID), zap.Duration("Duration", tofire.duration))
+	// function to fire timer
+	fireTimer := func(th *timerHandle) {
+		d := th.duration
+		env.logger.Debug("Auto fire timer", zap.Int(tagTimerID, th.timerID), zap.Duration("Duration", th.duration))
 
-	// Move mock clock forward, this will fire the timer, and the timer callback will remove timer from scheduledTimers.
-	env.clock.Add(d)
+		// Move mockClock forward, this will fire the timer, and the timer callback will remove timer from scheduledTimers.
+		env.mockClock.Add(d)
 
-	// reduce all pending timer's duration by d
-	for _, t := range env.scheduledTimers {
-		t.duration -= d
+		// reduce all pending timer's duration by d
+		for _, t := range env.scheduledTimers {
+			t.duration -= d
+		}
 	}
-	return true
+
+	// fire timer if there is no running activity
+	if env.runningActivityCount.Load() == 0 {
+		if nextTimer.wallTimer != nil {
+			nextTimer.wallTimer.Stop()
+			nextTimer.wallTimer = nil
+		}
+		fireTimer(nextTimer)
+		return true
+	}
+
+	// there is running activities, we would fire next timer only if wall time passed by nextTimer duration.
+	nextTimer.wallTimer = env.wallClock.AfterFunc(nextTimer.duration, func() {
+		// make sure it is running in the main loop
+		env.postCallback(func() {
+			// now fire the timer if it is not already fired.
+			if timerHandle, ok := env.scheduledTimers[getStringID(nextTimer.timerID)]; ok {
+				fireTimer(timerHandle)
+			}
+		}, true)
+	})
+
+	return false
 }
 
 func (env *testWorkflowEnvironmentImpl) postCallback(cb func(), startDecisionTask bool) {
@@ -443,7 +470,7 @@ func (env *testWorkflowEnvironmentImpl) GetLogger() *zap.Logger {
 }
 
 func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParameters, callback resultHandler) *activityInfo {
-	activityInfo := &activityInfo{fmt.Sprintf("%d", env.nextID())}
+	activityInfo := &activityInfo{getStringID(env.nextID())}
 
 	task := newTestActivityTask(
 		defaultTestWorkflowID,
@@ -599,8 +626,8 @@ func newTestActivityTask(workflowID, runID, activityID, activityType string, inp
 
 func (env *testWorkflowEnvironmentImpl) NewTimer(d time.Duration, callback resultHandler) *timerInfo {
 	nextID := env.nextID()
-	timerInfo := &timerInfo{fmt.Sprintf("%d", nextID)}
-	timer := env.clock.AfterFunc(d, func() {
+	timerInfo := &timerInfo{getStringID(nextID)}
+	timer := env.mockClock.AfterFunc(d, func() {
 		env.postCallback(func() {
 			delete(env.scheduledTimers, timerInfo.timerID)
 			callback(nil, nil)
@@ -617,7 +644,7 @@ func (env *testWorkflowEnvironmentImpl) NewTimer(d time.Duration, callback resul
 }
 
 func (env *testWorkflowEnvironmentImpl) Now() time.Time {
-	return env.clock.Now()
+	return env.mockClock.Now()
 }
 
 func (env *testWorkflowEnvironmentImpl) WorkflowInfo() *WorkflowInfo {
@@ -637,6 +664,10 @@ func (env *testWorkflowEnvironmentImpl) nextID() int {
 	activityID := env.counterID
 	env.counterID++
 	return activityID
+}
+
+func getStringID(intID int) string {
+	return fmt.Sprintf("%d", intID)
 }
 
 func (env *testWorkflowEnvironmentImpl) getActivityInfo(activityID, activityType string) *ActivityInfo {

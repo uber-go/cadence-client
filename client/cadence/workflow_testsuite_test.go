@@ -224,7 +224,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 	testKey, testValue := testContextKey("test_key"), "test_value"
 	userCtx := context.WithValue(context.Background(), testKey, testValue)
 	workerOptions := WorkerOptions{}
-	workerOptions.UserContext = userCtx
+	workerOptions.BackgroundActivityContext = userCtx
 
 	// inline activity using value passing through user context.
 	activityWithUserContext := func(ctx context.Context, keyName testContextKey) (string, error) {

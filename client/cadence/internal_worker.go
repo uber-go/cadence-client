@@ -743,7 +743,7 @@ func newAggregatedWorker(
 		MetricsScope:              wOptions.MetricsScope,
 		Logger:                    wOptions.Logger,
 		EnableLoggingInReplay:     wOptions.EnableLoggingInReplay,
-		UserContext:               wOptions.UserContext,
+		UserContext:               wOptions.BackgroundActivityContext,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -762,7 +762,7 @@ func newAggregatedWorker(
 	if !wOptions.DisableWorkflowWorker {
 		if env.lenWorkflowFns() > 0 {
 			workflowFactory := newRegisteredWorkflowFactory()
-			testTags := getTestTags(wOptions.UserContext)
+			testTags := getTestTags(wOptions.BackgroundActivityContext)
 			if testTags != nil && len(testTags) > 0 {
 				workflowWorker = newWorkflowWorkerWithPressurePoints(
 					workflowFactory,
@@ -820,7 +820,7 @@ func newRegisteredWorkflowFactory() workflowFactory {
 }
 
 func processTestTags(wOptions *WorkerOptions, ep *workerExecutionParameters) {
-	testTags := getTestTags(wOptions.UserContext)
+	testTags := getTestTags(wOptions.BackgroundActivityContext)
 	if testTags != nil {
 		if paramsOverride, ok := testTags[workerOptionsConfig]; ok {
 			for key, val := range paramsOverride {
@@ -925,4 +925,19 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 		options.MaxActivityExecutionRate = defaultMaxActivityExecutionRate
 	}
 	return options
+}
+
+type contextKey string
+
+const testTagsContextKey = contextKey("testTags")
+
+// getTestTags returns the test tags in the context.
+func getTestTags(ctx context.Context) map[string]map[string]string {
+	if ctx != nil {
+		env := ctx.Value(testTagsContextKey)
+		if env != nil {
+			return env.(map[string]map[string]string)
+		}
+	}
+	return nil
 }

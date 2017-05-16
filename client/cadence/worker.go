@@ -85,7 +85,7 @@ type (
 
 		// Optional: sets context for activity. The context can be used to pass any configuration to activity
 		// like common logger for all activities.
-		UserContext context.Context
+		BackgroundActivityContext context.Context
 	}
 )
 

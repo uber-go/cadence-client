@@ -94,7 +94,7 @@ func NewActivityTaskWorker(
 		MetricsScope:              wOptions.MetricsScope,
 		Logger:                    wOptions.Logger,
 		EnableLoggingInReplay:     wOptions.EnableLoggingInReplay,
-		UserContext:               wOptions.UserContext,
+		UserContext:               wOptions.BackgroundActivityContext,
 	}
 
 	processTestTags(&wOptions, &workerParams)
@@ -171,21 +171,6 @@ func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
 	impl := &decodeFutureImpl{
 		&futureImpl{channel: NewChannel(ctx).(*channelImpl)}, fn}
 	return impl, impl
-}
-
-type contextKey string
-
-const testTagsContextKey = contextKey("testTags")
-
-// getTestTags returns the test tags in the context.
-func getTestTags(ctx context.Context) map[string]map[string]string {
-	if ctx != nil {
-		env := ctx.Value(testTagsContextKey)
-		if env != nil {
-			return env.(map[string]map[string]string)
-		}
-	}
-	return nil
 }
 
 // WithTestTags - is used for internal cadence use to pass any test tags.

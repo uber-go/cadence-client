@@ -291,7 +291,6 @@ func (env *testWorkflowEnvironmentImpl) startMainLoop() {
 					// check workflow stack for more details.
 					panicMsg := fmt.Sprintf("test timeout: %v, workflow stack: %v",
 						env.testTimeout, env.workflowDef.StackTrace())
-					env.logger.Info(panicMsg)
 					panic(panicMsg)
 				}
 			}

@@ -53,6 +53,7 @@ type (
 		StartToCloseTimeoutSeconds    int32
 		HeartbeatTimeoutSeconds       int32
 		WaitForCancellation           bool
+		OriginalTaskListName          string
 	}
 
 	// asyncActivityClient for requesting activity execution
@@ -103,6 +104,10 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 		// We need task list as a compulsory parameter. This can be removed after registration
 		return nil, errActivityParamsBadRequest
 	}
+	if p.TaskListName == "" {
+		// We default to origin task list name.
+		p.TaskListName = p.OriginalTaskListName
+	}
 	if p.ScheduleToStartTimeoutSeconds <= 0 {
 		return nil, errors.New("missing or negative ScheduleToStartTimeoutSeconds")
 	}
@@ -116,6 +121,10 @@ func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error
 		// This is a optional parameter, we default to sum of the other two timeouts.
 		p.ScheduleToCloseTimeoutSeconds = p.ScheduleToStartTimeoutSeconds + p.StartToCloseTimeoutSeconds
 	}
+	if p.HeartbeatTimeoutSeconds < 0 {
+		return nil, errors.New("missing or negative HeartbeatTimeoutSeconds")
+	}
+
 	return p, nil
 }
 

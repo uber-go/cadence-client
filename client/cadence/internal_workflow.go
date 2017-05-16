@@ -298,6 +298,8 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	d.rootCtx = WithExecutionStartToCloseTimeout(d.rootCtx, time.Duration(wInfo.ExecutionStartToCloseTimeoutSeconds)*time.Second)
 	d.rootCtx = WithWorkflowTaskStartToCloseTimeout(d.rootCtx, time.Duration(wInfo.TaskStartToCloseTimeoutSeconds)*time.Second)
 	d.rootCtx = WithTaskList(d.rootCtx, wInfo.TaskListName)
+	activityOptions := getActivityOptions(d.rootCtx)
+	activityOptions.OriginalTaskListName = wInfo.TaskListName
 
 	// There is a inter dependency, before we call Execute() we can have a cancel request since
 	// dispatcher executes code on decision task started, we might not have cancel handler created.

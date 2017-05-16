@@ -106,8 +106,8 @@ func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}) {
 
 // SetLogger sets the logger for this WorkflowTestSuite. If you don't set logger, test suite will create a default logger
 // with Debug level logging enabled.
-func (t *WorkflowTestSuite) SetLogger(logger *zap.Logger) {
-	t.logger = logger
+func (s *WorkflowTestSuite) SetLogger(logger *zap.Logger) {
+	s.logger = logger
 }
 
 // ExecuteActivity executes an activity. The tested activity will be executed synchronously in the calling goroutinue.
@@ -155,18 +155,31 @@ func (t *TestWorkflowEnvironment) SetTestTimeout(idleTimeout time.Duration) *Tes
 	return t
 }
 
-// TODO: create an interface for all the test intercept callbacks.
-// SetOnActivityStartedListener sets a listener that will be called before an activity task started.
+// SetOnActivityStartedListener sets a listener that will be called before activity starts execution.
 func (t *TestWorkflowEnvironment) SetOnActivityStartedListener(
-	listener func(ctx context.Context, args EncodedValues)) *TestWorkflowEnvironment {
+	listener func(activityInfo *ActivityInfo, ctx context.Context, args EncodedValues)) *TestWorkflowEnvironment {
 	t.impl.onActivityStartedListener = listener
 	return t
 }
 
-// SetOnActivityEndedListener sets a listener that will be called after an activity task ended.
-func (t *TestWorkflowEnvironment) SetOnActivityEndedListener(
-	listener func(result EncodedValue, err error, activityType string)) *TestWorkflowEnvironment {
-	t.impl.onActivityEndedListener = listener
+// SetOnActivityCompletedListener sets a listener that will be called after an activity is completed.
+func (t *TestWorkflowEnvironment) SetOnActivityCompletedListener(
+	listener func(activityInfo *ActivityInfo, result EncodedValue, err error)) *TestWorkflowEnvironment {
+	t.impl.onActivityCompletedListener = listener
+	return t
+}
+
+// SetOnActivityCancelledListener sets a listener that will be called after an activity is cancelled.
+func (t *TestWorkflowEnvironment) SetOnActivityCancelledListener(
+	listener func(activityInfo *ActivityInfo)) *TestWorkflowEnvironment {
+	t.impl.onActivityCancelledListener = listener
+	return t
+}
+
+// SetOnActivityHeartbeatListener sets a listener that will be called when activity heartbeat.
+func (t *TestWorkflowEnvironment) SetOnActivityHeartbeatListener(
+	listener func(activityInfo *ActivityInfo, details EncodedValues)) *TestWorkflowEnvironment {
+	t.impl.onActivityHeartbeatListener = listener
 	return t
 }
 
@@ -219,7 +232,6 @@ func (t *TestWorkflowEnvironment) CancelWorkflow() {
 		t.impl.workflowInfo.WorkflowExecution.RunID)
 }
 
-//
 // RegisterDelayedCallback creates a new timer with specified delayDuration using workflow clock (not wall clock). When
 // the timer fires, the callback will be called. By default, this test suite uses mock clock which automatically move
 // forward to fire next timer when workflow is blocked. You can use this API to make some event (like activity completion,
@@ -231,6 +243,6 @@ func (t *TestWorkflowEnvironment) RegisterDelayedCallback(callback func(), delay
 // SetActivityTaskList set the affinity between activity and tasklist. By default, activity can be invoked by any tasklist
 // in this test environment. You can use this SetActivityTaskList() to set affinity between activity and a tasklist. Once
 // activity is set to a particular tasklist, that activity will only be available to that tasklist.
-func (env *TestWorkflowEnvironment) SetActivityTaskList(tasklist string, activityFn ...interface{}) {
-	env.impl.setActivityTaskList(tasklist, activityFn...)
+func (t *TestWorkflowEnvironment) SetActivityTaskList(tasklist string, activityFn ...interface{}) {
+	t.impl.setActivityTaskList(tasklist, activityFn...)
 }

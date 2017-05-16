@@ -22,10 +22,9 @@ package cadence
 
 import (
 	"context"
-	"testing"
+	"sync"
 	"time"
 
-	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 )
 
@@ -38,9 +37,9 @@ type (
 
 	// WorkflowTestSuite is the test suite to run unit tests for workflow/activity.
 	WorkflowTestSuite struct {
-		suite.Suite
 		logger  *zap.Logger
 		hostEnv *hostEnvImpl
+		locker  sync.Mutex
 	}
 
 	// TestWorkflowEnvironment is the environment that you use to test workflow
@@ -64,9 +63,11 @@ func (b EncodedValues) Get(valuePtrs ...interface{}) error {
 	return getHostEnvironment().decode(b, valuePtrs)
 }
 
-// SetT sets the testing.T instance. This method is called by testify to setup the testing.T for test suite.
-func (s *WorkflowTestSuite) SetT(t *testing.T) {
-	s.Suite.SetT(t)
+func (s *WorkflowTestSuite) initIfNotDoneYet() {
+	if s.hostEnv != nil {
+		return
+	}
+	s.locker.Lock()
 	if s.hostEnv == nil {
 		s.hostEnv = &hostEnvImpl{
 			workflowFuncMap: make(map[string]interface{}),
@@ -74,28 +75,20 @@ func (s *WorkflowTestSuite) SetT(t *testing.T) {
 			encoding:        gobEncoding{},
 		}
 	}
-}
-
-// NewWorkflowTestSuite creates a WorkflowTestSuite
-func NewWorkflowTestSuite() *WorkflowTestSuite {
-	return &WorkflowTestSuite{
-		hostEnv: &hostEnvImpl{
-			workflowFuncMap: make(map[string]interface{}),
-			activityFuncMap: make(map[string]interface{}),
-			encoding:        gobEncoding{},
-		},
-	}
+	s.locker.Unlock()
 }
 
 // NewTestWorkflowEnvironment creates a new instance of TestWorkflowEnvironment. You can use the returned TestWorkflowEnvironment
 // to run your workflow in the test environment.
 func (s *WorkflowTestSuite) NewTestWorkflowEnvironment() *TestWorkflowEnvironment {
+	s.initIfNotDoneYet()
 	return &TestWorkflowEnvironment{impl: newTestWorkflowEnvironmentImpl(s)}
 }
 
 // NewTestActivityEnvironment creates a new instance of TestActivityEnviornment. You can use the returned TestActivityEnviornment
 // to run your activity in the test environment.
 func (s *WorkflowTestSuite) NewTestActivityEnvironment() *TestActivityEnviornment {
+	s.initIfNotDoneYet()
 	return &TestActivityEnviornment{impl: newTestWorkflowEnvironmentImpl(s)}
 }
 
@@ -103,6 +96,7 @@ func (s *WorkflowTestSuite) NewTestActivityEnvironment() *TestActivityEnviornmen
 // via cadence.RegisterWorkflow() are still valid and will be available to all tests of all instance of WorkflowTestSuite.
 // In the context of unit tests, workflow registration is only required if you are invoking workflow by name.
 func (s *WorkflowTestSuite) RegisterWorkflow(workflowFn interface{}) {
+	s.initIfNotDoneYet()
 	err := s.hostEnv.RegisterWorkflow(workflowFn)
 	if err != nil {
 		panic(err)
@@ -113,6 +107,7 @@ func (s *WorkflowTestSuite) RegisterWorkflow(workflowFn interface{}) {
 // and only available to all tests of this WorkflowTestSuite instance. Activities registered via cadence.RegisterActivity()
 // are still valid and will be available to all tests of all instances of WorkflowTestSuite.
 func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}) {
+	s.initIfNotDoneYet()
 	fnName := getFunctionName(activityFn)
 	_, ok := s.hostEnv.activityFuncMap[fnName]
 	if !ok {
@@ -126,8 +121,8 @@ func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}) {
 
 // SetLogger sets the logger for this WorkflowTestSuite. If you don't set logger, test suite will create a default logger
 // with Debug level logging enabled.
-func (t *WorkflowTestSuite) SetLogger(logger *zap.Logger) {
-	t.logger = logger
+func (s *WorkflowTestSuite) SetLogger(logger *zap.Logger) {
+	s.logger = logger
 }
 
 // ExecuteActivity executes an activity. The tested activity will be executed synchronously in the calling goroutinue.
@@ -175,18 +170,31 @@ func (t *TestWorkflowEnvironment) SetTestTimeout(idleTimeout time.Duration) *Tes
 	return t
 }
 
-// TODO: create an interface for all the test intercept callbacks.
-// SetOnActivityStartedListener sets a listener that will be called before an activity task started.
+// SetOnActivityStartedListener sets a listener that will be called before activity starts execution.
 func (t *TestWorkflowEnvironment) SetOnActivityStartedListener(
-	listener func(ctx context.Context, args EncodedValues)) *TestWorkflowEnvironment {
+	listener func(activityInfo *ActivityInfo, ctx context.Context, args EncodedValues)) *TestWorkflowEnvironment {
 	t.impl.onActivityStartedListener = listener
 	return t
 }
 
-// SetOnActivityEndedListener sets a listener that will be called after an activity task ended.
-func (t *TestWorkflowEnvironment) SetOnActivityEndedListener(
-	listener func(result EncodedValue, err error, activityType string)) *TestWorkflowEnvironment {
-	t.impl.onActivityEndedListener = listener
+// SetOnActivityCompletedListener sets a listener that will be called after an activity is completed.
+func (t *TestWorkflowEnvironment) SetOnActivityCompletedListener(
+	listener func(activityInfo *ActivityInfo, result EncodedValue, err error)) *TestWorkflowEnvironment {
+	t.impl.onActivityCompletedListener = listener
+	return t
+}
+
+// SetOnActivityCancelledListener sets a listener that will be called after an activity is cancelled.
+func (t *TestWorkflowEnvironment) SetOnActivityCancelledListener(
+	listener func(activityInfo *ActivityInfo)) *TestWorkflowEnvironment {
+	t.impl.onActivityCancelledListener = listener
+	return t
+}
+
+// SetOnActivityHeartbeatListener sets a listener that will be called when activity heartbeat.
+func (t *TestWorkflowEnvironment) SetOnActivityHeartbeatListener(
+	listener func(activityInfo *ActivityInfo, details EncodedValues)) *TestWorkflowEnvironment {
+	t.impl.onActivityHeartbeatListener = listener
 	return t
 }
 
@@ -214,12 +222,15 @@ func (t *TestWorkflowEnvironment) IsWorkflowCompleted() bool {
 	return t.impl.isTestCompleted
 }
 
-// GetWorkflowResult return the encoded result from test workflow
-func (t *TestWorkflowEnvironment) GetWorkflowResult(valuePtr interface{}) {
-	s, r := t.impl.testSuite, t.impl.testResult
-	s.NotNil(r)
-	err := r.Get(valuePtr)
-	s.NoError(err)
+// GetWorkflowResult extracts the encoded result from test workflow, it returns error if the extraction failed.
+func (t *TestWorkflowEnvironment) GetWorkflowResult(valuePtr interface{}) error {
+	if !t.impl.isTestCompleted {
+		panic("workflow is not completed")
+	}
+	if t.impl.testResult == nil {
+		return nil
+	}
+	return t.impl.testResult.Get(valuePtr)
 }
 
 // GetWorkflowError return the error from test workflow
@@ -239,7 +250,6 @@ func (t *TestWorkflowEnvironment) CancelWorkflow() {
 		t.impl.workflowInfo.WorkflowExecution.RunID)
 }
 
-//
 // RegisterDelayedCallback creates a new timer with specified delayDuration using workflow clock (not wall clock). When
 // the timer fires, the callback will be called. By default, this test suite uses mock clock which automatically move
 // forward to fire next timer when workflow is blocked. You can use this API to make some event (like activity completion,
@@ -251,6 +261,6 @@ func (t *TestWorkflowEnvironment) RegisterDelayedCallback(callback func(), delay
 // SetActivityTaskList set the affinity between activity and tasklist. By default, activity can be invoked by any tasklist
 // in this test environment. You can use this SetActivityTaskList() to set affinity between activity and a tasklist. Once
 // activity is set to a particular tasklist, that activity will only be available to that tasklist.
-func (env *TestWorkflowEnvironment) SetActivityTaskList(tasklist string, activityFn ...interface{}) {
-	env.impl.setActivityTaskList(tasklist, activityFn...)
+func (t *TestWorkflowEnvironment) SetActivityTaskList(tasklist string, activityFn ...interface{}) {
+	t.impl.setActivityTaskList(tasklist, activityFn...)
 }

@@ -1,3 +1,23 @@
+// Copyright (c) 2017 Uber Technologies, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package cadence
 
 import (
@@ -19,13 +39,14 @@ type WorkflowTestSuiteUnitTest struct {
 	activityOptions ActivityOptions
 }
 
+type testContextKey string
+
 func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
-	s.activityOptions = NewActivityOptions().
-		WithTaskList(testTaskList).
-		WithScheduleToCloseTimeout(time.Minute).
-		WithScheduleToStartTimeout(time.Minute).
-		WithStartToCloseTimeout(time.Minute).
-		WithHeartbeatTimeout(time.Second * 20)
+	s.activityOptions = ActivityOptions{
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+		HeartbeatTimeout:       20 * time.Second,
+	}
 	s.RegisterActivity(testActivityHello)
 	s.RegisterActivity(testActivityHeartbeat)
 }
@@ -242,12 +263,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowActivityCancellation() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
-	testKey, testValue := "test_key", "test_value"
+	testKey, testValue := testContextKey("test_key"), "test_value"
 	userCtx := context.WithValue(context.Background(), testKey, testValue)
-	workerOptions := NewWorkerOptions().WithActivityContext(userCtx)
+	workerOptions := WorkerOptions{}
+	workerOptions.BackgroundActivityContext = userCtx
 
 	// inline activity using value passing through user context.
-	activityWithUserContext := func(ctx context.Context, keyName string) (string, error) {
+	activityWithUserContext := func(ctx context.Context, keyName testContextKey) (string, error) {
 		value := ctx.Value(keyName)
 		if value != nil {
 			return value.(string), nil
@@ -315,12 +337,12 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowCancellation() {
 }
 
 func testWorkflowHello(ctx Context) (string, error) {
-	ctx = WithActivityOptions(ctx, NewActivityOptions().
-		WithTaskList(testTaskList).
-		WithScheduleToCloseTimeout(time.Minute).
-		WithScheduleToStartTimeout(time.Minute).
-		WithStartToCloseTimeout(time.Minute).
-		WithHeartbeatTimeout(time.Second*20))
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+		HeartbeatTimeout:       20 * time.Second,
+	}
+	ctx = WithActivityOptions(ctx, ao)
 
 	var result string
 	err := ExecuteActivity(ctx, testActivityHello, "world").Get(ctx, &result)

@@ -1,3 +1,23 @@
+// Copyright (c) 2017 Uber Technologies, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package cadence
 
 // All code in this file is private to the package.
@@ -9,6 +29,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"go.uber.org/zap"
@@ -16,10 +37,11 @@ import (
 
 type (
 	syncWorkflowDefinition struct {
-		workflow   workflow
-		dispatcher dispatcher
-		cancel     CancelFunc
-		rootCtx    Context
+		workflow        workflow
+		dispatcher      dispatcher
+		cancel          CancelFunc
+		cancelRequested bool
+		rootCtx         Context
 	}
 
 	workflowResult struct {
@@ -269,8 +291,26 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	var resultPtr *workflowResult
 	d.rootCtx = WithValue(d.rootCtx, workflowResultContextKey, &resultPtr)
 
+	// Set default values for the workflow execution.
+	wInfo := env.WorkflowInfo()
+	d.rootCtx = WithWorkflowDomain(d.rootCtx, wInfo.Domain)
+	d.rootCtx = WithWorkflowTaskList(d.rootCtx, wInfo.TaskListName)
+	d.rootCtx = WithExecutionStartToCloseTimeout(d.rootCtx, time.Duration(wInfo.ExecutionStartToCloseTimeoutSeconds)*time.Second)
+	d.rootCtx = WithWorkflowTaskStartToCloseTimeout(d.rootCtx, time.Duration(wInfo.TaskStartToCloseTimeoutSeconds)*time.Second)
+	d.rootCtx = WithTaskList(d.rootCtx, wInfo.TaskListName)
+	activityOptions := getActivityOptions(d.rootCtx)
+	activityOptions.OriginalTaskListName = wInfo.TaskListName
+
+	// There is a inter dependency, before we call Execute() we can have a cancel request since
+	// dispatcher executes code on decision task started, we might not have cancel handler created.
+	// WithCancel -> creates channel -> needs dispatcher -> dispatcher needs a root function with context.
+	// We use cancelRequested to remember if the cancel request came in.
+
 	d.dispatcher = newDispatcher(d.rootCtx, func(ctx Context) {
 		ctx, d.cancel = WithCancel(ctx)
+		if d.cancelRequested {
+			d.cancel()
+		}
 		r := &workflowResult{}
 		r.workflowResult, r.error = d.workflow.Execute(ctx, input)
 		rpp := getWorkflowResultPointerPointer(ctx)
@@ -280,7 +320,10 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	getWorkflowEnvironment(d.rootCtx).RegisterCancel(func() {
 		// It is ok to call this method multiple times.
 		// it doesn't do anything new, the context remains cancelled.
-		d.cancel()
+		if d.cancel != nil {
+			d.cancel()
+		}
+		d.cancelRequested = true
 	})
 }
 

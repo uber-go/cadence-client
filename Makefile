@@ -56,14 +56,13 @@ clean_thrift:
 
 thriftc: clean_thrift glide $(THRIFT_GEN_SRC)
 
-libversion_gen: ./cmd/tools/libversiongen.go
-    # auto-generate const for libversion and git-sha
-	go run ./cmd/tools/libversiongen.go -v=$(LIBRARY_VERSION) -s=$(GIT_SHA) -o=$(OUT_VERSION_FILE)
+copyright: ./cmd/tools/copyright/licensegen.go
+	go run ./cmd/tools/copyright/licensegen.go --verifyOnly
 
-bins: libversion_gen thriftc
+bins_nothrift: copyright lint glide
 	go build -i -o cadence-client main.go
 
-bins_nothrift: libversion_gen glide
+bins: thriftc bins_nothrift
 	go build -i -o cadence-client main.go
 
 test: bins
@@ -89,6 +88,24 @@ cover_ci: cover_profile
 	@for dir in $(TEST_DIRS); do \
 		goveralls -coverprofile=$(BUILD)/"$$dir"/coverage.out -service=travis-ci || echo -e "\x1b[31mCoveralls failed\x1b[m"; \
 	done
+
+
+lint:
+	@lintFail=0; for file in $(ALL_SRC); do \
+		golint -set_exit_status "$$file"; \
+		if [ $$? -eq 1 ]; then lintFail=1; fi; \
+	done; \
+	if [ $$lintFail -eq 1 ]; then exit 1; fi;
+	@OUTPUT=`gofmt -l $(ALL_SRC) 2>&1`; \
+	if [ "$$OUTPUT" ]; then \
+		echo "Run 'make fmt'. gofmt must be run on the following files:"; \
+		echo "$$OUTPUT"; \
+		exit 1; \
+	fi
+
+fmt:
+	@gofmt -w $(ALL_SRC)
+
 
 clean:
 	rm -rf cadence-client

@@ -1,3 +1,23 @@
+// Copyright (c) 2017 Uber Technologies, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package cadence
 
 import (
@@ -152,12 +172,17 @@ func NewFuture(ctx Context) (Future, Settable) {
 //  - Context can be used to pass the settings for this activity.
 // 	For example: task list that this need to be routed, timeouts that need to be configured.
 //	Use ActivityOptions to pass down the options.
-//			ctx1 := WithActivityOptions(ctx, NewActivityOptions().
-//					WithTaskList("exampleTaskList").
-//					WithScheduleToCloseTimeout(time.Second).
-//					WithScheduleToStartTimeout(time.Second).
-//					WithHeartbeatTimeout(0)
-//			or
+//			ao := ActivityOptions{
+// 				TaskList: "exampleTaskList",
+// 				ScheduleToStartTimeout: 10 * time.Second,
+// 				StartToCloseTimeout: 5 * time.Second,
+// 				ScheduleToCloseTimeout: 10 * time.Second,
+// 				HeartbeatTimeout: 0,
+// 			}
+//			ctx1 := WithActivityOptions(ctx, ao)
+//
+//			or to override a single option
+//
 //			ctx1 := WithTaskList(ctx, "exampleTaskList")
 //  - f - Either a activity name or a function that is getting scheduled.
 //  - args - The arguments that need to be passed to the function represented by 'f'.
@@ -200,9 +225,12 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 
 // WorkflowInfo information about currently executing workflow
 type WorkflowInfo struct {
-	WorkflowExecution WorkflowExecution
-	WorkflowType      WorkflowType
-	TaskListName      string
+	WorkflowExecution                   WorkflowExecution
+	WorkflowType                        WorkflowType
+	TaskListName                        string
+	ExecutionStartToCloseTimeoutSeconds int32
+	TaskStartToCloseTimeoutSeconds      int32
+	Domain                              string
 }
 
 // GetWorkflowInfo extracts info of a current workflow from a context.

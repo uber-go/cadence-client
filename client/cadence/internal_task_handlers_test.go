@@ -1,3 +1,23 @@
+// Copyright (c) 2017 Uber Technologies, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package cadence
 
 import (
@@ -10,6 +30,10 @@ import (
 	"github.com/uber-go/cadence-client/common/util"
 	"github.com/uber-go/cadence-client/mocks"
 	"go.uber.org/zap"
+)
+
+const (
+	testDomain = "test-domain"
 )
 
 type (
@@ -100,7 +124,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, params, nil)
+	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, nil)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 	s.NoError(err)
 	s.NotNil(response)
@@ -129,7 +153,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, params, nil)
+	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, nil)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 
 	s.NoError(err)
@@ -165,7 +189,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, params, nil)
+	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, nil)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 
 	s.NotNil(err)
@@ -192,7 +216,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityTask() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(twdFactory, params, nil)
+	taskHandler := newWorkflowTaskHandler(twdFactory, testDomain, params, nil)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 
 	s.NoError(err)
@@ -225,7 +249,7 @@ func (s *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 		Identity: "test-id-1",
 		Logger:   s.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, params, ppMgr)
+	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, ppMgr)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 
 	s.Error(err)

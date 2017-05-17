@@ -60,10 +60,8 @@ copyright: ./cmd/tools/copyright/licensegen.go
 	go run ./cmd/tools/copyright/licensegen.go --verifyOnly
 
 bins_nothrift: copyright lint glide
-#	go build -i -o cadence-client main.go
 
 bins: thriftc bins_nothrift
-#	go build -i -o cadence-client main.go
 
 test: bins
 	@rm -f test

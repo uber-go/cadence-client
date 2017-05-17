@@ -171,7 +171,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowMixedClock() {
 
 		err := f1.Get(ctx, nil)
 		if err != nil {
-			return "", nil
+			return "", err
 		}
 
 		// Schedule a short timer after f1 completed.
@@ -181,7 +181,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowMixedClock() {
 			if !f2.IsReady() {
 				f2Cancel()
 			}
-		}).Select(ctx)
+		}).Select(ctx) // wait until t2 fires
 
 		t1.Get(ctx, nil) // wait for the long timer to fire.
 

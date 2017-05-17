@@ -327,7 +327,7 @@ func (env *testWorkflowEnvironmentImpl) processCallback(c callbackHandle) {
 	env.locker.Lock()
 	defer env.locker.Unlock()
 	c.callback()
-	if c.startDecisionTask {
+	if c.startDecisionTask && !env.isTestCompleted {
 		env.workflowDef.OnDecisionTaskStarted() // this will execute dispatcher
 	}
 }
@@ -427,6 +427,7 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelTimer(timerID string) {
 	timerHandle, ok := env.scheduledTimers[timerID]
 	if !ok {
 		env.logger.Debug("RequestCancelTimer failed, TimerID not exists.", zap.String(tagTimerID, timerID))
+		return
 	}
 
 	delete(env.scheduledTimers, timerID)

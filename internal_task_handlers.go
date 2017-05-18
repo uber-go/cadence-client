@@ -746,16 +746,20 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 		}
 	}()
 
+	var deadline time.Time
 	scheduleToCloseDeadline := time.Unix(0, t.GetScheduledTimestamp()).Add(time.Duration(t.GetScheduleToCloseTimeoutSeconds()) * time.Second)
 	startToCloseDeadline := time.Unix(0, t.GetStartedTimestamp()).Add(time.Duration(t.GetStartToCloseTimeoutSeconds()) * time.Second)
-	// let the context.Deadline figure out right deadline among the two.
-	ctx, dlScheduleCancelFunc := context.WithDeadline(ctx, scheduleToCloseDeadline)
-	ctx, dlStartCancelFunc := context.WithDeadline(ctx, startToCloseDeadline)
+	// Minimum of the two deadlines.
+	if scheduleToCloseDeadline.Before(startToCloseDeadline) {
+		deadline = scheduleToCloseDeadline
+	} else {
+		deadline = startToCloseDeadline
+	}
+	ctx, dlCancelFunc := context.WithDeadline(ctx, deadline)
 
 	output, err := activityImplementation.Execute(ctx, t.GetInput())
 
-	dlStartCancelFunc()
-	dlScheduleCancelFunc()
+	dlCancelFunc()
 	if <-ctx.Done(); ctx.Err() == context.DeadlineExceeded {
 		return nil, ctx.Err()
 	}

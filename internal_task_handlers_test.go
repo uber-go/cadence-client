@@ -303,7 +303,9 @@ func (t testActivityDeadline) Execute(ctx context.Context, input []byte) ([]byte
 		panic("invalid deadline provided")
 	}
 	if t.d != 0 {
-		time.Sleep(t.d)
+		// Wait till deadline expires.
+		<-ctx.Done()
+		return nil, ctx.Err()
 	}
 	return nil, nil
 }

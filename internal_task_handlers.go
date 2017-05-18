@@ -139,15 +139,15 @@ func (eh *history) IsNextDecisionFailed() bool {
 
 func isDecisionEvent(eventType s.EventType) bool {
 	switch eventType {
-	case s.EventType_WorkflowExecutionCompleted, s.EventType_WorkflowExecutionFailed, s.EventType_WorkflowExecutionCanceled:
-		return true
-	case s.EventType_ActivityTaskScheduled, s.EventType_ActivityTaskCancelRequested:
-		return true
-	case s.EventType_TimerStarted, s.EventType_TimerCanceled:
-		return true
-	case s.EventType_MarkerRecorded:
-		return true
-	case s.EventType_RequestCancelExternalWorkflowExecutionInitiated:
+	case s.EventType_WorkflowExecutionCompleted,
+		s.EventType_WorkflowExecutionFailed,
+		s.EventType_WorkflowExecutionCanceled,
+		s.EventType_ActivityTaskScheduled,
+		s.EventType_ActivityTaskCancelRequested,
+		s.EventType_TimerStarted,
+		s.EventType_TimerCanceled,
+		s.EventType_MarkerRecorded,
+		s.EventType_RequestCancelExternalWorkflowExecutionInitiated:
 		return true
 	default:
 		return false

@@ -746,7 +746,20 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 		}
 	}()
 
+	scheduleToCloseDeadline := time.Unix(0, t.GetScheduledTimestamp()).Add(time.Duration(t.GetScheduleToCloseTimeoutSeconds()) * time.Second)
+	startToCloseDeadline := time.Unix(0, t.GetStartedTimestamp()).Add(time.Duration(t.GetStartToCloseTimeoutSeconds()) * time.Second)
+	// let the context.Deadline figure out right deadline among the two.
+	ctx, dlScheduleCancelFunc := context.WithDeadline(ctx, scheduleToCloseDeadline)
+	ctx, dlStartCancelFunc := context.WithDeadline(ctx, startToCloseDeadline)
+
 	output, err := activityImplementation.Execute(ctx, t.GetInput())
+
+	dlStartCancelFunc()
+	dlScheduleCancelFunc()
+	if <-ctx.Done(); ctx.Err() == context.DeadlineExceeded {
+		return nil, ctx.Err()
+	}
+
 	return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, output, err), nil
 }
 

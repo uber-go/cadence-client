@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	mock "go.uber.org/cadence/mocks"
+	"go.uber.org/cadence/mock"
 	"go.uber.org/zap"
 )
 
@@ -141,20 +141,20 @@ func (t *TestActivityEnviornment) SetWorkerOption(options WorkerOptions) *TestAc
 	return t
 }
 
-// On setup a mock call for activity. Parameter activity must be activity function (func) or activity name (string).
+// OnActivity setup a mock call for activity. Parameter activity must be activity function (func) or activity name (string).
 // You must call Return() with appropriate parameters on the returned *mock.Call instance. The supplied parameters to
 // the Return() call should either be a function that has exact same signature as the mocked activity, or it should be
 // mock values with the same types as the mocked activity function returns.
 // Example: assume the activity you want to mock has function signature as:
 //   func MyActivity(ctx context.Context, msg string) (string, error)
 // You can mock it by return a function with exact same signature:
-//   t.On(MyActivity, mock.Anything, mock.Anything).Return(func(ctx context.Context, msg string) (string, error) {
+//   t.OnActivity(MyActivity, mock.Anything, mock.Anything).Return(func(ctx context.Context, msg string) (string, error) {
 //      // your mock function implementation
 //      return "", nil
 //   })
 // OR return mock values with same types as activity function's return types:
-//   t.On(MyActivity, mock.Anything, mock.Anything).Return("mock_result", nil)
-func (t *TestWorkflowEnvironment) On(activity interface{}, args ...interface{}) *mock.Call {
+//   t.OnActivity(MyActivity, mock.Anything, mock.Anything).Return("mock_result", nil)
+func (t *TestWorkflowEnvironment) OnActivity(activity interface{}, args ...interface{}) *mock.Call {
 	fType := reflect.TypeOf(activity)
 	switch fType.Kind() {
 	case reflect.Func:

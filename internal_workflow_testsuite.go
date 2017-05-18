@@ -34,7 +34,8 @@ import (
 	m "go.uber.org/cadence/.gen/go/cadence"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
-	mock "go.uber.org/cadence/mocks"
+	"go.uber.org/cadence/mock"
+	"go.uber.org/cadence/mocks"
 	"go.uber.org/zap"
 )
 
@@ -147,7 +148,7 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 	}
 
 	// setup mock service
-	mockService := new(mock.TChanWorkflowService)
+	mockService := new(mocks.TChanWorkflowService)
 	mockHeartbeatFn := func(c thrift.Context, r *shared.RecordActivityTaskHeartbeatRequest) error {
 		activityID := string(r.TaskToken)
 		env.locker.Lock() // need lock as this is running in activity worker's goroutinue
@@ -602,11 +603,22 @@ func (a *activityExecutorWrapper) Execute(ctx context.Context, input []byte) ([]
 		}, false)
 	}
 
-	// check if we have mock
-	if a.env.mock == nil {
+	// get mock returns if mock is available
+	mockRet := a.getMockReturn(ctx, input)
+	if mockRet == nil {
 		// no mock
 		return a.activityExecutor.Execute(ctx, input)
 	}
+
+	return a.executeMock(ctx, input, mockRet)
+}
+
+func (a *activityExecutorWrapper) getMockReturn(ctx context.Context, input []byte) mock.Arguments {
+	if a.env.mock == nil {
+		// no mock
+		return nil
+	}
+
 	// check if we have mock setup for this activity
 	fnType := reflect.TypeOf(a.fn)
 	reflectArgs, err := getHostEnvironment().decodeArgs(fnType, input)
@@ -620,21 +632,23 @@ func (a *activityExecutorWrapper) Execute(ctx context.Context, input []byte) ([]
 	for _, arg := range reflectArgs {
 		realArgs = append(realArgs, arg.Interface())
 	}
-	fnName := a.name
-	found, _ := a.env.mock.FindExpectedCall(fnName, realArgs...)
+	found, _ := a.env.mock.FindExpectedCall(a.name, realArgs...)
 
 	if found < 0 {
-		// no mock for this activity
-		return a.activityExecutor.Execute(ctx, input)
+		return nil
 	}
 
-	// record mock method call
-	mockRet := a.env.mock.MethodCalled(fnName, realArgs...)
+	return a.env.mock.MethodCalled(a.name, realArgs...)
+}
+
+func (a *activityExecutorWrapper) executeMock(ctx context.Context, input []byte, mockRet mock.Arguments) ([]byte, error) {
+	fnName := a.name
 	mockRetLen := len(mockRet)
 	if mockRetLen == 0 {
 		panic(fmt.Sprintf("mock of %v has no returns", fnName))
 	}
 
+	fnType := reflect.TypeOf(a.fn)
 	// check if mock returns function which must match to the actual activity.
 	mockFn := mockRet.Get(0)
 	mockFnType := reflect.TypeOf(mockFn)
@@ -687,7 +701,7 @@ func (a *activityExecutorWrapper) Execute(ctx context.Context, input []byte) ([]
 					fnName, expectedType, mockResult, mockResult))
 			}
 			result, encodeErr := getHostEnvironment().encodeArg(mockResult)
-			if err != nil {
+			if encodeErr != nil {
 				panic(fmt.Sprintf("encode result from mock of %v failed: %v", fnName, encodeErr))
 			}
 			return result, retErr

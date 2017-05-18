@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	mock "go.uber.org/cadence/mocks"
+	"go.uber.org/cadence/mock"
 	"go.uber.org/zap"
 )
 
@@ -77,7 +77,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockFunction() {
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	env.On(testActivityHello, mock.Anything, mock.Anything).Return(mockActivity).Once()
+	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return(mockActivity).Once()
 
 	env.ExecuteWorkflow(testWorkflowHello)
 
@@ -91,7 +91,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockFunction() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockValues() {
 	env := s.NewTestWorkflowEnvironment()
-	env.On(testActivityHello, mock.Anything, mock.Anything).Return("mock_value", nil).Once()
+	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("mock_value", nil).Once()
 
 	env.ExecuteWorkflow(testWorkflowHello)
 

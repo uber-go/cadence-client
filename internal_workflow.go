@@ -23,7 +23,6 @@ package cadence
 // All code in this file is private to the package.
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -32,6 +31,7 @@ import (
 	"time"
 	"unicode"
 
+	"errors"
 	"go.uber.org/zap"
 )
 
@@ -190,7 +190,7 @@ func getWorkflowEnvironment(ctx Context) workflowEnvironment {
 }
 
 func (f *futureImpl) Get(ctx Context, value interface{}) error {
-	_, more := f.channel.ReceiveWithMoreFlag(ctx)
+	more := f.channel.ReceiveWithMoreFlag(ctx, nil)
 	if more {
 		panic("not closed")
 	}
@@ -388,12 +388,11 @@ func getState(ctx Context) *coroutineState {
 	return s.(*coroutineState)
 }
 
-func (c *channelImpl) Receive(ctx Context) (v interface{}) {
-	v, _ = c.ReceiveWithMoreFlag(ctx)
-	return v
+func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) {
+	c.ReceiveWithMoreFlag(ctx, valuePtr)
 }
 
-func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (value interface{}, more bool) {
+func (c *channelImpl) ReceiveWithMoreFlag(ctx Context, valuePtr interface{}) (more bool) {
 	state := getState(ctx)
 	hasResult := false
 	var result interface{}
@@ -405,24 +404,28 @@ func (c *channelImpl) ReceiveWithMoreFlag(ctx Context) (value interface{}, more 
 	}
 	v, ok, more := c.receiveAsyncImpl(callback)
 	if ok || !more {
-		return v, more
+		c.assginValue(v, valuePtr)
+		return more
 	}
 	for {
 		if hasResult {
 			state.unblocked()
-			return result, more
+			c.assginValue(result, valuePtr)
+			return more
 		}
 		state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
 	}
 }
 
-func (c *channelImpl) ReceiveAsync() (v interface{}, ok bool) {
-	v, ok, _ = c.ReceiveAsyncWithMoreFlag()
-	return v, ok
+func (c *channelImpl) ReceiveAsync(valuePtr interface{}) (ok bool) {
+	ok, _ = c.ReceiveAsyncWithMoreFlag(valuePtr)
+	return ok
 }
 
-func (c *channelImpl) ReceiveAsyncWithMoreFlag() (v interface{}, ok bool, more bool) {
-	return c.receiveAsyncImpl(nil)
+func (c *channelImpl) ReceiveAsyncWithMoreFlag(valuePtr interface{}) (ok bool, more bool) {
+	v, ok, more := c.receiveAsyncImpl(nil)
+	c.assginValue(v, valuePtr)
+	return ok, more
 }
 
 // ok = true means that value was received
@@ -513,6 +516,26 @@ func (c *channelImpl) Close() {
 	for i := 0; i < len(c.blockedSends); i++ {
 		b := c.blockedSends[i]
 		b.callback()
+	}
+}
+
+func (c *channelImpl) assginValue(from interface{}, to interface{}) {
+	if to == nil {
+		return
+	}
+	rf := reflect.ValueOf(to)
+	if rf.Type().Kind() != reflect.Ptr {
+		panic("value parameter provided is not a pointer")
+	}
+	if data, ok := from.([]byte); ok {
+		if err := getHostEnvironment().decodeArg(data, to); err != nil {
+			panic(err)
+		}
+	} else {
+		fv := reflect.ValueOf(from)
+		if fv.IsValid() {
+			rf.Elem().Set(fv)
+		}
 	}
 }
 
@@ -742,12 +765,18 @@ func (d *dispatcherImpl) StackTrace() string {
 }
 
 func (s *selectorImpl) AddReceive(c Channel, f func(v interface{})) Selector {
-	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveFunc: &f})
+	wrapFn := func(v interface{}) {
+		f(s.decodeFnValue(reflect.TypeOf(f), v))
+	}
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveFunc: &wrapFn})
 	return s
 }
 
 func (s *selectorImpl) AddReceiveWithMoreFlag(c Channel, f func(v interface{}, more bool)) Selector {
-	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveWithMoreFlagFunc: &f})
+	wrapFn := func(v interface{}, more bool) {
+		f(s.decodeFnValue(reflect.TypeOf(f), v), more)
+	}
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveWithMoreFlagFunc: &wrapFn})
 	return s
 }
 
@@ -861,6 +890,18 @@ func (s *selectorImpl) Select(ctx Context) {
 	}
 }
 
+func (s *selectorImpl) decodeFnValue(fnType reflect.Type, v interface{}) interface{} {
+	if data, ok := v.([]byte); ok {
+		// decode value to first argument type of the function.
+		arg := reflect.New(fnType.In(0)).Interface()
+		if err := getHostEnvironment().decodeArg(data, arg); err != nil {
+			panic(err)
+		}
+		return reflect.ValueOf(arg).Elem().Interface()
+	}
+	return v
+}
+
 // NewWorkflowDefinition creates a  WorkflowDefinition from a Workflow
 func newWorkflowDefinition(workflow workflow) workflowDefinition {
 	return &syncWorkflowDefinition{workflow: workflow}
@@ -925,7 +966,7 @@ type decodeFutureImpl struct {
 }
 
 func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
-	_, more := d.futureImpl.channel.ReceiveWithMoreFlag(ctx)
+	more := d.futureImpl.channel.ReceiveWithMoreFlag(ctx, nil)
 	if more {
 		panic("not closed")
 	}

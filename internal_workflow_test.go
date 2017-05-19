@@ -205,7 +205,7 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 		fmt.Println("After c2.Send")
 	})
 
-	c1.Receive(ctx)
+	c1.Receive(ctx, nil)
 	// Use selector to test it
 	selected := false
 	NewSelector(ctx).AddReceiveWithMoreFlag(c2, func(v interface{}, more bool) {
@@ -608,7 +608,7 @@ func TestContinueAsNewWorkflow(t *testing.T) {
 type cancelWorkflowTest struct{}
 
 func (w cancelWorkflowTest) Execute(ctx Context, input []byte) ([]byte, error) {
-	if ctx.Done().Receive(ctx); ctx.Err() == ErrCanceled {
+	if ctx.Done().Receive(ctx, nil); ctx.Err() == ErrCanceled {
 		return []byte("Cancelled."), ctx.Err()
 	}
 	return []byte("Completed."), nil
@@ -666,7 +666,7 @@ func (w cancelWorkflowAfterActivityTest) Execute(ctx Context, input []byte) ([]b
 		return nil, err2
 	}
 
-	if ctx.Done().Receive(ctx); ctx.Err() == ErrCanceled {
+	if ctx.Done().Receive(ctx, nil); ctx.Err() == ErrCanceled {
 		return []byte("Cancelled."), ctx.Err()
 	}
 	return []byte("Completed."), nil

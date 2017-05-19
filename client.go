@@ -49,7 +49,7 @@ type (
 		// The errors it can return:
 		//	- EntityNotExistsError
 		//	- InternalServiceError
-		SignalWorkflow(workflowID string, runID string, signalName string, args ...interface{}) error
+		SignalWorkflow(workflowID string, runID string, signalName string, arg interface{}) error
 
 		// CancelWorkflow cancels a workflow in execution
 		// - workflow ID of the workflow.

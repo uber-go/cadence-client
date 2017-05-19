@@ -114,8 +114,8 @@ func (wc *workflowClient) StartWorkflow(
 }
 
 // SignalWorkflow signals a workflow in execution.
-func (wc *workflowClient) SignalWorkflow(workflowID string, runID string, signalName string, args ...interface{}) error {
-	input, err := getHostEnvironment().encodeArgs(args)
+func (wc *workflowClient) SignalWorkflow(workflowID string, runID string, signalName string, arg interface{}) error {
+	input, err := getHostEnvironment().encodeArg(arg)
 	if err != nil {
 		return err
 	}
@@ -126,8 +126,8 @@ func (wc *workflowClient) SignalWorkflow(workflowID string, runID string, signal
 			RunId:      common.StringPtr(runID),
 		},
 		SignalName: common.StringPtr(signalName),
-		Input: input,
-		Identity: common.StringPtr(wc.identity),
+		Input:      input,
+		Identity:   common.StringPtr(wc.identity),
 	}
 
 	return backoff.Retry(

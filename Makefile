@@ -45,6 +45,9 @@ ALL_SRC := $(shell find . -name "*.go" | grep -v -e Godeps -e vendor \
 	-e ".*/_.*" \
 	-e ".*/mocks.*")
 
+# Files that needs to run lint, exclude testify mock from lint
+LINT_SRC := $(filter-out ./mock%,$(ALL_SRC))
+
 # all directories with *_test.go files in them
 TEST_DIRS := $(sort $(dir $(filter %_test.go,$(ALL_SRC))))
 
@@ -90,10 +93,7 @@ cover_ci: cover_profile
 
 # exclude mock.go from lint as temporary hack
 lint:
-	@lintFail=0; for file in $(ALL_SRC); do \
-		if [ "$$file" == "./mock/mock.go" ]; then \
-			continue; \
-		fi; \
+	@lintFail=0; for file in $(LINT_SRC); do \
 		golint -set_exit_status "$$file"; \
 		if [ $$? -eq 1 ]; then lintFail=1; fi; \
 	done; \

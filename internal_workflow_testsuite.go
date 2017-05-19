@@ -635,6 +635,7 @@ func (a *activityExecutorWrapper) getMockReturn(ctx context.Context, input []byt
 	found, _ := a.env.mock.FindExpectedCall(a.name, realArgs...)
 
 	if found < 0 {
+		// mock not setup for this activity
 		return nil
 	}
 

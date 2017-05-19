@@ -91,7 +91,6 @@ cover_ci: cover_profile
 	done
 
 
-# exclude mock.go from lint as temporary hack
 lint:
 	@lintFail=0; for file in $(LINT_SRC); do \
 		golint -set_exit_status "$$file"; \

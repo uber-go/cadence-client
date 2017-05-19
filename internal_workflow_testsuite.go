@@ -654,14 +654,13 @@ func (a *activityExecutorWrapper) executeMock(ctx context.Context, input []byte,
 	mockFn := mockRet.Get(0)
 	mockFnType := reflect.TypeOf(mockFn)
 	if mockFnType != nil && mockFnType.Kind() == reflect.Func {
-		if mockFnType == fnType {
-			// we found a mock function that matches to actual activity, so call that mockFn
-			ae := &activityExecutor{name: fnName, fn: mockFn}
-			return ae.Execute(ctx, input)
-		} else {
+		if mockFnType != fnType {
 			panic(fmt.Sprintf("mock of %v has incorrect return function, expected %v, but actual is %v",
 				fnName, fnType, mockFnType))
 		}
+		// we found a mock function that matches to actual activity, so call that mockFn
+		ae := &activityExecutor{name: fnName, fn: mockFn}
+		return ae.Execute(ctx, input)
 	}
 
 	// check if mockRet have same types as activity's return types

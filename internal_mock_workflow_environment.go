@@ -144,4 +144,9 @@ func (_m *mockWorkflowEnvironment) RegisterCancel(handler func()) {
 	_m.Called(handler)
 }
 
+// RegisterSignal provides a mock function with given fields: handler
+func (_m *mockWorkflowEnvironment) RegisterSignal(handler func(name string, input []byte)) {
+	_m.Called(handler)
+}
+
 var _ workflowEnvironment = (*mockWorkflowEnvironment)(nil)

@@ -57,6 +57,7 @@ type (
 		RegisterCancel(handler func())
 		RequestCancelWorkflow(domainName, workflowID, runID string) error
 		GetLogger() *zap.Logger
+		RegisterSignal(handler func(name string, input []byte))
 	}
 
 	// WorkflowDefinition wraps the code that can execute a workflow.

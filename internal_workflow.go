@@ -301,15 +301,10 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	activityOptions := getActivityOptions(d.rootCtx)
 	activityOptions.OriginalTaskListName = wInfo.TaskListName
 
-	// There is a inter dependency, before we call Execute() we can have a cancel request since
-	// dispatcher executes code on decision task started, we might not have cancel handler created.
-	// WithCancel -> creates channel -> needs dispatcher -> dispatcher needs a root function with context.
-	// We use cancelRequested to remember if the cancel request came in.
-
 	d.dispatcher = newDispatcher(d.rootCtx, func(ctx Context) {
 		d.rootCtx, d.cancel = WithCancel(ctx)
 		r := &workflowResult{}
-		r.workflowResult, r.error = d.workflow.Execute(ctx, input)
+		r.workflowResult, r.error = d.workflow.Execute(d.rootCtx, input)
 		rpp := getWorkflowResultPointerPointer(ctx)
 		*rpp = r
 	})
@@ -319,10 +314,21 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 		// it doesn't do anything new, the context remains cancelled.
 		d.cancel()
 	})
+
 	getWorkflowEnvironment(d.rootCtx).RegisterSignal(func(name string, result []byte) {
 		eo := getWorkflowEnvOptions(d.rootCtx)
 		eo.getSignalChannel(d.rootCtx, name).Send(d.rootCtx, result)
+		// Channel has limited capacity so we need to make progress on workflow consumer side.
+		executeDispatcher(d.rootCtx, d.dispatcher)
 	})
+
+	// There is a inter dependency, before we call Execute() we can have a cancel request since
+	// dispatcher executes code on decision task started, we might not have cancel handler created.
+	//  (1) WithCancel -> creates channel -> needs dispatcher -> dispatcher needs a root function with context.
+	//  (2) Signals before first decision start needs to setup channels with data and needs the context with co-routine state.
+	//  (3) ...
+	// So all the events, that need to be executed before first decision task need a context with with co-routine state
+	// setup. So we call execute here so we get the root context created.
 	executeDispatcher(d.rootCtx, d.dispatcher)
 }
 

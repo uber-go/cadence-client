@@ -307,10 +307,7 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	// We use cancelRequested to remember if the cancel request came in.
 
 	d.dispatcher = newDispatcher(d.rootCtx, func(ctx Context) {
-		ctx, d.cancel = WithCancel(ctx)
-		if d.cancelRequested {
-			d.cancel()
-		}
+		d.rootCtx, d.cancel = WithCancel(ctx)
 		r := &workflowResult{}
 		r.workflowResult, r.error = d.workflow.Execute(ctx, input)
 		rpp := getWorkflowResultPointerPointer(ctx)
@@ -320,11 +317,13 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	getWorkflowEnvironment(d.rootCtx).RegisterCancel(func() {
 		// It is ok to call this method multiple times.
 		// it doesn't do anything new, the context remains cancelled.
-		if d.cancel != nil {
-			d.cancel()
-		}
-		d.cancelRequested = true
+		d.cancel()
 	})
+	getWorkflowEnvironment(d.rootCtx).RegisterSignal(func(name string, result []byte) {
+		eo := getWorkflowEnvOptions(d.rootCtx)
+		eo.getSignalChannel(d.rootCtx, name).Send(d.rootCtx, result)
+	})
+	executeDispatcher(d.rootCtx, d.dispatcher)
 }
 
 func (d *syncWorkflowDefinition) OnDecisionTaskStarted() {
@@ -945,7 +944,8 @@ func getWorkflowEnvOptions(ctx Context) *wfEnvironmentOptions {
 
 func setWorkflowEnvOptionsIfNotExist(ctx Context) Context {
 	if valCtx := getWorkflowEnvOptions(ctx); valCtx == nil {
-		return WithValue(ctx, workflowEnvOptionsContextKey, &wfEnvironmentOptions{})
+		return WithValue(ctx, workflowEnvOptionsContextKey, &wfEnvironmentOptions{
+			signalChannels: make(map[string]Channel)})
 	}
 	return ctx
 }
@@ -957,6 +957,16 @@ type wfEnvironmentOptions struct {
 	executionStartToCloseTimeoutSeconds *int32
 	taskStartToCloseTimeoutSeconds      *int32
 	domain                              *string
+	signalChannels                      map[string]Channel
+}
+
+func (w *wfEnvironmentOptions) getSignalChannel(ctx Context, signalName string) Channel {
+	if ch, ok := w.signalChannels[signalName]; ok {
+		return ch
+	}
+	ch := NewChannel(ctx)
+	w.signalChannels[signalName] = ch
+	return ch
 }
 
 // decodeFutureImpl

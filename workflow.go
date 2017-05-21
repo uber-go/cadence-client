@@ -338,5 +338,5 @@ func WithWorkflowTaskStartToCloseTimeout(ctx Context, d time.Duration) Context {
 
 // GetSignalChannel returns channel corresponding to the signal name.
 func GetSignalChannel(ctx Context, signalName string) Channel {
-	return nil
+	return getWorkflowEnvOptions(ctx).getSignalChannel(ctx, signalName)
 }

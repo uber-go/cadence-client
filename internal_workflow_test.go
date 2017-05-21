@@ -98,6 +98,7 @@ func TestHelloWorldWorkflow(t *testing.T) {
 	w := newWorkflowDefinition(&helloWorldWorklfow{t: t})
 	ctx := &mockWorkflowEnvironment{}
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", []byte("Hello World!"), nil).Return().Once()
 	w.Execute(ctx, []byte("Hello"))
@@ -146,6 +147,7 @@ func TestSingleActivityWorkflow(t *testing.T) {
 	cbProcessor := newAsyncTestCallbackProcessor(w.OnDecisionTaskStarted)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
 		//result := args.Get(0).([]byte)
@@ -208,7 +210,7 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	c1.Receive(ctx, nil)
 	// Use selector to test it
 	selected := false
-	NewSelector(ctx).AddReceiveWithMoreFlag(c2, func(v interface{}, more bool) {
+	NewSelector(ctx).AddReceiveWithMoreFlag(c2, func(f Future, more bool) {
 		require.True(w.t, more)
 		selected = true
 	}).Select(ctx)
@@ -241,6 +243,7 @@ func TestSplitJoinActivityWorkflow(t *testing.T) {
 	}).Twice()
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", []byte("Hello Flow!"), nil).Return().Run(func(args mock.Arguments) {
 		workflowComplete <- struct{}{}
@@ -266,6 +269,7 @@ func TestWorkflowPanic(t *testing.T) {
 		cbProcessor.Add(callback, []byte("test"), nil)
 	}).Twice()
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", []byte(nil), mock.Anything).Return().Run(func(args mock.Arguments) {
 		resultErr := args.Get(1).(ErrorWithDetails)
@@ -301,10 +305,10 @@ func TestClockWorkflow(t *testing.T) {
 
 	ctx.On("Now").Return(time.Now()).Once()
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", []byte("workflow-completed"), nil).Return().Once()
 	w.Execute(ctx, []byte("Hello"))
-	w.OnDecisionTaskStarted()
 
 	ctx.AssertExpectations(t)
 }
@@ -382,6 +386,7 @@ func TestTimerWorkflow(t *testing.T) {
 	}).Twice()
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
 		result := args.Get(0).([]byte)
@@ -479,6 +484,7 @@ func TestActivityCancellation(t *testing.T) {
 	}).Times(3)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
 		result := args.Get(0).([]byte)
@@ -559,6 +565,7 @@ func TestExternalExampleWorkflow(t *testing.T) {
 	}).Times(3)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
 		workflowComplete <- struct{}{}
@@ -586,6 +593,7 @@ func TestContinueAsNewWorkflow(t *testing.T) {
 	cbProcessor := newAsyncTestCallbackProcessor(w.OnDecisionTaskStarted)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "newTaskList", Domain: "d", ExecutionStartToCloseTimeoutSeconds: 1, TaskStartToCloseTimeoutSeconds: 1}).Once()
 	ctx.On("Complete", []byte(nil), mock.Anything).Return().Run(func(args mock.Arguments) {
 		resultErr := args.Get(1).(*continueAsNewError)
@@ -597,7 +605,6 @@ func TestContinueAsNewWorkflow(t *testing.T) {
 	}).Once()
 
 	w.Execute(ctx, []byte(""))
-	w.OnDecisionTaskStarted()
 
 	c := cbProcessor.ProcessOrWait(workflowComplete)
 	require.True(t, c, "Workflow failed to complete")
@@ -631,6 +638,7 @@ func TestCancelWorkflow(t *testing.T) {
 		cancelHandler = args.Get(0).(func())
 	}).Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 
 	w.Execute(ctx, []byte("test Cancel"))
 	w.OnDecisionTaskStarted()
@@ -701,11 +709,77 @@ func TestCancelWorkflowAfterActivity(t *testing.T) {
 		cancelHandler = args.Get(0).(func())
 	}).Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 
 	w.Execute(ctx, []byte("test Cancel"))
 	w.OnDecisionTaskStarted()
 	cancelHandler()
 	w.OnDecisionTaskStarted()
+
+	c := cbProcessor.ProcessOrWait(workflowComplete)
+	require.True(t, c, "Workflow failed to complete")
+	ctx.AssertExpectations(t)
+}
+
+type testSignalWorkflow struct{}
+
+func (w testSignalWorkflow) Execute(ctx Context, input []byte) ([]byte, error) {
+	var result string
+	ch := GetSignalChannel(ctx, "testSig1")
+	var v string
+	ch.Receive(ctx, &v)
+	result += v
+	ch.Receive(ctx, &v)
+	result += v
+
+	ch2 := GetSignalChannel(ctx, "testSig2")
+	s := NewSelector(ctx)
+	s.AddReceive(ch2, func(f Future) {
+		f.Get(ctx, &v)
+		result += v
+	})
+	s.Select(ctx)
+	s.AddReceive(ch2, func(f Future) {
+		f.Get(ctx, &v)
+		result += v
+	})
+	s.Select(ctx)
+	s.AddReceiveWithMoreFlag(ch2, func(f Future, more bool) {
+		f.Get(ctx, &v)
+		result += v
+	})
+	s.Select(ctx)
+	return []byte(result), nil
+}
+
+func TestSignalWorkflowActivity(t *testing.T) {
+	w := newWorkflowDefinition(&testSignalWorkflow{})
+	ctx := &mockWorkflowEnvironment{}
+	workflowComplete := make(chan struct{}, 1)
+	cbProcessor := newAsyncTestCallbackProcessor(w.OnDecisionTaskStarted)
+	var signalHandler func(name string, input []byte)
+
+	expected := "Sig1Value1;" + "Sig1Value2;" + "Sig2Value1;" + "Sig2Value2;" + "Sig2Value3;"
+
+	ctx.On("RegisterCancel", mock.Anything).Return().Once()
+	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Run(func(args mock.Arguments) {
+		signalHandler = args.Get(0).(func(name string, input []byte))
+	}).Once()
+	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
+		result := args.Get(0).([]byte)
+		require.EqualValues(t, expected, []byte(result))
+		workflowComplete <- struct{}{}
+	}).Once()
+
+	w.Execute(ctx, []byte("test Signal"))
+	signalHandler("testSig1", testEncodeFunctionResult("Sig1Value1;"))
+	w.OnDecisionTaskStarted()
+	signalHandler("testSig1", testEncodeFunctionResult("Sig1Value2;"))
+	w.OnDecisionTaskStarted()
+	signalHandler("testSig2", testEncodeFunctionResult("Sig2Value1;"))
+	signalHandler("testSig2", testEncodeFunctionResult("Sig2Value2;"))
+	signalHandler("testSig2", testEncodeFunctionResult("Sig2Value3;"))
 
 	c := cbProcessor.ProcessOrWait(workflowComplete)
 	require.True(t, c, "Workflow failed to complete")

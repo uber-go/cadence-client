@@ -409,13 +409,13 @@ func (c *channelImpl) ReceiveWithMoreFlag(ctx Context, valuePtr interface{}) (mo
 	}
 	v, ok, more := c.receiveAsyncImpl(callback)
 	if ok || !more {
-		c.assginValue(v, valuePtr)
+		c.assignValue(v, valuePtr)
 		return more
 	}
 	for {
 		if hasResult {
 			state.unblocked()
-			c.assginValue(result, valuePtr)
+			c.assignValue(result, valuePtr)
 			return more
 		}
 		state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
@@ -429,7 +429,7 @@ func (c *channelImpl) ReceiveAsync(valuePtr interface{}) (ok bool) {
 
 func (c *channelImpl) ReceiveAsyncWithMoreFlag(valuePtr interface{}) (ok bool, more bool) {
 	v, ok, more := c.receiveAsyncImpl(nil)
-	c.assginValue(v, valuePtr)
+	c.assignValue(v, valuePtr)
 	return ok, more
 }
 
@@ -524,23 +524,10 @@ func (c *channelImpl) Close() {
 	}
 }
 
-func (c *channelImpl) assginValue(from interface{}, to interface{}) {
-	if to == nil {
-		return
-	}
-	rf := reflect.ValueOf(to)
-	if rf.Type().Kind() != reflect.Ptr {
-		panic("value parameter provided is not a pointer")
-	}
-	if data, ok := from.([]byte); ok {
-		if err := getHostEnvironment().decodeArg(data, to); err != nil {
-			panic(err)
-		}
-	} else {
-		fv := reflect.ValueOf(from)
-		if fv.IsValid() {
-			rf.Elem().Set(fv)
-		}
+func (c *channelImpl) assignValue(from interface{}, to interface{}) {
+	err := decodeAndAssignValue(from, to)
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -769,17 +756,17 @@ func (d *dispatcherImpl) StackTrace() string {
 	return result
 }
 
-func (s *selectorImpl) AddReceive(c Channel, f func(v interface{})) Selector {
+func (s *selectorImpl) AddReceive(c Channel, f func(f Future)) Selector {
 	wrapFn := func(v interface{}) {
-		f(s.decodeFnValue(reflect.TypeOf(f), v))
+		f(&decodeFutureNoWaitImpl{value: v})
 	}
 	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveFunc: &wrapFn})
 	return s
 }
 
-func (s *selectorImpl) AddReceiveWithMoreFlag(c Channel, f func(v interface{}, more bool)) Selector {
+func (s *selectorImpl) AddReceiveWithMoreFlag(c Channel, f func(f Future, more bool)) Selector {
 	wrapFn := func(v interface{}, more bool) {
-		f(s.decodeFnValue(reflect.TypeOf(f), v), more)
+		f(&decodeFutureNoWaitImpl{value: v}, more)
 	}
 	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveWithMoreFlagFunc: &wrapFn})
 	return s
@@ -895,18 +882,6 @@ func (s *selectorImpl) Select(ctx Context) {
 	}
 }
 
-func (s *selectorImpl) decodeFnValue(fnType reflect.Type, v interface{}) interface{} {
-	if data, ok := v.([]byte); ok {
-		// decode value to first argument type of the function.
-		arg := reflect.New(fnType.In(0)).Interface()
-		if err := getHostEnvironment().decodeArg(data, arg); err != nil {
-			panic(err)
-		}
-		return reflect.ValueOf(arg).Elem().Interface()
-	}
-	return v
-}
-
 // NewWorkflowDefinition creates a  WorkflowDefinition from a Workflow
 func newWorkflowDefinition(workflow workflow) workflowDefinition {
 	return &syncWorkflowDefinition{workflow: workflow}
@@ -1002,4 +977,34 @@ func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
 		return err
 	}
 	return d.futureImpl.err
+}
+
+// decodeFutureNoWaitImpl. This is a thin wrapper over to read a value.
+type decodeFutureNoWaitImpl struct {
+	value interface{}
+}
+
+func (d *decodeFutureNoWaitImpl) IsReady() bool {
+	return true
+}
+
+func (d *decodeFutureNoWaitImpl) Get(ctx Context, valuePtr interface{}) error {
+	return decodeAndAssignValue(d.value, valuePtr)
+}
+
+func decodeAndAssignValue(from interface{}, toValuePtr interface{}) error {
+	if toValuePtr == nil {
+		return nil
+	}
+	if rf := reflect.ValueOf(toValuePtr); rf.Type().Kind() != reflect.Ptr {
+		return errors.New("value parameter provided is not a pointer")
+	}
+	if data, ok := from.([]byte); ok {
+		if err := getHostEnvironment().decodeArg(data, toValuePtr); err != nil {
+			return err
+		}
+	} else if fv := reflect.ValueOf(from); fv.IsValid() {
+		reflect.ValueOf(toValuePtr).Elem().Set(fv)
+	}
+	return nil
 }

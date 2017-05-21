@@ -479,6 +479,7 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 	cbProcessor := newAsyncTestCallbackProcessor(w.OnDecisionTaskStarted)
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Run(func(args mock.Arguments) {}).Once()
+	ctx.On("RegisterSignal", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
 
 	ctx.On("ExecuteActivity", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {

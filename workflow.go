@@ -54,8 +54,8 @@ type (
 	// Selector must be used instead of native go select by workflow code
 	// Use Context.NewSelector method to create an instance.
 	Selector interface {
-		AddReceive(c Channel, f func(v interface{})) Selector
-		AddReceiveWithMoreFlag(c Channel, f func(v interface{}, more bool)) Selector
+		AddReceive(c Channel, f func(f Future)) Selector
+		AddReceiveWithMoreFlag(c Channel, f func(f Future, more bool)) Selector
 		AddSend(c Channel, v interface{}, f func()) Selector
 		AddFuture(future Future, f func(f Future)) Selector
 		AddDefault(f func())

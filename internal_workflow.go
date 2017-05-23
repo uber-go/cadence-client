@@ -97,13 +97,14 @@ type (
 		blockedSends    []valueCallbackPair // puts waiting when buffer is full.
 		blockedReceives []receiveCallback   // receives waiting when no messages are available.
 		closed          bool                // true if channel is closed
+		recValue        *interface{}        // Used only while receiving value.
 	}
 
 	// Single case statement of the Select
 	selectCase struct {
-		channel                 *channelImpl                    // Channel of this case.
-		receiveFunc             *func(v interface{})            // function to call when channel has a message. nil for send case.
-		receiveWithMoreFlagFunc *func(v interface{}, more bool) // function to call when channel has a message. nil for send case.
+		channel                 *channelImpl                // Channel of this case.
+		receiveFunc             *func(c Channel)            // function to call when channel has a message. nil for send case.
+		receiveWithMoreFlagFunc *func(c Channel, more bool) // function to call when channel has a message. nil for send case.
 
 		sendFunc   *func()         // function to call when channel accepted a message. nil for receive case.
 		sendValue  *interface{}    // value to send to the channel. Used only for send case.
@@ -436,6 +437,11 @@ func (c *channelImpl) ReceiveAsyncWithMoreFlag(valuePtr interface{}) (ok bool, m
 // ok = true means that value was received
 // more = true means that channel is not closed and more deliveries are possible
 func (c *channelImpl) receiveAsyncImpl(callback receiveCallback) (v interface{}, ok bool, more bool) {
+	if c.recValue != nil {
+		r := *c.recValue
+		c.recValue = nil
+		return r, true, true
+	}
 	if len(c.buffer) > 0 {
 		r := c.buffer[0]
 		c.buffer = c.buffer[1:]
@@ -756,19 +762,13 @@ func (d *dispatcherImpl) StackTrace() string {
 	return result
 }
 
-func (s *selectorImpl) AddReceive(c Channel, f func(f Future)) Selector {
-	wrapFn := func(v interface{}) {
-		f(&decodeFutureNoWaitImpl{value: v})
-	}
-	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveFunc: &wrapFn})
+func (s *selectorImpl) AddReceive(c Channel, f func(c Channel)) Selector {
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveFunc: &f})
 	return s
 }
 
-func (s *selectorImpl) AddReceiveWithMoreFlag(c Channel, f func(f Future, more bool)) Selector {
-	wrapFn := func(v interface{}, more bool) {
-		f(&decodeFutureNoWaitImpl{value: v}, more)
-	}
-	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveWithMoreFlagFunc: &wrapFn})
+func (s *selectorImpl) AddReceiveWithMoreFlag(c Channel, f func(c Channel, more bool)) Selector {
+	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveWithMoreFlagFunc: &f})
 	return s
 }
 
@@ -796,35 +796,41 @@ func (s *selectorImpl) Select(ctx Context) {
 	for _, pair := range s.cases {
 		if pair.receiveFunc != nil {
 			f := *pair.receiveFunc
+			c := pair.channel
 			callback := func(v interface{}, more bool) bool {
 				if readyBranch != nil {
 					return false
 				}
 				readyBranch = func() {
-					f(v)
+					c.recValue = &v
+					f(c)
 				}
 				return true
 			}
 
 			v, ok, more := pair.channel.receiveAsyncImpl(callback)
 			if ok || !more {
-				f(v)
+				c.recValue = &v
+				f(c)
 				return
 			}
 		} else if pair.receiveWithMoreFlagFunc != nil {
 			f := *pair.receiveWithMoreFlagFunc
+			c := pair.channel
 			callback := func(v interface{}, more bool) bool {
 				if readyBranch != nil {
 					return false
 				}
 				readyBranch = func() {
-					f(v, more)
+					c.recValue = &v
+					f(c, more)
 				}
 				return true
 			}
 			v, ok, more := pair.channel.receiveAsyncImpl(callback)
 			if ok || !more {
-				f(v, more)
+				c.recValue = &v
+				f(c, more)
 				return
 			}
 		} else if pair.sendFunc != nil {

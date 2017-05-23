@@ -228,16 +228,16 @@ func TestNotBlockingSelect(t *testing.T) {
 		c2 := NewBufferedChannel(ctx, 1)
 		s := NewSelector(ctx)
 		s.
-			AddReceiveWithMoreFlag(c1, func(f Future, more bool) {
+			AddReceiveWithMoreFlag(c1, func(c Channel, more bool) {
 				assert.True(t, more)
 				var v string
-				assert.NoError(t, f.Get(ctx, &v))
+				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c1-%v", v))
 			}).
-			AddReceiveWithMoreFlag(c2, func(f Future, more bool) {
+			AddReceiveWithMoreFlag(c2, func(c Channel, more bool) {
 				assert.True(t, more)
 				var v string
-				assert.NoError(t, f.Get(ctx, &v))
+				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c2-%v", v))
 			}).
 			AddDefault(func() { history = append(history, "default") })
@@ -277,15 +277,15 @@ func TestBlockingSelect(t *testing.T) {
 
 		s := NewSelector(ctx)
 		s.
-			AddReceiveWithMoreFlag(c1, func(f Future, more bool) {
+			AddReceiveWithMoreFlag(c1, func(c Channel, more bool) {
 				assert.True(t, more)
 				var v string
-				assert.NoError(t, f.Get(ctx, &v))
+				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c1-%v", v))
 			}).
-			AddReceive(c2, func(f Future) {
+			AddReceive(c2, func(c Channel) {
 				var v string
-				assert.NoError(t, f.Get(ctx, &v))
+				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c2-%v", v))
 			})
 		history = append(history, "select1")
@@ -318,10 +318,10 @@ func TestBlockingSelectAsyncSend(t *testing.T) {
 		c1 := NewChannel(ctx)
 		s := NewSelector(ctx)
 		s.
-			AddReceiveWithMoreFlag(c1, func(f Future, more bool) {
+			AddReceiveWithMoreFlag(c1, func(c Channel, more bool) {
 				assert.True(t, more)
 				var v int
-				assert.NoError(t, f.Get(ctx, &v))
+				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c1-%v", v))
 			})
 		for i := 0; i < 3; i++ {

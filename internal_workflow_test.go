@@ -210,7 +210,7 @@ func (w *splitJoinActivityWorkflow) Execute(ctx Context, input []byte) (result [
 	c1.Receive(ctx, nil)
 	// Use selector to test it
 	selected := false
-	NewSelector(ctx).AddReceiveWithMoreFlag(c2, func(f Future, more bool) {
+	NewSelector(ctx).AddReceiveWithMoreFlag(c2, func(c Channel, more bool) {
 		require.True(w.t, more)
 		selected = true
 	}).Select(ctx)
@@ -734,18 +734,18 @@ func (w testSignalWorkflow) Execute(ctx Context, input []byte) ([]byte, error) {
 
 	ch2 := GetSignalChannel(ctx, "testSig2")
 	s := NewSelector(ctx)
-	s.AddReceive(ch2, func(f Future) {
-		f.Get(ctx, &v)
+	s.AddReceive(ch2, func(c Channel) {
+		c.Receive(ctx, &v)
 		result += v
 	})
 	s.Select(ctx)
-	s.AddReceive(ch2, func(f Future) {
-		f.Get(ctx, &v)
+	s.AddReceive(ch2, func(c Channel) {
+		c.Receive(ctx, &v)
 		result += v
 	})
 	s.Select(ctx)
-	s.AddReceiveWithMoreFlag(ch2, func(f Future, more bool) {
-		f.Get(ctx, &v)
+	s.AddReceiveWithMoreFlag(ch2, func(c Channel, more bool) {
+		c.Receive(ctx, &v)
 		result += v
 	})
 	s.Select(ctx)

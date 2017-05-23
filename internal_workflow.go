@@ -318,6 +318,7 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 
 	getWorkflowEnvironment(d.rootCtx).RegisterSignal(func(name string, result []byte) {
 		eo := getWorkflowEnvOptions(d.rootCtx)
+		// We don't want this code to be blocked ever, using sendAsync().
 		ch := eo.getSignalChannel(d.rootCtx, name).(*channelImpl)
 		callback := &valueCallbackPair{
 			value: result,
@@ -547,6 +548,7 @@ func (c *channelImpl) Close() {
 	}
 }
 
+// Takes a value and assigns that 'to' value.
 func (c *channelImpl) assignValue(from interface{}, to interface{}) {
 	err := decodeAndAssignValue(from, to)
 	if err != nil {
@@ -964,6 +966,7 @@ type wfEnvironmentOptions struct {
 	signalChannels                      map[string]Channel
 }
 
+// getSignalChannel finds the assosciated channel for the signal.
 func (w *wfEnvironmentOptions) getSignalChannel(ctx Context, signalName string) Channel {
 	if ch, ok := w.signalChannels[signalName]; ok {
 		return ch
@@ -973,6 +976,7 @@ func (w *wfEnvironmentOptions) getSignalChannel(ctx Context, signalName string) 
 	return ch
 }
 
+// getUnhandledSignals checks if there are any signal channels that have data to be consumed.
 func (w *wfEnvironmentOptions) getUnhandledSignals() []string {
 	unhandledSignals := []string{}
 	for k, c := range w.signalChannels {
@@ -1013,19 +1017,6 @@ func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
 		return err
 	}
 	return d.futureImpl.err
-}
-
-// decodeFutureNoWaitImpl. This is a thin wrapper over to read a value.
-type decodeFutureNoWaitImpl struct {
-	value interface{}
-}
-
-func (d *decodeFutureNoWaitImpl) IsReady() bool {
-	return true
-}
-
-func (d *decodeFutureNoWaitImpl) Get(ctx Context, valuePtr interface{}) error {
-	return decodeAndAssignValue(d.value, valuePtr)
 }
 
 func decodeAndAssignValue(from interface{}, toValuePtr interface{}) error {

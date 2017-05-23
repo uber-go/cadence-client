@@ -318,9 +318,14 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 
 	getWorkflowEnvironment(d.rootCtx).RegisterSignal(func(name string, result []byte) {
 		eo := getWorkflowEnvOptions(d.rootCtx)
-		eo.getSignalChannel(d.rootCtx, name).Send(d.rootCtx, result)
-		// Channel has limited capacity so we need to make progress on workflow consumer side.
-		executeDispatcher(d.rootCtx, d.dispatcher)
+		ch := eo.getSignalChannel(d.rootCtx, name).(*channelImpl)
+		callback := &valueCallbackPair{
+			value: result,
+			callback: func() bool {
+				return true
+			},
+		}
+		ch.sendAsyncImpl(result, callback)
 	})
 
 	// There is a inter dependency, before we call Execute() we can have a cancel request since
@@ -364,12 +369,23 @@ func getDispatcher(ctx Context) dispatcher {
 // executeDispatcher executed coroutines in the calling thread and calls workflow completion callbacks
 // if root workflow function returned
 func executeDispatcher(ctx Context, dispatcher dispatcher) {
+	checkUnhandledSigFn := func(ctx Context) {
+		us := getWorkflowEnvOptions(ctx).getUnhandledSignals()
+		if len(us) > 0 {
+			getWorkflowEnvironment(ctx).GetLogger().Warn("Workflow has unhandled signals",
+				zap.Strings("SignalNames", us))
+			// TODO: We don't have a metrics added to workflow environment yet,
+			// this need to be reported as a metric.
+		}
+	}
+
 	panicErr := dispatcher.ExecuteUntilAllBlocked()
 	if panicErr != nil {
 		env := getWorkflowEnvironment(ctx)
 		env.GetLogger().Error("Dispatcher panic.",
 			zap.String("PanicError", panicErr.Error()),
 			zap.String("PanicStack", panicErr.StackTrace()))
+		checkUnhandledSigFn(ctx)
 		env.Complete(nil, NewErrorWithDetails(panicErr.Error(), []byte(panicErr.StackTrace())))
 		return
 	}
@@ -379,6 +395,7 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 		return
 	}
 	// Cannot cast nil values from interface{} to interface
+	checkUnhandledSigFn(ctx)
 	getWorkflowEnvironment(ctx).Complete(rp.workflowResult, rp.error)
 }
 
@@ -954,6 +971,19 @@ func (w *wfEnvironmentOptions) getSignalChannel(ctx Context, signalName string) 
 	ch := NewChannel(ctx)
 	w.signalChannels[signalName] = ch
 	return ch
+}
+
+func (w *wfEnvironmentOptions) getUnhandledSignals() []string {
+	unhandledSignals := []string{}
+	for k, c := range w.signalChannels {
+		ch := c.(*channelImpl)
+		v, ok, _ := ch.receiveAsyncImpl(nil)
+		if ok {
+			unhandledSignals = append(unhandledSignals, k)
+			ch.recValue = &v
+		}
+	}
+	return unhandledSignals
 }
 
 // decodeFutureImpl

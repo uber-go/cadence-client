@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"strings"
 )
 
 type testContext struct {
@@ -724,6 +725,7 @@ func TestCancelWorkflowAfterActivity(t *testing.T) {
 type testSignalWorkflow struct{}
 
 func (w testSignalWorkflow) Execute(ctx Context, input []byte) ([]byte, error) {
+	// read multiple times.
 	var result string
 	ch := GetSignalChannel(ctx, "testSig1")
 	var v string
@@ -732,6 +734,7 @@ func (w testSignalWorkflow) Execute(ctx Context, input []byte) ([]byte, error) {
 	ch.Receive(ctx, &v)
 	result += v
 
+	// Read on a selector.
 	ch2 := GetSignalChannel(ctx, "testSig2")
 	s := NewSelector(ctx)
 	s.AddReceive(ch2, func(c Channel) {
@@ -739,16 +742,36 @@ func (w testSignalWorkflow) Execute(ctx Context, input []byte) ([]byte, error) {
 		result += v
 	})
 	s.Select(ctx)
-	s.AddReceive(ch2, func(c Channel) {
-		c.Receive(ctx, &v)
-		result += v
-	})
 	s.Select(ctx)
 	s.AddReceiveWithMoreFlag(ch2, func(c Channel, more bool) {
 		c.Receive(ctx, &v)
 		result += v
 	})
 	s.Select(ctx)
+
+	// Read on a selector inside the callback, multiple times.
+	ch2 = GetSignalChannel(ctx, "testSig2")
+	s = NewSelector(ctx)
+	s.AddReceive(ch2, func(c Channel) {
+		for i := 0; i < 4; i++ {
+			c.Receive(ctx, &v)
+			result += v
+		}
+	})
+	s.Select(ctx)
+
+	// Check un handled signals.
+	u, list := GetUnHandledSignals(ctx)
+	if !u || len(list) != 1 || list[0] != "testSig3" {
+		panic("expecting one unhandled signal")
+	}
+	ch3 := GetSignalChannel(ctx, "testSig3")
+	ch3.Receive(ctx, &v)
+	result += v
+	u, _ = GetUnHandledSignals(ctx)
+	if u {
+		panic("expecting no unhandled signals")
+	}
 	return []byte(result), nil
 }
 
@@ -759,7 +782,18 @@ func TestSignalWorkflowActivity(t *testing.T) {
 	cbProcessor := newAsyncTestCallbackProcessor(w.OnDecisionTaskStarted)
 	var signalHandler func(name string, input []byte)
 
-	expected := "Sig1Value1;" + "Sig1Value2;" + "Sig2Value1;" + "Sig2Value2;" + "Sig2Value3;"
+	expected := []string{
+		"Sig1Value1;",
+		"Sig1Value2;",
+		"Sig2Value1;",
+		"Sig2Value2;",
+		"Sig2Value3;",
+		"Sig2Value4;",
+		"Sig2Value5;",
+		"Sig2Value6;",
+		"Sig2Value7;",
+		"Sig3Value1;",
+	}
 
 	ctx.On("RegisterCancel", mock.Anything).Return().Once()
 	ctx.On("WorkflowInfo").Return(&WorkflowInfo{TaskListName: "t", Domain: "d"}).Once()
@@ -768,18 +802,21 @@ func TestSignalWorkflowActivity(t *testing.T) {
 	}).Once()
 	ctx.On("Complete", mock.Anything, nil).Return().Run(func(args mock.Arguments) {
 		result := args.Get(0).([]byte)
-		require.EqualValues(t, expected, []byte(result))
+		require.EqualValues(t, strings.Join(expected, ""), []byte(result))
 		workflowComplete <- struct{}{}
 	}).Once()
+	//ctx.On("GetLogger").Return(zap.NewDevelopment())
 
 	w.Execute(ctx, []byte("test Signal"))
-	signalHandler("testSig1", testEncodeFunctionResult("Sig1Value1;"))
+	signalHandler("testSig1", testEncodeFunctionResult(expected[0]))
 	w.OnDecisionTaskStarted()
-	signalHandler("testSig1", testEncodeFunctionResult("Sig1Value2;"))
+	signalHandler("testSig1", testEncodeFunctionResult(expected[1]))
 	w.OnDecisionTaskStarted()
-	signalHandler("testSig2", testEncodeFunctionResult("Sig2Value1;"))
-	signalHandler("testSig2", testEncodeFunctionResult("Sig2Value2;"))
-	signalHandler("testSig2", testEncodeFunctionResult("Sig2Value3;"))
+	signalHandler("testSig3", testEncodeFunctionResult(expected[9]))
+	for i := 2; i < 9; i++ {
+		signalHandler("testSig2", testEncodeFunctionResult(expected[i]))
+	}
+	w.OnDecisionTaskStarted()
 
 	c := cbProcessor.ProcessOrWait(workflowComplete)
 	require.True(t, c, "Workflow failed to complete")

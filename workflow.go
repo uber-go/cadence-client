@@ -340,3 +340,11 @@ func WithWorkflowTaskStartToCloseTimeout(ctx Context, d time.Duration) Context {
 func GetSignalChannel(ctx Context, signalName string) Channel {
 	return getWorkflowEnvOptions(ctx).getSignalChannel(ctx, signalName)
 }
+
+// GetUnHandledSignals return whether the workflow has any unhandled signal messages.
+// - returns true to indicate if there are any.
+// - returns list of unhandled signal names.
+func GetUnHandledSignals(ctx Context) (bool, []string) {
+	unhandledSignals := getWorkflowEnvOptions(ctx).getUnhandledSignals()
+	return len(unhandledSignals) > 0, unhandledSignals
+}

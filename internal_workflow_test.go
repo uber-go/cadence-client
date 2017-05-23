@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
+	"math/rand"
 )
 
 type WorkflowUnitTest struct {
@@ -424,4 +425,17 @@ func (s *WorkflowUnitTest) Test_CancelWorkflowAfterActivity() {
 	}, time.Hour)
 	env.ExecuteWorkflow(cancelWorkflowAfterActivityTest)
 	s.True(env.IsWorkflowCompleted())
+}
+
+func (s *WorkflowUnitTest) Test_SideEffect() {
+	encodedRandom := SideEffect(func(ctx Context) interface{} {
+		return rand.Intn(100)
+	})
+	var random int
+	encodedRandom.Get(&random)
+	if random < 50 {
+
+	} else {
+
+	}
 }

@@ -291,7 +291,7 @@ func (wc *workflowEnvironmentImpl) addPostEventHooks(hook func()) {
 	wc.postEventHooks = append(wc.postEventHooks, hook)
 }
 
-func (wc *workflowEnvironmentImpl) SideEffect(f func() []byte, callback resultHandler) {
+func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback resultHandler) {
 	sideEffectID := wc.GenerateSequence()
 	result, ok := wc.sideEffectResult[sideEffectID]
 	if ok {
@@ -301,7 +301,12 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() []byte, callback resultHa
 		return
 	}
 
-	result = f()
+	var err error
+	result, err = f()
+	if err != nil {
+		callback(result, err)
+		return
+	}
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(sideEffectID); err != nil {

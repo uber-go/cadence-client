@@ -373,6 +373,19 @@ func (b EncodedValue) Get(valuePtr interface{}) error {
 // } else {
 //        ....
 // }
-func SideEffect(f func(ctx Context) interface{}) EncodedValue {
-	return getHostEnvironment().sideEffect(f)
+func SideEffect(ctx Context, f func(ctx Context) interface{}) EncodedValue {
+	future, settable := NewFuture(ctx)
+	wrapperFunc := func() ([]byte, error) {
+		r := f(ctx)
+		return getHostEnvironment().encodeArg(r)
+	}
+	resultCallback := func(result []byte, err error) {
+		settable.Set(EncodedValue(result), err)
+	}
+	getWorkflowEnvironment(ctx).SideEffect(wrapperFunc, resultCallback)
+	var encoded EncodedValue
+	if err := future.Get(ctx, &encoded); err != nil {
+		panic(err)
+	}
+	return encoded
 }

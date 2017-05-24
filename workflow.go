@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"time"
 
+	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
 	"go.uber.org/zap"
 )
@@ -82,6 +83,13 @@ type (
 		Chain(future Future) // Value (or error) of the future become the same of the chained one.
 	}
 
+	// ChildWorkflowFuture represents the result of a child workflow execution
+	ChildWorkflowFuture interface {
+		Future
+		// GetChildWorkflowExecution returns a future that will be ready when child workflow execution started
+		GetChildWorkflowExecution() Future
+	}
+
 	// WorkflowType identifies a workflow type.
 	WorkflowType struct {
 		Name string
@@ -91,6 +99,33 @@ type (
 	WorkflowExecution struct {
 		ID    string
 		RunID string
+	}
+
+	// ChildWorkflowOptions stores all child workflow specific parameters that will be stored inside of a Context.
+	ChildWorkflowOptions struct {
+		// Domain of the child workflow.
+		// optional: the current workflow (parent)'s domain will be used if this is not provided.
+		Domain string
+
+		// WorkflowID of the child workflow to be scheduled.
+		// optional: A random UUID will be generated if this is not provided.
+		WorkflowID string
+
+		// TaskList that the child workflow needs to be scheduled on.
+		// optional: The parent workflow task list will be used if this is not provided.
+		TaskList string
+
+		// ExecutionStartToCloseTimeout - The end to end timeout for the child workflow execution.
+		// Mandatory: no default
+		ExecutionStartToCloseTimeout time.Duration
+
+		// TaskStartToCloseTimeout - The decision task timeout for the child workflow .
+		// Mandatory: oo default.
+		TaskStartToCloseTimeout time.Duration
+
+		// ChildPolicy defines the behavior of child workflow when parent workflow is terminated.
+		// optional: default to use ChildPolicy_TERMINATE if this is not provided
+		ChildPolicy s.ChildPolicy
 	}
 )
 
@@ -222,6 +257,35 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	})
 	return future
 }
+
+// ExecuteChildWorkflow requests child workflow execution in the context of a workflow.
+//  - Context can be used to pass the settings for the child workflow.
+// 	For example: task list that this child workflow should be routed, timeouts that need to be configured.
+//	Use ChildWorkflowOptions to pass down the options.
+//			cwo := ChildWorkflowOptions{
+// 				ExecutionStartToCloseTimeout: 10 * time.Minute,
+// 				TaskStartToCloseTimeout: time.Minute,
+// 			}
+//			ctx1 := WithChildWorkflowOptions(ctx, cwo)
+//  - f - Either a workflow name or a workflow function that is getting scheduled.
+//  - args - The arguments that need to be passed to the child workflow function represented by 'f'.
+//  - If the child workflow failed to complete then the future get error would indicate the failure
+// and it can be one of ErrorWithDetails, TimeoutError, CanceledError.
+//  - You can also cancel the pending child workflow using context(WithCancel(ctx)) and that will fail the workflow with
+// error CanceledError.
+// - returns ChildWorkflowFuture
+func ExecuteChildWorkflow(ctx Context, f interface{}, args ...interface{}) ChildWorkflowFuture {
+	// TODO: to be implemented
+	return nil
+}
+
+// WithChildWorkflowOptions adds all options to the context.
+func WithChildWorkflowOptions(ctx Context, options ChildWorkflowOptions) Context {
+	// TODO: to be implemented
+	return ctx
+}
+
+// TODO: add other With functions for ChildWorkflowOptions
 
 // WorkflowInfo information about currently executing workflow
 type WorkflowInfo struct {

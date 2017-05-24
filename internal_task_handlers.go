@@ -156,6 +156,7 @@ func isDecisionEvent(eventType s.EventType) bool {
 		s.EventType_TimerStarted,
 		s.EventType_TimerCanceled,
 		s.EventType_MarkerRecorded,
+		s.EventType_StartChildWorkflowExecutionInitiated,
 		s.EventType_RequestCancelExternalWorkflowExecutionInitiated:
 		return true
 	default:
@@ -600,6 +601,19 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 		return true
 
+	case s.DecisionType_StartChildWorkflowExecution:
+		if e.GetEventType() != s.EventType_StartChildWorkflowExecutionInitiated {
+			return false
+		}
+		eventAttributes := e.GetStartChildWorkflowExecutionInitiatedEventAttributes()
+		decisionAttributes := d.GetStartChildWorkflowExecutionDecisionAttributes()
+		if eventAttributes.GetDomain() != decisionAttributes.GetDomain() ||
+			eventAttributes.GetTaskList().GetName() != decisionAttributes.GetTaskList().GetName() ||
+			eventAttributes.GetWorkflowType().GetName() != decisionAttributes.GetWorkflowType().GetName() {
+			return false
+		}
+
+		return true
 	}
 
 	return false

@@ -360,7 +360,7 @@ func (b EncodedValue) Get(valuePtr interface{}) error {
 // }
 // On replay the function is not executed, the executed flag is not set to true
 // and the workflow takes a different path breaking the determinism.
-
+//
 // Here is the correct way to use SideEffect:
 //
 // encodedRandom := SideEffect(func(ctx cadence.Context) interface{} {

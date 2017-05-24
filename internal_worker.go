@@ -608,6 +608,10 @@ func (th *hostEnvImpl) decodeArg(data []byte, to interface{}) error {
 	return th.decode(data, []interface{}{to})
 }
 
+func (th *hostEnvImpl) sideEffect(f func(ctx Context) interface{}) EncodedValue {
+	return nil
+}
+
 func isTypeByteSlice(inType reflect.Type) bool {
 	r := reflect.TypeOf(([]byte)(nil))
 	return inType == r || inType == reflect.PtrTo(r)

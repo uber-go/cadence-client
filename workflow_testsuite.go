@@ -290,7 +290,7 @@ func (t *TestWorkflowEnvironment) SignalWorkflow(name string, input interface{})
 	if err != nil {
 		panic(err)
 	}
-	t.impl.signalCancelHandler(name, data)
+	t.impl.signalHandler(name, data)
 }
 
 // RegisterDelayedCallback creates a new timer with specified delayDuration using workflow clock (not wall clock). When

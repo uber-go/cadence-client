@@ -296,7 +296,8 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 	if wc.isReplay {
 		result, ok := wc.sideEffectResult[sideEffectID]
 		if !ok {
-			panic("No cached result found for side effect")
+			panic(fmt.Sprintf("No cached result found for side effectID=%v. KnownSideEffects=%v",
+				sideEffectID, wc.sideEffectResult))
 		}
 		wc.logger.Debug("SideEffect returning already caclulated result.",
 			zap.Int32(tagSideEffectID, sideEffectID))

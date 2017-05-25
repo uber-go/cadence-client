@@ -412,3 +412,31 @@ func testActivityHeartbeat(ctx context.Context, msg string, waitTime time.Durati
 
 	return "heartbeat_" + msg, nil
 }
+
+func (s *WorkflowTestSuiteUnitTest) Test_SideEffect() {
+	value := 12345
+	workflowFn := func(ctx Context) error {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+		se := SideEffect(ctx, func(ctx Context) interface{} {
+			return value
+		})
+		var v int
+		if err := se.Get(&v); err != nil {
+			return err
+		}
+		if v == value {
+			f := ExecuteActivity(ctx, testActivityHeartbeat, "msg1", time.Second*10)
+			err := f.Get(ctx, nil) // wait for result
+			return err
+		} else {
+			return errors.New("unexpected")
+		}
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+}

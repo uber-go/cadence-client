@@ -103,7 +103,7 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 		currentIndex:      0,
 		historyEventsSize: len(task.task.History.Events),
 	}
-	result.next = result.nextDecisionEvents()
+	result.next, _ = result.nextDecisionEvents()
 	return result
 }
 
@@ -174,19 +174,20 @@ func isDecisionEvent(eventType s.EventType) bool {
 // To maintain determinism the concurrent decisions are moved to the one after the decisions made by current decision.
 func (eh *history) NextDecisionEvents() []*s.HistoryEvent {
 	result := eh.next
+	var markers []*s.HistoryEvent
 	if len(result) > 0 {
-		eh.next = eh.nextDecisionEvents()
+		eh.next, markers = eh.nextDecisionEvents()
 	}
-	return result
+	// Prepend markers from the current decision to make sure that call to SideEffect is non blocking.
+	return append(markers, result...)
 }
 
-func (eh *history) nextDecisionEvents() []*s.HistoryEvent {
+func (eh *history) nextDecisionEvents() (reorderedEvents []*s.HistoryEvent, markers []*s.HistoryEvent) {
 	if eh.currentIndex == eh.historyEventsSize {
-		return []*s.HistoryEvent{}
+		return []*s.HistoryEvent{}, []*s.HistoryEvent{}
 	}
 
 	// Process events
-	reorderedEvents := []*s.HistoryEvent{}
 	history := eh.workflowTask.task.History
 
 	decisionStartToCompletionEvents := []*s.HistoryEvent{}
@@ -214,7 +215,8 @@ OrderEvents:
 
 		case s.EventType_DecisionTaskScheduled, s.EventType_DecisionTaskTimedOut:
 		// Skip
-
+		case s.EventType_MarkerRecorded:
+			markers = append(markers, event)
 		default:
 			if concurrentToDecision {
 				decisionStartToCompletionEvents = append(decisionStartToCompletionEvents, event)
@@ -245,7 +247,7 @@ OrderEvents:
 	if decisionStartedEvent != nil {
 		reorderedEvents = append(reorderedEvents, decisionStartedEvent)
 	}
-	return reorderedEvents
+	return reorderedEvents, markers
 }
 
 // newWorkflowTaskHandler returns an implementation of workflow task handler.

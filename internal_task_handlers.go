@@ -172,6 +172,8 @@ func isDecisionEvent(eventType s.EventType) bool {
 // B_Complete happened concurrent to execution of the decision(2), where C_Schedule is a result made
 // by execution of decision(2).
 // To maintain determinism the concurrent decisions are moved to the one after the decisions made by current decision.
+// markers result value returns marker events that currently running decision produced. They are used to
+// implement SideEffect method execution without blocking on decision roundtrip.
 func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent) {
 	result = eh.next
 	if len(result) > 0 {

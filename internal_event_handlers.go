@@ -146,11 +146,11 @@ func (wc *workflowEnvironmentImpl) RequestCancelWorkflow(domainName, workflowID,
 	return nil
 }
 
-func (wc *workflowEnvironmentImpl) RegisterCancel(handler func()) {
+func (wc *workflowEnvironmentImpl) RegisterCancelHandler(handler func()) {
 	wc.cancelHandler = handler
 }
 
-func (wc *workflowEnvironmentImpl) RegisterSignal(handler func(name string, input []byte)) {
+func (wc *workflowEnvironmentImpl) RegisterSignalHandler(handler func(name string, input []byte)) {
 	wc.signalHandler = handler
 }
 

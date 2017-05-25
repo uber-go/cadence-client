@@ -66,7 +66,7 @@ func TestNonbufferedChannel(t *testing.T) {
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
 			var v string
-			more := c1.ReceiveWithMoreFlag(ctx, &v)
+			more := c1.Receive(ctx, &v)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("child-end-%v", v))
 		})
@@ -97,20 +97,20 @@ func TestNonbufferedChannelBlockedReceive(t *testing.T) {
 		c2 = NewChannel(ctx)
 		Go(ctx, func(ctx Context) {
 			var v string
-			more := c1.ReceiveWithMoreFlag(ctx, &v)
+			more := c1.Receive(ctx, &v)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("child1-end1-%v", v))
-			more = c1.ReceiveWithMoreFlag(ctx, &v)
+			more = c1.Receive(ctx, &v)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("child1-end2-%v", v))
 		})
 		Go(ctx, func(ctx Context) {
 			var v string
 			history = append(history, "child2-start")
-			more := c2.ReceiveWithMoreFlag(ctx, &v)
+			more := c2.Receive(ctx, &v)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("child2-end1-%v", v))
-			more = c2.ReceiveWithMoreFlag(ctx, &v)
+			more = c2.Receive(ctx, &v)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("child2-end2-%v", v))
 		})
@@ -138,7 +138,7 @@ func TestBufferedChannelPut(t *testing.T) {
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
 			var v1, v2 string
-			more := c1.ReceiveWithMoreFlag(ctx, &v1)
+			more := c1.Receive(ctx, &v1)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("child-end-%v", v1))
 			c1.Receive(ctx, &v2)
@@ -177,7 +177,7 @@ func TestBufferedChannelGet(t *testing.T) {
 			c2.Send(ctx, "bar1")
 			history = append(history, "child1-get")
 			var v1 string
-			more := c1.ReceiveWithMoreFlag(ctx, &v1)
+			more := c1.Receive(ctx, &v1)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("child1-end-%v", v1))
 
@@ -187,7 +187,7 @@ func TestBufferedChannelGet(t *testing.T) {
 			c2.Send(ctx, "bar2")
 			history = append(history, "child2-get")
 			var v1 string
-			more := c1.ReceiveWithMoreFlag(ctx, &v1)
+			more := c1.Receive(ctx, &v1)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("child2-end-%v", v1))
 		})
@@ -228,13 +228,13 @@ func TestNotBlockingSelect(t *testing.T) {
 		c2 := NewBufferedChannel(ctx, 1)
 		s := NewSelector(ctx)
 		s.
-			AddReceiveWithMoreFlag(c1, func(c Channel, more bool) {
+			AddReceive(c1, func(c Channel, more bool) {
 				assert.True(t, more)
 				var v string
 				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c1-%v", v))
 			}).
-			AddReceiveWithMoreFlag(c2, func(c Channel, more bool) {
+			AddReceive(c2, func(c Channel, more bool) {
 				assert.True(t, more)
 				var v string
 				c.Receive(ctx, &v)
@@ -277,13 +277,13 @@ func TestBlockingSelect(t *testing.T) {
 
 		s := NewSelector(ctx)
 		s.
-			AddReceiveWithMoreFlag(c1, func(c Channel, more bool) {
+			AddReceive(c1, func(c Channel, more bool) {
 				assert.True(t, more)
 				var v string
 				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c1-%v", v))
 			}).
-			AddReceive(c2, func(c Channel) {
+			AddReceive(c2, func(c Channel, more bool) {
 				var v string
 				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c2-%v", v))
@@ -318,7 +318,7 @@ func TestBlockingSelectAsyncSend(t *testing.T) {
 		c1 := NewChannel(ctx)
 		s := NewSelector(ctx)
 		s.
-			AddReceiveWithMoreFlag(c1, func(c Channel, more bool) {
+			AddReceive(c1, func(c Channel, more bool) {
 				assert.True(t, more)
 				var v int
 				c.Receive(ctx, &v)
@@ -361,10 +361,10 @@ func TestSendSelect(t *testing.T) {
 		Go(ctx, func(ctx Context) {
 			history = append(history, "receiver")
 			var v string
-			more := c2.ReceiveWithMoreFlag(ctx, &v)
+			more := c2.Receive(ctx, &v)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("c2-%v", v))
-			more = c1.ReceiveWithMoreFlag(ctx, &v)
+			more = c1.Receive(ctx, &v)
 
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("c1-%v", v))
@@ -406,7 +406,7 @@ func TestSendSelectWithAsyncReceive(t *testing.T) {
 			assert.True(t, ok)
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("c2-%v", v))
-			more = c1.ReceiveWithMoreFlag(ctx, &v)
+			more = c1.Receive(ctx, &v)
 
 			assert.True(t, more)
 			history = append(history, fmt.Sprintf("c1-%v", v))
@@ -445,7 +445,7 @@ func TestChannelClose(t *testing.T) {
 		GoNamed(ctx, "receiver", func(ctx Context) {
 			for {
 				var j int
-				more := jobs.ReceiveWithMoreFlag(ctx, &j)
+				more := jobs.Receive(ctx, &j)
 				if more {
 					history = append(history, fmt.Sprintf("received job %v", j))
 				} else {
@@ -544,8 +544,8 @@ func TestDispatchClose(t *testing.T) {
 	d.ExecuteUntilAllBlocked()
 	require.False(t, d.IsDone())
 	stack := d.StackTrace()
-	// 11 coroutines (5 lines each) + 10 nl
-	require.EqualValues(t, 11*5+10, len(strings.Split(stack, "\n")), stack)
+	// 11 coroutines (3 lines each) + 10 nl
+	require.EqualValues(t, 11*3+10, len(strings.Split(stack, "\n")), stack)
 	require.Contains(t, stack, "coroutine 1 [blocked on forever_blocked.Receive]:")
 	for i := 0; i < 10; i++ {
 		require.Contains(t, stack, fmt.Sprintf("coroutine c-%v [blocked on forever_blocked.Receive]:", i))

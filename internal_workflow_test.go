@@ -125,7 +125,7 @@ func splitJoinActivityWorkflow(ctx Context, testPanic bool) (result string, err 
 	c1.Receive(ctx, nil)
 	// Use selector to test it
 	selected := false
-	NewSelector(ctx).AddReceiveWithMoreFlag(c2, func(c Channel, more bool) {
+	NewSelector(ctx).AddReceive(c2, func(c Channel, more bool) {
 		if !more {
 			panic("more should be true")
 		}
@@ -440,22 +440,18 @@ func signalWorkflowTest(ctx Context) ([]byte, error) {
 	// Read on a selector.
 	ch2 := GetSignalChannel(ctx, "testSig2")
 	s := NewSelector(ctx)
-	s.AddReceive(ch2, func(c Channel) {
+	s.AddReceive(ch2, func(c Channel, more bool) {
 		c.Receive(ctx, &v)
 		result += v
 	})
 	s.Select(ctx)
 	s.Select(ctx)
-	s.AddReceiveWithMoreFlag(ch2, func(c Channel, more bool) {
-		c.Receive(ctx, &v)
-		result += v
-	})
 	s.Select(ctx)
 
 	// Read on a selector inside the callback, multiple times.
 	ch2 = GetSignalChannel(ctx, "testSig2")
 	s = NewSelector(ctx)
-	s.AddReceive(ch2, func(c Channel) {
+	s.AddReceive(ch2, func(c Channel, more bool) {
 		for i := 0; i < 4; i++ {
 			c.Receive(ctx, &v)
 			result += v

@@ -106,9 +106,8 @@ type (
 
 	// Single case statement of the Select
 	selectCase struct {
-		channel                 *channelImpl                // Channel of this case.
-		receiveFunc             *func(c Channel)            // function to call when channel has a message. nil for send case.
-		receiveWithMoreFlagFunc *func(c Channel, more bool) // function to call when channel has a message. nil for send case.
+		channel     *channelImpl                // Channel of this case.
+		receiveFunc *func(c Channel, more bool) // function to call when channel has a message. nil for send case.
 
 		sendFunc   *func()         // function to call when channel accepted a message. nil for receive case.
 		sendValue  *interface{}    // value to send to the channel. Used only for send case.
@@ -195,7 +194,7 @@ func getWorkflowEnvironment(ctx Context) workflowEnvironment {
 }
 
 func (f *futureImpl) Get(ctx Context, value interface{}) error {
-	more := f.channel.ReceiveWithMoreFlag(ctx, nil)
+	more := f.channel.Receive(ctx, nil)
 	if more {
 		panic("not closed")
 	}
@@ -419,11 +418,7 @@ func getState(ctx Context) *coroutineState {
 	return s.(*coroutineState)
 }
 
-func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) {
-	c.ReceiveWithMoreFlag(ctx, valuePtr)
-}
-
-func (c *channelImpl) ReceiveWithMoreFlag(ctx Context, valuePtr interface{}) (more bool) {
+func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 	state := getState(ctx)
 	hasResult := false
 	var result interface{}
@@ -788,13 +783,8 @@ func (d *dispatcherImpl) StackTrace() string {
 	return result
 }
 
-func (s *selectorImpl) AddReceive(c Channel, f func(c Channel)) Selector {
+func (s *selectorImpl) AddReceive(c Channel, f func(c Channel, more bool)) Selector {
 	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveFunc: &f})
-	return s
-}
-
-func (s *selectorImpl) AddReceiveWithMoreFlag(c Channel, f func(c Channel, more bool)) Selector {
-	s.cases = append(s.cases, &selectCase{channel: c.(*channelImpl), receiveWithMoreFlagFunc: &f})
 	return s
 }
 
@@ -822,26 +812,6 @@ func (s *selectorImpl) Select(ctx Context) {
 	for _, pair := range s.cases {
 		if pair.receiveFunc != nil {
 			f := *pair.receiveFunc
-			c := pair.channel
-			callback := func(v interface{}, more bool) bool {
-				if readyBranch != nil {
-					return false
-				}
-				readyBranch = func() {
-					c.recValue = &v
-					f(c)
-				}
-				return true
-			}
-
-			v, ok, more := pair.channel.receiveAsyncImpl(callback)
-			if ok || !more {
-				c.recValue = &v
-				f(c)
-				return
-			}
-		} else if pair.receiveWithMoreFlagFunc != nil {
-			f := *pair.receiveWithMoreFlagFunc
 			c := pair.channel
 			callback := func(v interface{}, more bool) bool {
 				if readyBranch != nil {
@@ -1004,7 +974,7 @@ type decodeFutureImpl struct {
 }
 
 func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
-	more := d.futureImpl.channel.ReceiveWithMoreFlag(ctx, nil)
+	more := d.futureImpl.channel.Receive(ctx, nil)
 	if more {
 		panic("not closed")
 	}

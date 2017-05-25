@@ -42,8 +42,7 @@ type (
 		// Example:
 		//   var v string
 		//   c.Receive(ctx, &v)
-		Receive(ctx Context, valuePtr interface{})
-		ReceiveWithMoreFlag(ctx Context, valuePtr interface{}) (more bool)  // more is false when channel is closed
+		Receive(ctx Context, valuePtr interface{}) (more bool)              // more is false when channel is closed
 		ReceiveAsync(valuePtr interface{}) (ok bool)                        // ok is true when value was returned
 		ReceiveAsyncWithMoreFlag(valuePtr interface{}) (ok bool, more bool) // ok is true when value was returned, more is false when channel is closed
 		Send(ctx Context, v interface{})
@@ -54,8 +53,7 @@ type (
 	// Selector must be used instead of native go select by workflow code
 	// Use Context.NewSelector method to create an instance.
 	Selector interface {
-		AddReceive(c Channel, f func(c Channel)) Selector
-		AddReceiveWithMoreFlag(c Channel, f func(c Channel, more bool)) Selector
+		AddReceive(c Channel, f func(c Channel, more bool)) Selector
 		AddSend(c Channel, v interface{}, f func()) Selector
 		AddFuture(future Future, f func(f Future)) Selector
 		AddDefault(f func())

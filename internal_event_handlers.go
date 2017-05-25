@@ -68,7 +68,6 @@ type (
 		logger                         *zap.Logger
 		isReplay                       bool // flag to indicate if workflow is in replay mode
 		enableLoggingInReplay          bool // flag to indicate if workflow should enable logging in replay mode
-		isWorkflowCancelRequested      bool // if the workflow cancel is requested.
 	}
 
 	// wrapper around zapcore.Core that will be aware of replay
@@ -616,7 +615,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleTimerFired(
 func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionCancelRequested(
 	attributes *m.WorkflowExecutionCancelRequestedEventAttributes) {
 	weh.cancelHandler()
-	weh.isWorkflowCancelRequested = true
 }
 
 // Currently handles only side effect markers

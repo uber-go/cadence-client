@@ -35,6 +35,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	defaultSignalChannelSize = 100000 // really large buffering size(100K)
+)
+
 type (
 	syncWorkflowDefinition struct {
 		workflow        workflow
@@ -96,8 +100,8 @@ type (
 		buffer          []interface{}       // buffered messages
 		blockedSends    []valueCallbackPair // puts waiting when buffer is full.
 		blockedReceives []receiveCallback   // receives waiting when no messages are available.
-		closed          bool                // true if channel is closed
-		recValue        *interface{}        // Used only while receiving value.
+		closed          bool                // true if channel is closed.
+		recValue        *interface{}        // Used only while receiving value, this is used as pre-fetch buffer value from the channel.
 	}
 
 	// Single case statement of the Select
@@ -305,28 +309,32 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	d.dispatcher = newDispatcher(d.rootCtx, func(ctx Context) {
 		d.rootCtx, d.cancel = WithCancel(ctx)
 		r := &workflowResult{}
+
+		// We want to execute the user workflow definition from the first decision task started,
+		// so they can see everything before that. Here we would have all initialization done, hence
+		// we are yielding.
+		state := getState(d.rootCtx)
+		state.yield("yield before executing to setup state")
+
 		r.workflowResult, r.error = d.workflow.Execute(d.rootCtx, input)
 		rpp := getWorkflowResultPointerPointer(ctx)
 		*rpp = r
 	})
 
-	getWorkflowEnvironment(d.rootCtx).RegisterCancel(func() {
+	getWorkflowEnvironment(d.rootCtx).RegisterCancelHandler(func() {
 		// It is ok to call this method multiple times.
 		// it doesn't do anything new, the context remains cancelled.
 		d.cancel()
 	})
 
-	getWorkflowEnvironment(d.rootCtx).RegisterSignal(func(name string, result []byte) {
+	getWorkflowEnvironment(d.rootCtx).RegisterSignalHandler(func(name string, result []byte) {
 		eo := getWorkflowEnvOptions(d.rootCtx)
 		// We don't want this code to be blocked ever, using sendAsync().
 		ch := eo.getSignalChannel(d.rootCtx, name).(*channelImpl)
-		callback := &valueCallbackPair{
-			value: result,
-			callback: func() bool {
-				return true
-			},
+		ok := ch.SendAsync(result)
+		if !ok {
+			panic(fmt.Sprintf("Exceeded channel buffer size for signal: %v", name))
 		}
-		ch.sendAsyncImpl(result, callback)
 	})
 
 	// There is a inter dependency, before we call Execute() we can have a cancel request since
@@ -395,7 +403,6 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 		// Result is not set, so workflow is still executing
 		return
 	}
-	// Cannot cast nil values from interface{} to interface
 	checkUnhandledSigFn(ctx)
 	getWorkflowEnvironment(ctx).Complete(rp.workflowResult, rp.error)
 }
@@ -971,7 +978,7 @@ func (w *wfEnvironmentOptions) getSignalChannel(ctx Context, signalName string) 
 	if ch, ok := w.signalChannels[signalName]; ok {
 		return ch
 	}
-	ch := NewChannel(ctx)
+	ch := NewBufferedChannel(ctx, defaultSignalChannelSize)
 	w.signalChannels[signalName] = ch
 	return ch
 }

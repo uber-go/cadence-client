@@ -294,39 +294,43 @@ func (wc *workflowEnvironmentImpl) addPostEventHooks(hook func()) {
 
 func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback resultHandler) {
 	sideEffectID := wc.GenerateSequence()
+	var details []byte
+	var result []byte
 	if wc.isReplay {
-		result, ok := wc.sideEffectResult[sideEffectID]
+		var ok bool
+		result, ok = wc.sideEffectResult[sideEffectID]
 		if !ok {
 			panic(fmt.Sprintf("No cached result found for side effectID=%v. KnownSideEffects=%v",
 				sideEffectID, wc.sideEffectResult))
 		}
 		wc.logger.Debug("SideEffect returning already caclulated result.",
 			zap.Int32(tagSideEffectID, sideEffectID))
+		details = result
+	} else {
+		var err error
+		result, err = f()
+		if err != nil {
+			callback(result, err)
+			return
+		}
+		var buf bytes.Buffer
+		enc := gob.NewEncoder(&buf)
+		if err := enc.Encode(sideEffectID); err != nil {
+			callback(nil, fmt.Errorf("failure encoding sideEffectID: %v", err))
+			return
+		}
+		if err := enc.Encode(result); err != nil {
+			callback(nil, fmt.Errorf("failure encoding side effect result: %v", err))
+			return
+		}
+		details = buf.Bytes()
 		callback(result, nil)
-		return
 	}
-
-	result, err := f()
-	if err != nil {
-		callback(result, err)
-		return
-	}
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(sideEffectID); err != nil {
-		callback(nil, fmt.Errorf("failure encoding sideEffectID: %v", err))
-		return
-	}
-	if err := enc.Encode(result); err != nil {
-		callback(nil, fmt.Errorf("failure encoding side effect result: %v", err))
-		return
-	}
-
+	// Generate decision in replay as well to keep determinism checker happy
 	recordMarker := &m.RecordMarkerDecisionAttributes{
 		MarkerName: common.StringPtr(sideEffectMarkerName),
-		Details:    buf.Bytes(),
+		Details:    details, // Keep
 	}
-
 	decision := wc.CreateNewDecision(m.DecisionType_RecordMarker)
 	decision.RecordMarkerDecisionAttributes = recordMarker
 	wc.executeDecisions = append(wc.executeDecisions, decision)

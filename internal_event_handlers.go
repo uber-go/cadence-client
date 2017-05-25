@@ -324,7 +324,6 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 			return
 		}
 		details = buf.Bytes()
-		callback(result, nil)
 	}
 	// Generate decision in replay as well to keep determinism checker happy
 	recordMarker := &m.RecordMarkerDecisionAttributes{

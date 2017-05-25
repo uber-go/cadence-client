@@ -23,6 +23,7 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -31,7 +32,6 @@ import (
 	"time"
 	"unicode"
 
-	"errors"
 	"go.uber.org/zap"
 )
 

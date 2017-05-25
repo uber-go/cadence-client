@@ -74,7 +74,7 @@ const (
 	DecisionsExecutionLatency       = "decisions-execution-latency"
 	ActivityResponseLatency         = "activities-response-latency"
 	DecisionsResponseLatency        = "decisions-response-latency"
-	UnHandledSignalsTotalCounter    = "unhandled-signals-total"
+	UnhandledSignalsTotalCounter    = "unhandled-signals-total"
 )
 
 // ServiceMetrics are types for common service base metrics

@@ -427,7 +427,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_SideEffect() {
 		if v != value {
 			return errors.New("unexpected")
 		}
-		f := ExecuteActivity(ctx, testActivityHeartbeat, "msg1", time.Second*10)
+		f := ExecuteActivity(ctx, testActivityHello, "msg1")
 		err := f.Get(ctx, nil) // wait for result
 		return err
 	}

@@ -293,16 +293,18 @@ func (wc *workflowEnvironmentImpl) addPostEventHooks(hook func()) {
 
 func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback resultHandler) {
 	sideEffectID := wc.GenerateSequence()
-	result, ok := wc.sideEffectResult[sideEffectID]
-	if ok {
+	if wc.isReplay {
+		result, ok := wc.sideEffectResult[sideEffectID]
+		if !ok {
+			panic("No cached result found for side effect")
+		}
 		wc.logger.Debug("SideEffect returning already caclulated result.",
 			zap.Int32(tagSideEffectID, sideEffectID))
 		callback(result, nil)
 		return
 	}
 
-	var err error
-	result, err = f()
+	result, err := f()
 	if err != nil {
 		callback(result, err)
 		return

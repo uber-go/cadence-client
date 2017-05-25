@@ -327,6 +327,7 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 	decision.RecordMarkerDecisionAttributes = recordMarker
 	wc.executeDecisions = append(wc.executeDecisions, decision)
 
+	callback(result, nil)
 	wc.logger.Debug("SideEffect Marker added", zap.Int32(tagSideEffectID, sideEffectID))
 }
 

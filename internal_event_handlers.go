@@ -300,8 +300,12 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 		var ok bool
 		result, ok = wc.sideEffectResult[sideEffectID]
 		if !ok {
+			keys := make([]int32, 0, len(wc.sideEffectResult))
+			for k := range wc.sideEffectResult {
+				keys = append(keys, k)
+			}
 			panic(fmt.Sprintf("No cached result found for side effectID=%v. KnownSideEffects=%v",
-				sideEffectID, wc.sideEffectResult))
+				sideEffectID, keys))
 		}
 		wc.logger.Debug("SideEffect returning already caclulated result.",
 			zap.Int32(tagSideEffectID, sideEffectID))
@@ -325,7 +329,6 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 		}
 		details = buf.Bytes()
 	}
-	// Generate decision in replay as well to keep determinism checker happy
 	recordMarker := &m.RecordMarkerDecisionAttributes{
 		MarkerName: common.StringPtr(sideEffectMarkerName),
 		Details:    details, // Keep
@@ -633,7 +636,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleMarkerRecorded(
 	}
 	var result []byte
 	if err := dec.Decode(&result); err != nil {
-		return fmt.Errorf("failure decodeing side effect result: %v", err)
+		return fmt.Errorf("failure decoding side effect result: %v", err)
 	}
 	weh.sideEffectResult[sideEffectID] = result
 	return nil

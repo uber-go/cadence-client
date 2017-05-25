@@ -844,7 +844,7 @@ func (env *testWorkflowEnvironmentImpl) getActivityInfo(activityID, activityType
 }
 
 func (env *testWorkflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback resultHandler) {
-	panic("not implemented yet")
+	callback(f())
 }
 
 // make sure interface is implemented

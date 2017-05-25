@@ -205,6 +205,33 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 	if response == nil || len(response.GetTaskToken()) == 0 {
 		return &workflowTask{}, nil
 	}
+
+	events := response.GetHistory().GetEvents()
+	nextPageToken := response.GetNextPageToken()
+	execution := response.GetWorkflowExecution()
+	for nextPageToken != nil {
+		var resp *s.GetWorkflowExecutionHistoryResponse
+		err = backoff.Retry(
+			func() error {
+				ctx, cancel := newTChannelContext()
+				defer cancel()
+
+				var err1 error
+				resp, err1 = wtp.service.GetWorkflowExecutionHistory(ctx, &s.GetWorkflowExecutionHistoryRequest{
+					Domain:        common.StringPtr(wtp.domain),
+					Execution:     execution,
+					NextPageToken: nextPageToken,
+				})
+				return err1
+			}, serviceOperationRetryPolicy, isServiceTransientError)
+		if err != nil {
+			return nil, err
+		}
+		nextPageToken = resp.GetNextPageToken()
+		events = append(events, resp.GetHistory().GetEvents()...)
+		response.GetHistory().Events = events
+	}
+
 	return &workflowTask{task: response}, nil
 }
 

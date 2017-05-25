@@ -92,16 +92,19 @@ type (
 		eventsHandler     *workflowExecutionEventHandlerImpl
 		currentIndex      int
 		historyEventsSize int
+		next              []*s.HistoryEvent
 	}
 )
 
 func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandlerImpl) *history {
-	return &history{
+	result := &history{
 		workflowTask:      task,
 		eventsHandler:     eventsHandler,
 		currentIndex:      0,
 		historyEventsSize: len(task.task.History.Events),
 	}
+	result.next = result.nextDecisionEvents()
+	return result
 }
 
 // Get workflow start attributes.
@@ -170,6 +173,14 @@ func isDecisionEvent(eventType s.EventType) bool {
 // by execution of decision(2).
 // To maintain determinism the concurrent decisions are moved to the one after the decisions made by current decision.
 func (eh *history) NextDecisionEvents() []*s.HistoryEvent {
+	result := eh.next
+	if len(result) > 0 {
+		eh.next = eh.nextDecisionEvents()
+	}
+	return result
+}
+
+func (eh *history) nextDecisionEvents() []*s.HistoryEvent {
 	if eh.currentIndex == eh.historyEventsSize {
 		return []*s.HistoryEvent{}
 	}

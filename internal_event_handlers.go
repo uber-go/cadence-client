@@ -109,6 +109,7 @@ func newWorkflowExecutionEventHandler(workflowInfo *WorkflowInfo, workflowDefini
 		scheduledEventIDToActivityID:   make(map[int64]string),
 		scheduledTimers:                make(map[string]resultHandler),
 		executeDecisions:               make([]*m.Decision, 0),
+		sideEffectResult:               make(map[int32][]byte),
 		completeHandler:                completeHandler,
 		postEventHooks:                 []func(){},
 		enableLoggingInReplay:          enableLoggingInReplay,

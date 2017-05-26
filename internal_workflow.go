@@ -1012,3 +1012,11 @@ func decodeAndAssignValue(from interface{}, toValuePtr interface{}) error {
 	}
 	return nil
 }
+
+// newDecodeFuture creates a new future as well as associated Settable that is used to set its value.
+// fn - the decoded value needs to be validated against a function.
+func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
+	impl := &decodeFutureImpl{
+		&futureImpl{channel: NewChannel(ctx).(*channelImpl)}, fn}
+	return impl, impl
+}

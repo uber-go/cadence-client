@@ -206,10 +206,8 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 		return &workflowTask{}, nil
 	}
 
-	events := response.GetHistory().GetEvents()
-	nextPageToken := response.GetNextPageToken()
 	execution := response.GetWorkflowExecution()
-	for nextPageToken != nil {
+	iterator := func(nextPageToken []byte) (*s.History, []byte, error) {
 		var resp *s.GetWorkflowExecutionHistoryResponse
 		err = backoff.Retry(
 			func() error {
@@ -225,14 +223,13 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 				return err1
 			}, serviceOperationRetryPolicy, isServiceTransientError)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		nextPageToken = resp.GetNextPageToken()
-		events = append(events, resp.GetHistory().GetEvents()...)
-		response.GetHistory().Events = events
+		return resp.GetHistory(), resp.GetNextPageToken(), nil
 	}
 
-	return &workflowTask{task: response}, nil
+	task := &workflowTask{task: response, iterator: iterator}
+	return task, nil
 }
 
 func newActivityTaskPoller(taskHandler ActivityTaskHandler, service m.TChanWorkflowService,

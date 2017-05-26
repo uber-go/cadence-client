@@ -181,7 +181,18 @@ func isDecisionEvent(eventType s.EventType) bool {
 // markers result value returns marker events that currently running decision produced. They are used to
 // implement SideEffect method execution without blocking on decision roundtrip.
 func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
-	return eh.nextDecisionEvents()
+	if eh.next == nil {
+		eh.next, _, err = eh.nextDecisionEvents()
+		if err != nil {
+			return result, markers, err
+		}
+	}
+
+	result = eh.next
+	if len(result) > 0 {
+		eh.next, markers, err = eh.nextDecisionEvents()
+	}
+	return result, markers, err
 }
 
 func (eh *history) nextDecisionEvents() (reorderedEvents []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {

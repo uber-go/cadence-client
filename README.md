@@ -1,7 +1,7 @@
 # Go framework for Cadence
 [Cadence](https://github.com/uber/cadence) is a distributed, scalable, durable, and highly available orchestration engine we developed at Uber Engineering to execute asynchronous long-running business logic in a scalable and resilient way.
 
-`cadence-client` is the framework for autoring workflows and activites.
+`cadence-client` is the framework for authoring workflows and activites.
 
 ## How to use
 
@@ -19,11 +19,11 @@ go get go.uber.org/cadence
 
 ### Activity
 
-The activity is the implementation of a particular task in the business logic. 
+Activity is the implementation of a particular task in the business logic. 
 
-Activities are implemented as functions. Data can be passed directly to an activity via function parameters. The parameters can be either basic types or srtucts, with the only requirement being that the parameters need to be serializable. Even though it is not required, we recommand that the first parameter of an activity function is of type `context.Context`, in order to allow the activity to interact with other framework methods. The function must return an `error` value, and can optional return a result value. The result value can be either a basic type or a stuct with the only requirement being that the it is serializable.
+Activities are implemented as functions. Data can be passed directly to an activity via function parameters. The parameters can be either basic types or structs, with the only requirement being that the parameters need to be serializable. Even though it is not required, we recommand that the first parameter of an activity function is of type `context.Context`, in order to allow the activity to interact with other framework methods. The function must return an `error` value, and can optionally return a result value. The result value can be either a basic type or a struct with the only requirement being that the it is serializable.
 
-It is strongly recommended that the data passed to activities through invocation parameters or the data returned by activities to the function's return value be relatively small. Other than that no additional limitations exist on activity implementations.
+The values passed to activities through invocation parameters or returned throughthe result value is recorded in the execution history. The entire execution history is transfered from the Cadence service to workflow workers with every event that the workflow logic needs to process. A large execution history can thus adversily impact the performance of your workflow. Therefore be mindful of the amount of data you transfer via activity invocation parameters or return values. Other than that no additional limitations exist on activity implementations.
 
 In order to make the activity visible to the worker process hosting it, the activity needs to be registered via a call to `cadence.RegisterActivity`.
 
@@ -51,14 +51,14 @@ func SimpleActivity(ctx context.Context, value string) (string, error) {
 
 ### Workflow
 
-The workflow is the implementation of the coordination logic. Its sole purpose is to orchestrate activity executions.
+Workflow is the implementation of coordination logic. Its sole purpose is to orchestrate activity executions.
 
-Workflows are implemented as functions. Startup data can be passed to a workflow via function parameters. The parameters can be either basic types or srtucts, with the only requirement being that the parameters need to be serializable. The first parameter of a workflow function is of type `cadence.Context`. The function must return an **error** value, and can optional return a result value. The result value can be either a basic type or a stuct with the only requirement being that the it is serializable.
+Workflows are implemented as functions. Startup data can be passed to a workflow via function parameters. The parameters can be either basic types or structs, with the only requirement being that the parameters need to be serializable. The first parameter of a workflow function is of type `cadence.Context`. The function must return an **error** value, and can optional return a result value. The result value can be either a basic type or a struct with the only requirement being that the it is serializable.
 
-Workflow functions need to execute deterministically and be idempotent. Therefore, here is a list of rules that workflow code should obey to be a good Cadence citizen:
+Workflow functions need to execute deterministically. Therefore, here is a list of rules that workflow code should obey to be a good Cadence citizen:
 * Use `cadence.Context` everywhere.
 * Don’t use range over `map`.
-* Don’t call any non deterministic functions like `rand`.
+* Use `cadence.SideEffect` to call rand and similar nondeterministic functions like UUID generator.
 * Use `cadence.Now` to get current time. Use `cadence.NewTimer` or `cadence.Sleep` instead of standard Go functions.
 * Don’t use native channel and select. Use `cadence.Channel` and `cadence.Selector`.
 * Don’t use go func(...). Use `cadence.Go(func(...))`.
@@ -67,9 +67,9 @@ Workflow functions need to execute deterministically and be idempotent. Therefor
 * Don’t use any synchronization primitives as they can cause blockage and there is no possibility of races when running under dispatcher.
 * Don’t change workflow code when there are open workflows using it. Cadence is going to provide versioning mechanism to deal with deploying code changes without breaking existing workflows.
 * Don’t perform any IO or service calls as they are not usually deterministic. Use activities for that.
-* Don’t access configuration APIs directly from workflow as change in configuration affects workflow execution path. The workaround is to pass configuration as workflow input or return it from an activity.
+* Don’t access configuration APIs directly from workflow as change in configuration affects workflow execution path. Either return configuration from an activity or use `cadence.SideEffect` to load it.
 
-In order to make the activity visible to the worker process hosting it, the activity needs to be registered via a call to **cadence.RegisterActivity**.
+In order to make the workflow visible to the worker process hosting it, the workflow needs to be registered via a call to **cadence.RegisterWorkflow**.
 
 ```go
 package simple
@@ -78,7 +78,7 @@ import (
 	"time"
 
 	"go.uber.org/cadence"
-    "go.uber.org/zap"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -102,7 +102,7 @@ func SimpleWorkflow(ctx cadence.Context, value string) error {
 	cadence.GetLogger(ctx).Info(
 		"SimpleActivity returned successfully!", zap.String("Result", result))
 
-    cadence.GetLogger(ctx).Info("SimpleWorkflow completed!")
+	cadence.GetLogger(ctx).Info("SimpleWorkflow completed!")
 	return nil
 }
 ```

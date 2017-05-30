@@ -439,3 +439,89 @@ func (s *WorkflowTestSuiteUnitTest) Test_SideEffect() {
 	s.True(env.IsWorkflowCompleted())
 	s.Nil(env.GetWorkflowError())
 }
+
+const Component = "workflow"
+const (
+	Version1 = iota + 10
+	Version2
+	Version3
+)
+
+const CurrentVersion = Version3
+
+func oldActivity(ctx context.Context, msg string) (string, error) {
+	return "hello" + "_" + msg, nil
+}
+
+func newActivity(ctx context.Context, msg string) (string, error) {
+	return "hello" + "_" + msg, nil
+}
+
+func newActivity2(ctx context.Context, msg string) (string, error) {
+	return "hello" + "_" + msg, nil
+}
+
+func newActivity3(ctx context.Context, msg string) (string, error) {
+	return "hello" + "_" + msg, nil
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_IsVersion() {
+	workflowFn := func(ctx Context) error {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+		var f Future
+
+		f = ExecuteActivity(ctx, oldActivity, "msg1")
+
+		f = ExecuteActivity(ctx, newActivity, "anotherMsg")
+
+		v := GetVersion(ctx, Component, CurrentVersion)
+		if v == DefaultVersion {
+			f = ExecuteActivity(ctx, oldActivity, "msg1")
+		} else {
+			f = ExecuteActivity(ctx, newActivity, "anotherMsg")
+		}
+
+		err := f.Get(ctx, nil) // wait for result
+		return err
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_IsVersion2() {
+	workflowFn := func(ctx Context) error {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+		var f Future
+
+		f = ExecuteActivity(ctx, oldActivity, "msg1")
+
+		f = ExecuteActivity(ctx, newActivity, "anotherMsg")
+
+		v := GetVersion(ctx, Component, CurrentVersion)
+		switch v {
+		case DefaultVersion:
+			f = ExecuteActivity(ctx, oldActivity, "msg1")
+		case Version1:
+			f = ExecuteActivity(ctx, newActivity, "anotherMsg")
+		case Version2:
+			f = ExecuteActivity(ctx, newActivity2, "anotherMsg2")
+		default: // Default to support larger versions without code change
+			f = ExecuteActivity(ctx, newActivity3, "anotherMsg3")
+		}
+
+		err := f.Get(ctx, nil) // wait for result
+		return err
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+}

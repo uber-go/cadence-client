@@ -852,5 +852,10 @@ func (env *testWorkflowEnvironmentImpl) SideEffect(f func() ([]byte, error), cal
 	callback(f())
 }
 
+func (env *testWorkflowEnvironmentImpl) GetVersion(component string, maxSupported, minSupported Version) Version {
+	// TODO: Add validation that maxSupported is the same for all calls for the given component.
+	return maxSupported
+}
+
 // make sure interface is implemented
 var _ workflowEnvironment = (*testWorkflowEnvironmentImpl)(nil)

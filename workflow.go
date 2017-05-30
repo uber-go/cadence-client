@@ -97,6 +97,9 @@ type (
 
 	// EncodedValue is type alias used to encapsulate/extract encoded result from workflow/activity.
 	EncodedValue []byte
+
+	// Version represents a component version. See GetVersion call.
+	Version int
 )
 
 // RegisterWorkflow - registers a workflow function with the framework.
@@ -395,4 +398,12 @@ func SideEffect(ctx Context, f func(ctx Context) interface{}) EncodedValue {
 		panic(err)
 	}
 	return encoded
+}
+
+// DefaultVersion is a version returned by GetVersion for code that wasn't versioned before
+var DefaultVersion Version = -1
+
+// GetVersion is used to safely perform backwards incompatible changes to workflow definitions.
+func GetVersion(ctx Context, component string, maxSupported, minSupported Version) Version {
+	return getWorkflowEnvironment(ctx).GetVersion(component, maxSupported, minSupported)
 }

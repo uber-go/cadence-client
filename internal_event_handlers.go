@@ -59,6 +59,7 @@ type (
 		scheduledEventIDToActivityID   map[int64]string         // Mapping from scheduled event ID to activity ID
 		scheduledTimers                map[string]resultHandler // Map of scheduledTimers(timer ID ->) and their response handlers
 		sideEffectResult               map[int32][]byte
+		componentVersions              map[string]Version              // Map of component versions extracted from markers
 		counterID                      int32                           // To generate activity IDs
 		executeDecisions               []*m.Decision                   // Decisions made during the execute of the workflow
 		completeHandler                completionHandler               // events completion handler
@@ -80,6 +81,7 @@ type (
 )
 
 var sideEffectMarkerName = "SideEffect"
+var versionMarkerName = "Version"
 
 func wrapLogger(isReplay *bool, enableLoggingInReplay *bool) func(zapcore.Core) zapcore.Core {
 	return func(c zapcore.Core) zapcore.Core {
@@ -294,6 +296,52 @@ func (wc *workflowEnvironmentImpl) RequestCancelTimer(timerID string) {
 
 func (wc *workflowEnvironmentImpl) addPostEventHooks(hook func()) {
 	wc.postEventHooks = append(wc.postEventHooks, hook)
+}
+
+func (wc *workflowEnvironmentImpl) GetVersion(component string, maxSupported, minSupported Version) Version {
+	var result Version
+	if wc.isReplay {
+		var ok bool
+		result, ok = wc.componentVersions[component]
+		if !ok {
+			result = DefaultVersion
+		}
+		if result < minSupported {
+			panic(fmt.Sprintf("Workflow code removed support of version %v. "+
+				"for \"%v\" component. The oldest supported version is %v",
+				result, component, minSupported))
+		}
+		if result > maxSupported {
+			panic(fmt.Sprintf("Workflow code is too old to support version %v "+
+				"for \"%v\" component. The maximum supported version is %v",
+				result, component, minSupported))
+		}
+		wc.logger.Debug("GetVersion return version from a marker",
+			zap.String(tagComponentName, component), zap.Int(tagVersion, int(result)))
+		return result
+	}
+	result = maxSupported
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(component); err != nil {
+		panic(fmt.Sprintf("Failure encoding component name: %v", err))
+	}
+	if err := enc.Encode(result); err != nil {
+		panic(fmt.Sprintf("Failure encoding version value: %v", err))
+	}
+	details := buf.Bytes()
+
+	recordMarker := &m.RecordMarkerDecisionAttributes{
+		MarkerName: common.StringPtr(versionMarkerName),
+		Details:    details, // Keep
+	}
+	decision := wc.CreateNewDecision(m.DecisionType_RecordMarker)
+	decision.RecordMarkerDecisionAttributes = recordMarker
+	wc.executeDecisions = append(wc.executeDecisions, decision)
+
+	wc.logger.Debug("GetVersion return",
+		zap.String(tagComponentName, component), zap.Int(tagVersion, int(result)))
+	return result
 }
 
 func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback resultHandler) {
@@ -631,22 +679,37 @@ func (weh *workflowExecutionEventHandlerImpl) handleMarkerRecorded(
 	eventID int64,
 	attributes *m.MarkerRecordedEventAttributes,
 ) error {
-	if attributes.GetMarkerName() != sideEffectMarkerName {
+	switch attributes.GetMarkerName() {
+	case sideEffectMarkerName:
+		dec := gob.NewDecoder(bytes.NewBuffer(attributes.GetDetails()))
+		var sideEffectID int32
+
+		if err := dec.Decode(&sideEffectID); err != nil {
+			return fmt.Errorf("failure decoding sideEffectID: %v", err)
+		}
+		var result []byte
+		if err := dec.Decode(&result); err != nil {
+			return fmt.Errorf("failure decoding side effect result: %v", err)
+		}
+		weh.sideEffectResult[sideEffectID] = result
+		return nil
+	case versionMarkerName:
+		dec := gob.NewDecoder(bytes.NewBuffer(attributes.GetDetails()))
+		var component string
+
+		if err := dec.Decode(&component); err != nil {
+			return fmt.Errorf("failure decoding version component: %v", err)
+		}
+		var version int
+		if err := dec.Decode(&version); err != nil {
+			return fmt.Errorf("failure decoding version: %v", err)
+		}
+		weh.componentVersions[component] = Version(version)
+		return nil
+	default:
 		return fmt.Errorf("unknown marker name \"%v\" for eventID \"%v\"",
 			attributes.GetMarkerName(), eventID)
 	}
-	dec := gob.NewDecoder(bytes.NewBuffer(attributes.GetDetails()))
-	var sideEffectID int32
-
-	if err := dec.Decode(&sideEffectID); err != nil {
-		return fmt.Errorf("failure decodeing sideEffectID: %v", err)
-	}
-	var result []byte
-	if err := dec.Decode(&result); err != nil {
-		return fmt.Errorf("failure decoding side effect result: %v", err)
-	}
-	weh.sideEffectResult[sideEffectID] = result
-	return nil
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionSignaled(

@@ -204,6 +204,9 @@ func (f *futureImpl) Get(ctx Context, value interface{}) error {
 	if value == nil {
 		return f.err
 	}
+	if f.err != nil {
+		return f.err
+	}
 	rf := reflect.ValueOf(value)
 	if rf.Type().Kind() != reflect.Ptr {
 		return errors.New("value parameter is not a pointer")

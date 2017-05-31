@@ -165,9 +165,10 @@ type (
 	}
 )
 
-const workflowEnvironmentContextKey = "workflowEnv"
-const workflowResultContextKey = "workflowResult"
-const coroutinesContextKey = "coroutines"
+const workflowEnvironmentContextKey = "_workflowEnv"
+const workflowResultContextKey = "_workflowResult"
+const coroutinesContextKey = "_coroutines"
+const componentVersionsContextKey = "_componentVersions"
 
 // Assert that structs do indeed implement the interfaces
 var _ Channel = (*channelImpl)(nil)
@@ -294,6 +295,7 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	d.rootCtx = WithValue(background, workflowEnvironmentContextKey, env)
 	var resultPtr *workflowResult
 	d.rootCtx = WithValue(d.rootCtx, workflowResultContextKey, &resultPtr)
+	d.rootCtx = WithValue(d.rootCtx, componentVersionsContextKey, make(map[string]Version))
 
 	// Set default values for the workflow execution.
 	wInfo := env.WorkflowInfo()

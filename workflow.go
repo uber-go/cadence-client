@@ -405,5 +405,13 @@ var DefaultVersion Version = -1
 
 // GetVersion is used to safely perform backwards incompatible changes to workflow definitions.
 func GetVersion(ctx Context, component string, maxSupported, minSupported Version) Version {
-	return getWorkflowEnvironment(ctx).GetVersion(component, maxSupported, minSupported)
+	versions := ctx.Value(componentVersionsContextKey).(map[string]Version)
+	result, ok := versions[component]
+	if ok {
+		validateVersion(component, result, maxSupported, minSupported)
+		return result
+	}
+	result = getWorkflowEnvironment(ctx).GetVersion(component, maxSupported, minSupported)
+	versions[component] = result
+	return result
 }

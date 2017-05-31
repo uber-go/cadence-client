@@ -299,6 +299,19 @@ func (wc *workflowEnvironmentImpl) addPostEventHooks(hook func()) {
 	wc.postEventHooks = append(wc.postEventHooks, hook)
 }
 
+func validateVersion(component string, version, maxSupported, minSupported Version) {
+	if version < minSupported {
+		panic(fmt.Sprintf("Workflow code removed support of version %v. "+
+			"for \"%v\" component. The oldest supported version is %v",
+			version, component, minSupported))
+	}
+	if version > maxSupported {
+		panic(fmt.Sprintf("Workflow code is too old to support version %v "+
+			"for \"%v\" component. The maximum supported version is %v",
+			version, component, minSupported))
+	}
+}
+
 func (wc *workflowEnvironmentImpl) GetVersion(component string, maxSupported, minSupported Version) Version {
 	var result Version
 	if wc.isReplay {
@@ -307,16 +320,7 @@ func (wc *workflowEnvironmentImpl) GetVersion(component string, maxSupported, mi
 		if !ok {
 			result = DefaultVersion
 		}
-		if result < minSupported {
-			panic(fmt.Sprintf("Workflow code removed support of version %v. "+
-				"for \"%v\" component. The oldest supported version is %v",
-				result, component, minSupported))
-		}
-		if result > maxSupported {
-			panic(fmt.Sprintf("Workflow code is too old to support version %v "+
-				"for \"%v\" component. The maximum supported version is %v",
-				result, component, minSupported))
-		}
+		validateVersion(component, result, maxSupported, minSupported)
 		wc.logger.Debug("GetVersion return version from a marker",
 			zap.String(tagComponentName, component), zap.Int(tagVersion, int(result)))
 		return result

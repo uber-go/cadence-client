@@ -768,28 +768,41 @@ func TestFutureSet(t *testing.T) {
 
 func TestFutureChain(t *testing.T) {
 	var history []string
-	var f, cf Future
-	var s, cs Settable
+	var f1, cf1, f2, cf2 Future
+	var s1, cs1, s2, cs2 Settable
 
 	d := newDispatcher(background, func(ctx Context) {
-		f, s = NewFuture(ctx)
-		cf, cs = NewFuture(ctx)
-		s.Chain(cf)
+		f1, s1 = NewFuture(ctx)
+		cf1, cs1 = NewFuture(ctx)
+		s1.Chain(cf1)
+		f2, s2 = NewFuture(ctx)
+		cf2, cs2 = NewFuture(ctx)
+		s2.Chain(cf2)
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
-			assert.False(t, f.IsReady())
+			assert.False(t, f1.IsReady())
 			var v string
-			err := f.Get(ctx, &v)
+			err := f1.Get(ctx, &v)
 			assert.NotNil(t, err)
-			assert.NotNil(t, v)
-			assert.True(t, f.IsReady())
-			history = append(history, fmt.Sprintf("future-get-%v-%v", v, err))
+			assert.True(t, f1.IsReady())
+			history = append(history, fmt.Sprintf("f1-get-%v-%v", v, err))
 			// test second get of the ready future
-			err = f.Get(ctx, &v)
+			err = f1.Get(ctx, &v)
 			assert.NotNil(t, err)
-			assert.NotNil(t, v)
-			assert.True(t, f.IsReady())
-			history = append(history, fmt.Sprintf("child-end-%v-%v", v, err))
+			assert.True(t, f1.IsReady())
+			history = append(history, fmt.Sprintf("f1-get2-%v-%v", v, err))
+
+			err = f2.Get(ctx, &v)
+			assert.NoError(t, err)
+			assert.Equal(t, "value2", v)
+			assert.True(t, f2.IsReady())
+			history = append(history, fmt.Sprintf("f2-get-%v-%v", v, err))
+			// test second get of the ready future
+			err = f2.Get(ctx, &v)
+			assert.NoError(t, err)
+			assert.Equal(t, "value2", v)
+			assert.True(t, f2.IsReady())
+			history = append(history, fmt.Sprintf("f2-get2-%v-%v", v, err))
 		})
 		history = append(history, "root-end")
 
@@ -800,22 +813,36 @@ func TestFutureChain(t *testing.T) {
 		require.NoError(t, err, err.StackTrace())
 	}
 	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
-	history = append(history, "future-set")
-	assert.False(t, f.IsReady())
-	cs.Set("value1", errors.New("error1"))
-	assert.True(t, f.IsReady())
+	history = append(history, "f1-set")
+	assert.False(t, f1.IsReady())
+	cs1.Set("value1-will-be-ignored", errors.New("error1"))
+	assert.True(t, f1.IsReady())
 	err = d.ExecuteUntilAllBlocked()
 	if err != nil {
 		require.NoError(t, err, err.StackTrace())
 	}
+
+	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
+	history = append(history, "f2-set")
+	assert.False(t, f2.IsReady())
+	cs2.Set("value2", nil)
+	assert.True(t, f2.IsReady())
+	err = d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err, err.StackTrace())
+	}
+
 	require.True(t, d.IsDone())
 
 	expected := []string{
 		"root-end",
 		"child-start",
-		"future-set",
-		"future-get--error1",
-		"child-end--error1",
+		"f1-set",
+		"f1-get--error1",
+		"f1-get2--error1",
+		"f2-set",
+		"f2-get-value2-<nil>",
+		"f2-get2-value2-<nil>",
 	}
 	require.EqualValues(t, expected, history)
 }

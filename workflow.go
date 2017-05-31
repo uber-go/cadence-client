@@ -404,14 +404,14 @@ func SideEffect(ctx Context, f func(ctx Context) interface{}) EncodedValue {
 var DefaultVersion Version = -1
 
 // GetVersion is used to safely perform backwards incompatible changes to workflow definitions.
-func GetVersion(ctx Context, component string, maxSupported, minSupported Version) Version {
+func GetVersion(ctx Context, component string, minSupported, maxSupported Version) Version {
 	versions := ctx.Value(componentVersionsContextKey).(map[string]Version)
 	result, ok := versions[component]
 	if ok {
-		validateVersion(component, result, maxSupported, minSupported)
+		validateVersion(component, result, minSupported, maxSupported)
 		return result
 	}
-	result = getWorkflowEnvironment(ctx).GetVersion(component, maxSupported, minSupported)
+	result = getWorkflowEnvironment(ctx).GetVersion(component, minSupported, maxSupported)
 	versions[component] = result
 	return result
 }

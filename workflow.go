@@ -23,6 +23,7 @@ package cadence
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"go.uber.org/cadence/common"
@@ -403,15 +404,42 @@ func SideEffect(ctx Context, f func(ctx Context) interface{}) EncodedValue {
 // DefaultVersion is a version returned by GetVersion for code that wasn't versioned before
 var DefaultVersion Version = -1
 
+// VersionTombstone is used to indicate that GetVersion call was at this place.
+// It is needed to ensure that workflows that use lower version are not corrupted by this decider.
+func VersionTombstone(ctx Context, component string, minSupported Version) {
+	versions := ctx.Value(componentVersionsContextKey).(map[string]*componentVersion)
+	cv, ok := versions[component]
+	if ok {
+		if cv.minSupported < minSupported {
+			minSupported = cv.minSupported
+		} else {
+			cv.minSupported = minSupported
+		}
+		if cv.version != nil {
+			validateVersion(component, *cv.version, minSupported, math.MaxInt32)
+		}
+		return
+	}
+	versions[component] = &componentVersion{minSupported: minSupported}
+}
+
 // GetVersion is used to safely perform backwards incompatible changes to workflow definitions.
 func GetVersion(ctx Context, component string, minSupported, maxSupported Version) Version {
-	versions := ctx.Value(componentVersionsContextKey).(map[string]Version)
-	result, ok := versions[component]
+	versions := ctx.Value(componentVersionsContextKey).(map[string]*componentVersion)
+	cv, ok := versions[component]
 	if ok {
-		validateVersion(component, result, minSupported, maxSupported)
-		return result
+		if cv.minSupported < minSupported {
+			minSupported = cv.minSupported
+		} else {
+			cv.minSupported = minSupported
+		}
+
+		if cv.version != nil {
+			validateVersion(component, *cv.version, minSupported, maxSupported)
+			return *cv.version
+		}
 	}
-	result = getWorkflowEnvironment(ctx).GetVersion(component, minSupported, maxSupported)
-	versions[component] = result
-	return result
+	version := getWorkflowEnvironment(ctx).GetVersion(component, minSupported, maxSupported)
+	versions[component] = &componentVersion{minSupported: minSupported, version: &version}
+	return version
 }

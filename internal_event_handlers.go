@@ -491,7 +491,10 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 
 	case m.EventType_RequestCancelExternalWorkflowExecutionInitiated:
 		// No Operation.
+	case m.EventType_ExternalWorkflowExecutionCancelRequested:
+		// No Operation.
 	case m.EventType_RequestCancelExternalWorkflowExecutionFailed:
+		// No Operation.
 	case m.EventType_WorkflowExecutionContinuedAsNew:
 		// No Operation.
 
@@ -543,7 +546,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	default:
 		weh.logger.Error("unknown event type",
 			zap.Int64(tagEventID, event.GetEventId()),
-			zap.String(tagEventType, string(event.GetEventType())))
+			zap.String(tagEventType, event.GetEventType().String()))
 		// Do not fail to be forward compatible with new events
 	}
 
@@ -814,7 +817,8 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionCancel
 	childWorkflowID := attributes.WorkflowExecution.GetWorkflowId()
 	childWorkflowHandle, ok := weh.scheduledChildWorkflows[childWorkflowID]
 	if !ok {
-		return fmt.Errorf("unable to find child workflow callback: %v", attributes)
+		// this could happen if waitForCancellation is false
+		return nil
 	}
 	delete(weh.scheduledChildWorkflows, childWorkflowID)
 	err := NewCanceledError(attributes.GetDetails())

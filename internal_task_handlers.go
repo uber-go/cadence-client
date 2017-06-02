@@ -626,11 +626,11 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	startAttributes *s.WorkflowExecutionStartedEventAttributes,
 ) ([]*s.Decision, error) {
 	decisions := []*s.Decision{}
-	if err == ErrCanceled {
+	if canceledErr, ok := err.(*canceledError); ok {
 		// Workflow cancelled
 		cancelDecision := createNewDecision(s.DecisionType_CancelWorkflowExecution)
 		cancelDecision.CancelWorkflowExecutionDecisionAttributes = &s.CancelWorkflowExecutionDecisionAttributes{
-			Details: completionResult,
+			Details: canceledErr.details,
 		}
 		decisions = append(decisions, cancelDecision)
 	} else if contErr, ok := err.(*continueAsNewError); ok {

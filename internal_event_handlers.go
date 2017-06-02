@@ -748,7 +748,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleStartChildWorkflowExecutionI
 
 func (weh *workflowExecutionEventHandlerImpl) handleStartChildWorkflowExecutionFailed(
 	attributes *m.StartChildWorkflowExecutionFailedEventAttributes) error {
-	childWorkflowID := *attributes.WorkflowId
+	childWorkflowID := attributes.GetWorkflowId()
 	childWorkflowHandle, ok := weh.scheduledChildWorkflows[childWorkflowID]
 	if !ok {
 		return fmt.Errorf("unable to find child workflow callback: %v", attributes)

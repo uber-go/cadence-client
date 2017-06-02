@@ -509,7 +509,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	case m.EventType_StartChildWorkflowExecutionInitiated:
 		// No Operation.
 	case m.EventType_StartChildWorkflowExecutionFailed:
-		err := weh.handleChildWorkflowExecutionFailed(event.ChildWorkflowExecutionFailedEventAttributes)
+		err := weh.handleStartChildWorkflowExecutionFailed(event.StartChildWorkflowExecutionFailedEventAttributes)
 		if err != nil {
 			return nil, err
 		}

@@ -323,7 +323,7 @@ func ExecuteChildWorkflow(ctx Context, f interface{}, args ...interface{}) Child
 	getWorkflowEnvironment(ctx).ExecuteChildWorkflow(*options, func(r []byte, e error) {
 		mainSettable.Set(r, e)
 	}, func(r WorkflowExecution, e error) {
-		if e != nil {
+		if e == nil {
 			childWorkflowExecution = &r
 		}
 		executionSettable.Set(r, e)

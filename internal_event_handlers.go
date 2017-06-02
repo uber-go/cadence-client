@@ -177,7 +177,7 @@ func (wc *workflowEnvironmentImpl) RegisterCancelHandler(handler func()) {
 func (wc *workflowEnvironmentImpl) ExecuteChildWorkflow(
 	options workflowOptions, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error {
 	if options.workflowID == "" {
-		options.workflowID = wc.workflowInfo.WorkflowExecution.RunID + wc.GenerateSequenceID()
+		options.workflowID = wc.workflowInfo.WorkflowExecution.RunID + "_" + wc.GenerateSequenceID()
 	}
 
 	attributes := m.NewStartChildWorkflowExecutionDecisionAttributes()
@@ -754,7 +754,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleStartChildWorkflowExecutionF
 		return fmt.Errorf("unable to find child workflow callback: %v", attributes)
 	}
 	delete(weh.scheduledChildWorkflows, childWorkflowID)
-	err := NewErrorWithDetails(fmt.Sprintf("%v", *attributes.Cause), nil)
+	err := fmt.Errorf("ChildWorkflowFailed: %v", attributes.GetCause())
 	childWorkflowHandle.resultCallback(nil, err)
 
 	return nil
@@ -788,7 +788,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionComple
 	}
 	delete(weh.scheduledChildWorkflows, childWorkflowID)
 
-	childWorkflowHandle.resultCallback(attributes.Result_, nil)
+	childWorkflowHandle.resultCallback(attributes.GetResult_(), nil)
 
 	return nil
 }
@@ -803,7 +803,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionFailed
 	}
 	delete(weh.scheduledChildWorkflows, childWorkflowID)
 
-	err := NewErrorWithDetails(*attributes.Reason, attributes.Details)
+	err := NewErrorWithDetails(attributes.GetReason(), attributes.GetDetails())
 	childWorkflowHandle.resultCallback(nil, err)
 
 	return nil
@@ -817,7 +817,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionCancel
 		return fmt.Errorf("unable to find child workflow callback: %v", attributes)
 	}
 	delete(weh.scheduledChildWorkflows, childWorkflowID)
-	err := NewCanceledError(attributes.Details)
+	err := NewCanceledError(attributes.GetDetails())
 
 	childWorkflowHandle.resultCallback(nil, err)
 	return nil
@@ -831,7 +831,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTimedO
 		return fmt.Errorf("unable to find child workflow callback: %v", attributes)
 	}
 	delete(weh.scheduledChildWorkflows, childWorkflowID)
-	err := NewTimeoutError(*attributes.TimeoutType)
+	err := NewTimeoutError(attributes.GetTimeoutType())
 
 	childWorkflowHandle.resultCallback(nil, err)
 
@@ -846,8 +846,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTermin
 		return fmt.Errorf("unable to find child workflow callback: %v", attributes)
 	}
 	delete(weh.scheduledChildWorkflows, childWorkflowID)
-	err := NewErrorWithDetails("terminated", nil)
-
+	err := errors.New("terminated")
 	childWorkflowHandle.resultCallback(nil, err)
 
 	return nil

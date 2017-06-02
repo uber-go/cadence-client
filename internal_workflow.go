@@ -956,10 +956,11 @@ func getValidatedWorkflowOptions(ctx Context) (*workflowOptions, error) {
 	}
 	info := GetWorkflowInfo(ctx)
 	if p.domain == nil || *p.domain == "" {
-		// We default to origin task list name.
+		// default to use current workflow's domain
 		p.domain = common.StringPtr(info.Domain)
 	}
 	if p.taskListName == nil || *p.taskListName == "" {
+		// default to use current workflow's task list
 		p.taskListName = common.StringPtr(info.TaskListName)
 	}
 	if p.taskStartToCloseTimeoutSeconds == nil || *p.taskStartToCloseTimeoutSeconds < 0 {

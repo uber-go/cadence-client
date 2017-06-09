@@ -959,7 +959,7 @@ func (env *testWorkflowEnvironmentImpl) ExecuteChildWorkflow(options workflowOpt
 	go func() {
 		childEnv.executeWorkflowInternal(options.workflowType.Name, options.input)
 		env.postCallback(func() {
-			delete(env.childWorkflows, workflowID)
+			delete(env.childWorkflows, options.workflowID)
 			// deliver result
 			callback(childEnv.testResult, childEnv.testError)
 

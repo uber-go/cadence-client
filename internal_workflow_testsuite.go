@@ -240,6 +240,9 @@ func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(optio
 	childEnv.workflowInfo.ExecutionStartToCloseTimeoutSeconds = *options.executionStartToCloseTimeoutSeconds
 	childEnv.workflowInfo.TaskStartToCloseTimeoutSeconds = *options.taskStartToCloseTimeoutSeconds
 
+	workflowID := childEnv.workflowInfo.WorkflowExecution.ID
+	env.childWorkflows[workflowID] = &testChildWorkflowHandle{env: childEnv}
+
 	return childEnv
 }
 
@@ -344,42 +347,31 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	}
 }
 
-func (env *testWorkflowEnvironmentImpl) overrideActivity(activityFn, fakeActivityFn interface{}) {
-	// verify both functions are valid activity func
-	actualFnType := reflect.TypeOf(activityFn)
-	if err := validateFnFormat(actualFnType, false); err != nil {
-		panic(err)
-	}
-	fakeFnType := reflect.TypeOf(fakeActivityFn)
-	if err := validateFnFormat(fakeFnType, false); err != nil {
-		panic(err)
-	}
-
-	// verify signature of registeredActivityFn and fakeActivityFn are the same.
-	if actualFnType != fakeFnType {
-		panic(fmt.Sprintf("override activity failed, expected %v, but got %v.", actualFnType, fakeFnType))
-	}
-
-	fnName := getFunctionName(activityFn)
-	env.overrodeActivities[fnName] = fakeActivityFn
-}
-
-func (env *testWorkflowEnvironmentImpl) overrideWorkflow(workflowFn, fakeWorkflowFn interface{}) {
+func validateOverrideFunction(fn, fakeFn interface{}, isWorkflow bool) {
 	// verify both functions are valid workflow func
-	actualFnType := reflect.TypeOf(workflowFn)
-	if err := validateFnFormat(actualFnType, true); err != nil {
+	actualFnType := reflect.TypeOf(fn)
+	if err := validateFnFormat(actualFnType, isWorkflow); err != nil {
 		panic(err)
 	}
-	fakeFnType := reflect.TypeOf(fakeWorkflowFn)
-	if err := validateFnFormat(fakeFnType, true); err != nil {
+	fakeFnType := reflect.TypeOf(fakeFn)
+	if err := validateFnFormat(fakeFnType, isWorkflow); err != nil {
 		panic(err)
 	}
 
 	// verify function signatures are the same.
 	if actualFnType != fakeFnType {
-		panic(fmt.Sprintf("override workflow failed, expected %v, but got %v.", actualFnType, fakeFnType))
+		panic(fmt.Sprintf("override failed, expected %v, but got %v.", actualFnType, fakeFnType))
 	}
+}
 
+func (env *testWorkflowEnvironmentImpl) overrideActivity(activityFn, fakeActivityFn interface{}) {
+	validateOverrideFunction(activityFn, fakeActivityFn, false)
+	fnName := getFunctionName(activityFn)
+	env.overrodeActivities[fnName] = fakeActivityFn
+}
+
+func (env *testWorkflowEnvironmentImpl) overrideWorkflow(workflowFn, fakeWorkflowFn interface{}) {
+	validateOverrideFunction(workflowFn, fakeWorkflowFn, true)
 	fnName := getFunctionName(workflowFn)
 	env.overrodeWorkflows[fnName] = fakeWorkflowFn
 }
@@ -777,12 +769,12 @@ func (m *mockWrapper) executeMock(ctx interface{}, input []byte, mockRet mock.Ar
 		}
 		// we found a mock function that matches to actual function, so call that mockFn
 		if m.isWorkflow {
-			we := &workflowExecutor{name: fnName, fn: mockFn}
-			return we.Execute(ctx.(Context), input)
-		} else {
-			ae := &activityExecutor{name: fnName, fn: mockFn}
-			return ae.Execute(ctx.(context.Context), input)
+			executor := &workflowExecutor{name: fnName, fn: mockFn}
+			return executor.Execute(ctx.(Context), input)
 		}
+
+		executor := &activityExecutor{name: fnName, fn: mockFn}
+		return executor.Execute(ctx.(context.Context), input)
 	}
 
 	// check if mockRet have same types as function's return types
@@ -958,9 +950,6 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelWorkflow(domainName, workfl
 
 func (env *testWorkflowEnvironmentImpl) ExecuteChildWorkflow(options workflowOptions, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error {
 	childEnv := env.newTestWorkflowEnvironmentForChild(&options)
-	workflowID := childEnv.workflowInfo.WorkflowExecution.ID
-	env.childWorkflows[workflowID] = &testChildWorkflowHandle{env: childEnv}
-
 	env.logger.Sugar().Infof("ExecuteChildWorkflow: %v", options.workflowType.Name)
 
 	// start immediately

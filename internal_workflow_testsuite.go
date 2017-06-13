@@ -444,8 +444,6 @@ func (c *testCallbackHandle) processCallback() {
 }
 
 func (env *testWorkflowEnvironmentImpl) autoFireNextTimer() bool {
-	env.locker.Lock()
-	defer env.locker.Unlock()
 	if len(env.timers) == 0 {
 		return false
 	}
@@ -503,8 +501,6 @@ func (env *testWorkflowEnvironmentImpl) autoFireNextTimer() bool {
 	nextTimer.wallTimeToFire, nextTimer.wallTimer = wallTimeToFire, env.wallClock.AfterFunc(durationToFire, func() {
 		// make sure it is running in the main loop
 		nextTimer.env.postCallback(func() {
-			env.locker.Lock()
-			defer env.locker.Unlock()
 			if timerHandle, ok := env.timers[getStringID(nextTimer.timerID)]; ok {
 				fireTimer(timerHandle)
 			}
@@ -537,8 +533,6 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelActivity(activityID string)
 
 // RequestCancelTimer request to cancel timer on this testWorkflowEnvironmentImpl.
 func (env *testWorkflowEnvironmentImpl) RequestCancelTimer(timerID string) {
-	env.locker.Lock()
-	defer env.locker.Unlock()
 	env.logger.Debug("RequestCancelTimer", zap.String(tagTimerID, timerID))
 	timerHandle, ok := env.timers[timerID]
 	if !ok {
@@ -907,9 +901,6 @@ func newTestActivityTask(workflowID, runID, activityID, activityType string, inp
 }
 
 func (env *testWorkflowEnvironmentImpl) NewTimer(d time.Duration, callback resultHandler) *timerInfo {
-	env.locker.Lock()
-	defer env.locker.Unlock()
-
 	nextID := env.nextID()
 	timerInfo := &timerInfo{timerID: getStringID(nextID)}
 	timer := env.mockClock.AfterFunc(d, func() {

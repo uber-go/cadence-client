@@ -202,7 +202,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 	// now change the history event so it does not match to decision produced via replay
 	testEvents[1].ActivityTaskScheduledEventAttributes.ActivityType.Name = common.StringPtr("some-other-activity")
 	response, _, err = taskHandler.ProcessWorkflowTask(task, false)
-	t.NotNil(err)
+	t.Error(err)
 	t.Nil(response)
 	t.Contains(err.Error(), "nondeterministic")
 }

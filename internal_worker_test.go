@@ -673,12 +673,27 @@ type encodingTest struct {
 	input    []interface{}
 }
 
+type CustomError struct {
+}
+
+func (ce *CustomError) Error() string {
+	return "CustomError"
+}
+
+type FancyError struct {
+}
+
+func (fe *FancyError) Error() string {
+	return "FancyError"
+}
+
 var encodingTests = []encodingTest{
 	{&gobEncoding{}, []interface{}{"test"}},
 	{&gobEncoding{}, []interface{}{"test1", "test2"}},
 	{&gobEncoding{}, []interface{}{"test1", 1, false}},
 	{&gobEncoding{}, []interface{}{"test1", testWorkflowResult{V: 10}, false}},
 	{&gobEncoding{}, []interface{}{"test2", &testWorkflowResult{V: 20}, 4}},
+	{&gobEncoding{}, []interface{}{&FancyError{}, &CustomError{}}},
 }
 
 // duplicate of GetHostEnvironment().registerType()
@@ -710,6 +725,8 @@ func TestGobEncoding(t *testing.T) {
 
 		for i := 0; i < len(et.input); i++ {
 			vat := reflect.ValueOf(result[i]).Elem().Interface()
+			fmt.Printf("Encode Value: %v, %v \n", reflect.TypeOf(et.input[i]), et.input[i])
+			fmt.Printf("Decoded Value: %v, %v \n", reflect.TypeOf(vat), vat)
 			require.Equal(t, et.input[i], vat)
 		}
 	}

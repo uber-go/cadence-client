@@ -466,7 +466,7 @@ func testActivityReturnEmptyString() (string, error) {
 	return "", nil
 }
 
-type testActivityResult struct{
+type testActivityResult struct {
 	Index int
 }
 

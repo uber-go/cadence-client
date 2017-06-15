@@ -435,7 +435,6 @@ ProcessEvents:
 	if _, ok := failure.(PanicError); ok {
 		// Timeout the Decision instead of failing workflow.
 		// TODO: Pump this stack trace on to workflow history for debuggability by exposing decision type fail to client.
-		wth.logger.Error("Workflow failed with a panic error.", zap.Error(failure))
 		return nil, "", failure
 	}
 

@@ -583,6 +583,8 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 		// this is completion of child workflow
 		childWorkflowID := env.workflowInfo.WorkflowExecution.ID
 		if childWorkflowHandle, ok := env.childWorkflows[childWorkflowID]; ok {
+			// It is possible that child workflow could complete after cancellation. In that case, childWorkflowHandle
+			// would have already been removed from the childWorkflows map by RequestCancelWorkflow().
 			delete(env.childWorkflows, childWorkflowID)
 			env.parentEnv.postCallback(func() {
 				// deliver result
@@ -781,17 +783,23 @@ func (w *workflowExecutorWrapper) Execute(ctx Context, input []byte) (result []b
 	// run the mock, and resume after mock call returns.
 	mockReadyChannel := NewChannel(ctx)
 	go func() {
-		mockRet := m.getMockReturn(ctx, input) // this call could block if mock is configured to wait
+		// getMockReturn could block if mock is configured to wait. The returned mockRet is what has been configured
+		// for the mock by using MockCallWrapper.Return(). The mockRet could be mock values or mock function. We process
+		// the returned mockRet by calling executeMock() later in the main thread after it is send over via mockReadyChannel.
+		mockRet := m.getMockReturn(ctx, input)
 		env.postCallback(func() {
 			mockReadyChannel.SendAsync(mockRet)
 		}, true /* true to trigger the dispatcher for this workflow so it resume from mockReadyChannel block*/)
 	}()
 
 	var mockRet mock.Arguments
-	mockReadyChannel.Receive(ctx, &mockRet) // this will block the workflow dispatcher, but not block the main loop.
+	// This will block workflow dispatcher (on cadence channel), which the dispatcher understand and will return from
+	// ExecuteUntilAllBlocked() so the main loop is not blocked. The dispatcher will unblock when getMockReturn() returns.
+	mockReadyChannel.Receive(ctx, &mockRet)
 
 	if env.isChildWorkflow() {
 		env.postCallback(func() {
+			// reduce runningCount after current workflow dispatcher run is blocked (aka ExecuteUntilAllBlocked() returns).
 			env.runningCount.Dec()
 		}, false)
 	}

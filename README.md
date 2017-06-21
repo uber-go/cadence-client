@@ -3,6 +3,8 @@
 
 `cadence-client` is the framework for authoring workflows and activites.
 
+See [here](https://github.com/samarabbas/cadence-samples) for some sample recipes using cadence
+
 ## How to use
 
 Make sure you clone this repo into the correct location.

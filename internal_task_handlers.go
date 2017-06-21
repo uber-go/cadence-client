@@ -40,6 +40,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	defaultHeartBeatInterval = 10 * time.Minute
+)
+
 // interfaces
 type (
 	// workflowExecutionEventHandler process a single event.
@@ -724,14 +728,21 @@ func newActivityTaskHandler(activities []activity,
 }
 
 type cadenceInvoker struct {
-	identity      string
-	service       m.TChanWorkflowService
-	taskToken     []byte
-	cancelHandler func()
-	retryPolicy   backoff.RetryPolicy
+	identity               string
+	service                m.TChanWorkflowService
+	taskToken              []byte
+	cancelHandler          func()
+	retryPolicy            backoff.RetryPolicy
+	heartBeatTimeoutInSec  int32 // The heart beat interval configured for this activity.
+	lastHeartBeatTimestamp time.Time
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
+	nonTransientError := false
+	if !i.isTimeToReportHeartbeat() {
+		return nil
+	}
+
 	err := recordActivityHeartbeat(i.service, i.identity, i.taskToken, details, i.retryPolicy)
 
 	switch err.(type) {
@@ -739,11 +750,17 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 		// We are asked to cancel. inform the activity about cancellation through context.
 		// We are asked to cancel. inform the activity about cancellation through context.
 		i.cancelHandler()
+		nonTransientError = true
 
 	case *s.EntityNotExistsError:
 		// We will pass these through as cancellation for now but something we can change
 		// later when we have setter on cancel handler.
 		i.cancelHandler()
+		nonTransientError = true
+	}
+
+	if err == nil || nonTransientError {
+		i.lastHeartBeatTimestamp = time.Now()
 	}
 
 	// We don't want to bubble temporary errors to the user.
@@ -751,18 +768,42 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 	return err
 }
 
+func (i *cadenceInvoker) isTimeToReportHeartbeat() bool {
+	// If we don't have any heartbeat timeout configured.
+	lastHeartbeatTS := i.lastHeartBeatTimestamp
+	if i.heartBeatTimeoutInSec <= 0 {
+		if lastHeartbeatTS.IsZero() || time.Now().After(lastHeartbeatTS.Add(defaultHeartBeatInterval)) {
+			return true
+		}
+		return false
+	}
+
+	// If we have heartbeat timeout configured.
+	// The heartbeat time indicates that on any two successive pings the distance should not be more than the
+	// the configured timeout.
+	// We want to suppress reporting HB too frequently to server, until we get auto heartbeating.
+	// we will suppress reporting HB if it is with-in a certain window(60% of HB timeout)
+	duration := time.Duration(0.6*float32(i.heartBeatTimeoutInSec)) * time.Second
+	if lastHeartbeatTS.IsZero() || time.Now().After(lastHeartbeatTS.Add(duration)) {
+		return true
+	}
+	return false
+}
+
 func newServiceInvoker(
 	taskToken []byte,
 	identity string,
 	service m.TChanWorkflowService,
 	cancelHandler func(),
+	heartBeatTimeoutInSec int32,
 ) ServiceInvoker {
 	return &cadenceInvoker{
-		taskToken:     taskToken,
-		identity:      identity,
-		service:       service,
-		cancelHandler: cancelHandler,
-		retryPolicy:   serviceOperationRetryPolicy,
+		taskToken:             taskToken,
+		identity:              identity,
+		service:               service,
+		cancelHandler:         cancelHandler,
+		retryPolicy:           serviceOperationRetryPolicy,
+		heartBeatTimeoutInSec: heartBeatTimeoutInSec,
 	}
 }
 
@@ -786,7 +827,7 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 		rootCtx = context.Background()
 	}
 	canCtx, cancel := context.WithCancel(rootCtx)
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel)
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds())
 	ctx := WithActivityTask(canCtx, t, invoker, ath.logger)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.implementations[flowActivityTypeFrom(activityType)]

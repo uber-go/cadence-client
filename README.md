@@ -3,8 +3,6 @@
 
 `cadence-client` is the framework for authoring workflows and activites.
 
-See [here](https://github.com/samarabbas/cadence-samples) for some sample recipes using cadence
-
 ## How to use
 
 Make sure you clone this repo into the correct location.
@@ -18,6 +16,8 @@ or
 ```bash
 go get go.uber.org/cadence
 ```
+
+See [samples](https://github.com/samarabbas/cadence-samples) to get started
 
 ### Activity
 

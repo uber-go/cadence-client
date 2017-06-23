@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/uber-go/tally"
@@ -41,7 +42,7 @@ import (
 )
 
 const (
-	defaultHeartBeatInterval = 10 * time.Minute
+	defaultHeartBeatIntervalInSec = 10 * 60
 )
 
 // interfaces
@@ -728,21 +729,77 @@ func newActivityTaskHandler(activities []activity,
 }
 
 type cadenceInvoker struct {
-	identity               string
-	service                m.TChanWorkflowService
-	taskToken              []byte
-	cancelHandler          func()
-	retryPolicy            backoff.RetryPolicy
-	heartBeatTimeoutInSec  int32 // The heart beat interval configured for this activity.
-	lastHeartBeatTimestamp time.Time
+	sync.Mutex
+	identity              string
+	service               m.TChanWorkflowService
+	taskToken             []byte
+	cancelHandler         func()
+	retryPolicy           backoff.RetryPolicy
+	heartBeatTimeoutInSec int32 // The heart beat interval configured for this activity.
+	hbBatchEndTimer       *time.Timer
+	lastProgressToReport  *[]byte
+	isInBatchingWindow    bool // Whether we started a batch of operations that need to be reported in the cycle. This gets started on a user call.
+	closeCh               chan struct{}
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
-	nonTransientError := false
-	if !i.isTimeToReportHeartbeat() {
+	i.Lock()
+	defer i.Unlock()
+
+	if i.isInBatchingWindow {
+		// If we have started batching window, keep track of last reported progress.
+		i.lastProgressToReport = &details
 		return nil
 	}
 
+	nonTransientError, err := i.internalHeartBeat(details)
+
+	if err == nil || nonTransientError {
+		// We have successfully sent heartbeat, start next batching window.
+		i.lastProgressToReport = nil
+		i.isInBatchingWindow = true
+
+		// reset timer to fire before the threshold to report.
+		if i.hbBatchEndTimer != nil {
+			i.hbBatchEndTimer.Stop()
+		}
+		deadlineToTrigger := i.heartBeatTimeoutInSec
+		if deadlineToTrigger <= 0 {
+			// If we don't have any heartbeat timeout configured.
+			deadlineToTrigger = defaultHeartBeatIntervalInSec
+		}
+
+		// We set a deadline at 80% of the timeout.
+		duration := time.Duration(0.8*float32(deadlineToTrigger)) * time.Second
+		i.hbBatchEndTimer = time.NewTimer(duration)
+
+		go func() {
+			select {
+			case <-i.hbBatchEndTimer.C:
+				// We are close to deadline.
+			case <-i.closeCh:
+				// We got closed.
+				return
+			}
+
+			// We close the batch and report the progress.
+			var progressToReport *[]byte
+			i.Lock()
+			i.isInBatchingWindow = false
+			progressToReport = i.lastProgressToReport
+			i.Unlock()
+
+			if progressToReport != nil {
+				i.Heartbeat(*progressToReport)
+			}
+		}()
+	}
+
+	return err
+}
+
+func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {
+	nonTransientError := false
 	err := recordActivityHeartbeat(i.service, i.identity, i.taskToken, details, i.retryPolicy)
 
 	switch err.(type) {
@@ -759,35 +816,19 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 		nonTransientError = true
 	}
 
-	if err == nil || nonTransientError {
-		i.lastHeartBeatTimestamp = time.Now()
-	}
-
 	// We don't want to bubble temporary errors to the user.
 	// This error won't be return to user check RecordActivityHeartbeat().
-	return err
+	return nonTransientError, err
 }
 
-func (i *cadenceInvoker) isTimeToReportHeartbeat() bool {
-	// If we don't have any heartbeat timeout configured.
-	lastHeartbeatTS := i.lastHeartBeatTimestamp
-	if i.heartBeatTimeoutInSec <= 0 {
-		if lastHeartbeatTS.IsZero() || time.Now().After(lastHeartbeatTS.Add(defaultHeartBeatInterval)) {
-			return true
-		}
-		return false
-	}
+func (i *cadenceInvoker) Close() {
+	i.Lock()
+	defer i.Unlock()
 
-	// If we have heartbeat timeout configured.
-	// The heartbeat time indicates that on any two successive pings the distance should not be more than the
-	// the configured timeout.
-	// We want to suppress reporting HB too frequently to server, until we get auto heartbeating.
-	// we will suppress reporting HB if it is with-in a certain window(60% of HB timeout)
-	duration := time.Duration(0.6*float32(i.heartBeatTimeoutInSec)) * time.Second
-	if lastHeartbeatTS.IsZero() || time.Now().After(lastHeartbeatTS.Add(duration)) {
-		return true
+	close(i.closeCh)
+	if i.hbBatchEndTimer != nil {
+		i.hbBatchEndTimer.Stop()
 	}
-	return false
 }
 
 func newServiceInvoker(
@@ -804,6 +845,7 @@ func newServiceInvoker(
 		cancelHandler:         cancelHandler,
 		retryPolicy:           serviceOperationRetryPolicy,
 		heartBeatTimeoutInSec: heartBeatTimeoutInSec,
+		closeCh:               make(chan struct{}),
 	}
 }
 
@@ -828,6 +870,7 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 	}
 	canCtx, cancel := context.WithCancel(rootCtx)
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds())
+	defer invoker.Close()
 	ctx := WithActivityTask(canCtx, t, invoker, ath.logger)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.implementations[flowActivityTypeFrom(activityType)]

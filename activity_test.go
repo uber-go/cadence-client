@@ -116,14 +116,46 @@ func TestActivityHeartbeat_SuppressContinousInvokes(t *testing.T) {
 	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
 		Return(&s.RecordActivityTaskHeartbeatResponse{}, nil).Once()
 	RecordActivityHeartbeat(ctx, "testDetails")
+	invoker.Close()
 
 	// No HB timeout configured.
-	invoker = newServiceInvoker([]byte("task-token"), "identity", service, cancel, 0)
+	service2 := new(mocks.TChanWorkflowService)
+	invoker2 := newServiceInvoker([]byte("task-token"), "identity", service2, cancel, 0)
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
-		serviceInvoker: invoker,
+		serviceInvoker: invoker2,
 		logger:         getLogger()})
-	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
+	service2.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
 		Return(&s.RecordActivityTaskHeartbeatResponse{}, nil).Once()
 	RecordActivityHeartbeat(ctx, "testDetails")
 	RecordActivityHeartbeat(ctx, "testDetails")
+	invoker2.Close()
+
+	// simulate batch picks before expiry.
+	waitCh := make(chan struct{})
+	service3 := new(mocks.TChanWorkflowService)
+	invoker3 := newServiceInvoker([]byte("task-token"), "identity", service3, cancel, 2)
+	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
+		serviceInvoker: invoker3,
+		logger:         getLogger()})
+	service3.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
+		Return(&s.RecordActivityTaskHeartbeatResponse{}, nil).Once()
+	service3.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
+		Return(&s.RecordActivityTaskHeartbeatResponse{}, nil).Run(func(arg mock.Arguments) {
+		request := arg.Get(1).(*s.RecordActivityTaskHeartbeatRequest)
+		ev := EncodedValues(request.GetDetails())
+		var progress string
+		err := ev.Get(&progress)
+		if err != nil {
+			panic(err)
+		}
+		require.Equal(t, "testDetails-expected", progress)
+		waitCh <- struct{}{}
+	}).Once()
+
+	RecordActivityHeartbeat(ctx, "testDetails")
+	RecordActivityHeartbeat(ctx, "testDetails2")
+	RecordActivityHeartbeat(ctx, "testDetails3")
+	RecordActivityHeartbeat(ctx, "testDetails-expected")
+	<-waitCh
+	invoker3.Close()
 }

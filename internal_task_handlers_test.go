@@ -22,10 +22,10 @@ package cadence
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
-	"fmt"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -177,13 +177,12 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
-	// Schedule an activity and see if we complete workflow.
 	taskList := "taskList"
 	testEvents := []*s.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
 		createTestEventActivityTaskScheduled(2, &s.ActivityTaskScheduledEventAttributes{
 			ActivityId:   common.StringPtr("0"),
-			ActivityType: &s.ActivityType{Name: common.StringPtr("some_random_activity")},
+			ActivityType: &s.ActivityType{Name: common.StringPtr("Greeter_Activity")},
 			TaskList:     &s.TaskList{Name: &taskList},
 		}),
 	}
@@ -191,17 +190,24 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		Identity: "test-id-1",
-		Logger:   t.logger,
+		Logger:   zap.NewNop(),
 	}
 	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, nil)
 	response, _, err := taskHandler.ProcessWorkflowTask(task, false)
 
-	t.NotNil(err)
+	// there should be no error as the history events matched the decisions.
+	t.NoError(err)
+	t.NotNil(response)
+
+	// now change the history event so it does not match to decision produced via replay
+	testEvents[1].ActivityTaskScheduledEventAttributes.ActivityType.Name = common.StringPtr("some-other-activity")
+	response, _, err = taskHandler.ProcessWorkflowTask(task, false)
+	t.Error(err)
 	t.Nil(response)
 	t.Contains(err.Error(), "nondeterministic")
 }
 
-func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityTask() {
+func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {
 	// Schedule an activity and see if we complete workflow.
 	taskList := "tl1"
 	testEvents := []*s.HistoryEvent{
@@ -226,13 +232,9 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityTask() {
 	t.NoError(err)
 	t.NotNil(response)
 	//t.printAllDecisions(response.GetDecisions())
-	t.Equal(3, len(response.GetDecisions()))
-	t.Equal(s.DecisionType_ScheduleActivityTask, response.GetDecisions()[0].GetDecisionType())
-	t.NotNil(response.GetDecisions()[0].GetScheduleActivityTaskDecisionAttributes())
-	t.Equal(s.DecisionType_RequestCancelActivityTask, response.GetDecisions()[1].GetDecisionType())
-	t.NotNil(response.GetDecisions()[1].GetRequestCancelActivityTaskDecisionAttributes())
-	t.Equal(s.DecisionType_CompleteWorkflowExecution, response.GetDecisions()[2].GetDecisionType())
-	t.NotNil(response.GetDecisions()[2].GetCompleteWorkflowExecutionDecisionAttributes())
+	t.Equal(1, len(response.GetDecisions()))
+	t.Equal(s.DecisionType_CompleteWorkflowExecution, response.GetDecisions()[0].GetDecisionType())
+	t.NotNil(response.GetDecisions()[0].GetCompleteWorkflowExecutionDecisionAttributes())
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {

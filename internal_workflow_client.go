@@ -22,6 +22,7 @@ package cadence
 
 import (
 	"errors"
+
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
 	m "go.uber.org/cadence/.gen/go/cadence"
@@ -34,6 +35,10 @@ import (
 // Assert that structs do indeed implement the interfaces
 var _ Client = (*workflowClient)(nil)
 var _ DomainClient = (*domainClient)(nil)
+
+const (
+	defaultDecisionTaskTimeoutInSecs = 20
+)
 
 type (
 	// workflowClient is the client for starting a workflow execution.
@@ -69,6 +74,23 @@ func (wc *workflowClient) StartWorkflow(
 		workflowID = uuid.NewRandom().String()
 	}
 
+	if options.TaskList == "" {
+		return nil, errors.New("missing TaskList")
+	}
+
+	executionTimeout := int32(options.ExecutionStartToCloseTimeout.Seconds())
+	if executionTimeout <= 0 {
+		return nil, errors.New("missing or invalid ExecutionStartToCloseTimeout")
+	}
+
+	decisionTaskTimeout := int32(options.DecisionTaskStartToCloseTimeout.Seconds())
+	if decisionTaskTimeout < 0 {
+		return nil, errors.New("negative DecisionTaskStartToCloseTimeout provided")
+	}
+	if decisionTaskTimeout == 0 {
+		decisionTaskTimeout = defaultDecisionTaskTimeoutInSecs
+	}
+
 	// Validate type and its arguments.
 	workflowType, input, err := getValidatedWorkerFunction(workflowFunc, args)
 	if err != nil {
@@ -82,8 +104,8 @@ func (wc *workflowClient) StartWorkflow(
 		WorkflowType: workflowTypePtr(*workflowType),
 		TaskList:     common.TaskListPtr(s.TaskList{Name: common.StringPtr(options.TaskList)}),
 		Input:        input,
-		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(options.ExecutionStartToCloseTimeoutSeconds),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(options.DecisionTaskStartToCloseTimeoutSeconds),
+		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionTimeout),
+		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(decisionTaskTimeout),
 		Identity:                            common.StringPtr(wc.identity)}
 
 	var response *s.StartWorkflowExecutionResponse
@@ -183,27 +205,40 @@ func (wc *workflowClient) TerminateWorkflow(workflowID string, runID string, rea
 
 // GetWorkflowHistory gets history of a particular workflow.
 func (wc *workflowClient) GetWorkflowHistory(workflowID string, runID string) (*s.History, error) {
-	request := &s.GetWorkflowExecutionHistoryRequest{
-		Domain: common.StringPtr(wc.domain),
-		Execution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      common.StringPtr(runID),
-		},
-	}
+	history := s.NewHistory()
+	history.Events = make([]*s.HistoryEvent, 0)
+	var nextPageToken []byte
 
-	var response *s.GetWorkflowExecutionHistoryResponse
-	err := backoff.Retry(
-		func() error {
-			var err1 error
-			ctx, cancel := newTChannelContext()
-			defer cancel()
-			response, err1 = wc.workflowService.GetWorkflowExecutionHistory(ctx, request)
-			return err1
-		}, serviceOperationRetryPolicy, isServiceTransientError)
-	if err != nil {
-		return nil, err
+GetHistoryLoop:
+	for {
+		request := &s.GetWorkflowExecutionHistoryRequest{
+			Domain: common.StringPtr(wc.domain),
+			Execution: &s.WorkflowExecution{
+				WorkflowId: common.StringPtr(workflowID),
+				RunId:      common.StringPtr(runID),
+			},
+			NextPageToken: nextPageToken,
+		}
+
+		var response *s.GetWorkflowExecutionHistoryResponse
+		err := backoff.Retry(
+			func() error {
+				var err1 error
+				ctx, cancel := newTChannelContext()
+				defer cancel()
+				response, err1 = wc.workflowService.GetWorkflowExecutionHistory(ctx, request)
+				return err1
+			}, serviceOperationRetryPolicy, isServiceTransientError)
+		if err != nil {
+			return nil, err
+		}
+		history.Events = append(history.Events, response.GetHistory().GetEvents()...)
+		if response.GetNextPageToken() == nil {
+			break GetHistoryLoop
+		}
+		nextPageToken = response.GetNextPageToken()
 	}
-	return response.GetHistory(), nil
+	return history, nil
 }
 
 // CompleteActivity reports activity completed. activity Execute method can return cadence.ErrActivityResultPending to

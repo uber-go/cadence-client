@@ -32,6 +32,8 @@ import (
 	"time"
 	"unicode"
 
+	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/common"
 	"go.uber.org/zap"
 )
 
@@ -70,7 +72,7 @@ type (
 	dispatcher interface {
 		// ExecuteUntilAllBlocked executes coroutines one by one in deterministic order
 		// until all of them are completed or blocked on Channel or Selector
-		ExecuteUntilAllBlocked() (err PanicError)
+		ExecuteUntilAllBlocked() (err *PanicError)
 		// IsDone returns true when all of coroutines are completed
 		IsDone() bool
 		Close()             // Destroys all coroutines without waiting for their completion
@@ -134,7 +136,7 @@ type (
 		unblock      chan unblockFunc // used to notify coroutine that it should continue executing.
 		keptBlocked  bool             // true indicates that coroutine didn't make any progress since the last yield unblocking
 		closed       bool             // indicates that owning coroutine has finished execution
-		panicError   PanicError       // non nil if coroutine had unhandled panic
+		panicError   *PanicError      // non nil if coroutine had unhandled panic
 	}
 
 	dispatcherImpl struct {
@@ -145,6 +147,30 @@ type (
 		executing        bool       // currently running ExecuteUntilAllBlocked. Used to avoid recursive calls to it.
 		mutex            sync.Mutex // used to synchronize executing
 		closed           bool
+	}
+
+	workflowOptions struct {
+		workflowType                        *WorkflowType
+		input                               []byte
+		taskListName                        *string
+		executionStartToCloseTimeoutSeconds *int32
+		taskStartToCloseTimeoutSeconds      *int32
+		domain                              *string
+		workflowID                          string
+		childPolicy                         ChildWorkflowPolicy
+		waitForCancellation                 bool
+		signalChannels                      map[string]Channel
+	}
+
+	// decodeFutureImpl
+	decodeFutureImpl struct {
+		*futureImpl
+		fn interface{}
+	}
+
+	childWorkflowFutureImpl struct {
+		*decodeFutureImpl             // for child workflow result
+		executionFuture   *futureImpl // for child workflow execution future
 	}
 
 	asyncFuture interface {
@@ -170,10 +196,13 @@ type (
 	}
 )
 
-const workflowEnvironmentContextKey = "_workflowEnv"
-const workflowResultContextKey = "_workflowResult"
-const coroutinesContextKey = "_coroutines"
-const componentVersionsContextKey = "_componentVersions"
+const (
+	workflowEnvironmentContextKey = "workflowEnv"
+	workflowResultContextKey      = "workflowResult"
+	coroutinesContextKey          = "coroutines"
+	componentVersionsContextKey   = "changeVersions"
+	workflowEnvOptionsContextKey  = "wfEnvOptions"
+)
 
 // Assert that structs do indeed implement the interfaces
 var _ Channel = (*channelImpl)(nil)
@@ -207,7 +236,7 @@ func (f *futureImpl) Get(ctx Context, value interface{}) error {
 	if !f.ready {
 		panic("not ready")
 	}
-	if value == nil {
+	if f.err != nil || f.value == nil || value == nil {
 		return f.err
 	}
 	rf := reflect.ValueOf(value)
@@ -294,6 +323,10 @@ func (f *futureImpl) ChainFuture(future Future) {
 
 func (f *futureImpl) GetValueAndError() (interface{}, error) {
 	return f.value, f.err
+}
+
+func (f childWorkflowFutureImpl) GetChildWorkflowExecution() Future {
+	return f.executionFuture
 }
 
 func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) {
@@ -401,7 +434,7 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 			zap.String("PanicError", panicErr.Error()),
 			zap.String("PanicStack", panicErr.StackTrace()))
 		checkUnhandledSigFn(ctx)
-		env.Complete(nil, NewErrorWithDetails(panicErr.Error(), []byte(panicErr.StackTrace())))
+		env.Complete(nil, panicErr)
 		return
 	}
 	rp := *getWorkflowResultPointerPointer(ctx)
@@ -708,7 +741,7 @@ func (d *dispatcherImpl) newState(name string) *coroutineState {
 	return c
 }
 
-func (d *dispatcherImpl) ExecuteUntilAllBlocked() (err PanicError) {
+func (d *dispatcherImpl) ExecuteUntilAllBlocked() (err *PanicError) {
 	d.mutex.Lock()
 	if d.closed {
 		panic("dispatcher is closed")
@@ -922,36 +955,52 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*
 	return &WorkflowType{Name: fnName}, input, nil
 }
 
-const workflowEnvOptionsContextKey = "wfEnvOptions"
+func getValidatedWorkflowOptions(ctx Context) (*workflowOptions, error) {
+	p := getWorkflowEnvOptions(ctx)
+	if p == nil {
+		// We need task list as a compulsory parameter. This can be removed after registration
+		return nil, errWorkflowOptionBadRequest
+	}
+	info := GetWorkflowInfo(ctx)
+	if p.domain == nil || *p.domain == "" {
+		// default to use current workflow's domain
+		p.domain = common.StringPtr(info.Domain)
+	}
+	if p.taskListName == nil || *p.taskListName == "" {
+		// default to use current workflow's task list
+		p.taskListName = common.StringPtr(info.TaskListName)
+	}
+	if p.taskStartToCloseTimeoutSeconds == nil || *p.taskStartToCloseTimeoutSeconds < 0 {
+		return nil, errors.New("missing or negative DecisionTaskStartToCloseTimeout")
+	}
+	if *p.taskStartToCloseTimeoutSeconds == 0 {
+		p.taskStartToCloseTimeoutSeconds = common.Int32Ptr(defaultDecisionTaskTimeoutInSecs)
+	}
+	if p.executionStartToCloseTimeoutSeconds == nil || *p.executionStartToCloseTimeoutSeconds <= 0 {
+		return nil, errors.New("missing or invalid ExecutionStartToCloseTimeout")
+	}
 
-func getWorkflowEnvOptions(ctx Context) *wfEnvironmentOptions {
-	env := ctx.Value(workflowEnvOptionsContextKey)
-	if env != nil {
-		return env.(*wfEnvironmentOptions)
+	return p, nil
+}
+
+func getWorkflowEnvOptions(ctx Context) *workflowOptions {
+	options := ctx.Value(workflowEnvOptionsContextKey)
+	if options != nil {
+		return options.(*workflowOptions)
 	}
 	return nil
 }
 
 func setWorkflowEnvOptionsIfNotExist(ctx Context) Context {
 	if valCtx := getWorkflowEnvOptions(ctx); valCtx == nil {
-		return WithValue(ctx, workflowEnvOptionsContextKey, &wfEnvironmentOptions{
+		return WithValue(ctx, workflowEnvOptionsContextKey, &workflowOptions{
 			signalChannels: make(map[string]Channel)})
 	}
 	return ctx
 }
 
-type wfEnvironmentOptions struct {
-	workflowType                        *WorkflowType
-	input                               []byte
-	taskListName                        *string
-	executionStartToCloseTimeoutSeconds *int32
-	taskStartToCloseTimeoutSeconds      *int32
-	domain                              *string
-	signalChannels                      map[string]Channel
-}
-
 // getSignalChannel finds the assosciated channel for the signal.
-func (w *wfEnvironmentOptions) getSignalChannel(ctx Context, signalName string) Channel {
+func (w *workflowOptions) getSignalChannel(ctx Context, signalName string) Channel {
 	if ch, ok := w.signalChannels[signalName]; ok {
 		return ch
 	}
@@ -961,7 +1010,7 @@ func (w *wfEnvironmentOptions) getSignalChannel(ctx Context, signalName string) 
 }
 
 // getUnhandledSignals checks if there are any signal channels that have data to be consumed.
-func (w *wfEnvironmentOptions) getUnhandledSignals() []string {
+func (w *workflowOptions) getUnhandledSignals() []string {
 	unhandledSignals := []string{}
 	for k, c := range w.signalChannels {
 		ch := c.(*channelImpl)
@@ -974,12 +1023,6 @@ func (w *wfEnvironmentOptions) getUnhandledSignals() []string {
 	return unhandledSignals
 }
 
-// decodeFutureImpl
-type decodeFutureImpl struct {
-	*futureImpl
-	fn interface{}
-}
-
 func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
 	more := d.futureImpl.channel.Receive(ctx, nil)
 	if more {
@@ -988,7 +1031,7 @@ func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
 	if !d.futureImpl.ready {
 		panic("not ready")
 	}
-	if value == nil {
+	if d.futureImpl.err != nil || d.futureImpl.value == nil || value == nil {
 		return d.futureImpl.err
 	}
 	rf := reflect.ValueOf(value)
@@ -1018,6 +1061,21 @@ func decodeAndAssignValue(from interface{}, toValuePtr interface{}) error {
 		reflect.ValueOf(toValuePtr).Elem().Set(fv)
 	}
 	return nil
+}
+
+func (p ChildWorkflowPolicy) toThriftChildPolicyPtr() *shared.ChildPolicy {
+	var childPolicy shared.ChildPolicy
+	switch p {
+	case ChildWorkflowPolicyTerminate:
+		childPolicy = shared.ChildPolicy_TERMINATE
+	case ChildWorkflowPolicyRequestCancel:
+		childPolicy = shared.ChildPolicy_REQUEST_CANCEL
+	case ChildWorkflowPolicyAbandon:
+		childPolicy = shared.ChildPolicy_ABANDON
+	default:
+		panic(fmt.Sprintf("unknown child policy %v", p))
+	}
+	return &childPolicy
 }
 
 // newDecodeFuture creates a new future as well as associated Settable that is used to set its value.

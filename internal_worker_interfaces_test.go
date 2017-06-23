@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -80,7 +81,7 @@ func (wf helloWorldWorkflow) Execute(env workflowEnvironment, input []byte) {
 	}
 	a := env.ExecuteActivity(activityParameters, func(result []byte, err error) {
 		if err != nil {
-			if _, ok := err.(CanceledError); !ok {
+			if _, ok := err.(*CanceledError); !ok {
 				env.Complete(nil, err)
 				return
 			}
@@ -154,10 +155,10 @@ func (s *InterfacesTestSuite) TestInterface() {
 
 	// Start a workflow.
 	workflowOptions := StartWorkflowOptions{
-		ID:       "HelloWorld_Workflow",
-		TaskList: "testTaskList",
-		ExecutionStartToCloseTimeoutSeconds:    10,
-		DecisionTaskStartToCloseTimeoutSeconds: 10,
+		ID:                              "HelloWorld_Workflow",
+		TaskList:                        "testTaskList",
+		ExecutionStartToCloseTimeout:    10 * time.Second,
+		DecisionTaskStartToCloseTimeout: 10 * time.Second,
 	}
 	workflowClient := NewClient(service, domain, nil)
 	wfExecution, err := workflowClient.StartWorkflow(workflowOptions, "workflowType")

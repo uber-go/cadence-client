@@ -52,9 +52,11 @@ type (
 		Close()
 	}
 
+	workflowHistoryIterator func(nextToken []byte) (*s.History, []byte, error)
 	// workflowTask wraps a decision task.
 	workflowTask struct {
-		task *s.PollForDecisionTaskResponse
+		task     *s.PollForDecisionTaskResponse
+		iterator workflowHistoryIterator
 	}
 
 	// activityTask wraps a activity task.
@@ -90,6 +92,8 @@ type (
 	history struct {
 		workflowTask      *workflowTask
 		eventsHandler     *workflowExecutionEventHandlerImpl
+		loadedEvents      []*s.HistoryEvent
+		nextPageToken     []byte
 		currentIndex      int
 		historyEventsSize int
 		next              []*s.HistoryEvent
@@ -100,10 +104,12 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 	result := &history{
 		workflowTask:      task,
 		eventsHandler:     eventsHandler,
+		loadedEvents:      task.task.GetHistory().GetEvents(),
+		nextPageToken:     task.task.GetNextPageToken(),
 		currentIndex:      0,
 		historyEventsSize: len(task.task.History.Events),
 	}
-	result.next, _ = result.nextDecisionEvents()
+
 	return result
 }
 
@@ -145,11 +151,13 @@ func isDecisionEvent(eventType s.EventType) bool {
 	case s.EventType_WorkflowExecutionCompleted,
 		s.EventType_WorkflowExecutionFailed,
 		s.EventType_WorkflowExecutionCanceled,
+		s.EventType_WorkflowExecutionContinuedAsNew,
 		s.EventType_ActivityTaskScheduled,
 		s.EventType_ActivityTaskCancelRequested,
 		s.EventType_TimerStarted,
 		s.EventType_TimerCanceled,
 		s.EventType_MarkerRecorded,
+		s.EventType_StartChildWorkflowExecutionInitiated,
 		s.EventType_RequestCancelExternalWorkflowExecutionInitiated:
 		return true
 	default:
@@ -174,21 +182,27 @@ func isDecisionEvent(eventType s.EventType) bool {
 // To maintain determinism the concurrent decisions are moved to the one after the decisions made by current decision.
 // markers result value returns marker events that currently running decision produced. They are used to
 // implement SideEffect method execution without blocking on decision roundtrip.
-func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent) {
+func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
+	if eh.next == nil {
+		eh.next, _, err = eh.nextDecisionEvents()
+		if err != nil {
+			return result, markers, err
+		}
+	}
+
 	result = eh.next
 	if len(result) > 0 {
-		eh.next, markers = eh.nextDecisionEvents()
+		eh.next, markers, err = eh.nextDecisionEvents()
 	}
-	return result, markers
+	return result, markers, err
 }
 
-func (eh *history) nextDecisionEvents() (reorderedEvents []*s.HistoryEvent, markers []*s.HistoryEvent) {
-	if eh.currentIndex == eh.historyEventsSize {
-		return []*s.HistoryEvent{}, []*s.HistoryEvent{}
+func (eh *history) nextDecisionEvents() (reorderedEvents []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
+	if eh.currentIndex == len(eh.loadedEvents) && eh.nextPageToken == nil {
+		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, nil
 	}
 
 	// Process events
-	history := eh.workflowTask.task.History
 
 	decisionStartToCompletionEvents := []*s.HistoryEvent{}
 	decisionCompletionToStartEvents := []*s.HistoryEvent{}
@@ -197,8 +211,22 @@ func (eh *history) nextDecisionEvents() (reorderedEvents []*s.HistoryEvent, mark
 	lastDecisionIndex := -1
 
 OrderEvents:
-	for ; eh.currentIndex < eh.historyEventsSize; eh.currentIndex++ {
-		event := history.Events[eh.currentIndex]
+	for {
+		// load more history events if needed
+		for eh.currentIndex == len(eh.loadedEvents) {
+			if eh.nextPageToken == nil {
+				break OrderEvents
+			}
+			historyPage, token, err1 := eh.workflowTask.iterator(eh.nextPageToken)
+			if err1 != nil {
+				err = err1
+				return
+			}
+			eh.nextPageToken = token
+			eh.loadedEvents = append(eh.loadedEvents, historyPage.GetEvents()...)
+		}
+
+		event := eh.loadedEvents[eh.currentIndex]
 		switch event.GetEventType() {
 		case s.EventType_DecisionTaskStarted:
 			if !eh.IsNextDecisionFailed() {
@@ -213,7 +241,7 @@ OrderEvents:
 		case s.EventType_DecisionTaskCompleted:
 			concurrentToDecision = false
 
-		case s.EventType_DecisionTaskScheduled, s.EventType_DecisionTaskTimedOut:
+		case s.EventType_DecisionTaskScheduled, s.EventType_DecisionTaskTimedOut, s.EventType_DecisionTaskFailed:
 		// Skip
 		default:
 			if concurrentToDecision {
@@ -228,6 +256,7 @@ OrderEvents:
 				decisionCompletionToStartEvents = append(decisionCompletionToStartEvents, event)
 			}
 		}
+		eh.currentIndex++
 	}
 
 	// Reorder events to correspond to the order that decider sees them.
@@ -248,7 +277,7 @@ OrderEvents:
 	if decisionStartedEvent != nil {
 		reorderedEvents = append(reorderedEvents, decisionStartedEvent)
 	}
-	return reorderedEvents, markers
+	return reorderedEvents, markers, nil
 }
 
 // newWorkflowTaskHandler returns an implementation of workflow task handler.
@@ -340,7 +369,10 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	// Process events
 ProcessEvents:
 	for {
-		reorderedEvents, markers := reorderedHistory.NextDecisionEvents()
+		reorderedEvents, markers, err := reorderedHistory.NextDecisionEvents()
+		if err != nil {
+			return nil, "", err
+		}
 
 		if len(reorderedEvents) == 0 {
 			break ProcessEvents
@@ -399,14 +431,16 @@ ProcessEvents:
 		wth.logger.Error("Unable to read workflow start attributes.", zap.Error(err))
 		return nil, "", err
 	}
-	eventDecisions, err := wth.completeWorkflow(
-		isWorkflowCompleted, completionResult, failure, startAttributes)
-	if err != nil {
-		wth.logger.Error("Complete workflow failed.", zap.Error(err))
-		return nil, "", err
+
+	if _, ok := failure.(*PanicError); ok {
+		// Timeout the Decision instead of failing workflow.
+		// TODO: Pump this stack trace on to workflow history for debuggability by exposing decision type fail to client.
+		return nil, "", failure
 	}
-	if len(eventDecisions) > 0 {
-		decisions = append(decisions, eventDecisions...)
+
+	closeDecision := wth.completeWorkflow(isWorkflowCompleted, completionResult, failure, startAttributes)
+	if closeDecision != nil {
+		decisions = append(decisions, closeDecision)
 		if wth.metricsScope != nil {
 			wth.metricsScope.Counter(metrics.WorkflowsCompletionTotalCounter).Inc(1)
 			elapsed := time.Now().Sub(startTime)
@@ -421,6 +455,17 @@ ProcessEvents:
 		Identity:  common.StringPtr(wth.identity),
 		// ExecutionContext:
 	}
+
+	if enableVerboseLogging {
+		var buf bytes.Buffer
+		for i, d := range decisions {
+			buf.WriteString(fmt.Sprintf("%v: %v\n", i, util.DecisionToString(d)))
+		}
+		wth.logger.Debug("new_decisions",
+			zap.Int("DecisionCount", len(decisions)),
+			zap.String("Decisions", buf.String()))
+	}
+
 	if emitStack {
 		stackTrace = eventHandler.StackTrace()
 	}
@@ -602,15 +647,35 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		if e.GetEventType() != s.EventType_WorkflowExecutionCanceled {
 			return false
 		}
-		eventAttributes := e.GetWorkflowExecutionCanceledEventAttributes()
-		decisionAttributes := d.GetCancelWorkflowExecutionDecisionAttributes()
 		if strictMode {
+			eventAttributes := e.GetWorkflowExecutionCanceledEventAttributes()
+			decisionAttributes := d.GetCancelWorkflowExecutionDecisionAttributes()
 			if bytes.Compare(eventAttributes.GetDetails(), decisionAttributes.GetDetails()) != 0 {
 				return false
 			}
 		}
 		return true
 
+	case s.DecisionType_ContinueAsNewWorkflowExecution:
+		if e.GetEventType() != s.EventType_WorkflowExecutionContinuedAsNew {
+			return false
+		}
+
+		return true
+
+	case s.DecisionType_StartChildWorkflowExecution:
+		if e.GetEventType() != s.EventType_StartChildWorkflowExecutionInitiated {
+			return false
+		}
+		eventAttributes := e.GetStartChildWorkflowExecutionInitiatedEventAttributes()
+		decisionAttributes := d.GetStartChildWorkflowExecutionDecisionAttributes()
+		if eventAttributes.GetDomain() != decisionAttributes.GetDomain() ||
+			eventAttributes.GetTaskList().GetName() != decisionAttributes.GetTaskList().GetName() ||
+			eventAttributes.GetWorkflowType().GetName() != decisionAttributes.GetWorkflowType().GetName() {
+			return false
+		}
+
+		return true
 	}
 
 	return false
@@ -621,44 +686,40 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	completionResult []byte,
 	err error,
 	startAttributes *s.WorkflowExecutionStartedEventAttributes,
-) ([]*s.Decision, error) {
-	decisions := []*s.Decision{}
-	if err == ErrCanceled {
+) *s.Decision {
+	var decision *s.Decision
+	if canceledErr, ok := err.(*CanceledError); ok {
 		// Workflow cancelled
-		cancelDecision := createNewDecision(s.DecisionType_CancelWorkflowExecution)
-		cancelDecision.CancelWorkflowExecutionDecisionAttributes = &s.CancelWorkflowExecutionDecisionAttributes{
-			Details: completionResult,
+		decision = createNewDecision(s.DecisionType_CancelWorkflowExecution)
+		decision.CancelWorkflowExecutionDecisionAttributes = &s.CancelWorkflowExecutionDecisionAttributes{
+			Details: canceledErr.details,
 		}
-		decisions = append(decisions, cancelDecision)
-	} else if contErr, ok := err.(*continueAsNewError); ok {
+	} else if contErr, ok := err.(*ContinueAsNewError); ok {
 		// Continue as new error.
-		continueAsNewDecision := createNewDecision(s.DecisionType_ContinueAsNewWorkflowExecution)
-		continueAsNewDecision.ContinueAsNewWorkflowExecutionDecisionAttributes = &s.ContinueAsNewWorkflowExecutionDecisionAttributes{
+		decision = createNewDecision(s.DecisionType_ContinueAsNewWorkflowExecution)
+		decision.ContinueAsNewWorkflowExecutionDecisionAttributes = &s.ContinueAsNewWorkflowExecutionDecisionAttributes{
 			WorkflowType: workflowTypePtr(*contErr.options.workflowType),
 			Input:        contErr.options.input,
 			TaskList:     common.TaskListPtr(s.TaskList{Name: contErr.options.taskListName}),
 			ExecutionStartToCloseTimeoutSeconds: contErr.options.executionStartToCloseTimeoutSeconds,
 			TaskStartToCloseTimeoutSeconds:      contErr.options.taskStartToCloseTimeoutSeconds,
 		}
-		decisions = append(decisions, continueAsNewDecision)
 	} else if err != nil {
 		// Workflow failures
-		failDecision := createNewDecision(s.DecisionType_FailWorkflowExecution)
+		decision = createNewDecision(s.DecisionType_FailWorkflowExecution)
 		reason, details := getErrorDetails(err)
-		failDecision.FailWorkflowExecutionDecisionAttributes = &s.FailWorkflowExecutionDecisionAttributes{
+		decision.FailWorkflowExecutionDecisionAttributes = &s.FailWorkflowExecutionDecisionAttributes{
 			Reason:  common.StringPtr(reason),
 			Details: details,
 		}
-		decisions = append(decisions, failDecision)
 	} else if isWorkflowCompleted {
 		// Workflow completion
-		completeDecision := createNewDecision(s.DecisionType_CompleteWorkflowExecution)
-		completeDecision.CompleteWorkflowExecutionDecisionAttributes = &s.CompleteWorkflowExecutionDecisionAttributes{
+		decision = createNewDecision(s.DecisionType_CompleteWorkflowExecution)
+		decision.CompleteWorkflowExecutionDecisionAttributes = &s.CompleteWorkflowExecutionDecisionAttributes{
 			Result_: completionResult,
 		}
-		decisions = append(decisions, completeDecision)
 	}
-	return decisions, nil
+	return decision
 }
 
 func (wth *workflowTaskHandlerImpl) executeAnyPressurePoints(event *s.HistoryEvent, isInReplay bool) error {
@@ -715,7 +776,7 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 	err := recordActivityHeartbeat(i.service, i.identity, i.taskToken, details, i.retryPolicy)
 
 	switch err.(type) {
-	case CanceledError:
+	case *CanceledError:
 		// We are asked to cancel. inform the activity about cancellation through context.
 		// We are asked to cancel. inform the activity about cancellation through context.
 		i.cancelHandler()
@@ -783,7 +844,8 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 			ath.logger.Error("Activity panic.",
 				zap.String("PanicError", fmt.Sprintf("%v", p)),
 				zap.String("PanicStack", st))
-			err = newPanicError(p, st) // Fail decision on panic
+			panicErr := newPanicError(p, st)
+			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr), nil
 		}
 	}()
 

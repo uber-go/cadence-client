@@ -380,6 +380,28 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, testActivityResult{}, r2Struct)
 
+	f = ExecuteActivity(ctx, testActivityReturnNilStructPtr)
+	var rStructPtr *testActivityResult
+	err = f.Get(ctx, &rStructPtr)
+	require.NoError(w.t, err, err)
+	require.True(w.t, rStructPtr == nil)
+
+	f = ExecuteActivity(ctx, testActivityReturnStructPtr)
+	err = f.Get(ctx, &rStructPtr)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, *rStructPtr, testActivityResult{Index: 10})
+
+	f = ExecuteActivity(ctx, testActivityReturnNilStructPtrPtr)
+	var rStruct2Ptr **testActivityResult
+	err = f.Get(ctx, &rStruct2Ptr)
+	require.NoError(w.t, err, err)
+	require.True(w.t, rStruct2Ptr == nil)
+
+	f = ExecuteActivity(ctx, testActivityReturnStructPtrPtr)
+	err = f.Get(ctx, &rStruct2Ptr)
+	require.NoError(w.t, err, err)
+	require.True(w.t, **rStruct2Ptr == testActivityResult{Index: 10})
+
 	// By names.
 	err = ExecuteActivity(ctx, "go.uber.org/cadence.testActivityByteArgs", input).Get(ctx, nil)
 	require.NoError(w.t, err, err)
@@ -444,13 +466,28 @@ func testActivityReturnEmptyString() (string, error) {
 	return "", nil
 }
 
-type testActivityResult struct{}
+type testActivityResult struct {
+	Index int
+}
 
 // testActivityReturnEmptyStruct
 func testActivityReturnEmptyStruct() (testActivityResult, error) {
 	// Return is mocked to retrun nil from server.
 	// expect to convert it to appropriate default value.
 	return testActivityResult{}, nil
+}
+func testActivityReturnNilStructPtr() (*testActivityResult, error) {
+	return nil, nil
+}
+func testActivityReturnStructPtr() (*testActivityResult, error) {
+	return &testActivityResult{Index: 10}, nil
+}
+func testActivityReturnNilStructPtrPtr() (**testActivityResult, error) {
+	return nil, nil
+}
+func testActivityReturnStructPtrPtr() (**testActivityResult, error) {
+	r := &testActivityResult{Index: 10}
+	return &r, nil
 }
 
 func TestVariousActivitySchedulingOption(t *testing.T) {
@@ -460,6 +497,10 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 	ts.RegisterActivity(testActivityReturnByteArray)
 	ts.RegisterActivity(testActivityReturnInt)
 	ts.RegisterActivity(testActivityByteArgs)
+	ts.RegisterActivity(testActivityReturnNilStructPtr)
+	ts.RegisterActivity(testActivityReturnStructPtr)
+	ts.RegisterActivity(testActivityReturnNilStructPtrPtr)
+	ts.RegisterActivity(testActivityReturnStructPtrPtr)
 	env := ts.NewTestWorkflowEnvironment()
 	w := &activitiesCallingOptionsWorkflow{t: t}
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
@@ -522,14 +563,14 @@ func TestActivityErrorWithDetails(t *testing.T) {
 	a1 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (err error) {
-			return NewErrorWithDetails("testReason", "testStringDetails")
+			return NewCustomError("testReason", "testStringDetails")
 		}}
 	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
 
 	err := deSerializeFunctionResult(a1.fn, encResult, nil)
 	require.NoError(t, err)
 	require.Error(t, e)
-	errWD := e.(ErrorWithDetails)
+	errWD := e.(*CustomError)
 	require.Equal(t, "testReason", errWD.Reason())
 	var strDetails string
 	errWD.Details(&strDetails)
@@ -538,13 +579,13 @@ func TestActivityErrorWithDetails(t *testing.T) {
 	a2 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (err error) {
-			return NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack"})
+			return NewCustomError("testReason", testErrorDetails{T: "testErrorStack"})
 		}}
 	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
 	err = deSerializeFunctionResult(a2.fn, encResult, nil)
 	require.NoError(t, err)
 	require.Error(t, e)
-	errWD = e.(ErrorWithDetails)
+	errWD = e.(*CustomError)
 	require.Equal(t, "testReason", errWD.Reason())
 	var td testErrorDetails
 	errWD.Details(&td)
@@ -553,7 +594,7 @@ func TestActivityErrorWithDetails(t *testing.T) {
 	a3 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (result string, err error) {
-			return "testResult", NewErrorWithDetails("testReason", testErrorDetails{T: "testErrorStack3"})
+			return "testResult", NewCustomError("testReason", testErrorDetails{T: "testErrorStack3"})
 		}}
 	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a3.fn, 1))
 	var result string
@@ -561,7 +602,7 @@ func TestActivityErrorWithDetails(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "testResult", result)
 	require.Error(t, e)
-	errWD = e.(ErrorWithDetails)
+	errWD = e.(*CustomError)
 	require.Equal(t, "testReason", errWD.Reason())
 	errWD.Details(&td)
 	require.Equal(t, testErrorDetails{T: "testErrorStack3"}, td)
@@ -569,14 +610,14 @@ func TestActivityErrorWithDetails(t *testing.T) {
 	a4 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (result string, err error) {
-			return "testResult4", NewErrorWithDetails("testReason", "testMultipleString", testErrorDetails{T: "testErrorStack4"})
+			return "testResult4", NewCustomError("testReason", "testMultipleString", testErrorDetails{T: "testErrorStack4"})
 		}}
 	encResult, e = a4.Execute(context.Background(), testEncodeFunctionArgs(a4.fn, 1))
 	err = deSerializeFunctionResult(a3.fn, encResult, &result)
 	require.NoError(t, err)
 	require.Equal(t, "testResult4", result)
 	require.Error(t, e)
-	errWD = e.(ErrorWithDetails)
+	errWD = e.(*CustomError)
 	require.Equal(t, "testReason", errWD.Reason())
 	var ed string
 	errWD.Details(&ed, &td)
@@ -594,7 +635,7 @@ func TestActivityCancelledError(t *testing.T) {
 	err := deSerializeFunctionResult(a1.fn, encResult, nil)
 	require.NoError(t, err)
 	require.Error(t, e)
-	errWD := e.(CanceledError)
+	errWD := e.(*CanceledError)
 	var strDetails string
 	errWD.Details(&strDetails)
 	require.Equal(t, "testCancelStringDetails", strDetails)
@@ -608,7 +649,7 @@ func TestActivityCancelledError(t *testing.T) {
 	err = deSerializeFunctionResult(a2.fn, encResult, nil)
 	require.NoError(t, err)
 	require.Error(t, e)
-	errWD = e.(CanceledError)
+	errWD = e.(*CanceledError)
 	var td testErrorDetails
 	errWD.Details(&td)
 	require.Equal(t, testErrorDetails{T: "testCancelErrorStack"}, td)
@@ -624,7 +665,7 @@ func TestActivityCancelledError(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "testResult", r)
 	require.Error(t, e)
-	errWD = e.(CanceledError)
+	errWD = e.(*CanceledError)
 	errWD.Details(&td)
 	require.Equal(t, testErrorDetails{T: "testErrorStack3"}, td)
 
@@ -638,7 +679,7 @@ func TestActivityCancelledError(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "testResult4", r)
 	require.Error(t, e)
-	errWD = e.(CanceledError)
+	errWD = e.(*CanceledError)
 	var ed string
 	errWD.Details(&ed, &td)
 	require.Equal(t, "testMultipleString", ed)

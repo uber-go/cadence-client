@@ -205,7 +205,31 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 	if response == nil || len(response.GetTaskToken()) == 0 {
 		return &workflowTask{}, nil
 	}
-	return &workflowTask{task: response}, nil
+
+	execution := response.GetWorkflowExecution()
+	iterator := func(nextPageToken []byte) (*s.History, []byte, error) {
+		var resp *s.GetWorkflowExecutionHistoryResponse
+		err = backoff.Retry(
+			func() error {
+				ctx, cancel := newTChannelContext()
+				defer cancel()
+
+				var err1 error
+				resp, err1 = wtp.service.GetWorkflowExecutionHistory(ctx, &s.GetWorkflowExecutionHistoryRequest{
+					Domain:        common.StringPtr(wtp.domain),
+					Execution:     execution,
+					NextPageToken: nextPageToken,
+				})
+				return err1
+			}, serviceOperationRetryPolicy, isServiceTransientError)
+		if err != nil {
+			return nil, nil, err
+		}
+		return resp.GetHistory(), resp.GetNextPageToken(), nil
+	}
+
+	task := &workflowTask{task: response, iterator: iterator}
+	return task, nil
 }
 
 func newActivityTaskPoller(taskHandler ActivityTaskHandler, service m.TChanWorkflowService,
@@ -341,7 +365,7 @@ func convertActivityResultToRespondRequest(identity string, taskToken, result []
 	}
 
 	reason, details := getErrorDetails(err)
-	if _, ok := err.(CanceledError); ok || err == context.Canceled {
+	if _, ok := err.(*CanceledError); ok || err == context.Canceled {
 		return &s.RespondActivityTaskCanceledRequest{
 			TaskToken: taskToken,
 			Details:   details,

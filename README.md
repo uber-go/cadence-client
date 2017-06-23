@@ -17,6 +17,8 @@ or
 go get go.uber.org/cadence
 ```
 
+See [samples](https://github.com/samarabbas/cadence-samples) to get started
+
 ### Activity
 
 Activity is the implementation of a particular task in the business logic. 
@@ -166,22 +168,24 @@ func buildCadenceClient() t.TChanWorkflowService {
 }
 
 func startWorker(logger *zap.Logger, client t.TChanWorkflowService) {
+    // TaskListName - identifies set of client workflows, activities and workers.
+    // it could be your group or client or application name.
 	workerOptions := cadence.WorkerOptions{
 		Logger:       logger,
-		MetricsScope: tally.NewTestScope(ClientName, map[string]string{}),
+		MetricsScope: tally.NewTestScope(TaskListName, map[string]string{}),
 	}
 
 	worker := cadence.NewWorker(
 		client,
 		Domain,
-		ClientName,
+		TaskListName,
 		workerOptions)
 	err := worker.Start()
 	if err != nil {
 		panic("Failed to start worker")
 	}
 
-	logger.Info("Started Worker.", zap.String("worker", ClientName))
+	logger.Info("Started Worker.", zap.String("worker", TaskListName))
 }
 ```
 

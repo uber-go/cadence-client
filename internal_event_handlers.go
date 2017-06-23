@@ -73,9 +73,9 @@ type (
 		workflowInfo              *WorkflowInfo
 		workflowDefinitionFactory workflowDefinitionFactory
 
-		decisionsHelper   *decisionsHelper
-		sideEffectResult  map[int32][]byte
-		componentVersions map[string]Version // Map of component versions extracted from markers
+		decisionsHelper  *decisionsHelper
+		sideEffectResult map[int32][]byte
+		changeVersions   map[string]Version // Map of versions indexed by changeID extracted from markers
 
 		counterID         int32     // To generate sequence IDs for activity/timer etc.
 		currentReplayTime time.Time // Indicates current replay time of the decision.
@@ -122,7 +122,7 @@ func newWorkflowExecutionEventHandler(workflowInfo *WorkflowInfo, workflowDefini
 		workflowDefinitionFactory: workflowDefinitionFactory,
 		decisionsHelper:           newDecisionsHelper(),
 		sideEffectResult:          make(map[int32][]byte),
-		componentVersions:         make(map[string]Version),
+		changeVersions:            make(map[string]Version),
 		completeHandler:           completeHandler,
 		enableLoggingInReplay:     enableLoggingInReplay,
 	}
@@ -335,37 +335,37 @@ func (wc *workflowEnvironmentImpl) RequestCancelTimer(timerID string) {
 	wc.logger.Debug("RequestCancelTimer", zap.String(tagTimerID, timerID))
 }
 
-func validateVersion(component string, version, minSupported, maxSupported Version) {
+func validateVersion(changeID string, version, minSupported, maxSupported Version) {
 	if version < minSupported {
 		panic(fmt.Sprintf("Workflow code removed support of version %v. "+
-			"for \"%v\" component. The oldest supported version is %v",
-			version, component, minSupported))
+			"for \"%v\" changeID. The oldest supported version is %v",
+			version, changeID, minSupported))
 	}
 	if version > maxSupported {
 		panic(fmt.Sprintf("Workflow code is too old to support version %v "+
-			"for \"%v\" component. The maximum supported version is %v",
-			version, component, minSupported))
+			"for \"%v\" changeID. The maximum supported version is %v",
+			version, changeID, minSupported))
 	}
 }
 
-func (wc *workflowEnvironmentImpl) GetVersion(component string, minSupported, maxSupported Version) Version {
+func (wc *workflowEnvironmentImpl) GetVersion(changeID string, minSupported, maxSupported Version) Version {
 	var version Version
 	if wc.isReplay {
 		var ok bool
-		version, ok = wc.componentVersions[component]
+		version, ok = wc.changeVersions[changeID]
 		if !ok {
 			version = DefaultVersion
 		}
-		validateVersion(component, version, minSupported, maxSupported)
+		validateVersion(changeID, version, minSupported, maxSupported)
 		wc.logger.Debug("GetVersion return version from a marker",
-			zap.String(tagComponentName, component), zap.Int(tagVersion, int(version)))
+			zap.String(tagChangeID, changeID), zap.Int(tagVersion, int(version)))
 		return version
 	}
 	version = maxSupported
-	wc.decisionsHelper.recordVersionMarker(component, version)
+	wc.decisionsHelper.recordVersionMarker(changeID, version)
 
 	wc.logger.Debug("GetVersion return",
-		zap.String(tagComponentName, component), zap.Int(tagVersion, int(version)))
+		zap.String(tagChangeID, changeID), zap.Int(tagVersion, int(version)))
 	return version
 }
 
@@ -683,16 +683,16 @@ func (weh *workflowExecutionEventHandlerImpl) handleMarkerRecorded(
 		return nil
 	case versionMarkerName:
 		dec := gob.NewDecoder(bytes.NewBuffer(attributes.GetDetails()))
-		var component string
+		var changeID string
 
-		if err := dec.Decode(&component); err != nil {
-			return fmt.Errorf("failure decoding version component: %v", err)
+		if err := dec.Decode(&changeID); err != nil {
+			return fmt.Errorf("failure decoding version changeID: %v", err)
 		}
 		var version int
 		if err := dec.Decode(&version); err != nil {
 			return fmt.Errorf("failure decoding version: %v", err)
 		}
-		weh.componentVersions[component] = Version(version)
+		weh.changeVersions[changeID] = Version(version)
 		return nil
 	default:
 		return fmt.Errorf("unknown marker name \"%v\" for eventID \"%v\"",

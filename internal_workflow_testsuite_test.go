@@ -461,7 +461,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_SideEffect() {
 	s.Nil(env.GetWorkflowError())
 }
 
-const testComponent = "workflow"
+const testChangeID = "workflow"
 const (
 	testVersion1 = iota + 10
 	testVersion2
@@ -493,7 +493,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_IsVersion() {
 	workflowFn := func(ctx Context) error {
 		ctx = WithActivityOptions(ctx, s.activityOptions)
 		var f Future
-		v := GetVersion(ctx, testComponent, testCurrentVersion, DefaultVersion)
+		v := GetVersion(ctx, testChangeID, DefaultVersion, testCurrentVersion)
 		if v == DefaultVersion {
 			f = ExecuteActivity(ctx, oldActivity, "msg1")
 		} else {

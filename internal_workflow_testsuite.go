@@ -1124,8 +1124,8 @@ func (env *testWorkflowEnvironmentImpl) signalWorkflow(name string, input interf
 	}, true)
 }
 
-func (env *testWorkflowEnvironmentImpl) GetVersion(component string, maxSupported, minSupported Version) Version {
-	// TODO: Add validation that maxSupported is the same for all calls for the given component.
+func (env *testWorkflowEnvironmentImpl) GetVersion(changeID string, minSupported, maxSupported Version) Version {
+	// TODO: Add code that returns the same version for all calls for the given changeID.
 	return maxSupported
 }
 

@@ -686,7 +686,7 @@ func (h *decisionsHelper) recordVersionMarker(changeID string, version Version) 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(changeID); err != nil {
-		panic(fmt.Sprintf("Failure encoding component name: %v", err))
+		panic(fmt.Sprintf("Failure encoding changeID name: %v", err))
 	}
 	if err := enc.Encode(version); err != nil {
 		panic(fmt.Sprintf("Failure encoding version value: %v", err))

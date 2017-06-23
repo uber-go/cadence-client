@@ -23,7 +23,6 @@ package cadence
 import (
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"go.uber.org/cadence/common"
@@ -109,7 +108,7 @@ type (
 	// EncodedValue is type alias used to encapsulate/extract encoded result from workflow/activity.
 	EncodedValue []byte
 
-	// Version represents a component version. See GetVersion call.
+	// Version represents a change version. See GetVersion call.
 	Version int
 
 	// ChildWorkflowOptions stores all child workflow specific parameters that will be stored inside of a Context.
@@ -548,29 +547,10 @@ func SideEffect(ctx Context, f func(ctx Context) interface{}) EncodedValue {
 // DefaultVersion is a version returned by GetVersion for code that wasn't versioned before
 var DefaultVersion Version = -1
 
-// VersionTombstone is used to indicate that GetVersion call was at this place.
-// It is needed to ensure that workflows that use lower version are not corrupted by this decider.
-func VersionTombstone(ctx Context, component string, minSupported Version) {
-	versions := ctx.Value(componentVersionsContextKey).(map[string]*componentVersion)
-	cv, ok := versions[component]
-	if ok {
-		if cv.minSupported < minSupported {
-			minSupported = cv.minSupported
-		} else {
-			cv.minSupported = minSupported
-		}
-		if cv.version != nil {
-			validateVersion(component, *cv.version, minSupported, math.MaxInt32)
-		}
-		return
-	}
-	versions[component] = &componentVersion{minSupported: minSupported}
-}
-
 // GetVersion is used to safely perform backwards incompatible changes to workflow definitions.
-func GetVersion(ctx Context, component string, minSupported, maxSupported Version) Version {
-	versions := ctx.Value(componentVersionsContextKey).(map[string]*componentVersion)
-	cv, ok := versions[component]
+func GetVersion(ctx Context, changeID string, minSupported, maxSupported Version) Version {
+	versions := ctx.Value(changeVersionsContextKey).(map[string]*changeVersion)
+	cv, ok := versions[changeID]
 	if ok {
 		if cv.minSupported < minSupported {
 			minSupported = cv.minSupported
@@ -579,11 +559,11 @@ func GetVersion(ctx Context, component string, minSupported, maxSupported Versio
 		}
 
 		if cv.version != nil {
-			validateVersion(component, *cv.version, minSupported, maxSupported)
+			validateVersion(changeID, *cv.version, minSupported, maxSupported)
 			return *cv.version
 		}
 	}
-	version := getWorkflowEnvironment(ctx).GetVersion(component, minSupported, maxSupported)
-	versions[component] = &componentVersion{minSupported: minSupported, version: &version}
+	version := getWorkflowEnvironment(ctx).GetVersion(changeID, minSupported, maxSupported)
+	versions[changeID] = &changeVersion{minSupported: minSupported, version: &version}
 	return version
 }

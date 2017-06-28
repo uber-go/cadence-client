@@ -81,6 +81,16 @@ type (
 		//	- InternalServiceError
 		GetWorkflowHistory(workflowID string, runID string) (*s.History, error)
 
+		// GetWorkflowThreadDump gets thread dump of a particular workflow.
+		// The errors it can return:
+		//	- EntityNotExistsError
+		//	- BadRequestError
+		//	- InternalServiceError
+		GetWorkflowThreadDump(workflowID string, runID string) (string, error)
+
+		// GetWorkflowThreadDumpForHistory gets thread dump of a particular workflow history.
+		GetWorkflowThreadDumpForHistory(*s.History) (string, error)
+
 		// CompleteActivity reports activity completed.
 		// activity Execute method can return cadence.ErrActivityResultPending to
 		// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method

@@ -23,12 +23,14 @@ package cadence
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
 	"go.uber.org/cadence/common/util"
@@ -394,6 +396,62 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
 			t.Nil(r, td)
 		}
 	}
+}
+
+func ThreadDumpActivity() error {
+	return ErrActivityResultPending
+}
+
+func ThreadDumpWorkflow(ctx Context) error {
+	ctx = WithActivityOptions(ctx, ActivityOptions{
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+	})
+	err := ExecuteActivity(ctx, ThreadDumpActivity).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDump() {
+	RegisterWorkflow(ThreadDumpWorkflow)
+	RegisterActivity(ThreadDumpActivity)
+
+	// Schedule an activity and see if we complete workflow.
+	workflowType := "go.uber.org/cadence.ThreadDumpWorkflow"
+	taskListName := "tl1"
+	taskList := &s.TaskList{Name: &taskListName}
+	testEvents := []*s.HistoryEvent{
+
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
+			TaskList:     taskList,
+			WorkflowType: &s.WorkflowType{Name: &workflowType},
+		}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: taskList}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventActivityTaskScheduled(4, &s.ActivityTaskScheduledEventAttributes{
+			ActivityId:   common.StringPtr("0"),
+			ActivityType: &s.ActivityType{Name: common.StringPtr("go.uber.org/cadence.ThreadDumpActivity")},
+			TaskList:     taskList,
+		}),
+	}
+	service := new(mocks.TChanWorkflowService)
+
+	// mocks
+	service.On("GetWorkflowExecutionHistory", mock.Anything, mock.Anything).Return(&s.GetWorkflowExecutionHistoryResponse{
+		History: &s.History{
+			Events: testEvents,
+		},
+	}, nil)
+	domain := "testDomain"
+	workflowClient := NewClient(service, domain, nil)
+
+	dump, err := workflowClient.GetWorkflowThreadDump("id1", "runId1")
+	t.NoError(err)
+	t.NotNil(dump)
+	t.True(strings.Contains(dump, ".Receive]"))
+	t.True(strings.Contains(dump, "blocked on"))
 }
 
 func (t *TaskHandlersTestSuite) printAllDecisions(decisions []*s.Decision) {

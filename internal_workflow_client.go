@@ -300,9 +300,8 @@ func (wc *workflowClient) getWorkflowThreadDumpImpl(workflowID string, runID str
 		if lastDecision.GetDecisionType() == s.DecisionType_FailWorkflowExecution {
 			return "", fmt.Errorf("Cannot get stack trace dump for failed worklfow: %s",
 				lastDecision.GetFailWorkflowExecutionDecisionAttributes().GetDetails())
-		} else {
-			return "", errors.New("Cannot get stack trace for completed workflow")
 		}
+		return "", errors.New("Cannot get stack trace dump for a completed workflow")
 	}
 	return stackTrace, err
 }

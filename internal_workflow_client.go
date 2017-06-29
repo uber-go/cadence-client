@@ -21,17 +21,20 @@
 package cadence
 
 import (
-	"errors"
-
 	"context"
+	"errors"
+	"fmt"
+	"math"
+
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
+
 	m "go.uber.org/cadence/.gen/go/cadence"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
 	"go.uber.org/cadence/common/backoff"
 	"go.uber.org/cadence/common/metrics"
-	"math"
+	"go.uber.org/zap"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -269,12 +272,16 @@ func (wc *workflowClient) getWorkflowThreadDumpImpl(workflowID string, runID str
 	}
 	registeredWorkflowFactory := newRegisteredWorkflowFactory()
 	workflowDefinitionFactory := getWorkflowDefinitionFactory(registeredWorkflowFactory)
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		return "", err
+	}
 	workerParams := workerExecutionParameters{
 		TaskList:                  startWorkflowEvent.GetTaskList().GetName(),
 		ConcurrentPollRoutineSize: defaultConcurrentPollRoutineSize,
 		Identity:                  startWorkflowEvent.GetIdentity(),
 		MetricsScope:              wc.metricsScope,
-		Logger:                    nil,
+		Logger:                    logger,
 		EnableLoggingInReplay:     false,
 		UserContext:               context.Background(),
 	}
@@ -287,7 +294,16 @@ func (wc *workflowClient) getWorkflowThreadDumpImpl(workflowID string, runID str
 		WorkflowExecution:      &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
 		WorkflowType:           startWorkflowEvent.WorkflowType,
 	}
-	_, stackTrace, err := taskHandler.ProcessWorkflowTask(task, true)
+	response, stackTrace, err := taskHandler.ProcessWorkflowTask(task, true)
+	if err == nil && response != nil && len(response.GetDecisions()) > 0 && len(stackTrace) == 0 {
+		lastDecision := response.GetDecisions()[0]
+		if lastDecision.GetDecisionType() == s.DecisionType_FailWorkflowExecution {
+			return "", fmt.Errorf("Cannot get stack trace dump for failed worklfow: %s",
+				lastDecision.GetFailWorkflowExecutionDecisionAttributes().GetDetails())
+		} else {
+			return "", errors.New("Cannot get stack trace for completed workflow")
+		}
+	}
 	return stackTrace, err
 }
 

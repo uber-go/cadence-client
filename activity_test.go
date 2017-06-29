@@ -110,13 +110,8 @@ func TestActivityHeartbeat_SuppressContinousInvokes(t *testing.T) {
 	RecordActivityHeartbeat(ctx, "testDetails")
 	RecordActivityHeartbeat(ctx, "testDetails")
 	RecordActivityHeartbeat(ctx, "testDetails")
-
-	// Sleep for the duration and try again.
-	time.Sleep(1)
-	service.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
-		Return(&s.RecordActivityTaskHeartbeatResponse{}, nil).Once()
-	RecordActivityHeartbeat(ctx, "testDetails")
 	invoker.Close()
+	service.AssertExpectations(t)
 
 	// No HB timeout configured.
 	service2 := new(mocks.TChanWorkflowService)
@@ -129,6 +124,7 @@ func TestActivityHeartbeat_SuppressContinousInvokes(t *testing.T) {
 	RecordActivityHeartbeat(ctx, "testDetails")
 	RecordActivityHeartbeat(ctx, "testDetails")
 	invoker2.Close()
+	service2.AssertExpectations(t)
 
 	// simulate batch picks before expiry.
 	waitCh := make(chan struct{})
@@ -158,4 +154,29 @@ func TestActivityHeartbeat_SuppressContinousInvokes(t *testing.T) {
 	RecordActivityHeartbeat(ctx, "testDetails-expected")
 	<-waitCh
 	invoker3.Close()
+	service3.AssertExpectations(t)
+
+	// simulate batch picks before expiry, with out any progress specified.
+	waitCh2 := make(chan struct{})
+	service4 := new(mocks.TChanWorkflowService)
+	invoker4 := newServiceInvoker([]byte("task-token"), "identity", service4, cancel, 2)
+	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
+		serviceInvoker: invoker4,
+		logger:         getLogger()})
+	service4.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
+		Return(&s.RecordActivityTaskHeartbeatResponse{}, nil).Once()
+	service4.On("RecordActivityTaskHeartbeat", mock.Anything, mock.Anything).
+		Return(&s.RecordActivityTaskHeartbeatResponse{}, nil).Run(func(arg mock.Arguments) {
+		request := arg.Get(1).(*s.RecordActivityTaskHeartbeatRequest)
+		require.Nil(t, request.GetDetails())
+		waitCh2 <- struct{}{}
+	}).Once()
+
+	RecordActivityHeartbeat(ctx, nil)
+	RecordActivityHeartbeat(ctx, nil)
+	RecordActivityHeartbeat(ctx, nil)
+	RecordActivityHeartbeat(ctx, nil)
+	<-waitCh2
+	invoker4.Close()
+	service4.AssertExpectations(t)
 }

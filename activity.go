@@ -89,9 +89,13 @@ func GetActivityLogger(ctx context.Context) *zap.Logger {
 // details - the details that you provided here can be seen in the worflow when it receives TimeoutError, you
 //	can check error TimeOutType()/Details().
 func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
-	data, err := getHostEnvironment().encodeArgs(details)
-	if err != nil {
-		panic(err)
+	var data []byte
+	var err error
+	if len(details) != 1 || details[0] != nil {
+		data, err = getHostEnvironment().encodeArgs(details)
+		if err != nil {
+			panic(err)
+		}
 	}
 	env := getActivityEnv(ctx)
 	err = env.serviceInvoker.Heartbeat(data)

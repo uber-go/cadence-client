@@ -752,9 +752,11 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 		return nil
 	}
 
-	nonTransientError, err := i.internalHeartBeat(details)
+	isActivityCancelled, err := i.internalHeartBeat(details)
 
-	if err == nil || nonTransientError {
+	// If the activity is cancelled, the activity can ignore the cancellation and do its work
+	// and complete. Our cancellation is co-operative, so we will try to heartbeat.
+	if err == nil || isActivityCancelled {
 		// We have successfully sent heartbeat, start next batching window.
 		i.lastProgressToReport = nil
 		i.isInBatchingWindow = true
@@ -799,7 +801,7 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 }
 
 func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {
-	nonTransientError := false
+	isActivityCancelled := false
 	err := recordActivityHeartbeat(i.service, i.identity, i.taskToken, details, i.retryPolicy)
 
 	switch err.(type) {
@@ -807,18 +809,18 @@ func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {
 		// We are asked to cancel. inform the activity about cancellation through context.
 		// We are asked to cancel. inform the activity about cancellation through context.
 		i.cancelHandler()
-		nonTransientError = true
+		isActivityCancelled = true
 
 	case *s.EntityNotExistsError:
 		// We will pass these through as cancellation for now but something we can change
 		// later when we have setter on cancel handler.
 		i.cancelHandler()
-		nonTransientError = true
+		isActivityCancelled = true
 	}
 
 	// We don't want to bubble temporary errors to the user.
 	// This error won't be return to user check RecordActivityHeartbeat().
-	return nonTransientError, err
+	return isActivityCancelled, err
 }
 
 func (i *cadenceInvoker) Close() {

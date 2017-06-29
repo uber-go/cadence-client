@@ -326,9 +326,9 @@ type deadlineTest struct {
 }
 
 var deadlineTests = []deadlineTest{
-	{[]activity{&testActivityDeadline{}}, time.Now(), 2, time.Now(), 2, nil},
-	{[]activity{&testActivityDeadline{}}, time.Now(), 3, time.Now(), 2, nil},
-	{[]activity{&testActivityDeadline{}}, time.Now(), 2, time.Now(), 3, nil},
+	{[]activity{&testActivityDeadline{}}, time.Now(), 3, time.Now(), 3, nil},
+	{[]activity{&testActivityDeadline{}}, time.Now(), 4, time.Now(), 3, nil},
+	{[]activity{&testActivityDeadline{}}, time.Now(), 3, time.Now(), 4, nil},
 	{[]activity{&testActivityDeadline{}}, time.Now().Add(-1 * time.Second), 1, time.Now(), 1, context.DeadlineExceeded},
 	{[]activity{&testActivityDeadline{}}, time.Now(), 1, time.Now().Add(-1 * time.Second), 1, context.DeadlineExceeded},
 	{[]activity{&testActivityDeadline{}}, time.Now().Add(-1 * time.Second), 1, time.Now().Add(-1 * time.Second), 1, context.DeadlineExceeded},

@@ -735,10 +735,9 @@ type cadenceInvoker struct {
 	taskToken             []byte
 	cancelHandler         func()
 	retryPolicy           backoff.RetryPolicy
-	heartBeatTimeoutInSec int32 // The heart beat interval configured for this activity.
-	hbBatchEndTimer       *time.Timer
-	lastProgressToReport  *[]byte
-	isInBatchingWindow    bool // Whether we started a batch of operations that need to be reported in the cycle. This gets started on a user call.
+	heartBeatTimeoutInSec int32       // The heart beat interval configured for this activity.
+	hbBatchEndTimer       *time.Timer // Whether we started a batch of operations that need to be reported in the cycle. This gets started on a user call.
+	lastDetailsToReport   *[]byte
 	closeCh               chan struct{}
 }
 
@@ -746,9 +745,9 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 	i.Lock()
 	defer i.Unlock()
 
-	if i.isInBatchingWindow {
+	if i.hbBatchEndTimer != nil {
 		// If we have started batching window, keep track of last reported progress.
-		i.lastProgressToReport = &details
+		i.lastDetailsToReport = &details
 		return nil
 	}
 
@@ -758,13 +757,9 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 	// and complete. Our cancellation is co-operative, so we will try to heartbeat.
 	if err == nil || isActivityCancelled {
 		// We have successfully sent heartbeat, start next batching window.
-		i.lastProgressToReport = nil
-		i.isInBatchingWindow = true
+		i.lastDetailsToReport = nil
 
-		// reset timer to fire before the threshold to report.
-		if i.hbBatchEndTimer != nil {
-			i.hbBatchEndTimer.Stop()
-		}
+		// Create timer to fire before the threshold to report.
 		deadlineToTrigger := i.heartBeatTimeoutInSec
 		if deadlineToTrigger <= 0 {
 			// If we don't have any heartbeat timeout configured.
@@ -786,9 +781,11 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 
 			// We close the batch and report the progress.
 			var progressToReport *[]byte
+
 			i.Lock()
-			i.isInBatchingWindow = false
-			progressToReport = i.lastProgressToReport
+			progressToReport = i.lastDetailsToReport
+			i.hbBatchEndTimer.Stop()
+			i.hbBatchEndTimer = nil
 			i.Unlock()
 
 			if progressToReport != nil {
@@ -806,7 +803,6 @@ func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {
 
 	switch err.(type) {
 	case *CanceledError:
-		// We are asked to cancel. inform the activity about cancellation through context.
 		// We are asked to cancel. inform the activity about cancellation through context.
 		i.cancelHandler()
 		isActivityCancelled = true

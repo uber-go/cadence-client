@@ -91,6 +91,7 @@ func GetActivityLogger(ctx context.Context) *zap.Logger {
 func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 	var data []byte
 	var err error
+	// We would like to be a able to pass in "nil" as part of details(that is no progress to report to)
 	if len(details) != 1 || details[0] != nil {
 		data, err = getHostEnvironment().encodeArgs(details)
 		if err != nil {

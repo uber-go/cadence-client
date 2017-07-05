@@ -250,19 +250,29 @@ GetHistoryLoop:
 	return history, nil
 }
 
-func (wc *workflowClient) GetWorkflowThreadDump(workflowID string, runID string) (string, error) {
+func (wc *workflowClient) GetWorkflowThreadDump(workflowID string, runID string, atDecisionTaskCompletedEventID int64) (string, error) {
 	history, err := wc.GetWorkflowHistory(workflowID, runID)
 	if err != nil {
 		return "", err
 	}
-	return wc.getWorkflowThreadDumpImpl(workflowID, runID, history)
+	events := history.Events
+	if atDecisionTaskCompletedEventID > 0 {
+		for i, e := range events {
+			if e.GetEventId() == atDecisionTaskCompletedEventID {
+				if e.GetEventType() != s.EventType_DecisionTaskCompleted {
+					return "", fmt.Errorf("Event found at atDecisionTaskCompletedEventID value "+
+						"of %s is not DecisionTaskCompleted but %s",
+						atDecisionTaskCompletedEventID,
+						e.GetEventType())
+				}
+				history.Events = events[:i+1]
+			}
+		}
+	}
+	return getWorkflowThreadDumpImpl(workflowID, runID, history)
 }
 
-func (wc *workflowClient) GetWorkflowThreadDumpForHistory(h *s.History) (string, error) {
-	return wc.getWorkflowThreadDumpImpl("unknown", "unknown", h)
-}
-
-func (wc *workflowClient) getWorkflowThreadDumpImpl(workflowID string, runID string, h *s.History) (string, error) {
+func getWorkflowThreadDumpImpl(workflowID string, runID string, h *s.History) (string, error) {
 	if len(h.Events) == 0 {
 		return "", errors.New("empty history")
 	}
@@ -280,13 +290,13 @@ func (wc *workflowClient) getWorkflowThreadDumpImpl(workflowID string, runID str
 		TaskList:                  startWorkflowEvent.GetTaskList().GetName(),
 		ConcurrentPollRoutineSize: defaultConcurrentPollRoutineSize,
 		Identity:                  startWorkflowEvent.GetIdentity(),
-		MetricsScope:              wc.metricsScope,
+		MetricsScope:              tally.NoopScope,
 		Logger:                    logger,
 		EnableLoggingInReplay:     false,
 		UserContext:               context.Background(),
 	}
 	var maxInt64 int64 = math.MaxInt64
-	taskHandler := newWorkflowTaskHandler(workflowDefinitionFactory, wc.domain, workerParams, nil)
+	taskHandler := newWorkflowTaskHandler(workflowDefinitionFactory, "unknown", workerParams, nil)
 	task := &s.PollForDecisionTaskResponse{
 		History:                h,
 		PreviousStartedEventId: &maxInt64,

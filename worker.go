@@ -24,7 +24,9 @@ import (
 	"context"
 
 	"github.com/uber-go/tally"
+
 	m "go.uber.org/cadence/.gen/go/cadence"
+	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/zap"
 )
 
@@ -106,4 +108,12 @@ func NewWorker(
 	options WorkerOptions,
 ) Worker {
 	return newAggregatedWorker(service, domain, taskList, options)
+}
+
+// GetWorkflowThreadDump returns thread dump of a workflow given its current history.
+// It requires workflow function that was used to create the history to be registered
+// through RegisterWorkflow.
+// Use Client.GetWorkflowThreadDump to get dump given workflowID and runID.
+func GetWorkflowThreadDump(h *s.History) (string, error) {
+	return getWorkflowThreadDumpImpl("unknown", "unknown", h)
 }

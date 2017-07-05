@@ -217,7 +217,7 @@ OrderEvents:
 				break OrderEvents
 			}
 			if eh.workflowTask.iterator == nil {
-				err = errors.New("iterator is not provided for processing continuous page token.")
+				err = errors.New("iterator is not provided for processing continuous page token")
 				return
 			}
 			historyPage, token, err1 := eh.workflowTask.iterator(eh.nextPageToken)

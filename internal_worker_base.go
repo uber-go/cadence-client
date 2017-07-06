@@ -128,9 +128,7 @@ func (bw *baseWorker) Start() {
 	}
 
 	bw.isWorkerStarted = true
-	if enableVerboseLogging {
-		bw.logger.Info("Started Worker", zap.Int("RoutineCount", bw.options.routineCount))
-	}
+	bw.logger.Info("Started Worker", zap.Int("RoutineCount", bw.options.routineCount))
 }
 
 // Shutdown is a blocking call and cleans up all the resources assosciated with worker.
@@ -143,7 +141,7 @@ func (bw *baseWorker) Stop() {
 	// TODO: The poll is longer than the 10 seconds, we probably need some way to hard terminate the
 	// poll routines as well.
 
-	if success := awaitWaitGroup(&bw.shutdownWG, 10*time.Second); !success && enableVerboseLogging {
+	if success := awaitWaitGroup(&bw.shutdownWG, 10*time.Second); !success {
 		bw.logger.Info("Worker timed out on waiting for shutdown.")
 	}
 }
@@ -164,23 +162,17 @@ func (bw *baseWorker) execute(routineID int) {
 		if err == nil {
 			bw.retrier.Succeeded()
 		} else if isClientSideError(err) {
-			if enableVerboseLogging {
-				bw.logger.Info("Poll and processing failed with client side error", zap.Int(tagRoutineID, routineID), zap.Error(err))
-			}
+			bw.logger.Info("Poll and processing failed with client side error", zap.Int(tagRoutineID, routineID), zap.Error(err))
 			// This doesn't count against server failures.
 		} else {
-			if enableVerboseLogging {
-				bw.logger.Info("Poll and processing task failed with error", zap.Int(tagRoutineID, routineID), zap.Error(err))
-			}
+			bw.logger.Info("Poll and processing task failed with error", zap.Int(tagRoutineID, routineID), zap.Error(err))
 			bw.retrier.Failed()
 		}
 
 		select {
 		// Shutdown the Routine.
 		case <-bw.shutdownCh:
-			if enableVerboseLogging {
-				bw.logger.Info("Worker shutting down.", zap.Int(tagRoutineID, routineID))
-			}
+			bw.logger.Info("Worker shutting down.", zap.Int(tagRoutineID, routineID))
 			bw.shutdownWG.Done()
 			return
 

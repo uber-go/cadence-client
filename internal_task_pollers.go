@@ -140,9 +140,7 @@ func (wtp *workflowTaskPoller) PollAndProcessSingleTask() error {
 	}
 	if workflowTask.task == nil {
 		// We didn't have task, poll might have time out.
-		if enableVerboseLogging {
-			wtp.logger.Debug("Workflow task unavailable")
-		}
+		wtp.logger.Debug("Workflow task unavailable")
 		return nil
 	}
 
@@ -167,9 +165,7 @@ func (wtp *workflowTaskPoller) PollAndProcessSingleTask() error {
 			defer cancel()
 			err1 := wtp.service.RespondDecisionTaskCompleted(ctx, completedRequest)
 			if err1 != nil {
-				if enableVerboseLogging {
-					wtp.logger.Debug("RespondDecisionTaskCompleted failed.", zap.Error(err1))
-				}
+				wtp.logger.Debug("RespondDecisionTaskCompleted failed.", zap.Error(err1))
 			}
 			return err1
 		}, serviceOperationRetryPolicy, isServiceTransientError)
@@ -296,7 +292,7 @@ func (atp *activityTaskPoller) PollAndProcessSingleTask() error {
 	if err != nil {
 		return err
 	}
-	if activityTask.task == nil && enableVerboseLogging {
+	if activityTask.task == nil {
 		// We didn't have task, poll might have time out.
 		atp.logger.Debug("Activity task unavailable")
 		return nil
@@ -309,7 +305,7 @@ func (atp *activityTaskPoller) PollAndProcessSingleTask() error {
 	}
 
 	reportErr := reportActivityComplete(atp.service, request, atp.metricsScope)
-	if reportErr != nil && enableVerboseLogging {
+	if reportErr != nil {
 		atp.logger.Debug("reportActivityComplete failed", zap.Error(reportErr))
 	}
 

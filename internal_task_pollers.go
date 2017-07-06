@@ -296,11 +296,9 @@ func (atp *activityTaskPoller) PollAndProcessSingleTask() error {
 	if err != nil {
 		return err
 	}
-	if activityTask.task == nil {
+	if activityTask.task == nil && enableVerboseLogging {
 		// We didn't have task, poll might have time out.
-		if enableVerboseLogging {
-			atp.logger.Debug("Activity task unavailable")
-		}
+		atp.logger.Debug("Activity task unavailable")
 		return nil
 	}
 

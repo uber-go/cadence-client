@@ -327,11 +327,13 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		return nil, "", errors.New("nil TaskList in WorkflowExecutionStarted event")
 	}
 
-	wth.logger.Debug("Processing new workflow task.",
-		zap.String(tagWorkflowType, task.GetWorkflowType().GetName()),
-		zap.String(tagWorkflowID, task.GetWorkflowExecution().GetWorkflowId()),
-		zap.String(tagRunID, task.GetWorkflowExecution().GetRunId()),
-		zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
+	if enableVerboseLogging {
+		wth.logger.Debug("Processing new workflow task.",
+			zap.String(tagWorkflowType, task.GetWorkflowType().GetName()),
+			zap.String(tagWorkflowID, task.GetWorkflowExecution().GetWorkflowId()),
+			zap.String(tagRunID, task.GetWorkflowExecution().GetRunId()),
+			zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
+	}
 
 	// Setup workflow Info
 	workflowInfo := &WorkflowInfo{
@@ -422,13 +424,17 @@ ProcessEvents:
 	}
 	// check if decisions from reply matches to the history events
 	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
-		wth.logger.Error("Replay and history mismatch.", zap.Error(err))
+		if enableVerboseLogging {
+			wth.logger.Error("Replay and history mismatch.", zap.Error(err))
+		}
 		return nil, "", err
 	}
 
 	startAttributes, err := reorderedHistory.GetWorkflowStartedAttr()
 	if err != nil {
-		wth.logger.Error("Unable to read workflow start attributes.", zap.Error(err))
+		if enableVerboseLogging {
+			wth.logger.Error("Unable to read workflow start attributes.", zap.Error(err))
+		}
 		return nil, "", err
 	}
 
@@ -776,10 +782,12 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 		}
 	}()
 
-	ath.logger.Debug("Processing new activity task",
-		zap.String(tagWorkflowID, t.GetWorkflowExecution().GetWorkflowId()),
-		zap.String(tagRunID, t.GetWorkflowExecution().GetRunId()),
-		zap.String(tagActivityType, t.GetActivityType().GetName()))
+	if enableVerboseLogging {
+		ath.logger.Debug("Processing new activity task",
+			zap.String(tagWorkflowID, t.GetWorkflowExecution().GetWorkflowId()),
+			zap.String(tagRunID, t.GetWorkflowExecution().GetRunId()),
+			zap.String(tagActivityType, t.GetActivityType().GetName()))
+	}
 
 	rootCtx := ath.userContext
 	if rootCtx == nil {

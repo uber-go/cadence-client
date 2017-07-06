@@ -132,6 +132,9 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	if params.Identity == "" {
 		params.Identity = getWorkerIdentity(params.TaskList)
 	}
+	if !enableFrameworkLogging {
+		params.Logger = zap.NewNop()
+	}
 	if params.Logger == nil {
 		// create default logger if user does not supply one.
 		config := zap.NewProductionConfig()

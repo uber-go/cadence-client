@@ -186,9 +186,7 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 		}
 	}()
 
-	if enableVerboseLogging {
-		wtp.logger.Debug("workflowTaskPoller::Poll")
-	}
+	wtp.logger.Debug("workflowTaskPoller::Poll")
 	request := &s.PollForDecisionTaskRequest{
 		Domain:   common.StringPtr(wtp.domain),
 		TaskList: common.TaskListPtr(s.TaskList{Name: common.StringPtr(wtp.taskListName)}),
@@ -254,9 +252,8 @@ func (atp *activityTaskPoller) poll() (*activityTask, error) {
 		}
 	}()
 
-	if enableVerboseLogging {
-		atp.logger.Debug("activityTaskPoller::Poll")
-	}
+	atp.logger.Debug("activityTaskPoller::Poll")
+
 	request := &s.PollForActivityTaskRequest{
 		Domain:   common.StringPtr(atp.domain),
 		TaskList: common.TaskListPtr(s.TaskList{Name: common.StringPtr(atp.taskListName)}),

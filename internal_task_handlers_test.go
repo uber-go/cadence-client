@@ -262,6 +262,35 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 	t.Nil(response)
 }
 
+func (t *TaskHandlersTestSuite) TestWorkflowTask_PageToken() {
+	// Schedule a decision activity and see if we complete workflow.
+	taskList := "tl1"
+	testEvents := []*s.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
+	}
+	task := createWorkflowTask(testEvents, 0)
+	task.NextPageToken = []byte("token")
+
+	params := workerExecutionParameters{
+		TaskList: taskList,
+		Identity: "test-id-1",
+		Logger:   t.logger,
+	}
+
+	nextEvents := []*s.HistoryEvent{
+		createTestEventDecisionTaskStarted(3),
+	}
+	iteratorfn := func(nextToken []byte) (*s.History, []byte, error) {
+		return &s.History{nextEvents}, nil, nil
+	}
+	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, nil)
+	response, _, err := taskHandler.ProcessWorkflowTask(task, iteratorfn, false)
+
+	t.NoError(err)
+	t.NotNil(response)
+}
+
 func (t *TaskHandlersTestSuite) TestHeartBeat_NoError() {
 	mockService := mocks.TChanWorkflowService{}
 	cancelRequested := false

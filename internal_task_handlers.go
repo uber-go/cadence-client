@@ -780,16 +780,16 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 			}
 
 			// We close the batch and report the progress.
-			var progressToReport *[]byte
+			var detailsToReport *[]byte
 
 			i.Lock()
-			progressToReport = i.lastDetailsToReport
+			detailsToReport = i.lastDetailsToReport
 			i.hbBatchEndTimer.Stop()
 			i.hbBatchEndTimer = nil
 			i.Unlock()
 
-			if progressToReport != nil {
-				i.Heartbeat(*progressToReport)
+			if detailsToReport != nil {
+				i.Heartbeat(*detailsToReport)
 			}
 		}()
 	}

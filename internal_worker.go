@@ -230,6 +230,7 @@ func newActivityTaskWorker(
 	service m.TChanWorkflowService,
 	domain string,
 	workerParams workerExecutionParameters) (worker Worker) {
+	ensureRequiredParams(&workerParams)
 
 	poller := newActivityTaskPoller(
 		taskHandler,

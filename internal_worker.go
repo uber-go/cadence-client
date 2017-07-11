@@ -720,6 +720,7 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 type aggregatedWorker struct {
 	workflowWorker Worker
 	activityWorker Worker
+	logger         *zap.Logger
 }
 
 func (aw *aggregatedWorker) Start() error {
@@ -740,7 +741,8 @@ func (aw *aggregatedWorker) Start() error {
 
 func (aw *aggregatedWorker) Run() {
 	aw.Start()
-	<-aw.Done()
+	d := <-aw.Done()
+	aw.logger.Info("Worker has been killed", zap.String("Signal", d.String()))
 	aw.Stop()
 }
 
@@ -837,7 +839,11 @@ func newAggregatedWorker(
 			logger.Warn("Activity worker is enabled but no activity is registered. Use cadence.RegisterActivity() to register your activity.")
 		}
 	}
-	return &aggregatedWorker{workflowWorker: workflowWorker, activityWorker: activityWorker}
+	return &aggregatedWorker{
+		workflowWorker: workflowWorker,
+		activityWorker: activityWorker,
+		logger:         logger,
+	}
 }
 
 func (th *hostEnvImpl) newRegisteredWorkflowFactory() workflowFactory {

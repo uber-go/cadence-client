@@ -278,7 +278,7 @@ func (aw *activityWorker) Stop() {
 }
 
 // Done returns the exit channel
-func (aw *activityWorker) Done() chan os.Signal {
+func (aw *activityWorker) Done() <-chan os.Signal {
 	return aw.worker.Done()
 }
 
@@ -754,7 +754,7 @@ func (aw *aggregatedWorker) Stop() {
 	}
 }
 
-func (aw *aggregatedWorker) Done() chan os.Signal {
+func (aw *aggregatedWorker) Done() <-chan os.Signal {
 	c := make(chan os.Signal, 1)
 	select {
 	case w := <-aw.workflowWorker.Done():

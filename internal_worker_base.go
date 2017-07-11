@@ -135,10 +135,10 @@ func (bw *baseWorker) Start() {
 }
 
 func (bw *baseWorker) Run() {
-	Start()
-	d := <-Done()
+	bw.Start()
+	d := <-bw.Done()
 	bw.logger.Info("Worker has been killed: %s", d.String())
-	Stop()
+	bw.Stop()
 }
 
 // Shutdown is a blocking call and cleans up all the resources assosciated with worker.

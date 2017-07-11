@@ -739,10 +739,10 @@ func (aw *aggregatedWorker) Start() error {
 }
 
 func (aw *aggregatedWorker) Run() {
-	Start()
-	d := <-Done()
+	aw.Start()
+	d := <-aw.Done()
 	bw.logger.Info("Worker has been killed: %s", d.String())
-	Stop()
+	aw.Stop()
 }
 
 func (aw *aggregatedWorker) Stop() {

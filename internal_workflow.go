@@ -196,6 +196,7 @@ const (
 	workflowResultContextKey      = "workflowResult"
 	coroutinesContextKey          = "coroutines"
 	workflowEnvOptionsContextKey  = "wfEnvOptions"
+	changeVersionsContextKey      = "changeVersions"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -327,6 +328,7 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	d.rootCtx = WithValue(background, workflowEnvironmentContextKey, env)
 	var resultPtr *workflowResult
 	d.rootCtx = WithValue(d.rootCtx, workflowResultContextKey, &resultPtr)
+	d.rootCtx = WithValue(d.rootCtx, changeVersionsContextKey, make(map[string]Version))
 
 	// Set default values for the workflow execution.
 	wInfo := env.WorkflowInfo()

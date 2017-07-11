@@ -39,7 +39,7 @@ type (
 		// Stop cleans up any resources opened by worker
 		Stop()
 		// Done returns a channel that is sent a message when the process has been killed
-		Done() chan os.Signal
+		Done() <-chan os.Signal
 	}
 
 	// WorkerOptions is to configure a worker instance,

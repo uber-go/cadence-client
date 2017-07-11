@@ -150,7 +150,7 @@ func (bw *baseWorker) Stop() {
 	// TODO: The poll is longer than the 10 seconds, we probably need some way to hard terminate the
 	// poll routines as well.
 
-	if success := awaitWaitGroup(&bw.shutdownWG, 10*time.Second); !success {
+	if success := awaitWaitGroup(&bw.shutdownWG, 2*time.Second); !success {
 		bw.logger.Info("Worker timed out on waiting for shutdown.")
 	}
 }
@@ -163,26 +163,29 @@ func (bw *baseWorker) Done() <-chan os.Signal {
 
 // execute handler wraps call to process a task.
 func (bw *baseWorker) execute(routineID int) {
+	ch := make(chan struct{})
+	defer close(ch)
 	for {
-		// Check if we have to backoff.
-		// TODO: Check if this is needed concurrent retires (or) per connection retrier.
-		bw.retrier.Throttle()
+		go func() {
+			// Check if we have to backoff.
+			// TODO: Check if this is needed concurrent retires (or) per connection retrier.
+			bw.retrier.Throttle()
 
-		// Check if we are rate limited
-		if !bw.rateLimiter.Consume(1, time.Millisecond) {
-			continue
-		}
-
-		err := bw.options.taskPoller.PollAndProcessSingleTask()
-		if err == nil {
-			bw.retrier.Succeeded()
-		} else if isClientSideError(err) {
-			bw.logger.Info("Poll and processing failed with client side error", zap.Int(tagRoutineID, routineID), zap.Error(err))
-			// This doesn't count against server failures.
-		} else {
-			bw.logger.Info("Poll and processing task failed with error", zap.Int(tagRoutineID, routineID), zap.Error(err))
-			bw.retrier.Failed()
-		}
+			// Check if we are rate limited
+			if bw.rateLimiter.Consume(1, time.Millisecond) {
+				err := bw.options.taskPoller.PollAndProcessSingleTask()
+				if err == nil {
+					bw.retrier.Succeeded()
+				} else if isClientSideError(err) {
+					bw.logger.Info("Poll and processing failed with client side error", zap.Int(tagRoutineID, routineID), zap.Error(err))
+					// This doesn't count against server failures.
+				} else {
+					bw.logger.Info("Poll and processing task failed with error", zap.Int(tagRoutineID, routineID), zap.Error(err))
+					bw.retrier.Failed()
+				}
+			}
+			ch <- struct{}{}
+		}()
 
 		select {
 		// Shutdown the Routine.
@@ -192,7 +195,7 @@ func (bw *baseWorker) execute(routineID int) {
 			return
 
 		// We have work to do.
-		default:
+		case <-ch:
 		}
 	}
 }

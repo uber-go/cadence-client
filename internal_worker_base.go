@@ -122,11 +122,10 @@ func (bw *baseWorker) Start() {
 	if bw.isWorkerStarted {
 		return
 	}
-	// Add the total number of routines to the wait group
-	bw.shutdownWG.Add(bw.options.routineCount)
 
 	// Launch the routines to do work
 	for i := 0; i < bw.options.routineCount; i++ {
+		bw.shutdownWG.Add(1)
 		go bw.execute(i)
 	}
 

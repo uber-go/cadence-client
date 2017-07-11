@@ -163,10 +163,10 @@ func (bw *baseWorker) Done() <-chan os.Signal {
 
 // execute handler wraps call to process a task.
 func (bw *baseWorker) execute(routineID int) {
-	ch := make(chan struct{})
-	defer close(ch)
 	for {
+		ch := make(chan struct{})
 		go func() {
+			defer close(ch)
 			// Check if we have to backoff.
 			// TODO: Check if this is needed concurrent retires (or) per connection retrier.
 			bw.retrier.Throttle()

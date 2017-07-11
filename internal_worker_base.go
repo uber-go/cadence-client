@@ -23,7 +23,10 @@ package cadence
 // All code in this file is private to the package.
 
 import (
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	m "go.uber.org/cadence/.gen/go/cadence"
@@ -131,6 +134,13 @@ func (bw *baseWorker) Start() {
 	bw.logger.Info("Started Worker", zap.Int("RoutineCount", bw.options.routineCount))
 }
 
+func (bw *baseWorker) Run() {
+	Start()
+	d := <-Done()
+	bw.logger.Info("Worker has been killed: %s", d.String())
+	Stop()
+}
+
 // Shutdown is a blocking call and cleans up all the resources assosciated with worker.
 func (bw *baseWorker) Stop() {
 	if !bw.isWorkerStarted {
@@ -144,6 +154,12 @@ func (bw *baseWorker) Stop() {
 	if success := awaitWaitGroup(&bw.shutdownWG, 10*time.Second); !success {
 		bw.logger.Info("Worker timed out on waiting for shutdown.")
 	}
+}
+
+func (bw *baseWorker) Done() <-chan os.Signal {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	return c
 }
 
 // execute handler wraps call to process a task.

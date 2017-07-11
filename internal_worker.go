@@ -27,6 +27,7 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"os"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -199,9 +200,17 @@ func (ww *workflowWorker) Start() error {
 	return nil // TODO: propagate error
 }
 
+func (ww *workflowWorker) Run() {
+	ww.worker.Run()
+}
+
 // Shutdown the worker.
 func (ww *workflowWorker) Stop() {
 	ww.worker.Stop()
+}
+
+func (ww *workflowWorker) Done() <-chan os.Signal {
+	return ww.worker.Done()
 }
 
 func newActivityWorker(
@@ -258,9 +267,19 @@ func (aw *activityWorker) Start() error {
 	return nil // TODO: propagate errors
 }
 
+// Run the worker.
+func (aw *activityWorker) Run() {
+	aw.worker.Run()
+}
+
 // Shutdown the worker.
 func (aw *activityWorker) Stop() {
 	aw.worker.Stop()
+}
+
+// Done returns the exit channel
+func (aw *activityWorker) Done() chan os.Signal {
+	return aw.worker.Done()
 }
 
 type workerFunc func(ctx Context, input []byte) ([]byte, error)
@@ -719,6 +738,13 @@ func (aw *aggregatedWorker) Start() error {
 	return nil
 }
 
+func (aw *aggregatedWorker) Run() {
+	Start()
+	d := <-Done()
+	bw.logger.Info("Worker has been killed: %s", d.String())
+	Stop()
+}
+
 func (aw *aggregatedWorker) Stop() {
 	if !isInterfaceNil(aw.workflowWorker) {
 		aw.workflowWorker.Stop()
@@ -726,6 +752,17 @@ func (aw *aggregatedWorker) Stop() {
 	if !isInterfaceNil(aw.activityWorker) {
 		aw.activityWorker.Stop()
 	}
+}
+
+func (aw *aggregatedWorker) Done() chan os.Signal {
+	c := make(chan os.Signal, 1)
+	select {
+	case w := <-aw.workflowWorker.Done():
+		c <- w
+	case a := <-aw.activityWorker.Done():
+		c <= a
+	}
+	return c
 }
 
 // aggregatedWorker returns an instance to manage the workers.

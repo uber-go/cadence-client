@@ -22,6 +22,7 @@ package cadence
 
 import (
 	"context"
+	"os"
 
 	"github.com/uber-go/tally"
 	m "go.uber.org/cadence/.gen/go/cadence"
@@ -31,8 +32,14 @@ import (
 type (
 	// Worker represents objects that can be started and stopped.
 	Worker interface {
-		Stop()
+		// Start starts the worker in a non-blocking fashion
 		Start() error
+		// Run is a blocking start and cleans up resources when killed
+		Run()
+		// Stop cleans up any resources opened by worker
+		Stop()
+		// Done returns a channel that is sent a message when the process has been killed
+		Done() <-chan os.Signal
 	}
 
 	// WorkerOptions is to configure a worker instance,

@@ -137,7 +137,7 @@ func (bw *baseWorker) Start() {
 func (bw *baseWorker) Run() {
 	bw.Start()
 	d := <-bw.Done()
-	bw.logger.Info("Worker has been killed: %s", d.String())
+	bw.logger.Info("Worker has been killed", zap.String("Signal", d.String()))
 	bw.Stop()
 }
 

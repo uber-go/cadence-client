@@ -740,8 +740,7 @@ func (aw *aggregatedWorker) Start() error {
 
 func (aw *aggregatedWorker) Run() {
 	aw.Start()
-	d := <-aw.Done()
-	bw.logger.Info("Worker has been killed: %s", d.String())
+	<-aw.Done()
 	aw.Stop()
 }
 
@@ -760,7 +759,7 @@ func (aw *aggregatedWorker) Done() <-chan os.Signal {
 	case w := <-aw.workflowWorker.Done():
 		c <- w
 	case a := <-aw.activityWorker.Done():
-		c <= a
+		c <- a
 	}
 	return c
 }

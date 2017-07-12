@@ -595,13 +595,5 @@ const DefaultVersion Version = -1
 // It is necessary as GetVersion performs validation of a version against a workflow history and fails decisions if
 // a workflow code is not compatible with it.
 func GetVersion(ctx Context, changeID string, minSupported, maxSupported Version) Version {
-	versions := ctx.Value(changeVersionsContextKey).(map[string]Version)
-	cv, ok := versions[changeID]
-	if ok {
-		validateVersion(changeID, cv, minSupported, maxSupported)
-		return cv
-	}
-	version := getWorkflowEnvironment(ctx).GetVersion(changeID, minSupported, maxSupported)
-	versions[changeID] = version
-	return version
+	return getWorkflowEnvironment(ctx).GetVersion(changeID, minSupported, maxSupported)
 }

@@ -347,18 +347,23 @@ func validateVersion(changeID string, version, minSupported, maxSupported Versio
 }
 
 func (wc *workflowEnvironmentImpl) GetVersion(changeID string, minSupported, maxSupported Version) Version {
-	var version Version
-	if wc.isReplay {
-		var ok bool
-		version, ok = wc.changeVersions[changeID]
-		if !ok {
-			version = DefaultVersion
-		}
+	if version, ok := wc.changeVersions[changeID]; ok {
 		validateVersion(changeID, version, minSupported, maxSupported)
 		return version
 	}
-	version = maxSupported
-	wc.decisionsHelper.recordVersionMarker(changeID, version)
+
+	var version Version
+	if wc.isReplay {
+		// GetVersion for changeID is called first time in replay mode, use DefaultVersion
+		version = DefaultVersion
+	} else {
+		// GetVersion for changeID is called first time (non-replay mode), we need to generate a marker decision for it.
+		version = maxSupported
+		wc.decisionsHelper.recordVersionMarker(changeID, version)
+	}
+
+	validateVersion(changeID, version, minSupported, maxSupported)
+	wc.changeVersions[changeID] = version
 	return version
 }
 

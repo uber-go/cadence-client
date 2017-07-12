@@ -731,7 +731,7 @@ func (aw *aggregatedWorker) Start() error {
 
 func (aw *aggregatedWorker) Run() {
 	aw.Start()
-	d := <-isProcessKilled()
+	d := <-getKillSignal()
 	aw.logger.Info("Worker has been killed", zap.String("Signal", d.String()))
 	aw.Stop()
 }

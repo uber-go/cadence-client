@@ -132,7 +132,7 @@ func (bw *baseWorker) Start() {
 
 func (bw *baseWorker) Run() {
 	bw.Start()
-	d := <-isProcessKilled()
+	d := <-getKillSignal()
 	bw.logger.Info("Worker has been killed", zap.String("Signal", d.String()))
 	bw.Stop()
 }
@@ -156,7 +156,7 @@ func (bw *baseWorker) Stop() {
 func (bw *baseWorker) execute(routineID int) {
 	for {
 		ch := make(chan struct{})
-		go func() {
+		go func(ch chan struct{}) {
 			defer close(ch)
 			// Check if we have to backoff.
 			// TODO: Check if this is needed concurrent retires (or) per connection retrier.
@@ -175,8 +175,7 @@ func (bw *baseWorker) execute(routineID int) {
 					bw.retrier.Failed()
 				}
 			}
-			ch <- struct{}{}
-		}()
+		}(ch)
 
 		select {
 		// Shutdown the Routine.

@@ -251,7 +251,7 @@ func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 
 	// Configure worker options.
-	workerOptions := WorkerOptions{logger: zap.New}
+	workerOptions := WorkerOptions{}
 	workerOptions.MaxActivityExecutionRate = 20
 
 	// Start Worker.

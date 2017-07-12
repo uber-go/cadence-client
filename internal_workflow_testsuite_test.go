@@ -461,6 +461,61 @@ func (s *WorkflowTestSuiteUnitTest) Test_SideEffect() {
 	s.Nil(env.GetWorkflowError())
 }
 
+const testChangeID = "workflow"
+const (
+	testVersion1 = iota + 10
+	testVersion2
+	testVersion3
+)
+
+const testCurrentVersion = testVersion3
+
+type keyType string
+
+var nameKey keyType = "name"
+
+func setName(ctx context.Context, name string) {
+	value := ctx.Value(nameKey).(*string)
+	*value = name
+}
+
+func oldActivity(ctx context.Context, msg string) (string, error) {
+	setName(ctx, "oldActivity")
+	return "hello" + "_" + msg, nil
+}
+
+func newActivity(ctx context.Context, msg string) (string, error) {
+	setName(ctx, "newActivity")
+	return "hello" + "_" + msg, nil
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_IsVersion() {
+	workflowFn := func(ctx Context) error {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+		var f Future
+		v := GetVersion(ctx, testChangeID, DefaultVersion, testCurrentVersion)
+		if v == DefaultVersion {
+			f = ExecuteActivity(ctx, oldActivity, "msg1")
+		} else {
+			f = ExecuteActivity(ctx, newActivity, "anotherMsg")
+		}
+		err := f.Get(ctx, nil) // wait for result
+		return err
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	RegisterActivity(oldActivity)
+	RegisterActivity(newActivity)
+	var name string
+	ctx := context.WithValue(context.Background(), nameKey, &name)
+	env.SetWorkerOption(WorkerOptions{BackgroundActivityContext: ctx})
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+	s.EqualValues("newActivity", name)
+}
+
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Basic() {
 	workflowFn := func(ctx Context) (string, error) {
 		ctx = WithActivityOptions(ctx, s.activityOptions)

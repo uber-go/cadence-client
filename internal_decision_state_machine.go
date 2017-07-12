@@ -23,6 +23,8 @@ package cadence
 import (
 	"fmt"
 
+	"bytes"
+	"encoding/gob"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
 	"go.uber.org/cadence/common/util"
@@ -137,6 +139,9 @@ const (
 	eventCancelFailed     string = "handleCancelFailedEvent"
 	eventCanceled         string = "handleCanceledEvent"
 )
+
+var sideEffectMarkerName = "SideEffect"
+var versionMarkerName = "Version"
 
 func (d decisionState) String() string {
 	switch d {
@@ -674,6 +679,28 @@ func (h *decisionsHelper) getActivityID(event *s.HistoryEvent) string {
 		panic(fmt.Sprintf("unable to find activity ID for the event %v", util.HistoryEventToString(event)))
 	}
 	return activityID
+}
+
+func (h *decisionsHelper) recordVersionMarker(changeID string, version Version) decisionStateMachine {
+	markerID := fmt.Sprintf("%v_%v", versionMarkerName, changeID)
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(changeID); err != nil {
+		panic(fmt.Sprintf("Failure encoding changeID name: %v", err))
+	}
+	if err := enc.Encode(version); err != nil {
+		panic(fmt.Sprintf("Failure encoding version value: %v", err))
+	}
+	details := buf.Bytes()
+
+	recordMarker := &s.RecordMarkerDecisionAttributes{
+		MarkerName: common.StringPtr(versionMarkerName),
+		Details:    details, // Keep
+	}
+
+	decision := newMarkerDecisionStateMachine(markerID, recordMarker)
+	h.addDecision(decision)
+	return decision
 }
 
 func (h *decisionsHelper) recordSideEffectMarker(sideEffectID int32, data []byte) decisionStateMachine {

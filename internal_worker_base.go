@@ -53,6 +53,7 @@ type (
 		asyncActivityClient
 		workflowTimerClient
 		SideEffect(f func() ([]byte, error), callback resultHandler)
+		GetVersion(changeID string, maxSupported, minSupported Version) Version
 		WorkflowInfo() *WorkflowInfo
 		Complete(result []byte, err error)
 		RegisterCancelHandler(handler func())

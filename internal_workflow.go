@@ -189,12 +189,18 @@ type (
 
 		Set(value interface{}, err error)
 	}
+
+	changeVersion struct {
+		minSupported Version
+		version      *Version
+	}
 )
 
 const (
 	workflowEnvironmentContextKey = "workflowEnv"
 	workflowResultContextKey      = "workflowResult"
 	coroutinesContextKey          = "coroutines"
+	changeVersionsContextKey      = "changeVersions"
 	workflowEnvOptionsContextKey  = "wfEnvOptions"
 )
 
@@ -327,6 +333,7 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 	d.rootCtx = WithValue(background, workflowEnvironmentContextKey, env)
 	var resultPtr *workflowResult
 	d.rootCtx = WithValue(d.rootCtx, workflowResultContextKey, &resultPtr)
+	d.rootCtx = WithValue(d.rootCtx, changeVersionsContextKey, make(map[string]*changeVersion))
 
 	// Set default values for the workflow execution.
 	wInfo := env.WorkflowInfo()

@@ -1124,5 +1124,10 @@ func (env *testWorkflowEnvironmentImpl) signalWorkflow(name string, input interf
 	}, true)
 }
 
+func (env *testWorkflowEnvironmentImpl) GetVersion(changeID string, minSupported, maxSupported Version) Version {
+	// TODO: Add code that returns the same version for all calls for the given changeID.
+	return maxSupported
+}
+
 // make sure interface is implemented
 var _ workflowEnvironment = (*testWorkflowEnvironmentImpl)(nil)

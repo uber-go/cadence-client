@@ -27,7 +27,6 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
-	"os"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -209,10 +208,6 @@ func (ww *workflowWorker) Stop() {
 	ww.worker.Stop()
 }
 
-func (ww *workflowWorker) Done() <-chan os.Signal {
-	return ww.worker.Done()
-}
-
 func newActivityWorker(
 	activities []activity,
 	service m.TChanWorkflowService,
@@ -275,11 +270,6 @@ func (aw *activityWorker) Run() {
 // Shutdown the worker.
 func (aw *activityWorker) Stop() {
 	aw.worker.Stop()
-}
-
-// Done returns the exit channel
-func (aw *activityWorker) Done() <-chan os.Signal {
-	return aw.worker.Done()
 }
 
 type workerFunc func(ctx Context, input []byte) ([]byte, error)
@@ -741,7 +731,7 @@ func (aw *aggregatedWorker) Start() error {
 
 func (aw *aggregatedWorker) Run() {
 	aw.Start()
-	d := <-aw.Done()
+	d := <-isProcessKilled()
 	aw.logger.Info("Worker has been killed", zap.String("Signal", d.String()))
 	aw.Stop()
 }
@@ -753,17 +743,6 @@ func (aw *aggregatedWorker) Stop() {
 	if !isInterfaceNil(aw.activityWorker) {
 		aw.activityWorker.Stop()
 	}
-}
-
-func (aw *aggregatedWorker) Done() <-chan os.Signal {
-	c := make(chan os.Signal, 1)
-	select {
-	case w := <-aw.workflowWorker.Done():
-		c <- w
-	case a := <-aw.activityWorker.Done():
-		c <- a
-	}
-	return c
 }
 
 // aggregatedWorker returns an instance to manage the workers.

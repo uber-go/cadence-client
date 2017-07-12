@@ -198,7 +198,7 @@ func TestCreateWorkerRun(t *testing.T) {
 	time.Sleep(time.Millisecond * 200)
 	p, err := os.FindProcess(os.Getpid())
 	assert.NoError(t, err)
-	p.Signal(os.Interrupt)
+	assert.NoError(t, p.Signal(os.Interrupt))
 	wg.Wait()
 	service.AssertExpectations(t)
 }

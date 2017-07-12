@@ -23,8 +23,6 @@ package cadence
 // All code in this file is private to the package.
 
 import (
-	"bytes"
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"time"
@@ -344,7 +342,7 @@ func validateVersion(changeID string, version, minSupported, maxSupported Versio
 	if version > maxSupported {
 		panic(fmt.Sprintf("Workflow code is too old to support version %v "+
 			"for \"%v\" changeID. The maximum supported version is %v",
-			version, changeID, minSupported))
+			version, changeID, maxSupported))
 	}
 }
 
@@ -357,15 +355,10 @@ func (wc *workflowEnvironmentImpl) GetVersion(changeID string, minSupported, max
 			version = DefaultVersion
 		}
 		validateVersion(changeID, version, minSupported, maxSupported)
-		wc.logger.Debug("GetVersion return version from a marker",
-			zap.String(tagChangeID, changeID), zap.Int(tagVersion, int(version)))
 		return version
 	}
 	version = maxSupported
 	wc.decisionsHelper.recordVersionMarker(changeID, version)
-
-	wc.logger.Debug("GetVersion return",
-		zap.String(tagChangeID, changeID), zap.Int(tagVersion, int(version)))
 	return version
 }
 
@@ -394,17 +387,11 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 			callback(result, err)
 			return
 		}
-		var buf bytes.Buffer
-		enc := gob.NewEncoder(&buf)
-		if err := enc.Encode(sideEffectID); err != nil {
+		details, err = getHostEnvironment().encodeArgs([]interface{}{sideEffectID, result})
+		if err != nil {
 			callback(nil, fmt.Errorf("failure encoding sideEffectID: %v", err))
 			return
 		}
-		if err := enc.Encode(result); err != nil {
-			callback(nil, fmt.Errorf("failure encoding side effect result: %v", err))
-			return
-		}
-		details = buf.Bytes()
 	}
 
 	wc.decisionsHelper.recordSideEffectMarker(sideEffectID, details)
@@ -666,31 +653,18 @@ func (weh *workflowExecutionEventHandlerImpl) handleMarkerRecorded(
 	eventID int64,
 	attributes *m.MarkerRecordedEventAttributes,
 ) error {
+	encodedValues := EncodedValues(attributes.GetDetails())
 	switch attributes.GetMarkerName() {
 	case sideEffectMarkerName:
-		dec := gob.NewDecoder(bytes.NewBuffer(attributes.GetDetails()))
 		var sideEffectID int32
-
-		if err := dec.Decode(&sideEffectID); err != nil {
-			return fmt.Errorf("failure decoding sideEffectID: %v", err)
-		}
 		var result []byte
-		if err := dec.Decode(&result); err != nil {
-			return fmt.Errorf("failure decoding side effect result: %v", err)
-		}
+		encodedValues.Get(&sideEffectID, &result)
 		weh.sideEffectResult[sideEffectID] = result
 		return nil
 	case versionMarkerName:
-		dec := gob.NewDecoder(bytes.NewBuffer(attributes.GetDetails()))
 		var changeID string
-
-		if err := dec.Decode(&changeID); err != nil {
-			return fmt.Errorf("failure decoding version changeID: %v", err)
-		}
 		var version Version
-		if err := dec.Decode(&version); err != nil {
-			return fmt.Errorf("failure decoding version: %v", err)
-		}
+		encodedValues.Get(&changeID, &version)
 		weh.changeVersions[changeID] = version
 		return nil
 	default:

@@ -23,9 +23,6 @@ package cadence
 import (
 	"fmt"
 
-	"bytes"
-	"encoding/gob"
-
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
 	"go.uber.org/cadence/common/util"
@@ -686,15 +683,10 @@ func (h *decisionsHelper) getActivityID(event *s.HistoryEvent) string {
 
 func (h *decisionsHelper) recordVersionMarker(changeID string, version Version) decisionStateMachine {
 	markerID := fmt.Sprintf("%v_%v", versionMarkerName, changeID)
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(changeID); err != nil {
-		panic(fmt.Sprintf("Failure encoding changeID name: %v", err))
+	details, err := getHostEnvironment().encodeArgs([]interface{}{changeID, version})
+	if err != nil {
+		panic(err)
 	}
-	if err := enc.Encode(version); err != nil {
-		panic(fmt.Sprintf("Failure encoding version value: %v", err))
-	}
-	details := buf.Bytes()
 
 	recordMarker := &s.RecordMarkerDecisionAttributes{
 		MarkerName: common.StringPtr(versionMarkerName),

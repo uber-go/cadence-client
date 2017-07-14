@@ -1044,24 +1044,24 @@ func TestSelectFuture_WithBatchSets(t *testing.T) {
 
 		s := NewSelector(ctx)
 		s.
-		AddFuture(future1, func(f Future) {
-			var v string
-			err := f.Get(ctx, &v)
-			assert.Nil(t, err)
-			history = append(history, fmt.Sprintf("c1-%v", v))
-		}).
+			AddFuture(future1, func(f Future) {
+				var v string
+				err := f.Get(ctx, &v)
+				assert.Nil(t, err)
+				history = append(history, fmt.Sprintf("c1-%v", v))
+			}).
 			AddFuture(future2, func(f Future) {
-			var v string
-			err := f.Get(ctx, &v)
-			assert.Nil(t, err)
-			history = append(history, fmt.Sprintf("c2-%v", v))
-		}).
+				var v string
+				err := f.Get(ctx, &v)
+				assert.Nil(t, err)
+				history = append(history, fmt.Sprintf("c2-%v", v))
+			}).
 			AddFuture(future3, func(f Future) {
-			var v string
-			err := f.Get(ctx, &v)
-			assert.Nil(t, err)
-			history = append(history, fmt.Sprintf("c3-%v", v))
-		})
+				var v string
+				err := f.Get(ctx, &v)
+				assert.Nil(t, err)
+				history = append(history, fmt.Sprintf("c3-%v", v))
+			})
 
 		settable2.Set("two", nil)
 		s.Select(ctx)
@@ -1083,4 +1083,3 @@ func TestSelectFuture_WithBatchSets(t *testing.T) {
 	}
 	require.EqualValues(t, expected, history)
 }
-

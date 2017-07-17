@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/uber-go/tally"
@@ -38,6 +39,10 @@ import (
 	"go.uber.org/cadence/common/metrics"
 	"go.uber.org/cadence/common/util"
 	"go.uber.org/zap"
+)
+
+const (
+	defaultHeartBeatIntervalInSec = 10 * 60
 )
 
 // interfaces
@@ -52,11 +57,10 @@ type (
 		Close()
 	}
 
-	workflowHistoryIterator func(nextToken []byte) (*s.History, []byte, error)
 	// workflowTask wraps a decision task.
 	workflowTask struct {
 		task     *s.PollForDecisionTaskResponse
-		iterator workflowHistoryIterator
+		iterator WorkflowHistoryIterator
 	}
 
 	// activityTask wraps a activity task.
@@ -217,6 +221,10 @@ OrderEvents:
 			if eh.nextPageToken == nil {
 				break OrderEvents
 			}
+			if eh.workflowTask.iterator == nil {
+				err = errors.New("iterator is not provided for processing continuous page token")
+				return
+			}
 			historyPage, token, err1 := eh.workflowTask.iterator(eh.nextPageToken)
 			if err1 != nil {
 				err = err1
@@ -297,6 +305,7 @@ func newWorkflowTaskHandler(factory workflowDefinitionFactory, domain string,
 // ProcessWorkflowTask processes each all the events of the workflow task.
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	task *s.PollForDecisionTaskResponse,
+	itr WorkflowHistoryIterator,
 	emitStack bool,
 ) (result *s.RespondDecisionTaskCompletedRequest, stackTrace string, err error) {
 	currentTime := time.Now()
@@ -359,7 +368,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	eventHandler := newWorkflowExecutionEventHandler(
 		workflowInfo, wth.workflowDefFactory, completeHandler, wth.logger, wth.enableLoggingInReplay)
 	defer eventHandler.Close()
-	reorderedHistory := newHistory(&workflowTask{task: task}, eventHandler.(*workflowExecutionEventHandlerImpl))
+	reorderedHistory := newHistory(&workflowTask{task: task, iterator: itr}, eventHandler.(*workflowExecutionEventHandlerImpl))
 	decisions := []*s.Decision{}
 	replayDecisions := []*s.Decision{}
 	respondEvents := []*s.HistoryEvent{}
@@ -472,17 +481,61 @@ ProcessEvents:
 	return taskCompletionRequest, stackTrace, nil
 }
 
+func isVersionMarkerDecision(d *s.Decision) bool {
+	if d.GetDecisionType() == s.DecisionType_RecordMarker &&
+		d.RecordMarkerDecisionAttributes.GetMarkerName() == versionMarkerName {
+		return true
+	}
+	return false
+}
+
+func isVersionMarkerEvent(e *s.HistoryEvent) bool {
+	if e.GetEventType() == s.EventType_MarkerRecorded &&
+		e.MarkerRecordedEventAttributes.GetMarkerName() == versionMarkerName {
+		return true
+	}
+	return false
+}
+
 func matchReplayWithHistory(replayDecisions []*s.Decision, historyEvents []*s.HistoryEvent) error {
-	for i := 0; i < len(historyEvents); i++ {
-		e := historyEvents[i]
-		if i >= len(replayDecisions) {
+	di := 0
+	hi := 0
+	hSize := len(historyEvents)
+	dSize := len(replayDecisions)
+matchLoop:
+	for hi < hSize || di < dSize {
+		var e *s.HistoryEvent
+		if hi < hSize {
+			e = historyEvents[hi]
+		}
+		if isVersionMarkerEvent(e) {
+			hi++
+			continue matchLoop
+		}
+
+		var d *s.Decision
+		if di < dSize {
+			d = replayDecisions[di]
+		}
+		if isVersionMarkerDecision(d) {
+			di++
+			continue matchLoop
+		}
+		if d == nil {
 			return fmt.Errorf("nondeterministic workflow: missing replay decision for %s", util.HistoryEventToString(e))
 		}
-		d := replayDecisions[i]
+
+		if e == nil {
+			return fmt.Errorf("nondeterministic workflow: extra replay decision for %s", util.DecisionToString(d))
+		}
+
 		if !isDecisionMatchEvent(d, e, false) {
 			return fmt.Errorf("nondeterministic workflow: history event is %s, replay decision is %s",
 				util.HistoryEventToString(e), util.DecisionToString(d))
 		}
+
+		di++
+		hi++
 	}
 	return nil
 }
@@ -724,31 +777,104 @@ func newActivityTaskHandler(activities []activity,
 }
 
 type cadenceInvoker struct {
-	identity      string
-	service       m.TChanWorkflowService
-	taskToken     []byte
-	cancelHandler func()
-	retryPolicy   backoff.RetryPolicy
+	sync.Mutex
+	identity              string
+	service               m.TChanWorkflowService
+	taskToken             []byte
+	cancelHandler         func()
+	retryPolicy           backoff.RetryPolicy
+	heartBeatTimeoutInSec int32       // The heart beat interval configured for this activity.
+	hbBatchEndTimer       *time.Timer // Whether we started a batch of operations that need to be reported in the cycle. This gets started on a user call.
+	lastDetailsToReport   *[]byte
+	closeCh               chan struct{}
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
+	i.Lock()
+	defer i.Unlock()
+
+	if i.hbBatchEndTimer != nil {
+		// If we have started batching window, keep track of last reported progress.
+		i.lastDetailsToReport = &details
+		return nil
+	}
+
+	isActivityCancelled, err := i.internalHeartBeat(details)
+
+	// If the activity is cancelled, the activity can ignore the cancellation and do its work
+	// and complete. Our cancellation is co-operative, so we will try to heartbeat.
+	if err == nil || isActivityCancelled {
+		// We have successfully sent heartbeat, start next batching window.
+		i.lastDetailsToReport = nil
+
+		// Create timer to fire before the threshold to report.
+		deadlineToTrigger := i.heartBeatTimeoutInSec
+		if deadlineToTrigger <= 0 {
+			// If we don't have any heartbeat timeout configured.
+			deadlineToTrigger = defaultHeartBeatIntervalInSec
+		}
+
+		// We set a deadline at 80% of the timeout.
+		duration := time.Duration(0.8*float32(deadlineToTrigger)) * time.Second
+		i.hbBatchEndTimer = time.NewTimer(duration)
+
+		go func() {
+			select {
+			case <-i.hbBatchEndTimer.C:
+				// We are close to deadline.
+			case <-i.closeCh:
+				// We got closed.
+				return
+			}
+
+			// We close the batch and report the progress.
+			var detailsToReport *[]byte
+
+			i.Lock()
+			detailsToReport = i.lastDetailsToReport
+			i.hbBatchEndTimer.Stop()
+			i.hbBatchEndTimer = nil
+			i.Unlock()
+
+			if detailsToReport != nil {
+				i.Heartbeat(*detailsToReport)
+			}
+		}()
+	}
+
+	return err
+}
+
+func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {
+	isActivityCancelled := false
 	err := recordActivityHeartbeat(i.service, i.identity, i.taskToken, details, i.retryPolicy)
 
 	switch err.(type) {
 	case *CanceledError:
 		// We are asked to cancel. inform the activity about cancellation through context.
-		// We are asked to cancel. inform the activity about cancellation through context.
 		i.cancelHandler()
+		isActivityCancelled = true
 
 	case *s.EntityNotExistsError:
 		// We will pass these through as cancellation for now but something we can change
 		// later when we have setter on cancel handler.
 		i.cancelHandler()
+		isActivityCancelled = true
 	}
 
 	// We don't want to bubble temporary errors to the user.
 	// This error won't be return to user check RecordActivityHeartbeat().
-	return err
+	return isActivityCancelled, err
+}
+
+func (i *cadenceInvoker) Close() {
+	i.Lock()
+	defer i.Unlock()
+
+	close(i.closeCh)
+	if i.hbBatchEndTimer != nil {
+		i.hbBatchEndTimer.Stop()
+	}
 }
 
 func newServiceInvoker(
@@ -756,13 +882,16 @@ func newServiceInvoker(
 	identity string,
 	service m.TChanWorkflowService,
 	cancelHandler func(),
+	heartBeatTimeoutInSec int32,
 ) ServiceInvoker {
 	return &cadenceInvoker{
-		taskToken:     taskToken,
-		identity:      identity,
-		service:       service,
-		cancelHandler: cancelHandler,
-		retryPolicy:   serviceOperationRetryPolicy,
+		taskToken:             taskToken,
+		identity:              identity,
+		service:               service,
+		cancelHandler:         cancelHandler,
+		retryPolicy:           serviceOperationRetryPolicy,
+		heartBeatTimeoutInSec: heartBeatTimeoutInSec,
+		closeCh:               make(chan struct{}),
 	}
 }
 
@@ -786,7 +915,8 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 		rootCtx = context.Background()
 	}
 	canCtx, cancel := context.WithCancel(rootCtx)
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel)
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds())
+	defer invoker.Close()
 	ctx := WithActivityTask(canCtx, t, invoker, ath.logger)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.implementations[flowActivityTypeFrom(activityType)]

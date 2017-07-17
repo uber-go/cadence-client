@@ -24,12 +24,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	s "go.uber.org/cadence/.gen/go/shared"
@@ -146,7 +149,7 @@ func TestDecisionTaskHandler(t *testing.T) {
 	}
 
 	r := NewWorkflowTaskHandler(testDomain, "identity", logger)
-	_, stackTrace, err := r.ProcessWorkflowTask(task, true)
+	_, stackTrace, err := r.ProcessWorkflowTask(task, nil, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, stackTrace, stackTrace)
 	require.Contains(t, stackTrace, "cadence.(*decodeFutureImpl).Get")
@@ -174,6 +177,33 @@ func testActivityMultipleArgs(ctx context.Context, arg1 int, arg2 string, arg3 b
 func TestCreateWorker(t *testing.T) {
 	// Create service endpoint
 	service := new(mocks.TChanWorkflowService)
+	worker := createWorker(t, service)
+	err := worker.Start()
+	require.NoError(t, err)
+	time.Sleep(time.Millisecond * 200)
+	worker.Stop()
+	service.AssertExpectations(t)
+}
+
+func TestCreateWorkerRun(t *testing.T) {
+	// Create service endpoint
+	service := new(mocks.TChanWorkflowService)
+	worker := createWorker(t, service)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		worker.Run()
+	}()
+	time.Sleep(time.Millisecond * 200)
+	p, err := os.FindProcess(os.Getpid())
+	assert.NoError(t, err)
+	assert.NoError(t, p.Signal(os.Interrupt))
+	wg.Wait()
+	service.AssertExpectations(t)
+}
+
+func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 	//logger := getLogger()
 
 	domain := "testDomain"
@@ -230,11 +260,7 @@ func TestCreateWorker(t *testing.T) {
 		domain,
 		"testGroupName2",
 		workerOptions)
-	err = worker.Start()
-	require.NoError(t, err)
-	time.Sleep(time.Millisecond * 200)
-	worker.Stop()
-	service.AssertExpectations(t)
+	return worker
 }
 
 func TestCompleteActivity(t *testing.T) {

@@ -40,9 +40,13 @@ import (
 )
 
 const (
-	defaultConcurrentPollRoutineSize          = 2
-	defaultMaxConcurrentActivityExecutionSize = 10000  // Large execution size(unlimited)
-	defaultMaxActivityExecutionRate           = 100000 // Large execution rate(100K per sec)
+	defaultConcurrentPollRoutineSize = 1 // set to 1 for now, can adjust later if needed
+
+	defaultMaxConcurrentActivityExecutionSize = 1000   // Large concurrent activity execution size (1k)
+	defaultMaxActivityExecutionRate           = 100000 // Large activity execution rate (unlimited)
+
+	defaultMaxConcurrentWorkflowExecutionSize = 10     // workflow code normally run fast, so only need small concurrent number
+	defaultMaxWorkflowExecutionRate           = 100000 // Large workflow execution rate (unlimited)
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -63,7 +67,7 @@ type (
 		executionParameters workerExecutionParameters
 		workflowService     m.TChanWorkflowService
 		domain              string
-		poller              taskPoller // taskPoller to poll the tasks.
+		poller              taskPoller // taskPoller to poll and process the tasks.
 		worker              *baseWorker
 		identity            string
 	}
@@ -97,9 +101,11 @@ type (
 		// Defines how many concurrent poll requests for the task list by this worker.
 		ConcurrentPollRoutineSize int
 
-		// Defines how many executions for task list by this worker.
-		// TODO: In future we want to separate the activity executions as they take longer than polls.
-		// ConcurrentExecutionRoutineSize int
+		// Defines how many concurrent executions for task list by this worker.
+		ConcurrentActivityExecutionSize int
+
+		// Defines rate limiting on number of activity tasks that can be executed per second.
+		MaxActivityExecutionRate int
 
 		// User can provide an identity for the debuggability. If not provided the framework has
 		// a default option.
@@ -177,11 +183,13 @@ func newWorkflowTaskWorkerInternal(
 		params,
 	)
 	worker := newBaseWorker(baseWorkerOptions{
-		routineCount:    params.ConcurrentPollRoutineSize,
-		taskPoller:      poller,
-		workflowService: service,
-		identity:        params.Identity,
-		workerType:      "DecisionWorker"},
+		pollerCount:       params.ConcurrentPollRoutineSize,
+		maxConcurrentTask: defaultMaxConcurrentWorkflowExecutionSize,
+		maxTaskRps:        defaultMaxWorkflowExecutionRate,
+		taskWorker:        poller,
+		workflowService:   service,
+		identity:          params.Identity,
+		workerType:        "DecisionWorker"},
 		params.Logger)
 
 	return &workflowWorker{
@@ -240,11 +248,13 @@ func newActivityTaskWorker(
 		workerParams,
 	)
 	base := newBaseWorker(baseWorkerOptions{
-		routineCount:    workerParams.ConcurrentPollRoutineSize,
-		taskPoller:      poller,
-		workflowService: service,
-		identity:        workerParams.Identity,
-		workerType:      "ActivityWorker"},
+		pollerCount:       workerParams.ConcurrentPollRoutineSize,
+		maxConcurrentTask: workerParams.ConcurrentActivityExecutionSize,
+		maxTaskRps:        workerParams.MaxActivityExecutionRate,
+		taskWorker:        poller,
+		workflowService:   service,
+		identity:          workerParams.Identity,
+		workerType:        "ActivityWorker"},
 		workerParams.Logger)
 
 	return &activityWorker{
@@ -757,13 +767,15 @@ func newAggregatedWorker(
 ) (worker Worker) {
 	wOptions := fillWorkerOptionsDefaults(options)
 	workerParams := workerExecutionParameters{
-		TaskList:                  taskList,
-		ConcurrentPollRoutineSize: defaultConcurrentPollRoutineSize,
-		Identity:                  wOptions.Identity,
-		MetricsScope:              wOptions.MetricsScope,
-		Logger:                    wOptions.Logger,
-		EnableLoggingInReplay:     wOptions.EnableLoggingInReplay,
-		UserContext:               wOptions.BackgroundActivityContext,
+		TaskList:                        taskList,
+		ConcurrentPollRoutineSize:       defaultConcurrentPollRoutineSize,
+		ConcurrentActivityExecutionSize: wOptions.MaxConcurrentActivityExecutionSize,
+		MaxActivityExecutionRate:        wOptions.MaxActivityExecutionRate,
+		Identity:                        wOptions.Identity,
+		MetricsScope:                    wOptions.MetricsScope,
+		Logger:                          wOptions.Logger,
+		EnableLoggingInReplay:           wOptions.EnableLoggingInReplay,
+		UserContext:                     wOptions.BackgroundActivityContext,
 	}
 
 	ensureRequiredParams(&workerParams)

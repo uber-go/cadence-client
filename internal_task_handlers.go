@@ -456,13 +456,15 @@ ProcessEvents:
 		// ExecutionContext:
 	}
 
-	var buf bytes.Buffer
-	for i, d := range decisions {
-		buf.WriteString(fmt.Sprintf("%v: %v\n", i, util.DecisionToString(d)))
+	if enableVerboseLogging {
+		var buf bytes.Buffer
+		for i, d := range decisions {
+			buf.WriteString(fmt.Sprintf("%v: %v\n", i, util.DecisionToString(d)))
+		}
+		wth.logger.Debug("new_decisions",
+			zap.Int("DecisionCount", len(decisions)),
+			zap.String("Decisions", buf.String()))
 	}
-	wth.logger.Debug("new_decisions",
-		zap.Int("DecisionCount", len(decisions)),
-		zap.String("Decisions", buf.String()))
 
 	if emitStack {
 		stackTrace = eventHandler.StackTrace()

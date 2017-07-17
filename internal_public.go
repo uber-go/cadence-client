@@ -53,7 +53,7 @@ type (
 	}
 )
 
-var enableFrameworkLogging = false
+var enableVerboseLogging = false
 
 // NewWorkflowTaskWorker returns an instance of a workflow task handler worker.
 // To be used by framework level code that requires access to the original workflow task.
@@ -162,9 +162,9 @@ func DeserializeFnResults(result []byte, to interface{}) error {
 	return getHostEnvironment().decodeArg(result, to)
 }
 
-// EnableFrameworkLogging enable or disable trace level logging. This is for internal use only.
-func EnableFrameworkLogging(enable bool) {
-	enableFrameworkLogging = enable
+// EnableVerboseLogging enable or disable verbose logging. This is for internal use only.
+func EnableVerboseLogging(enable bool) {
+	enableVerboseLogging = enable
 }
 
 // WithTestTags - is used for internal cadence use to pass any test tags.

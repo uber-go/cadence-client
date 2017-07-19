@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/atomic"
 	m "go.uber.org/cadence/.gen/go/cadence"
 	"go.uber.org/cadence/common"
 	"go.uber.org/cadence/common/backoff"
@@ -99,9 +100,10 @@ type (
 		retrier         *backoff.ConcurrentRetrier // Service errors back off retrier
 		logger          *zap.Logger
 
-		pollerRequestCh chan struct{}
-		taskQueueCh     chan interface{}
-		taskSemaphore   chan struct{} // channel used as semaphore for concurrent task execution
+		pollerRequestCh     chan struct{}
+		taskQueueCh         chan interface{}
+		taskSemaphore       chan struct{} // channel used as semaphore for concurrent task execution
+		concurrentTaskCount atomic.Int32
 	}
 )
 
@@ -198,7 +200,6 @@ func (bw *baseWorker) runTaskDispatcher() {
 		case <-bw.shutdownCh:
 			return
 		case task := <-bw.taskQueueCh:
-			bw.pollerRequestCh <- struct{}{}
 			// got new task, wait for taskSemaphore or shutdown
 			select {
 			case <-bw.shutdownCh:
@@ -243,6 +244,12 @@ func (bw *baseWorker) pollTask() {
 }
 
 func (bw *baseWorker) processTask(task interface{}) {
+	pollerRequested := false
+	if bw.concurrentTaskCount.Inc() < int32(bw.options.maxConcurrentTask) {
+		bw.pollerRequestCh <- struct{}{}
+		pollerRequested = true
+	}
+
 	err := bw.options.taskWorker.ProcessTask(task)
 	if err != nil {
 		if isClientSideError(err) {
@@ -253,6 +260,10 @@ func (bw *baseWorker) processTask(task interface{}) {
 	}
 
 	bw.taskSemaphore <- struct{}{}
+	bw.concurrentTaskCount.Dec()
+	if !pollerRequested {
+		bw.pollerRequestCh <- struct{}{}
+	}
 }
 
 func (bw *baseWorker) Run() {

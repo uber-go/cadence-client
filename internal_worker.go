@@ -40,7 +40,9 @@ import (
 )
 
 const (
-	defaultConcurrentPollRoutineSize = 1 // set to 1 for now, can adjust later if needed
+	// Set to 1 for now, can adjust later if needed. The typical RTT (round-trip time) is below 1ms within data center.
+	// With 1 poller, we could easily achieve a few hundred RPS.
+	defaultConcurrentPollRoutineSize = 1
 
 	defaultMaxConcurrentActivityExecutionSize = 1000   // Large concurrent activity execution size (1k)
 	defaultMaxActivityExecutionRate           = 100000 // Large activity execution rate (unlimited)
@@ -105,7 +107,7 @@ type (
 		ConcurrentActivityExecutionSize int
 
 		// Defines rate limiting on number of activity tasks that can be executed per second.
-		MaxActivityExecutionRate int
+		MaxActivityExecutionRatePerSecond int
 
 		// User can provide an identity for the debuggability. If not provided the framework has
 		// a default option.
@@ -250,7 +252,7 @@ func newActivityTaskWorker(
 	base := newBaseWorker(baseWorkerOptions{
 		pollerCount:       workerParams.ConcurrentPollRoutineSize,
 		maxConcurrentTask: workerParams.ConcurrentActivityExecutionSize,
-		maxTaskRps:        workerParams.MaxActivityExecutionRate,
+		maxTaskRps:        workerParams.MaxActivityExecutionRatePerSecond,
 		taskWorker:        poller,
 		workflowService:   service,
 		identity:          workerParams.Identity,
@@ -758,7 +760,9 @@ func (aw *aggregatedWorker) Stop() {
 	aw.logger.Info("Stopped Worker")
 }
 
-// aggregatedWorker returns an instance to manage the workers.
+// aggregatedWorker returns an instance to manage the workers. Use defaultConcurrentPollRoutineSize (which is 1) as
+// poller size. The typical RTT (round-trip time) is below 1ms within data center. With 1 poller, we could easily achieve
+// a few hundred RPS.
 func newAggregatedWorker(
 	service m.TChanWorkflowService,
 	domain string,
@@ -767,15 +771,15 @@ func newAggregatedWorker(
 ) (worker Worker) {
 	wOptions := fillWorkerOptionsDefaults(options)
 	workerParams := workerExecutionParameters{
-		TaskList:                        taskList,
-		ConcurrentPollRoutineSize:       defaultConcurrentPollRoutineSize,
-		ConcurrentActivityExecutionSize: wOptions.MaxConcurrentActivityExecutionSize,
-		MaxActivityExecutionRate:        wOptions.MaxActivityExecutionRate,
-		Identity:                        wOptions.Identity,
-		MetricsScope:                    wOptions.MetricsScope,
-		Logger:                          wOptions.Logger,
-		EnableLoggingInReplay:           wOptions.EnableLoggingInReplay,
-		UserContext:                     wOptions.BackgroundActivityContext,
+		TaskList:                          taskList,
+		ConcurrentPollRoutineSize:         defaultConcurrentPollRoutineSize,
+		ConcurrentActivityExecutionSize:   wOptions.MaxConcurrentActivityExecutionSize,
+		MaxActivityExecutionRatePerSecond: wOptions.MaxActivityExecutionRatePerSecond,
+		Identity:              wOptions.Identity,
+		MetricsScope:          wOptions.MetricsScope,
+		Logger:                wOptions.Logger,
+		EnableLoggingInReplay: wOptions.EnableLoggingInReplay,
+		UserContext:           wOptions.BackgroundActivityContext,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -957,8 +961,8 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 	if options.MaxConcurrentActivityExecutionSize == 0 {
 		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
 	}
-	if options.MaxActivityExecutionRate == 0 {
-		options.MaxActivityExecutionRate = defaultMaxActivityExecutionRate
+	if options.MaxActivityExecutionRatePerSecond == 0 {
+		options.MaxActivityExecutionRatePerSecond = defaultMaxActivityExecutionRate
 	}
 	return options
 }

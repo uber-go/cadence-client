@@ -53,7 +53,8 @@ type (
 		// This can be used to protect down stream services from flooding.
 		// The zero value of this uses the default value.
 		// default: defaultMaxActivityExecutionRate(100k)
-		MaxActivityExecutionRate int
+		// Warning: activity's StartToCloseTimeout starts ticking even if a task is blocked due to rate limiting.
+		MaxActivityExecutionRatePerSecond int
 
 		// Optional: if the activities need auto heart beating for those activities
 		// by the framework

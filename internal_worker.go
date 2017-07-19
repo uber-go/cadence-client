@@ -107,7 +107,7 @@ type (
 		ConcurrentActivityExecutionSize int
 
 		// Defines rate limiting on number of activity tasks that can be executed per second.
-		MaxActivityExecutionRatePerSecond int
+		MaxActivityExecutionsPerSecond int
 
 		// User can provide an identity for the debuggability. If not provided the framework has
 		// a default option.
@@ -252,7 +252,7 @@ func newActivityTaskWorker(
 	base := newBaseWorker(baseWorkerOptions{
 		pollerCount:       workerParams.ConcurrentPollRoutineSize,
 		maxConcurrentTask: workerParams.ConcurrentActivityExecutionSize,
-		maxTaskRps:        workerParams.MaxActivityExecutionRatePerSecond,
+		maxTaskRps:        workerParams.MaxActivityExecutionsPerSecond,
 		taskWorker:        poller,
 		workflowService:   service,
 		identity:          workerParams.Identity,
@@ -771,15 +771,15 @@ func newAggregatedWorker(
 ) (worker Worker) {
 	wOptions := fillWorkerOptionsDefaults(options)
 	workerParams := workerExecutionParameters{
-		TaskList:                          taskList,
-		ConcurrentPollRoutineSize:         defaultConcurrentPollRoutineSize,
-		ConcurrentActivityExecutionSize:   wOptions.MaxConcurrentActivityExecutionSize,
-		MaxActivityExecutionRatePerSecond: wOptions.MaxActivityExecutionRatePerSecond,
-		Identity:              wOptions.Identity,
-		MetricsScope:          wOptions.MetricsScope,
-		Logger:                wOptions.Logger,
-		EnableLoggingInReplay: wOptions.EnableLoggingInReplay,
-		UserContext:           wOptions.BackgroundActivityContext,
+		TaskList:                        taskList,
+		ConcurrentPollRoutineSize:       defaultConcurrentPollRoutineSize,
+		ConcurrentActivityExecutionSize: wOptions.MaxConcurrentActivityExecutionSize,
+		MaxActivityExecutionsPerSecond:  wOptions.MaxActivityExecutionsPerSecond,
+		Identity:                        wOptions.Identity,
+		MetricsScope:                    wOptions.MetricsScope,
+		Logger:                          wOptions.Logger,
+		EnableLoggingInReplay:           wOptions.EnableLoggingInReplay,
+		UserContext:                     wOptions.BackgroundActivityContext,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -961,8 +961,8 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 	if options.MaxConcurrentActivityExecutionSize == 0 {
 		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
 	}
-	if options.MaxActivityExecutionRatePerSecond == 0 {
-		options.MaxActivityExecutionRatePerSecond = defaultMaxActivityExecutionRate
+	if options.MaxActivityExecutionsPerSecond == 0 {
+		options.MaxActivityExecutionsPerSecond = defaultMaxActivityExecutionRate
 	}
 	return options
 }

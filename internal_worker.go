@@ -40,9 +40,9 @@ import (
 )
 
 const (
-	// Set to 1 for now, can adjust later if needed. The typical RTT (round-trip time) is below 1ms within data center.
-	// With 1 poller, we could easily achieve a few hundred RPS.
-	defaultConcurrentPollRoutineSize = 1
+	// Set to 2 pollers for now, can adjust later if needed. The typical RTT (round-trip time) is below 1ms within data
+	// center. And the poll API latency is about 5ms. With 2 poller, we could achieve around 300~400 RPS.
+	defaultConcurrentPollRoutineSize = 2
 
 	defaultMaxConcurrentActivityExecutionSize = 1000   // Large concurrent activity execution size (1k)
 	defaultMaxActivityExecutionRate           = 100000 // Large activity execution rate (unlimited)
@@ -760,9 +760,9 @@ func (aw *aggregatedWorker) Stop() {
 	aw.logger.Info("Stopped Worker")
 }
 
-// aggregatedWorker returns an instance to manage the workers. Use defaultConcurrentPollRoutineSize (which is 1) as
-// poller size. The typical RTT (round-trip time) is below 1ms within data center. With 1 poller, we could easily achieve
-// a few hundred RPS.
+// aggregatedWorker returns an instance to manage the workers. Use defaultConcurrentPollRoutineSize (which is 2) as
+// poller size. The typical RTT (round-trip time) is below 1ms within data center. And the poll API latency is about 5ms.
+// With 2 poller, we could achieve around 300~400 RPS.
 func newAggregatedWorker(
 	service m.TChanWorkflowService,
 	domain string,

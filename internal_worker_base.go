@@ -200,7 +200,7 @@ func (bw *baseWorker) runTaskDispatcher() {
 			return
 		case task := <-bw.taskQueueCh:
 			// block until taskRateLimiter satisfied
-			for !bw.taskRateLimiter.Consume(1, time.Millisecond) {
+			for !bw.taskRateLimiter.Consume(1, time.Millisecond*100) {
 				if bw.isShutdown() {
 					return
 				}
@@ -214,7 +214,7 @@ func (bw *baseWorker) pollTask() {
 	var err error
 	var task interface{}
 	bw.retrier.Throttle()
-	if bw.pollRateLimiter.Consume(1, time.Millisecond) {
+	if bw.pollRateLimiter.Consume(1, time.Millisecond*100) {
 		task, err = bw.options.taskWorker.PollTask()
 		if err != nil {
 			bw.retrier.Failed()

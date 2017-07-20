@@ -47,7 +47,7 @@ const (
 	defaultMaxConcurrentActivityExecutionSize = 1000   // Large concurrent activity execution size (1k)
 	defaultMaxActivityExecutionRate           = 100000 // Large activity execution rate (unlimited)
 
-	defaultMaxConcurrentWorkflowExecutionSize = 10     // workflow code normally run fast, so only need small concurrent number
+	defaultMaxConcurrentWorkflowExecutionSize = 50     // hardcoded max workflow execution size.
 	defaultMaxWorkflowExecutionRate           = 100000 // Large workflow execution rate (unlimited)
 )
 
@@ -107,7 +107,7 @@ type (
 		ConcurrentActivityExecutionSize int
 
 		// Defines rate limiting on number of activity tasks that can be executed per second.
-		MaxActivityExecutionsPerSecond int
+		MaxActivityExecutionsPerSecond float32
 
 		// User can provide an identity for the debuggability. If not provided the framework has
 		// a default option.

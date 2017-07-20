@@ -54,7 +54,7 @@ type (
 		// The zero value of this uses the default value.
 		// default: defaultMaxActivityExecutionRate(100k)
 		// Warning: activity's StartToCloseTimeout starts ticking even if a task is blocked due to rate limiting.
-		MaxActivityExecutionsPerSecond int
+		MaxActivityExecutionsPerSecond float32
 
 		// Optional: if the activities need auto heart beating for those activities
 		// by the framework

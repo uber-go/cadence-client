@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/atomic"
 	m "go.uber.org/cadence/.gen/go/cadence"
 	"go.uber.org/cadence/common"
 	"go.uber.org/cadence/common/backoff"
@@ -82,7 +81,7 @@ type (
 	baseWorkerOptions struct {
 		pollerCount       int
 		maxConcurrentTask int
-		maxTaskRps        int
+		maxTaskRps        float32
 		taskWorker        taskPoller
 		workflowService   m.TChanWorkflowService
 		identity          string
@@ -100,10 +99,8 @@ type (
 		retrier         *backoff.ConcurrentRetrier // Service errors back off retrier
 		logger          *zap.Logger
 
-		pollerRequestCh     chan struct{}
-		taskQueueCh         chan interface{}
-		taskSemaphore       chan struct{} // channel used as semaphore for concurrent task execution
-		concurrentTaskCount atomic.Int32
+		pollerRequestCh chan struct{}
+		taskQueueCh     chan interface{}
 	}
 )
 
@@ -115,17 +112,21 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 }
 
 func newBaseWorker(options baseWorkerOptions, logger *zap.Logger) *baseWorker {
+	maxRpsInt := int(options.maxTaskRps)
+	if maxRpsInt < 1 {
+		// TokenBucket implementation does not support RPS < 1. Will need to update TokenBucket
+		maxRpsInt = 1
+	}
 	return &baseWorker{
 		options:         options,
 		shutdownCh:      make(chan struct{}),
 		pollRateLimiter: common.NewTokenBucket(1000, common.NewRealTimeSource()),
-		taskRateLimiter: common.NewTokenBucket(options.maxTaskRps, common.NewRealTimeSource()),
+		taskRateLimiter: common.NewTokenBucket(maxRpsInt, common.NewRealTimeSource()),
 		retrier:         backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
 		logger:          logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
 
-		pollerRequestCh: make(chan struct{}, options.pollerCount),
-		taskQueueCh:     make(chan interface{}, options.pollerCount),
-		taskSemaphore:   make(chan struct{}, options.maxConcurrentTask),
+		pollerRequestCh: make(chan struct{}, options.maxConcurrentTask),
+		taskQueueCh:     make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
 	}
 }
 
@@ -147,7 +148,7 @@ func (bw *baseWorker) Start() {
 		bw.logger.Info("Started Worker",
 			zap.Int("PollerCount", bw.options.pollerCount),
 			zap.Int("MaxConcurrentTask", bw.options.maxConcurrentTask),
-			zap.Int("MaxTaskRps", bw.options.maxTaskRps),
+			zap.Float32("MaxTaskRps", bw.options.maxTaskRps),
 		)
 	})
 }
@@ -163,8 +164,6 @@ func (bw *baseWorker) isShutdown() bool {
 
 func (bw *baseWorker) runPoller() {
 	defer bw.shutdownWG.Done()
-
-	bw.pollerRequestCh <- struct{}{} // initial poll request to kick off the poller loop
 
 	for {
 		select {
@@ -191,7 +190,7 @@ func (bw *baseWorker) runTaskDispatcher() {
 	defer bw.shutdownWG.Done()
 
 	for i := 0; i < bw.options.maxConcurrentTask; i++ {
-		bw.taskSemaphore <- struct{}{}
+		bw.pollerRequestCh <- struct{}{}
 	}
 
 	for {
@@ -200,19 +199,13 @@ func (bw *baseWorker) runTaskDispatcher() {
 		case <-bw.shutdownCh:
 			return
 		case task := <-bw.taskQueueCh:
-			// got new task, wait for taskSemaphore or shutdown
-			select {
-			case <-bw.shutdownCh:
-				return
-			case <-bw.taskSemaphore:
-				// block until taskRateLimiter satisfied
-				for !bw.taskRateLimiter.Consume(1, time.Millisecond) {
-					if bw.isShutdown() {
-						return
-					}
+			// block until taskRateLimiter satisfied
+			for !bw.taskRateLimiter.Consume(1, time.Millisecond) {
+				if bw.isShutdown() {
+					return
 				}
-				go bw.processTask(task)
 			}
+			go bw.processTask(task)
 		}
 	}
 }
@@ -244,12 +237,6 @@ func (bw *baseWorker) pollTask() {
 }
 
 func (bw *baseWorker) processTask(task interface{}) {
-	pollerRequested := false
-	if bw.concurrentTaskCount.Inc() < int32(bw.options.maxConcurrentTask) {
-		bw.pollerRequestCh <- struct{}{}
-		pollerRequested = true
-	}
-
 	err := bw.options.taskWorker.ProcessTask(task)
 	if err != nil {
 		if isClientSideError(err) {
@@ -259,11 +246,7 @@ func (bw *baseWorker) processTask(task interface{}) {
 		}
 	}
 
-	bw.taskSemaphore <- struct{}{}
-	bw.concurrentTaskCount.Dec()
-	if !pollerRequested {
-		bw.pollerRequestCh <- struct{}{}
-	}
+	bw.pollerRequestCh <- struct{}{}
 }
 
 func (bw *baseWorker) Run() {

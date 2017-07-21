@@ -115,5 +115,8 @@ func NewWorker(
 // through RegisterWorkflow.
 // Use Client.GetWorkflowThreadDump to get dump given workflowID and runID.
 func GetWorkflowThreadDump(h *s.History) (string, error) {
-	return getWorkflowThreadDumpImpl("unknown", "unknown", h)
+	getHistoryPage := func(nextPageToken []byte) (*s.History, []byte, error) {
+		return h, nil, nil
+	}
+	return getWorkflowThreadDumpImpl("unknown", "unknown", getHistoryPage)
 }

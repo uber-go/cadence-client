@@ -145,7 +145,7 @@ func (wtp *workflowTaskPoller) PollAndProcessSingleTask() error {
 	}
 
 	// Process the task.
-	completedRequest, _, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask.task, workflowTask.iterator, false)
+	completedRequest, _, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask.task, workflowTask.getHistoryPageFunc, false)
 	if err != nil {
 		return err
 	}
@@ -207,16 +207,26 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 	}
 
 	execution := response.GetWorkflowExecution()
-	iterator := func(nextPageToken []byte) (*s.History, []byte, error) {
+	iterator := newGetHistoryPageFunc(wtp.service, wtp.domain, execution)
+	task := &workflowTask{task: response, getHistoryPageFunc: iterator}
+	return task, nil
+}
+
+func newGetHistoryPageFunc(
+	service m.TChanWorkflowService,
+	domain string,
+	execution *s.WorkflowExecution,
+	atDecisionTaskCompletedEventID int64) func(nextPageToken []byte) (*s.History, []byte, error) {
+	return func(nextPageToken []byte) (*s.History, []byte, error) {
 		var resp *s.GetWorkflowExecutionHistoryResponse
-		err = backoff.Retry(
+		err := backoff.Retry(
 			func() error {
 				ctx, cancel := newTChannelContext()
 				defer cancel()
 
 				var err1 error
-				resp, err1 = wtp.service.GetWorkflowExecutionHistory(ctx, &s.GetWorkflowExecutionHistoryRequest{
-					Domain:        common.StringPtr(wtp.domain),
+				resp, err1 = service.GetWorkflowExecutionHistory(ctx, &s.GetWorkflowExecutionHistoryRequest{
+					Domain:        common.StringPtr(domain),
 					Execution:     execution,
 					NextPageToken: nextPageToken,
 				})
@@ -227,9 +237,6 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 		}
 		return resp.GetHistory(), resp.GetNextPageToken(), nil
 	}
-
-	task := &workflowTask{task: response, iterator: iterator}
-	return task, nil
 }
 
 func newActivityTaskPoller(taskHandler ActivityTaskHandler, service m.TChanWorkflowService,

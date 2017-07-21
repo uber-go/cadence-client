@@ -251,32 +251,23 @@ GetHistoryLoop:
 }
 
 func (wc *workflowClient) GetWorkflowThreadDump(workflowID string, runID string, atDecisionTaskCompletedEventID int64) (string, error) {
-	history, err := wc.GetWorkflowHistory(workflowID, runID)
+	getHistoryPage := newGetHistoryPageFunc(
+		wc.workflowService,
+		wc.domain,
+		&s.WorkflowExecution{WorkflowId: common.StringPtr(workflowID), RunId: common.StringPtr(runID)},
+	)
+	return getWorkflowThreadDumpImpl(workflowID, runID, getHistoryPage)
+}
+
+func getWorkflowThreadDumpImpl(workflowID string, runID string, getHistoryPage GetHistoryPage) (string, error) {
+	firstPage, taskToken, err := getHistoryPage([]byte{})
 	if err != nil {
 		return "", err
 	}
-	events := history.Events
-	if atDecisionTaskCompletedEventID > 0 {
-		for i, e := range events {
-			if e.GetEventId() == atDecisionTaskCompletedEventID {
-				if e.GetEventType() != s.EventType_DecisionTaskCompleted {
-					return "", fmt.Errorf("Event found at atDecisionTaskCompletedEventID value "+
-						"of %s is not DecisionTaskCompleted but %s",
-						atDecisionTaskCompletedEventID,
-						e.GetEventType())
-				}
-				history.Events = events[:i+1]
-			}
-		}
-	}
-	return getWorkflowThreadDumpImpl(workflowID, runID, history)
-}
-
-func getWorkflowThreadDumpImpl(workflowID string, runID string, h *s.History) (string, error) {
-	if len(h.Events) == 0 {
+	if len(firstPage.Events) == 0 {
 		return "", errors.New("empty history")
 	}
-	startWorkflowEvent := h.Events[0].WorkflowExecutionStartedEventAttributes
+	startWorkflowEvent := firstPage.Events[0].WorkflowExecutionStartedEventAttributes
 	if startWorkflowEvent == nil {
 		return "", errors.New("First event is not WorkflowExecutionStarted")
 	}
@@ -298,13 +289,14 @@ func getWorkflowThreadDumpImpl(workflowID string, runID string, h *s.History) (s
 	var maxInt64 int64 = math.MaxInt64
 	taskHandler := newWorkflowTaskHandler(workflowDefinitionFactory, "unknown", workerParams, nil)
 	task := &s.PollForDecisionTaskResponse{
-		History:                h,
+		History:                firstPage,
 		PreviousStartedEventId: &maxInt64,
 		StartedEventId:         &maxInt64,
 		WorkflowExecution:      &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
 		WorkflowType:           startWorkflowEvent.WorkflowType,
+		NextPageToken:          taskToken,
 	}
-	response, stackTrace, err := taskHandler.ProcessWorkflowTask(task, true)
+	response, stackTrace, err := taskHandler.ProcessWorkflowTask(task, getHistoryPage, true)
 	if err == nil && response != nil && len(response.GetDecisions()) > 0 && len(stackTrace) == 0 {
 		lastDecision := response.GetDecisions()[0]
 		if lastDecision.GetDecisionType() == s.DecisionType_FailWorkflowExecution {

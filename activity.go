@@ -42,9 +42,14 @@ type (
 		ActivityID        string
 		ActivityType      ActivityType
 	}
+
+	// RegisterActivityOptions consists of options for registering an activity
+	RegisterActivityOptions struct {
+		Name string
+	}
 )
 
-// RegisterActivity - register a activity function with the framework.
+// RegisterActivity - register an activity function with the framework.
 // A activity takes a context and input and returns a (result, error) or just error.
 // Examples:
 //	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
@@ -56,8 +61,14 @@ type (
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 // This method calls panic if activityFunc doesn't comply with the expected format.
 func RegisterActivity(activityFunc interface{}) {
+	RegisterActivityWithOptions(activityFunc, RegisterActivityOptions{})
+}
+
+// RegisterActivityWithOptions registers an activity function with the framework with provided
+// options.
+func RegisterActivityWithOptions(activityFunc interface{}, options RegisterActivityOptions) {
 	thImpl := getHostEnvironment()
-	err := thImpl.RegisterActivity(activityFunc)
+	err := thImpl.RegisterActivity(activityFunc, options)
 	if err != nil {
 		panic(err)
 	}

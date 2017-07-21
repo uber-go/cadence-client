@@ -430,7 +430,7 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	require.NoError(w.t, err, err)
 	require.True(w.t, **rStruct2Ptr == testActivityResult{Index: 10})
 
-	// By names.
+	// By fully qualified function names.
 	err = ExecuteActivity(ctx, "go.uber.org/cadence.testActivityByteArgs", input).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
@@ -458,6 +458,24 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	err = f.Get(ctx, &r2Struct)
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, testActivityResult{}, r2Struct)
+
+	// By custom names.
+
+	err = ExecuteActivity(ctx, "testActivityNoResult", 2, "test").Get(ctx, nil)
+	require.NoError(w.t, err, err)
+
+	err = ExecuteActivity(ctx, "testActivityNoContextArg", 2, "test").Get(ctx, nil)
+	require.NoError(w.t, err, err)
+
+	f = ExecuteActivity(ctx, "testActivityReturnByteArray")
+	err = f.Get(ctx, &r)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, []byte("testActivity"), r)
+
+	f = ExecuteActivity(ctx, "testActivityReturnInt")
+	err = f.Get(ctx, &rInt)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, 5, rInt)
 
 	return []byte("Done"), nil
 }
@@ -520,15 +538,28 @@ func testActivityReturnStructPtrPtr() (**testActivityResult, error) {
 
 func TestVariousActivitySchedulingOption(t *testing.T) {
 	ts := &WorkflowTestSuite{}
-	ts.RegisterActivity(testActivityNoResult)
-	ts.RegisterActivity(testActivityNoContextArg)
-	ts.RegisterActivity(testActivityReturnByteArray)
-	ts.RegisterActivity(testActivityReturnInt)
-	ts.RegisterActivity(testActivityByteArgs)
-	ts.RegisterActivity(testActivityReturnNilStructPtr)
-	ts.RegisterActivity(testActivityReturnStructPtr)
-	ts.RegisterActivity(testActivityReturnNilStructPtrPtr)
-	ts.RegisterActivity(testActivityReturnStructPtrPtr)
+	nopOptions := RegisterActivityOptions{}
+	ts.RegisterActivity(
+		testActivityNoResult,
+		RegisterActivityOptions{Name: "testActivityNoResult"},
+	)
+	ts.RegisterActivity(
+		testActivityNoContextArg,
+		RegisterActivityOptions{Name: "testActivityNoContextArg"},
+	)
+	ts.RegisterActivity(
+		testActivityReturnByteArray,
+		RegisterActivityOptions{Name: "testActivityReturnByteArray"},
+	)
+	ts.RegisterActivity(
+		testActivityReturnInt,
+		RegisterActivityOptions{Name: "testActivityReturnInt"},
+	)
+	ts.RegisterActivity(testActivityByteArgs, nopOptions)
+	ts.RegisterActivity(testActivityReturnNilStructPtr, nopOptions)
+	ts.RegisterActivity(testActivityReturnStructPtr, nopOptions)
+	ts.RegisterActivity(testActivityReturnNilStructPtrPtr, nopOptions)
+	ts.RegisterActivity(testActivityReturnStructPtrPtr, nopOptions)
 	env := ts.NewTestWorkflowEnvironment()
 	w := &activitiesCallingOptionsWorkflow{t: t}
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})

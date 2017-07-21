@@ -253,8 +253,9 @@ func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(optio
 }
 
 func (env *testWorkflowEnvironmentImpl) setActivityTaskList(tasklist string, activityFns ...interface{}) {
+	ao := RegisterActivityOptions{}
 	for _, activityFn := range activityFns {
-		env.testSuite.RegisterActivity(activityFn)
+		env.testSuite.RegisterActivity(activityFn, ao)
 		fnName := getFunctionName(activityFn)
 		taskListActivity, ok := env.taskListSpecificActivities[fnName]
 		if !ok {
@@ -276,7 +277,8 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, 
 		// auto register workflow if it is not already registered
 		fnName := getFunctionName(workflowFn)
 		if _, ok := s.hostEnv.getWorkflowFn(fnName); !ok {
-			s.RegisterWorkflow(workflowFn)
+			wo := RegisterWorkflowOptions{}
+			s.RegisterWorkflow(workflowFn, wo)
 		}
 		workflowType = getFunctionName(workflowFn)
 	default:
@@ -339,7 +341,8 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	)
 
 	// ensure activityFn is registered to defaultTestTaskList
-	env.testSuite.RegisterActivity(activityFn)
+	ao := RegisterActivityOptions{}
+	env.testSuite.RegisterActivity(activityFn, ao)
 	taskHandler := env.newTestActivityTaskHandler(defaultTestTaskList)
 	result, err := taskHandler.Execute(task)
 	if err != nil {

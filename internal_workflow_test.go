@@ -45,10 +45,11 @@ func (s *WorkflowUnitTest) SetupSuite() {
 		StartToCloseTimeout:    time.Minute,
 		HeartbeatTimeout:       20 * time.Second,
 	}
-	s.RegisterActivity(testAct)
-	s.RegisterActivity(getGreetingActivity)
-	s.RegisterActivity(getNameActivity)
-	s.RegisterActivity(sayGreetingActivity)
+	options := RegisterActivityOptions{}
+	s.RegisterActivity(testAct, options)
+	s.RegisterActivity(getGreetingActivity, options)
+	s.RegisterActivity(getNameActivity, options)
+	s.RegisterActivity(sayGreetingActivity, options)
 }
 
 func TestWorkflowUnitTest(t *testing.T) {
@@ -168,7 +169,7 @@ func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 func TestWorkflowPanic(t *testing.T) {
 	ts := &WorkflowTestSuite{}
 	ts.SetLogger(zap.NewNop()) // this test simulate panic, use nop logger to avoid logging noise
-	ts.RegisterActivity(testAct)
+	ts.RegisterActivity(testAct, RegisterActivityOptions{})
 	env := ts.NewTestWorkflowEnvironment()
 	env.ExecuteWorkflow(splitJoinActivityWorkflow, true)
 	require.True(t, env.IsWorkflowCompleted())
@@ -290,7 +291,8 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 
 func TestActivityCancellation(t *testing.T) {
 	ts := &WorkflowTestSuite{}
-	ts.RegisterActivity(testAct)
+	ao := RegisterActivityOptions{}
+	ts.RegisterActivity(testAct, ao)
 	env := ts.NewTestWorkflowEnvironment()
 	w := &testActivityCancelWorkflow{t: t}
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})

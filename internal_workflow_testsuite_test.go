@@ -47,10 +47,10 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 		StartToCloseTimeout:    time.Minute,
 		HeartbeatTimeout:       20 * time.Second,
 	}
-	s.RegisterWorkflow(testWorkflowHello)
-	s.RegisterWorkflow(testWorkflowHeartbeat)
-	s.RegisterActivity(testActivityHello)
-	s.RegisterActivity(testActivityHeartbeat)
+	s.RegisterWorkflow(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
+	s.RegisterWorkflow(testWorkflowHeartbeat, RegisterWorkflowOptions{Name: "testWorkflowHeartbeat"})
+	s.RegisterActivity(testActivityHello, RegisterActivityOptions{Name: "testActivityHello"})
+	s.RegisterActivity(testActivityHeartbeat, RegisterActivityOptions{Name: "testActivityHeartbeat"})
 }
 
 func TestUnitTestSuite(t *testing.T) {
@@ -491,6 +491,36 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Basic() {
 	s.Equal("hello_activity hello_world", actualResult)
 }
 
+func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Basic_CustomName() {
+	workflowFn := func(ctx Context) (string, error) {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+		var helloActivityResult string
+		err := ExecuteActivity(ctx, "testActivityHello", "activity").Get(ctx, &helloActivityResult)
+		if err != nil {
+			return "", err
+		}
+
+		cwo := ChildWorkflowOptions{ExecutionStartToCloseTimeout: time.Minute}
+		ctx = WithChildWorkflowOptions(ctx, cwo)
+		var helloWorkflowResult string
+		err = ExecuteChildWorkflow(ctx, "testWorkflowHello").Get(ctx, &helloWorkflowResult)
+		if err != nil {
+			return "", err
+		}
+
+		return helloActivityResult + " " + helloWorkflowResult, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var actualResult string
+	s.NoError(env.GetWorkflowResult(&actualResult))
+	s.Equal("hello_activity hello_world", actualResult)
+}
+
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowCancel() {
 	workflowFn := func(ctx Context) error {
 		cwo := ChildWorkflowOptions{
@@ -699,8 +729,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Clock() {
 		return nil
 	}
 
-	s.RegisterWorkflow(workflowFn)
-	s.RegisterWorkflow(childWorkflowFn)
+	wo := RegisterWorkflowOptions{}
+	s.RegisterWorkflow(workflowFn, wo)
+	s.RegisterWorkflow(childWorkflowFn, wo)
 	env := s.NewTestWorkflowEnvironment()
 	env.SetTestTimeout(time.Hour)
 
@@ -878,7 +909,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWithChild() {
 		return errors.New("child workflow takes too long")
 	}
 
-	s.RegisterWorkflow(childWorkflowFn)
+	wo := RegisterWorkflowOptions{}
+	s.RegisterWorkflow(childWorkflowFn, wo)
 
 	// no delay to the mock call, workflow should return no error
 	env := s.NewTestWorkflowEnvironment()
@@ -931,8 +963,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_GetVersion() {
 		return err
 	}
 
-	s.RegisterActivity(oldActivity)
-	s.RegisterActivity(newActivity)
+	ao := RegisterActivityOptions{}
+	s.RegisterActivity(oldActivity, ao)
+	s.RegisterActivity(newActivity, ao)
 	env := s.NewTestWorkflowEnvironment()
 	env.OnActivity(newActivity, mock.Anything, "new_msg").Return("hell new_mock_msg", nil).Once()
 	env.ExecuteWorkflow(workflowFn)

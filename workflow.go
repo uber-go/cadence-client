@@ -158,6 +158,11 @@ const (
 	ChildWorkflowPolicyAbandon ChildWorkflowPolicy = 2
 )
 
+// RegisterWorkflowOptions consists of options for registering a workflow
+type RegisterWorkflowOptions struct {
+	Name string
+}
+
 // RegisterWorkflow - registers a workflow function with the framework.
 // A workflow takes a cadence context and input and returns a (result, error) or just error.
 // Examples:
@@ -168,8 +173,14 @@ const (
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 // This method calls panic if workflowFunc doesn't comply with the expected format.
 func RegisterWorkflow(workflowFunc interface{}) {
+	RegisterWorkflowWithOptions(workflowFunc, RegisterWorkflowOptions{})
+}
+
+// RegisterWorkflowWithOptions registers a workflow function with the framework with provided
+// options.
+func RegisterWorkflowWithOptions(workflowFunc interface{}, options RegisterWorkflowOptions) {
 	thImpl := getHostEnvironment()
-	err := thImpl.RegisterWorkflow(workflowFunc)
+	err := thImpl.RegisterWorkflow(workflowFunc, options)
 	if err != nil {
 		panic(err)
 	}

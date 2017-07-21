@@ -99,9 +99,12 @@ func (s *WorkflowTestSuite) NewTestActivityEnvironment() *TestActivityEnviornmen
 // RegisterWorkflow registers a workflow that could be used by tests of this WorkflowTestSuite instance. All workflow registered
 // via cadence.RegisterWorkflow() are still valid and will be available to all tests of all instance of WorkflowTestSuite.
 // In the context of unit tests, workflow registration is only required if you are invoking workflow by name.
-func (s *WorkflowTestSuite) RegisterWorkflow(workflowFn interface{}) {
+func (s *WorkflowTestSuite) RegisterWorkflow(
+	workflowFn interface{},
+	options RegisterWorkflowOptions,
+) {
 	s.initIfNotDoneYet()
-	err := s.hostEnv.RegisterWorkflow(workflowFn)
+	err := s.hostEnv.RegisterWorkflow(workflowFn, options)
 	if err != nil {
 		panic(err)
 	}
@@ -110,13 +113,16 @@ func (s *WorkflowTestSuite) RegisterWorkflow(workflowFn interface{}) {
 // RegisterActivity registers an activity to this WorkflowTestSuite instance. Activities registered here will be available
 // and only available to all tests of this WorkflowTestSuite instance. Activities registered via cadence.RegisterActivity()
 // are still valid and will be available to all tests of all instances of WorkflowTestSuite.
-func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}) {
+func (s *WorkflowTestSuite) RegisterActivity(
+	activityFn interface{},
+	options RegisterActivityOptions,
+) {
 	s.initIfNotDoneYet()
 	fnName := getFunctionName(activityFn)
 	_, ok := s.hostEnv.activityFuncMap[fnName]
 	if !ok {
 		// activity not registered yet, register now
-		err := s.hostEnv.RegisterActivity(activityFn)
+		err := s.hostEnv.RegisterActivity(activityFn, options)
 		if err != nil {
 			panic(err)
 		}

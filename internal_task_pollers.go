@@ -24,6 +24,8 @@ package cadence
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"time"
 
 	"github.com/uber-go/tally"
@@ -221,7 +223,7 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 	}
 
 	execution := response.GetWorkflowExecution()
-	iterator := newGetHistoryPageFunc(wtp.service, wtp.domain, execution)
+	iterator := newGetHistoryPageFunc(wtp.service, wtp.domain, execution, math.MaxInt64)
 	task := &workflowTask{task: response, getHistoryPageFunc: iterator}
 	return task, nil
 }
@@ -249,7 +251,20 @@ func newGetHistoryPageFunc(
 		if err != nil {
 			return nil, nil, err
 		}
-		return resp.GetHistory(), resp.GetNextPageToken(), nil
+		h := resp.GetHistory()
+		size := len(h.Events)
+		if size > 0 && atDecisionTaskCompletedEventID > 0 {
+			if h.Events[size-1].GetEventId() <= atDecisionTaskCompletedEventID {
+				first := h.Events[0].GetEventId()
+				h.Events = h.Events[:atDecisionTaskCompletedEventID-first]
+				if h.Events[len(h.Events)-1].GetEventType() != s.EventType_DecisionTaskCompleted {
+					return nil, nil, fmt.Errorf("newGetHistoryPageFunc: atDecisionTaskCompletedEventID(%s) "+
+						"points to event that is not DecisionTaskCompleted", atDecisionTaskCompletedEventID)
+				}
+			}
+			return h, nil, nil
+		}
+		return h, resp.GetNextPageToken(), nil
 	}
 }
 

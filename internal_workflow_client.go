@@ -255,6 +255,7 @@ func (wc *workflowClient) GetWorkflowThreadDump(workflowID string, runID string,
 		wc.workflowService,
 		wc.domain,
 		&s.WorkflowExecution{WorkflowId: common.StringPtr(workflowID), RunId: common.StringPtr(runID)},
+		atDecisionTaskCompletedEventID,
 	)
 	return getWorkflowThreadDumpImpl(workflowID, runID, getHistoryPage)
 }

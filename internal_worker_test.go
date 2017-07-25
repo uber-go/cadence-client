@@ -74,7 +74,7 @@ func TestActivityRegistrationListener(t *testing.T) {
 		"go.uber.org/cadence.testActivityReturnString",
 		"go.uber.org/cadence.testActivityReturnEmptyString",
 		"go.uber.org/cadence.testActivityReturnEmptyStruct",
-		"go.uber.org/cadence.threadDumpActivity", // from internal_task_handlers_test.go
+		"go.uber.org/cadence.stackTraceActivity", // from internal_task_handlers_test.go
 	}
 	sort.Strings(expectedActivities)
 	expected := strings.Join(expectedActivities, ",")
@@ -88,7 +88,7 @@ func TestWorkflowRegistrationListener(t *testing.T) {
 	expectedWorkflows := []string{
 		"go.uber.org/cadence.sampleWorkflowExecute",
 		"go.uber.org/cadence.testReplayWorkflow",
-		"go.uber.org/cadence.threadDumpWorkflow", // from internal_task_handlers_test.go
+		"go.uber.org/cadence.stackTraceWorkflow", // from internal_task_handlers_test.go
 	}
 	sort.Strings(expectedWorkflows)
 	expected := strings.Join(expectedWorkflows, ",")

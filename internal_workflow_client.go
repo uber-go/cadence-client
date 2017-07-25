@@ -250,17 +250,17 @@ GetHistoryLoop:
 	return history, nil
 }
 
-func (wc *workflowClient) GetWorkflowThreadDump(workflowID string, runID string, atDecisionTaskCompletedEventID int64) (string, error) {
+func (wc *workflowClient) GetWorkflowStackTrace(workflowID string, runID string, atDecisionTaskCompletedEventID int64) (string, error) {
 	getHistoryPage := newGetHistoryPageFunc(
 		wc.workflowService,
 		wc.domain,
 		&s.WorkflowExecution{WorkflowId: common.StringPtr(workflowID), RunId: common.StringPtr(runID)},
 		atDecisionTaskCompletedEventID,
 	)
-	return getWorkflowThreadDumpImpl(workflowID, runID, getHistoryPage)
+	return getWorkflowStackTraceImpl(workflowID, runID, getHistoryPage)
 }
 
-func getWorkflowThreadDumpImpl(workflowID string, runID string, getHistoryPage GetHistoryPage) (string, error) {
+func getWorkflowStackTraceImpl(workflowID string, runID string, getHistoryPage GetHistoryPage) (string, error) {
 	firstPage, taskToken, err := getHistoryPage([]byte{})
 	if err != nil {
 		return "", err

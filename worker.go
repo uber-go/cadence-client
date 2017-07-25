@@ -111,13 +111,13 @@ func NewWorker(
 	return newAggregatedWorker(service, domain, taskList, options)
 }
 
-// GetWorkflowThreadDump returns thread dump of a workflow given its current history.
+// GetWorkflowStackTrace returns a stack trace of all goroutines of a workflow given its current history.
 // It requires workflow function that was used to create the history to be registered
 // through RegisterWorkflow.
-// Use Client.GetWorkflowThreadDump to get dump given workflowID and runID.
-func GetWorkflowThreadDump(h *s.History) (string, error) {
+// Use Client.GetWorkflowStackTrace to get a stack trace given workflowID and runID.
+func GetWorkflowStackTrace(h *s.History) (string, error) {
 	getHistoryPage := func(nextPageToken []byte) (*s.History, []byte, error) {
 		return h, nil, nil
 	}
-	return getWorkflowThreadDumpImpl("unknown", "unknown", getHistoryPage)
+	return getWorkflowStackTraceImpl("unknown", "unknown", getHistoryPage)
 }

@@ -49,6 +49,11 @@ type (
 	}
 )
 
+func init() {
+	RegisterWorkflow(threadDumpWorkflow)
+	RegisterActivity(threadDumpActivity)
+}
+
 // Test suite.
 func (t *TaskHandlersTestSuite) SetupTest() {
 }
@@ -56,8 +61,6 @@ func (t *TaskHandlersTestSuite) SetupTest() {
 func (t *TaskHandlersTestSuite) SetupSuite() {
 	logger, _ := zap.NewDevelopment()
 	t.logger = logger
-	RegisterWorkflow(ThreadDumpWorkflow)
-	RegisterActivity(ThreadDumpActivity)
 }
 
 func TestTaskHandlersTestSuite(t *testing.T) {
@@ -400,16 +403,16 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
 	}
 }
 
-func ThreadDumpActivity() error {
+func threadDumpActivity() error {
 	return ErrActivityResultPending
 }
 
-func ThreadDumpWorkflow(ctx Context) error {
+func threadDumpWorkflow(ctx Context) error {
 	ctx = WithActivityOptions(ctx, ActivityOptions{
 		ScheduleToStartTimeout: time.Minute,
 		StartToCloseTimeout:    time.Minute,
 	})
-	err := ExecuteActivity(ctx, ThreadDumpActivity).Get(ctx, nil)
+	err := ExecuteActivity(ctx, threadDumpActivity).Get(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -418,7 +421,7 @@ func ThreadDumpWorkflow(ctx Context) error {
 
 func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDumpByID() {
 	// Schedule an activity and see if we complete workflow.
-	workflowType := "go.uber.org/cadence.ThreadDumpWorkflow"
+	workflowType := "go.uber.org/cadence.threadDumpWorkflow"
 	taskListName := "tl1"
 	taskList := &s.TaskList{Name: &taskListName}
 	testEvents := []*s.HistoryEvent{
@@ -431,7 +434,7 @@ func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDumpByID() {
 		createTestEventDecisionTaskStarted(3),
 		createTestEventActivityTaskScheduled(4, &s.ActivityTaskScheduledEventAttributes{
 			ActivityId:   common.StringPtr("0"),
-			ActivityType: &s.ActivityType{Name: common.StringPtr("go.uber.org/cadence.ThreadDumpActivity")},
+			ActivityType: &s.ActivityType{Name: common.StringPtr("go.uber.org/cadence.threadDumpActivity")},
 			TaskList:     taskList,
 		}),
 	}
@@ -453,9 +456,35 @@ func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDumpByID() {
 	t.True(strings.Contains(dump, "blocked on"))
 }
 
+func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDump() {
+	// Schedule an activity and see if we complete workflow.
+	workflowType := "go.uber.org/cadence.threadDumpWorkflow"
+	taskListName := "tl1"
+	taskList := &s.TaskList{Name: &taskListName}
+	testEvents := []*s.HistoryEvent{
+
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
+			TaskList:     taskList,
+			WorkflowType: &s.WorkflowType{Name: &workflowType},
+		}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: taskList}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventActivityTaskScheduled(4, &s.ActivityTaskScheduledEventAttributes{
+			ActivityId:   common.StringPtr("0"),
+			ActivityType: &s.ActivityType{Name: common.StringPtr("go.uber.org/cadence.threadDumpActivity")},
+			TaskList:     taskList,
+		}),
+	}
+	dump, err := GetWorkflowThreadDump(&s.History{Events: testEvents})
+	t.NoError(err)
+	t.NotNil(dump)
+	t.True(strings.Contains(dump, ".Receive]"))
+	t.True(strings.Contains(dump, "blocked on"))
+}
+
 func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDumpByIDAndDecisionTaskCompletedEventID() {
 	// Schedule an activity and see if we complete workflow.
-	workflowType := "go.uber.org/cadence.ThreadDumpWorkflow"
+	workflowType := "go.uber.org/cadence.threadDumpWorkflow"
 	taskListName := "tl1"
 	taskList := &s.TaskList{Name: &taskListName}
 	var scheduled int64 = 2
@@ -471,7 +500,7 @@ func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDumpByIDAndDecisionTaskComp
 		createTestEventDecisionTaskStarted(started),
 		createTestEventActivityTaskScheduled(4, &s.ActivityTaskScheduledEventAttributes{
 			ActivityId:   common.StringPtr("0"),
-			ActivityType: &s.ActivityType{Name: common.StringPtr("go.uber.org/cadence.ThreadDumpActivity")},
+			ActivityType: &s.ActivityType{Name: common.StringPtr("go.uber.org/cadence.threadDumpActivity")},
 			TaskList:     taskList,
 		}),
 		createTestEventDecisionTaskCompleted(5, &s.DecisionTaskCompletedEventAttributes{
@@ -481,7 +510,7 @@ func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDumpByIDAndDecisionTaskComp
 		createTestEventDecisionTaskStarted(started),
 		createTestEventActivityTaskScheduled(7, &s.ActivityTaskScheduledEventAttributes{
 			ActivityId:   common.StringPtr("0"),
-			ActivityType: &s.ActivityType{Name: common.StringPtr("go.uber.org/cadence.ThreadDumpActivity")},
+			ActivityType: &s.ActivityType{Name: common.StringPtr("go.uber.org/cadence.threadDumpActivity")},
 			TaskList:     taskList,
 		}),
 		createTestEventDecisionTaskCompleted(8, &s.DecisionTaskCompletedEventAttributes{
@@ -499,32 +528,6 @@ func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDumpByIDAndDecisionTaskComp
 	workflowClient := NewClient(service, domain, nil)
 
 	dump, err := workflowClient.GetWorkflowThreadDump("id1", "runId1", 5)
-	t.NoError(err)
-	t.NotNil(dump)
-	t.True(strings.Contains(dump, ".Receive]"))
-	t.True(strings.Contains(dump, "blocked on"))
-}
-
-func (t *TaskHandlersTestSuite) TestGetWorkflowThreadDump() {
-	// Schedule an activity and see if we complete workflow.
-	workflowType := "go.uber.org/cadence.ThreadDumpWorkflow"
-	taskListName := "tl1"
-	taskList := &s.TaskList{Name: &taskListName}
-	testEvents := []*s.HistoryEvent{
-
-		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
-			TaskList:     taskList,
-			WorkflowType: &s.WorkflowType{Name: &workflowType},
-		}),
-		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: taskList}),
-		createTestEventDecisionTaskStarted(3),
-		createTestEventActivityTaskScheduled(4, &s.ActivityTaskScheduledEventAttributes{
-			ActivityId:   common.StringPtr("0"),
-			ActivityType: &s.ActivityType{Name: common.StringPtr("go.uber.org/cadence.ThreadDumpActivity")},
-			TaskList:     taskList,
-		}),
-	}
-	dump, err := GetWorkflowThreadDump(&s.History{Events: testEvents})
 	t.NoError(err)
 	t.NotNil(dump)
 	t.True(strings.Contains(dump, ".Receive]"))

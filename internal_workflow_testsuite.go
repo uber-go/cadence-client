@@ -30,6 +30,7 @@ import (
 
 	"github.com/facebookgo/clock"
 	"github.com/stretchr/testify/mock"
+	"github.com/uber-go/tally"
 	"github.com/uber/tchannel-go/thrift"
 	"go.uber.org/atomic"
 	m "go.uber.org/cadence/.gen/go/cadence"
@@ -226,6 +227,11 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 
 	if env.workerOptions.Logger == nil {
 		env.workerOptions.Logger = env.logger
+	}
+	if s.scope != nil {
+		env.workerOptions.MetricsScope = s.scope
+	} else {
+		env.workerOptions.MetricsScope = tally.NoopScope
 	}
 
 	return env
@@ -630,6 +636,10 @@ func (env *testWorkflowEnvironmentImpl) CompleteActivity(taskToken []byte, resul
 
 func (env *testWorkflowEnvironmentImpl) GetLogger() *zap.Logger {
 	return env.logger
+}
+
+func (env *testWorkflowEnvironmentImpl) GetMetricsScope() tally.Scope {
+	return env.workerOptions.MetricsScope
 }
 
 func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParameters, callback resultHandler) *activityInfo {

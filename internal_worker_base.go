@@ -219,7 +219,6 @@ func (bw *baseWorker) pollTask() {
 	var task interface{}
 	bw.retrier.Throttle()
 	if bw.pollLimiter.Wait(bw.limiterContext) == nil {
-		//if bw.pollRateLimiter.Consume(1, time.Millisecond*100) {
 		task, err = bw.options.taskWorker.PollTask()
 		if err != nil {
 			bw.retrier.Failed()
@@ -229,9 +228,6 @@ func (bw *baseWorker) pollTask() {
 		} else {
 			bw.retrier.Succeeded()
 		}
-	} else {
-		// if rate limiter fails, we need to back off.
-		bw.retrier.Failed()
 	}
 
 	if task != nil {

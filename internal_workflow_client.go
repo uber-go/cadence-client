@@ -273,7 +273,7 @@ func getWorkflowStackTraceImpl(workflowID string, runID string, getHistoryPage G
 	if startWorkflowEvent == nil {
 		return "", errors.New("First event is not WorkflowExecutionStarted")
 	}
-	registeredWorkflowFactory := newRegisteredWorkflowFactory()
+	registeredWorkflowFactory := newRegisteredWorkflowFactory(newHostEnvironment())
 	workflowDefinitionFactory := getWorkflowDefinitionFactory(registeredWorkflowFactory)
 	logger, err := zap.NewDevelopment()
 	if err != nil {

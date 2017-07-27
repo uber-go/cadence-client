@@ -136,8 +136,16 @@ func (s *InterfacesTestSuite) TestInterface() {
 	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 	service.On("StartWorkflowExecution", mock.Anything, mock.Anything).Return(&m.StartWorkflowExecutionResponse{}, nil)
 
+	env := newHostEnvironment()
 	// Launch worker.
-	workflowWorker := newWorkflowWorker(testWorkflowDefinitionFactory, service, domain, workflowExecutionParameters, nil)
+	workflowWorker := newWorkflowWorker(
+		testWorkflowDefinitionFactory,
+		service,
+		domain,
+		workflowExecutionParameters,
+		nil,
+		env,
+	)
 	defer workflowWorker.Stop()
 	workflowWorker.Start()
 
@@ -149,7 +157,14 @@ func (s *InterfacesTestSuite) TestInterface() {
 	}
 
 	// Register activity instances and launch the worker.
-	activityWorker := newActivityWorker([]activity{&greeterActivity{}}, service, domain, activityExecutionParameters, nil)
+	activityWorker := newActivityWorker(
+		[]activity{&greeterActivity{}},
+		service,
+		domain,
+		activityExecutionParameters,
+		nil,
+		env,
+	)
 	defer activityWorker.Stop()
 	activityWorker.Start()
 

@@ -53,6 +53,7 @@ type (
 		domain            string
 		metricsScope      tally.Scope
 		identity          string
+		env               *hostEnvImpl
 	}
 
 	// domainClient is the client for managing domains.
@@ -145,7 +146,7 @@ func (wc *workflowClient) SignalWorkflow(workflowID string, runID string, signal
 	var input []byte
 	if arg != nil {
 		var err error
-		if input, err = getHostEnvironment().encodeArg(arg); err != nil {
+		if input, err = wc.env.encodeArg(arg); err != nil {
 			return err
 		}
 	}
@@ -322,7 +323,7 @@ func (wc *workflowClient) CompleteActivity(taskToken []byte, result interface{},
 	var data []byte
 	if result != nil {
 		var err0 error
-		data, err0 = getHostEnvironment().encodeArg(result)
+		data, err0 = wc.env.encodeArg(result)
 		if err0 != nil {
 			return err0
 		}
@@ -333,7 +334,7 @@ func (wc *workflowClient) CompleteActivity(taskToken []byte, result interface{},
 
 // RecordActivityHeartbeat records heartbeat for an activity.
 func (wc *workflowClient) RecordActivityHeartbeat(taskToken []byte, details ...interface{}) error {
-	data, err := getHostEnvironment().encodeArgs(details)
+	data, err := wc.env.encodeArgs(details)
 	if err != nil {
 		return err
 	}

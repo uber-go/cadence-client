@@ -179,7 +179,7 @@ func RegisterWorkflow(workflowFunc interface{}) {
 // RegisterWorkflowWithOptions registers a workflow function with the framework with provided
 // options.
 func RegisterWorkflowWithOptions(workflowFunc interface{}, options RegisterWorkflowOptions) {
-	thImpl := getHostEnvironment()
+	thImpl := newHostEnvironment()
 	err := thImpl.RegisterWorkflow(workflowFunc, options)
 	if err != nil {
 		panic(err)
@@ -502,7 +502,7 @@ func GetSignalChannel(ctx Context, signalName string) Channel {
 
 // Get extract data from encoded data to desired value type. valuePtr is pointer to the actual value type.
 func (b EncodedValue) Get(valuePtr interface{}) error {
-	return getHostEnvironment().decodeArg(b, valuePtr)
+	return newHostEnvironment().decodeArg(b, valuePtr)
 }
 
 // SideEffect executes provided function once, records its result into the workflow history and doesn't
@@ -542,7 +542,7 @@ func SideEffect(ctx Context, f func(ctx Context) interface{}) EncodedValue {
 	future, settable := NewFuture(ctx)
 	wrapperFunc := func() ([]byte, error) {
 		r := f(ctx)
-		return getHostEnvironment().encodeArg(r)
+		return newHostEnvironment().encodeArg(r)
 	}
 	resultCallback := func(result []byte, err error) {
 		settable.Set(EncodedValue(result), err)

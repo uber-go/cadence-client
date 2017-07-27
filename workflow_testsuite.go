@@ -64,7 +64,7 @@ type (
 
 // Get extract data from encoded data to desired value type. valuePtr is pointer to the actual value type.
 func (b EncodedValues) Get(valuePtr ...interface{}) error {
-	return getHostEnvironment().decode(b, valuePtr)
+	return newHostEnvironment().decode(b, valuePtr)
 }
 
 func (s *WorkflowTestSuite) initIfNotDoneYet() {

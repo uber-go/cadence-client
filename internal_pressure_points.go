@@ -61,7 +61,9 @@ func newWorkflowWorkerWithPressurePoints(
 	service m.TChanWorkflowService,
 	domain string,
 	params workerExecutionParameters,
-	pressurePoints map[string]map[string]string) (worker Worker) {
+	pressurePoints map[string]map[string]string,
+	env *hostEnvImpl,
+) (worker WorkflowWorker) {
 	return newWorkflowWorker(
 		func(workflowType WorkflowType) (workflowDefinition, error) {
 			wd, err := factory(workflowType)
@@ -73,7 +75,9 @@ func newWorkflowWorkerWithPressurePoints(
 		service,
 		domain,
 		params,
-		&pressurePointMgrImpl{config: pressurePoints, logger: params.Logger})
+		&pressurePointMgrImpl{config: pressurePoints, logger: params.Logger},
+		env,
+	)
 }
 
 func (p *pressurePointMgrImpl) Execute(pressurePointName string) error {

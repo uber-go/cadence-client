@@ -187,7 +187,7 @@ func validateFunctionResults(f interface{}, result interface{}) ([]byte, error) 
 		return nil, nil
 	}
 
-	data, err := getHostEnvironment().encodeArg(result)
+	data, err := newHostEnvironment().encodeArg(result)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityT
 			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
 	}
 
-	input, err := getHostEnvironment().encodeArgs(args)
+	input, err := newHostEnvironment().encodeArgs(args)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -241,7 +241,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	if resultSize > 1 {
 		retValue := values[0]
 		if retValue.Kind() != reflect.Ptr || !retValue.IsNil() {
-			result, err = getHostEnvironment().encodeArg(retValue.Interface())
+			result, err = newHostEnvironment().encodeArg(retValue.Interface())
 			if err != nil {
 				return nil, err
 			}
@@ -274,7 +274,7 @@ func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interf
 		if result == nil {
 			return nil
 		}
-		err := getHostEnvironment().decodeArg(result, to)
+		err := newHostEnvironment().decodeArg(result, to)
 		if err != nil {
 			return err
 		}
@@ -293,13 +293,13 @@ func deSerializeFunctionResult(f interface{}, result []byte, to interface{}) err
 	case reflect.String:
 		// If we know about this function through registration then we will try to return corresponding result type.
 		fnName := reflect.ValueOf(f).String()
-		if fnRegistered, ok := getHostEnvironment().getActivityFn(fnName); ok {
+		if fnRegistered, ok := newHostEnvironment().getActivityFn(fnName); ok {
 			return deSerializeFnResultFromFnType(reflect.TypeOf(fnRegistered), result, to)
 		}
 	}
 
 	// For everything we return result.
-	return getHostEnvironment().decodeArg(result, to)
+	return newHostEnvironment().decodeArg(result, to)
 }
 
 func setActivityParametersIfNotExist(ctx Context) Context {

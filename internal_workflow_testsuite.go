@@ -293,10 +293,10 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, 
 }
 
 func (env *testWorkflowEnvironmentImpl) workflowFactory(workflowType WorkflowType) (workflow, error) {
-	factory := env.testSuite.hostEnv.newRegisteredWorkflowFactory()
+	factory := newRegisteredWorkflowFactory(env.testSuite.hostEnv)
 	wf, err := factory(workflowType)
 	if err != nil {
-		factory = getHostEnvironment().newRegisteredWorkflowFactory()
+		factory = newRegisteredWorkflowFactory(newHostEnvironment())
 		wf, err = factory(workflowType)
 		if err != nil {
 			return nil, err
@@ -327,7 +327,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	activityFn interface{}, args ...interface{}) (EncodedValue, error) {
 	fnName := getFunctionName(activityFn)
 
-	input, err := getHostEnvironment().encodeArgs(args)
+	input, err := newHostEnvironment().encodeArgs(args)
 	if err != nil {
 		panic(err)
 	}
@@ -610,7 +610,7 @@ func (env *testWorkflowEnvironmentImpl) CompleteActivity(taskToken []byte, resul
 	var data []byte
 	if result != nil {
 		var encodeErr error
-		data, encodeErr = getHostEnvironment().encodeArg(result)
+		data, encodeErr = newHostEnvironment().encodeArg(result)
 		if encodeErr != nil {
 			return encodeErr
 		}
@@ -831,7 +831,7 @@ func (m *mockWrapper) getMockReturn(ctx interface{}, input []byte) (retArgs mock
 
 	// check if we have mock setup
 	fnType := reflect.TypeOf(m.fn)
-	reflectArgs, err := getHostEnvironment().decodeArgs(fnType, input)
+	reflectArgs, err := newHostEnvironment().decodeArgs(fnType, input)
 	if err != nil {
 		panic(err)
 	}
@@ -936,7 +936,7 @@ func (m *mockWrapper) executeMock(ctx interface{}, input []byte, mockRet mock.Ar
 				panic(fmt.Sprintf("mock of %v has incorrect return type, expected %v, but actual is %T (%v)",
 					fnName, expectedType, mockResult, mockResult))
 			}
-			result, encodeErr := getHostEnvironment().encodeArg(mockResult)
+			result, encodeErr := newHostEnvironment().encodeArg(mockResult)
 			if encodeErr != nil {
 				panic(fmt.Sprintf("encode result from mock of %v failed: %v", fnName, encodeErr))
 			}
@@ -979,7 +979,7 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 	}
 
 	addActivities(env.testSuite.hostEnv.getRegisteredActivities())
-	addActivities(getHostEnvironment().getRegisteredActivities())
+	addActivities(newHostEnvironment().getRegisteredActivities())
 
 	if len(activities) == 0 {
 		panic(fmt.Sprintf("no activity is registered for tasklist '%v'", taskList))

@@ -73,6 +73,7 @@ type (
 		poller              taskPoller // taskPoller to poll and process the tasks.
 		worker              *baseWorker
 		identity            string
+		env                 *hostEnvImpl
 	}
 
 	// activityRegistry collection of activity implementations
@@ -88,6 +89,7 @@ type (
 		poller              *activityTaskPoller
 		worker              *baseWorker
 		identity            string
+		env                 *hostEnvImpl
 	}
 
 	// Worker overrides.
@@ -136,8 +138,9 @@ func newWorkflowWorker(
 	domain string,
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
-) Worker {
-	return newWorkflowWorkerInternal(factory, service, domain, params, ppMgr, nil)
+	env *hostEnvImpl,
+) WorkflowWorker {
+	return newWorkflowWorkerInternal(factory, service, domain, params, ppMgr, nil, env)
 }
 
 func ensureRequiredParams(params *workerExecutionParameters) {
@@ -163,7 +166,8 @@ func newWorkflowWorkerInternal(
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
 	overrides *workerOverrides,
-) Worker {
+	env *hostEnvImpl,
+) WorkflowWorker {
 	// Get a workflow task handler.
 	ensureRequiredParams(&params)
 	var taskHandler WorkflowTaskHandler
@@ -172,7 +176,7 @@ func newWorkflowWorkerInternal(
 	} else {
 		taskHandler = newWorkflowTaskHandler(factory, domain, params, ppMgr)
 	}
-	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params)
+	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params, env)
 }
 
 func newWorkflowTaskWorkerInternal(
@@ -180,7 +184,8 @@ func newWorkflowTaskWorkerInternal(
 	service m.TChanWorkflowService,
 	domain string,
 	params workerExecutionParameters,
-) Worker {
+	env *hostEnvImpl,
+) WorkflowWorker {
 	ensureRequiredParams(&params)
 	poller := newWorkflowTaskPoller(
 		taskHandler,
@@ -205,6 +210,7 @@ func newWorkflowTaskWorkerInternal(
 		poller:              poller,
 		worker:              worker,
 		identity:            params.Identity,
+		env:                 env,
 	}
 }
 
@@ -223,13 +229,18 @@ func (ww *workflowWorker) Stop() {
 	ww.worker.Stop()
 }
 
+func (ww *workflowWorker) Register(wFunc interface{}, opts RegisterWorkflowOptions) error {
+	return ww.env.RegisterWorkflow(wFunc, opts)
+}
+
 func newActivityWorker(
 	activities []activity,
 	service m.TChanWorkflowService,
 	domain string,
 	params workerExecutionParameters,
 	overrides *workerOverrides,
-) Worker {
+	env *hostEnvImpl,
+) ActivityWorker {
 	ensureRequiredParams(&params)
 	// Get a activity task handler.
 	var taskHandler ActivityTaskHandler
@@ -238,14 +249,16 @@ func newActivityWorker(
 	} else {
 		taskHandler = newActivityTaskHandler(activities, service, params)
 	}
-	return newActivityTaskWorker(taskHandler, service, domain, params)
+	return newActivityTaskWorker(taskHandler, service, domain, params, env)
 }
 
 func newActivityTaskWorker(
 	taskHandler ActivityTaskHandler,
 	service m.TChanWorkflowService,
 	domain string,
-	workerParams workerExecutionParameters) (worker Worker) {
+	workerParams workerExecutionParameters,
+	env *hostEnvImpl,
+) ActivityWorker {
 	ensureRequiredParams(&workerParams)
 
 	poller := newActivityTaskPoller(
@@ -272,6 +285,7 @@ func newActivityTaskWorker(
 		worker:              base,
 		poller:              poller,
 		identity:            workerParams.Identity,
+		env:                 env,
 	}
 }
 
@@ -289,6 +303,10 @@ func (aw *activityWorker) Run() {
 // Shutdown the worker.
 func (aw *activityWorker) Stop() {
 	aw.worker.Stop()
+}
+
+func (aw *activityWorker) Register(aFunc interface{}, opts RegisterActivityOptions) error {
+	return aw.env.RegisterActivity(aFunc, opts)
 }
 
 type workerFunc func(ctx Context, input []byte) ([]byte, error)
@@ -310,7 +328,9 @@ type interceptorFn func(name string, workflow interface{}) (string, interface{})
 type hostEnvImpl struct {
 	sync.Mutex
 	workflowFuncMap                  map[string]interface{}
+	workflowAliasMap                 map[string]string
 	activityFuncMap                  map[string]interface{}
+	activityAliasMap                 map[string]string
 	encoding                         gobEncoding
 	activityRegistrationInterceptors []interceptorFn
 	workflowRegistrationInterceptors []interceptorFn
@@ -588,7 +608,7 @@ func (th *hostEnvImpl) encode(r []interface{}) ([]byte, error) {
 		}
 	}
 
-	data, err := getHostEnvironment().Encoder().Marshal(r)
+	data, err := th.Encoder().Marshal(r)
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +629,7 @@ func (th *hostEnvImpl) decode(data []byte, to []interface{}) error {
 		}
 	}
 
-	if err := getHostEnvironment().Encoder().Unmarshal(data, to); err != nil {
+	if err := th.Encoder().Unmarshal(data, to); err != nil {
 		return err
 	}
 	return nil
@@ -662,12 +682,14 @@ var once sync.Once
 // Singleton to hold the host registration details.
 var thImpl *hostEnvImpl
 
-func getHostEnvironment() *hostEnvImpl {
+func newHostEnvironment() *hostEnvImpl {
 	once.Do(func() {
 		thImpl = &hostEnvImpl{
-			workflowFuncMap: make(map[string]interface{}),
-			activityFuncMap: make(map[string]interface{}),
-			encoding:        gobEncoding{},
+			workflowFuncMap:  make(map[string]interface{}),
+			workflowAliasMap: make(map[string]string),
+			activityFuncMap:  make(map[string]interface{}),
+			activityAliasMap: make(map[string]string),
+			encoding:         gobEncoding{},
 		}
 	})
 	return thImpl
@@ -689,7 +711,7 @@ func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
 		// 1 ... input types.
 		args = append(args, reflect.ValueOf(input))
 	} else {
-		decoded, err := getHostEnvironment().decodeArgs(fnType, input)
+		decoded, err := newHostEnvironment().decodeArgs(fnType, input)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"Unable to decode the workflow function input bytes with error: %v, function name: %v",
@@ -726,7 +748,7 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 	if fnType.NumIn() == 1 && isTypeByteSlice(fnType.In(0)) {
 		args = append(args, reflect.ValueOf(input))
 	} else {
-		decoded, err := getHostEnvironment().decodeArgs(fnType, input)
+		decoded, err := newHostEnvironment().decodeArgs(fnType, input)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"Unable to decode the activity function input bytes with error: %v for function name: %v",
@@ -743,8 +765,8 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 
 // aggregatedWorker combines management of both workflowWorker and activityWorker worker lifecycle.
 type aggregatedWorker struct {
-	workflowWorker Worker
-	activityWorker Worker
+	workflowWorker WorkflowWorker
+	activityWorker ActivityWorker
 	logger         *zap.Logger
 }
 
@@ -782,6 +804,20 @@ func (aw *aggregatedWorker) Stop() {
 	aw.logger.Info("Stopped Worker")
 }
 
+func (aw *aggregatedWorker) RegisterWorkflow(
+	wFunc interface{},
+	opts RegisterWorkflowOptions,
+) error {
+	return aw.workflowWorker.Register(wFunc, opts)
+}
+
+func (aw *aggregatedWorker) RegisterActivity(
+	aFunc interface{},
+	opts RegisterActivityOptions,
+) error {
+	return aw.activityWorker.Register(aFunc, opts)
+}
+
 // aggregatedWorker returns an instance to manage the workers. Use defaultConcurrentPollRoutineSize (which is 2) as
 // poller size. The typical RTT (round-trip time) is below 1ms within data center. And the poll API latency is about 5ms.
 // With 2 poller, we could achieve around 300~400 RPS.
@@ -815,12 +851,12 @@ func newAggregatedWorker(
 
 	processTestTags(&wOptions, &workerParams)
 
-	env := getHostEnvironment()
+	env := newHostEnvironment()
 	// workflow factory.
-	var workflowWorker Worker
+	var workflowWorker WorkflowWorker
 	if !wOptions.DisableWorkflowWorker {
 		if env.lenWorkflowFns() > 0 {
-			workflowFactory := newRegisteredWorkflowFactory()
+			workflowFactory := newRegisteredWorkflowFactory(env)
 			testTags := getTestTags(wOptions.BackgroundActivityContext)
 			if testTags != nil && len(testTags) > 0 {
 				workflowWorker = newWorkflowWorkerWithPressurePoints(
@@ -829,6 +865,7 @@ func newAggregatedWorker(
 					domain,
 					workerParams,
 					testTags,
+					env,
 				)
 			} else {
 				workflowWorker = newWorkflowWorker(
@@ -836,7 +873,9 @@ func newAggregatedWorker(
 					service,
 					domain,
 					workerParams,
-					nil)
+					nil,
+					env,
+				)
 			}
 		} else {
 			logger.Warn("Workflow worker is enabled but no workflow is registered. Use cadence.RegisterWorkflow() to register your workflow.")
@@ -844,7 +883,7 @@ func newAggregatedWorker(
 	}
 
 	// activity types.
-	var activityWorker Worker
+	var activityWorker ActivityWorker
 
 	if !wOptions.DisableActivityWorker {
 		activityTypes := env.getRegisteredActivities()
@@ -855,6 +894,7 @@ func newAggregatedWorker(
 				domain,
 				workerParams,
 				nil,
+				env,
 			)
 		} else {
 			logger.Warn("Activity worker is enabled but no activity is registered. Use cadence.RegisterActivity() to register your activity.")
@@ -867,19 +907,15 @@ func newAggregatedWorker(
 	}
 }
 
-func (th *hostEnvImpl) newRegisteredWorkflowFactory() workflowFactory {
+func newRegisteredWorkflowFactory(env *hostEnvImpl) workflowFactory {
 	return func(wt WorkflowType) (workflow, error) {
-		wf, ok := th.getWorkflowFn(wt.Name)
+		wf, ok := env.getWorkflowFn(wt.Name)
 		if !ok {
-			supported := strings.Join(th.getRegisteredWorkflowTypes(), ", ")
+			supported := strings.Join(env.getRegisteredWorkflowTypes(), ", ")
 			return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
 		}
 		return &workflowExecutor{name: wt.Name, fn: wf}, nil
 	}
-}
-
-func newRegisteredWorkflowFactory() workflowFactory {
-	return getHostEnvironment().newRegisteredWorkflowFactory()
 }
 
 func processTestTags(wOptions *WorkerOptions, ep *workerExecutionParameters) {

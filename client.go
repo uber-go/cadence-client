@@ -205,6 +205,7 @@ func NewClient(service m.TChanWorkflowService, domain string, options *ClientOpt
 		domain:          domain,
 		metricsScope:    metricScope,
 		identity:        identity,
+		env:             newHostEnvironment(),
 	}
 }
 

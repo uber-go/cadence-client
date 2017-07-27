@@ -941,7 +941,7 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*
 			workflowFunc)
 	}
 
-	input, err := getHostEnvironment().encodeArgs(args)
+	input, err := newHostEnvironment().encodeArgs(args)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1047,7 +1047,7 @@ func decodeAndAssignValue(from interface{}, toValuePtr interface{}) error {
 		return errors.New("value parameter provided is not a pointer")
 	}
 	if data, ok := from.([]byte); ok {
-		if err := getHostEnvironment().decodeArg(data, toValuePtr); err != nil {
+		if err := newHostEnvironment().decodeArg(data, toValuePtr); err != nil {
 			return err
 		}
 	} else if fv := reflect.ValueOf(from); fv.IsValid() {

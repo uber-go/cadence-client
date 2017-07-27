@@ -67,7 +67,7 @@ func RegisterActivity(activityFunc interface{}) {
 // RegisterActivityWithOptions registers an activity function with the framework with provided
 // options.
 func RegisterActivityWithOptions(activityFunc interface{}, options RegisterActivityOptions) {
-	thImpl := getHostEnvironment()
+	thImpl := newHostEnvironment()
 	err := thImpl.RegisterActivity(activityFunc, options)
 	if err != nil {
 		panic(err)
@@ -104,7 +104,7 @@ func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 	var err error
 	// We would like to be a able to pass in "nil" as part of details(that is no progress to report to)
 	if len(details) != 1 || details[0] != nil {
-		data, err = getHostEnvironment().encodeArgs(details)
+		data, err = newHostEnvironment().encodeArgs(details)
 		if err != nil {
 			panic(err)
 		}

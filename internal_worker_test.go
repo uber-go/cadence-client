@@ -150,7 +150,7 @@ func TestDecisionTaskHandler(t *testing.T) {
 		PreviousStartedEventId: common.Int64Ptr(5),
 	}
 
-	r := NewWorkflowTaskHandler(testDomain, "identity", logger)
+	r := NewWorkflowTaskHandler(testDomain, "identity", logger, newHostEnvironment())
 	_, stackTrace, err := r.ProcessWorkflowTask(task, nil, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, stackTrace, stackTrace)
@@ -217,7 +217,7 @@ func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 	activityID := "a1"
 	taskList := "tl1"
 	var startedEventID int64 = 10
-	input, err := getHostEnvironment().encodeArgs([]interface{}{})
+	input, err := newHostEnvironment().encodeArgs([]interface{}{})
 	require.NoError(t, err)
 
 	activityTask := &s.PollForActivityTaskResponse{
@@ -311,7 +311,7 @@ func TestRecordActivityHeartbeat(t *testing.T) {
 }
 
 func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string {
-	input, err := getHostEnvironment().Encoder().Marshal(args)
+	input, err := newHostEnvironment().Encoder().Marshal(args)
 	require.NoError(t, err, err)
 
 	var result []interface{}
@@ -319,7 +319,7 @@ func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string
 		arg := reflect.New(reflect.TypeOf(v)).Interface()
 		result = append(result, arg)
 	}
-	err = getHostEnvironment().Encoder().Unmarshal(input, result)
+	err = newHostEnvironment().Encoder().Unmarshal(input, result)
 	require.NoError(t, err, err)
 
 	targetArgs := []reflect.Value{}
@@ -332,7 +332,7 @@ func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string
 }
 
 func TestEncoder(t *testing.T) {
-	getHostEnvironment().Encoder().Register(new(emptyCtx))
+	newHostEnvironment().Encoder().Register(new(emptyCtx))
 	// Two param functor.
 	f1 := func(ctx Context, r []byte) string {
 		return "result"
@@ -817,7 +817,7 @@ func TestGobEncoding(t *testing.T) {
 
 // Encode function result.
 func testEncodeFunctionResult(r interface{}) []byte {
-	result, err := getHostEnvironment().encodeArg(r)
+	result, err := newHostEnvironment().encodeArg(r)
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to encode")
@@ -827,12 +827,12 @@ func testEncodeFunctionResult(r interface{}) []byte {
 
 // Encode function args
 func testEncodeFunctionArgs(workflowFunc interface{}, args ...interface{}) []byte {
-	err := getHostEnvironment().RegisterFnType(reflect.TypeOf(workflowFunc))
+	err := newHostEnvironment().RegisterFnType(reflect.TypeOf(workflowFunc))
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to register function types")
 	}
-	input, err := getHostEnvironment().encodeArgs(args)
+	input, err := newHostEnvironment().encodeArgs(args)
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to encode arguments")

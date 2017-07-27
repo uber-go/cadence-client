@@ -392,7 +392,7 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 			callback(result, err)
 			return
 		}
-		details, err = getHostEnvironment().encodeArgs([]interface{}{sideEffectID, result})
+		details, err = newHostEnvironment().encodeArgs([]interface{}{sideEffectID, result})
 		if err != nil {
 			callback(nil, fmt.Errorf("failure encoding sideEffectID: %v", err))
 			return

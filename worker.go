@@ -32,14 +32,22 @@ import (
 )
 
 type (
-	// Worker represents objects that can be started and stopped.
-	Worker interface {
+	// BaseWorker represents objects that can be started and stopped.
+	BaseWorker interface {
 		// Start starts the worker in a non-blocking fashion
 		Start() error
 		// Run is a blocking start and cleans up resources when killed
 		Run()
 		// Stop cleans up any resources opened by worker
 		Stop()
+	}
+	// Worker represents workflows and activities that can be started and stopped.
+	Worker interface {
+		BaseWorker
+		// RegisterWorkflow registers the workflow function with options
+		RegisterWorkflow(interface{}, RegisterWorkflowOptions) error
+		// RegisterActivity registers the activity function with options
+		RegisterActivity(interface{}, RegisterActivityOptions) error
 	}
 
 	// WorkerOptions is to configure a worker instance,

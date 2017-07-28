@@ -945,6 +945,9 @@ func getValidatedWorkerFunction(
 			workflowFunc)
 	}
 
+	if alias, ok := env.getWorkflowAlias(fnName); ok {
+		fnName = alias
+	}
 	input, err := env.encodeArgs(args)
 	if err != nil {
 		return nil, nil, err

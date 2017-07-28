@@ -54,7 +54,6 @@ const (
 
 // Assert that structs do indeed implement the interfaces
 var _ Worker = (*aggregatedWorker)(nil)
-var _ hostEnv = (*hostEnvImpl)(nil)
 
 type (
 
@@ -312,16 +311,6 @@ func (aw *activityWorker) Register(aFunc interface{}, opts RegisterActivityOptio
 type workerFunc func(ctx Context, input []byte) ([]byte, error)
 type activityFunc func(ctx context.Context, input []byte) ([]byte, error)
 
-// hostEnv stores all worker-specific parameters that will
-// be stored inside of a context.
-type hostEnv interface {
-	RegisterWorkflow(interface{}, RegisterWorkflowOptions) error
-	RegisterActivity(interface{}, RegisterActivityOptions) error
-	// TODO: This encoder should be pluggable.
-	Encoder() encoding
-	RegisterFnType(reflect.Type) error
-}
-
 type interceptorFn func(name string, workflow interface{}) (string, interface{})
 
 // hostEnvImpl is the implementation of hostEnv
@@ -380,10 +369,12 @@ func (th *hostEnvImpl) RegisterWorkflow(af interface{}, options RegisterWorkflow
 	if err := validateFnFormat(fnType, true); err != nil {
 		return err
 	}
+	fnName := getFunctionName(af)
+	alias := options.Name
 	names := make([]string, 0, 2)
-	names = append(names, getFunctionName(af))
-	if len(options.Name) > 0 {
-		names = append(names, options.Name)
+	names = append(names, fnName)
+	if len(alias) > 0 {
+		names = append(names, alias)
 	}
 	for _, name := range names {
 		// Check if already registered
@@ -399,6 +390,9 @@ func (th *hostEnvImpl) RegisterWorkflow(af interface{}, options RegisterWorkflow
 		name, af = th.invokeInterceptors(name, af, th.workflowRegistrationInterceptors)
 		th.addWorkflowFn(name, af)
 	}
+	if len(alias) > 0 {
+		th.addWorkflowAlias(fnName, alias)
+	}
 	return nil
 }
 
@@ -408,10 +402,12 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}, options RegisterActivity
 	if err := validateFnFormat(fnType, false); err != nil {
 		return err
 	}
+	fnName := getFunctionName(af)
+	alias := options.Name
 	names := make([]string, 0, 2)
-	names = append(names, getFunctionName(af))
-	if len(options.Name) > 0 {
-		names = append(names, options.Name)
+	names = append(names, fnName)
+	if len(alias) > 0 {
+		names = append(names, alias)
 	}
 	for _, name := range names {
 		// Check if already registered
@@ -426,6 +422,9 @@ func (th *hostEnvImpl) RegisterActivity(af interface{}, options RegisterActivity
 	for _, name := range names {
 		name, af = th.invokeInterceptors(name, af, th.activityRegistrationInterceptors)
 		th.addActivityFn(name, af)
+	}
+	if len(alias) > 0 {
+		th.addActivityAlias(fnName, alias)
 	}
 	return nil
 }
@@ -451,6 +450,19 @@ func (th *hostEnvImpl) Encoder() encoding {
 // Register all function args and return types with encoder.
 func (th *hostEnvImpl) RegisterFnType(fnType reflect.Type) error {
 	return th.registerEncodingTypes(fnType)
+}
+
+func (th *hostEnvImpl) addWorkflowAlias(fnName string, alias string) {
+	th.Lock()
+	defer th.Unlock()
+	th.workflowAliasMap[fnName] = alias
+}
+
+func (th *hostEnvImpl) getWorkflowAlias(fnName string) (string, bool) {
+	th.Lock()
+	defer th.Unlock()
+	alias, ok := th.workflowAliasMap[fnName]
+	return alias, ok
 }
 
 func (th *hostEnvImpl) addWorkflowFn(fnName string, wf interface{}) {
@@ -480,6 +492,19 @@ func (th *hostEnvImpl) lenWorkflowFns() int {
 	th.Lock()
 	defer th.Unlock()
 	return len(th.workflowFuncMap)
+}
+
+func (th *hostEnvImpl) addActivityAlias(fnName string, alias string) {
+	th.Lock()
+	defer th.Unlock()
+	th.activityAliasMap[fnName] = alias
+}
+
+func (th *hostEnvImpl) getActivityAlias(fnName string) (string, bool) {
+	th.Lock()
+	defer th.Unlock()
+	alias, ok := th.activityAliasMap[fnName]
+	return alias, ok
 }
 
 func (th *hostEnvImpl) addActivityFn(fnName string, af interface{}) {
@@ -682,6 +707,7 @@ var once sync.Once
 // Singleton to hold the host registration details.
 var thImpl *hostEnvImpl
 
+// TODO: Remove singleton
 func newHostEnvironment() *hostEnvImpl {
 	once.Do(func() {
 		thImpl = &hostEnvImpl{

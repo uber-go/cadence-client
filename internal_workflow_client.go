@@ -64,6 +64,16 @@ type (
 	}
 )
 
+// RegisterWorkflow registers the workflow function with options
+func (wc *workflowClient) RegisterWorkflow(wf interface{}, opts RegisterWorkflowOptions) error {
+	return wc.env.RegisterWorkflow(wf, opts)
+}
+
+// RegisterActivity registers the activity function with options
+func (wc *workflowClient) RegisterActivity(af interface{}, opts RegisterActivityOptions) error {
+	return wc.env.RegisterActivity(af, opts)
+}
+
 // StartWorkflow starts a workflow execution
 // The user can use this to start using a functor like.
 // Either by
@@ -98,7 +108,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	// Validate type and its arguments.
-	workflowType, input, err := getValidatedWorkerFunction(workflowFunc, args)
+	workflowType, input, err := getValidatedWorkerFunction(workflowFunc, args, wc.env)
 	if err != nil {
 		return nil, err
 	}

@@ -188,7 +188,7 @@ func NewCanceledError(details ...interface{}) *CanceledError {
 //
 func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *ContinueAsNewError {
 	// Validate type and its arguments.
-	workflowType, input, err := getValidatedWorkerFunction(wfn, args)
+	workflowType, input, err := getValidatedWorkerFunction(wfn, args, newHostEnvironment())
 	if err != nil {
 		panic(err)
 	}

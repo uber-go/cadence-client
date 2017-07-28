@@ -126,6 +126,12 @@ type (
 		//  - InternalServiceError
 		//  - EntityNotExistError
 		ListOpenWorkflow(request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error)
+
+		// RegisterWorkflow registers the workflow function with options
+		RegisterWorkflow(interface{}, RegisterWorkflowOptions) error
+
+		// RegisterActivity registers the activity function with options
+		RegisterActivity(interface{}, RegisterActivityOptions) error
 	}
 
 	// ClientOptions are optional parameters for Client creation.

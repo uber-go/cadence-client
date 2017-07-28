@@ -922,7 +922,11 @@ func newWorkflowDefinition(workflow workflow) workflowDefinition {
 	return &syncWorkflowDefinition{workflow: workflow}
 }
 
-func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*WorkflowType, []byte, error) {
+func getValidatedWorkerFunction(
+	workflowFunc interface{},
+	args []interface{},
+	env *hostEnvImpl,
+) (*WorkflowType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(workflowFunc)
 	switch fType.Kind() {
@@ -941,7 +945,7 @@ func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*
 			workflowFunc)
 	}
 
-	input, err := newHostEnvironment().encodeArgs(args)
+	input, err := env.encodeArgs(args)
 	if err != nil {
 		return nil, nil, err
 	}

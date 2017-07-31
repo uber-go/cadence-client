@@ -22,19 +22,36 @@ package metrics
 
 // Workflow Creation metrics
 const (
-	WorkflowsStartTotalCounter      = "workflows-start-total"
-	ActivitiesTotalCounter          = "activities-total"
-	DecisionsTotalCounter           = "decisions-total"
-	DecisionsTimeoutCounter         = "decisions-timeout"
-	WorkflowsCompletionTotalCounter = "workflows-completion-total"
-	WorkflowEndToEndLatency         = "workflows-endtoend-latency"
-	ActivityEndToEndLatency         = "activities-endtoend-latency"
-	DecisionsEndToEndLatency        = "decisions-endtoend-latency"
-	ActivityPollLatency             = "activities-poll-latency"
-	DecisionsPollLatency            = "decisions-poll-latency"
-	ActivityExecutionLatency        = "activities-execution-latency"
-	DecisionsExecutionLatency       = "decisions-execution-latency"
-	ActivityResponseLatency         = "activities-response-latency"
-	DecisionsResponseLatency        = "decisions-response-latency"
-	UnhandledSignalsTotalCounter    = "unhandled-signals-total"
+	WorkflowStartCounter     = "workflow-start"
+	WorkflowCompletedCounter = "workflow-completed"
+	WorkflowEndToEndLatency  = "workflow-endtoend-latency" // measure workflow execution from start to close
+	DecisionTimeoutCounter   = "decision-timeout"
+
+	DecisionPollCounter            = "decision-poll-total"
+	DecisionPollFailedCounter      = "decision-poll-failed"
+	DecisionPollNoTaskCounter      = "decision-poll-no-task"
+	DecisionPollSucceedCounter     = "decision-poll-succeed"
+	DecisionPollLatency            = "decision-poll-latency" // measure succeed poll request latency
+	DecisionExecutionFailedCounter = "decision-execution-failed"
+	DecisionExecutionLatency       = "decision-execution-latency"
+	DecisionResponseFailedCounter  = "decision-response-failed"
+	DecisionResponseLatency        = "decision-response-latency"
+	DecisionEndToEndLatency        = "decision-endtoend-latency" // measure from poll request start to response completed
+	DecisionTaskPanicCounter       = "decision-task-panic"
+	DecisionTaskCompletedCounter   = "decision-task-completed"
+
+	ActivityPollCounter            = "activity-poll-total"
+	ActivityPollFailedCounter      = "activity-poll-failed"
+	ActivityPollNoTaskCounter      = "activity-poll-no-task"
+	ActivityPollSucceedCounter     = "activity-poll-succeed"
+	ActivityPollLatency            = "activity-poll-latency"
+	ActivityExecutionFailedCounter = "activity-execution-failed"
+	ActivityExecutionLatency       = "activity-execution-latency"
+	ActivityResponseLatency        = "activity-response-latency"
+	ActivityResponseFailedCounter  = "activity-response-failed"
+	ActivityEndToEndLatency        = "activity-endtoend-latency"
+	ActivityTaskPanicCounter       = "activity-task-panic"
+	ActivityTaskCompletedCounter   = "activity-task-completed"
+
+	UnhandledSignalsCounter = "unhandled-signals"
 )

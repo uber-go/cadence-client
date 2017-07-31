@@ -129,20 +129,12 @@ func newWorkflowTaskPoller(taskHandler WorkflowTaskHandler, service m.TChanWorkf
 
 // PollTask polls a new task
 func (wtp *workflowTaskPoller) PollTask() (interface{}, error) {
-	startTime := time.Now()
-	defer func() {
-		deltaTime := time.Now().Sub(startTime)
-		if wtp.metricsScope != nil {
-			wtp.metricsScope.Counter(metrics.DecisionsTotalCounter).Inc(1)
-			wtp.metricsScope.Timer(metrics.DecisionsEndToEndLatency).Record(deltaTime)
-		}
-	}()
-
 	// Get the task.
 	workflowTask, err := wtp.poll()
 	if err != nil {
 		return nil, err
 	}
+
 	return workflowTask, nil
 }
 
@@ -157,20 +149,16 @@ func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 		return nil
 	}
 
+	executionStartTime := time.Now()
 	// Process the task.
 	completedRequest, _, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask.task, workflowTask.getHistoryPageFunc, false)
 	if err != nil {
+		wtp.metricsScope.Counter(metrics.DecisionExecutionFailedCounter).Inc(1)
 		return err
 	}
+	wtp.metricsScope.Timer(metrics.DecisionExecutionLatency).Record(time.Now().Sub(executionStartTime))
 
 	responseStartTime := time.Now()
-	defer func() {
-		deltaTime := time.Now().Sub(responseStartTime)
-		if wtp.metricsScope != nil {
-			wtp.metricsScope.Timer(metrics.DecisionsResponseLatency).Record(deltaTime)
-		}
-	}()
-
 	// Respond task completion.
 	err = backoff.Retry(
 		func() error {
@@ -186,21 +174,20 @@ func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 		}, serviceOperationRetryPolicy, isServiceTransientError)
 
 	if err != nil {
+		wtp.metricsScope.Counter(metrics.DecisionResponseFailedCounter).Inc(1)
 		return err
 	}
-	return nil
 
+	wtp.metricsScope.Timer(metrics.DecisionResponseLatency).Record(time.Now().Sub(responseStartTime))
+	wtp.metricsScope.Timer(metrics.DecisionEndToEndLatency).Record(time.Now().Sub(workflowTask.pollStartTime))
+	wtp.metricsScope.Counter(metrics.DecisionTaskCompletedCounter).Inc(1)
+	return nil
 }
 
 // Poll for a single workflow task from the service
 func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 	startTime := time.Now()
-	defer func() {
-		deltaTime := time.Now().Sub(startTime)
-		if wtp.metricsScope != nil {
-			wtp.metricsScope.Timer(metrics.DecisionsPollLatency).Record(deltaTime)
-		}
-	}()
+	wtp.metricsScope.Counter(metrics.DecisionPollCounter).Inc(1)
 
 	traceLog(func() {
 		wtp.logger.Debug("workflowTaskPoller::Poll")
@@ -216,15 +203,20 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 
 	response, err := wtp.service.PollForDecisionTask(ctx, request)
 	if err != nil {
+		wtp.metricsScope.Counter(metrics.DecisionPollFailedCounter).Inc(1)
 		return nil, err
 	}
+
 	if response == nil || len(response.GetTaskToken()) == 0 {
+		wtp.metricsScope.Counter(metrics.DecisionPollNoTaskCounter).Inc(1)
 		return &workflowTask{}, nil
 	}
 
 	execution := response.GetWorkflowExecution()
 	iterator := newGetHistoryPageFunc(wtp.service, wtp.domain, execution, math.MaxInt64)
-	task := &workflowTask{task: response, getHistoryPageFunc: iterator}
+	task := &workflowTask{task: response, getHistoryPageFunc: iterator, pollStartTime: startTime}
+	wtp.metricsScope.Counter(metrics.DecisionPollSucceedCounter).Inc(1)
+	wtp.metricsScope.Timer(metrics.DecisionPollLatency).Record(time.Now().Sub(startTime))
 	return task, nil
 }
 
@@ -282,12 +274,8 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service m.TChanWorkf
 // Poll for a single activity task from the service
 func (atp *activityTaskPoller) poll() (*activityTask, error) {
 	startTime := time.Now()
-	defer func() {
-		deltaTime := time.Now().Sub(startTime)
-		if atp.metricsScope != nil {
-			atp.metricsScope.Timer(metrics.ActivityPollLatency).Record(deltaTime)
-		}
-	}()
+
+	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
 
 	traceLog(func() {
 		atp.logger.Debug("activityTaskPoller::Poll")
@@ -303,25 +291,21 @@ func (atp *activityTaskPoller) poll() (*activityTask, error) {
 
 	response, err := atp.service.PollForActivityTask(ctx, request)
 	if err != nil {
+		atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
 		return nil, err
 	}
 	if response == nil || len(response.GetTaskToken()) == 0 {
+		atp.metricsScope.Counter(metrics.ActivityPollNoTaskCounter).Inc(1)
 		return &activityTask{}, nil
 	}
-	return &activityTask{task: response}, nil
+
+	atp.metricsScope.Counter(metrics.ActivityPollSucceedCounter).Inc(1)
+	atp.metricsScope.Timer(metrics.ActivityPollLatency).Record(time.Now().Sub(startTime))
+	return &activityTask{task: response, pollStartTime: startTime}, nil
 }
 
 // PollTask polls a new task
 func (atp *activityTaskPoller) PollTask() (interface{}, error) {
-	startTime := time.Now()
-	defer func() {
-		deltaTime := time.Now().Sub(startTime)
-		if atp.metricsScope != nil {
-			atp.metricsScope.Counter(metrics.ActivitiesTotalCounter).Inc(1)
-			atp.metricsScope.Timer(metrics.ActivityEndToEndLatency).Record(deltaTime)
-		}
-	}()
-
 	// Get the task.
 	activityTask, err := atp.poll()
 	if err != nil {
@@ -341,35 +325,39 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 		return nil
 	}
 
+	executionStartTime := time.Now()
 	// Process the activity task.
 	request, err := atp.taskHandler.Execute(activityTask.task)
 	if err != nil {
+		atp.metricsScope.Counter(metrics.ActivityExecutionFailedCounter).Inc(1)
 		return err
 	}
+	atp.metricsScope.Timer(metrics.ActivityExecutionLatency).Record(time.Now().Sub(executionStartTime))
 
-	reportErr := reportActivityComplete(atp.service, request, atp.metricsScope)
+	if request == nil {
+		// this could be true when activity returns ErrActivityResultPending.
+		return nil
+	}
+
+	responseStartTime := time.Now()
+	reportErr := reportActivityComplete(atp.service, request)
 	if reportErr != nil {
+		atp.metricsScope.Counter(metrics.ActivityResponseFailedCounter).Inc(1)
 		traceLog(func() {
 			atp.logger.Debug("reportActivityComplete failed", zap.Error(reportErr))
 		})
 	}
-
+	atp.metricsScope.Timer(metrics.ActivityResponseLatency).Record(time.Now().Sub(responseStartTime))
+	atp.metricsScope.Timer(metrics.ActivityEndToEndLatency).Record(time.Now().Sub(activityTask.pollStartTime))
+	atp.metricsScope.Counter(metrics.ActivityTaskCompletedCounter).Inc(1)
 	return reportErr
 }
 
-func reportActivityComplete(service m.TChanWorkflowService, request interface{}, metricsScope tally.Scope) error {
+func reportActivityComplete(service m.TChanWorkflowService, request interface{}) error {
 	if request == nil {
 		// nothing to report
 		return nil
 	}
-
-	startTime := time.Now()
-	defer func() {
-		deltaTime := time.Now().Sub(startTime)
-		if metricsScope != nil {
-			metricsScope.Timer(metrics.ActivityResponseLatency).Record(deltaTime)
-		}
-	}()
 
 	ctx, cancel := newTChannelContext()
 	defer cancel()

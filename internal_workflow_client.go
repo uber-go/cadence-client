@@ -131,7 +131,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	if wc.metricsScope != nil {
-		wc.metricsScope.Counter(metrics.WorkflowsStartTotalCounter).Inc(1)
+		wc.metricsScope.Counter(metrics.WorkflowStartCounter).Inc(1)
 	}
 
 	executionInfo := &WorkflowExecution{
@@ -328,7 +328,7 @@ func (wc *workflowClient) CompleteActivity(taskToken []byte, result interface{},
 		}
 	}
 	request := convertActivityResultToRespondRequest(wc.identity, taskToken, data, err)
-	return reportActivityComplete(wc.workflowService, request, wc.metricsScope)
+	return reportActivityComplete(wc.workflowService, request)
 }
 
 // RecordActivityHeartbeat records heartbeat for an activity.

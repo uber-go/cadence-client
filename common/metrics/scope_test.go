@@ -86,6 +86,13 @@ func Test_Histogram(t *testing.T) {
 	scope.Histogram("test-hist-2", valueBuckets).RecordValue(15)
 	closer.Close()
 	require.Equal(t, 0, len(reporter.histogramValueSamples))
+	scope, closer, reporter = newMetricsScope(&isReplay)
+	durationBuckets := tally.MustMakeLinearDurationBuckets(0, time.Hour, 10)
+	scope.Histogram("test-hist-1", durationBuckets).RecordDuration(time.Minute)
+	scope.Histogram("test-hist-2", durationBuckets).RecordDuration(time.Minute * 61)
+	sw := scope.Histogram("test-hist-3", durationBuckets).Start()
+	sw.Stop()
+	closer.Close()
 	require.Equal(t, 0, len(reporter.histogramDurationSamples))
 
 	isReplay = false
@@ -97,13 +104,26 @@ func Test_Histogram(t *testing.T) {
 	require.Equal(t, 2, len(reporter.histogramValueSamples))
 
 	scope, closer, reporter = newMetricsScope(&isReplay)
-	durationBuckets := tally.MustMakeLinearDurationBuckets(0, time.Hour, 10)
+	durationBuckets = tally.MustMakeLinearDurationBuckets(0, time.Hour, 10)
 	scope.Histogram("test-hist-1", durationBuckets).RecordDuration(time.Minute)
 	scope.Histogram("test-hist-2", durationBuckets).RecordDuration(time.Minute * 61)
-	sw := scope.Histogram("test-hist-3", durationBuckets).Start()
+	sw = scope.Histogram("test-hist-3", durationBuckets).Start()
 	sw.Stop()
 	closer.Close()
 	require.Equal(t, 3, len(reporter.histogramDurationSamples))
+}
+
+func Test_ScopeCoverage(t *testing.T) {
+	isReplay := false
+	scope, closer, reporter := newMetricsScope(&isReplay)
+	caps := scope.Capabilities()
+	require.Equal(t, true, caps.Reporting())
+	require.Equal(t, true, caps.Tagging())
+	subScope := scope.SubScope("test")
+	taggedScope := subScope.Tagged(make(map[string]string))
+	taggedScope.Counter("test-counter").Inc(1)
+	closer.Close()
+	require.Equal(t, 1, len(reporter.counts))
 }
 
 func newMetricsScope(isReplay *bool) (tally.Scope, io.Closer, *capturingStatsReporter) {

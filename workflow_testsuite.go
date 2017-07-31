@@ -138,8 +138,8 @@ func (s *WorkflowTestSuite) GetLogger() *zap.Logger {
 	return s.logger
 }
 
-// SetMetricsScope sets the metrics scope for this WorkflowTestSuite. If you don't set scope, test suite will create a test
-// scope using tally.NewTestScope().
+// SetMetricsScope sets the metrics scope for this WorkflowTestSuite. If you don't set scope, test suite will use
+// tally.NoopScope
 func (s *WorkflowTestSuite) SetMetricsScope(scope tally.Scope) {
 	s.initIfNotDoneYet()
 	s.scope = scope

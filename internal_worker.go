@@ -37,6 +37,7 @@ import (
 	"github.com/uber-go/tally"
 	m "go.uber.org/cadence/.gen/go/cadence"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/common/backoff"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -161,29 +162,32 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	}
 }
 
-// verifyDomainExist does a DescribeDomain operation on the specified domain
+// verifyDomainExist does a DescribeDomain operation on the specified domain with backoff/retry
 // It returns an error, if the server returns an EntityNotExist or BadRequest error
 // On any other transient error, this method will just return success
 func verifyDomainExist(client m.TChanWorkflowService, domain string, logger *zap.Logger) error {
 
-	ctx, cancel := newTChannelContext()
-	defer cancel()
-
-	_, err := client.DescribeDomain(ctx, &shared.DescribeDomainRequest{Name: &domain})
-	if err != nil {
-		if _, ok := err.(*shared.EntityNotExistsError); ok {
-			logger.Error("domain does not exist", zap.String("domain", domain), zap.Error(err))
-			return err
+	descDomainOp := func() error {
+		ctx, cancel := newTChannelContext()
+		defer cancel()
+		_, err := client.DescribeDomain(ctx, &shared.DescribeDomainRequest{Name: &domain})
+		if err != nil {
+			if _, ok := err.(*shared.EntityNotExistsError); ok {
+				logger.Error("domain does not exist", zap.String("domain", domain), zap.Error(err))
+				return err
+			}
+			if _, ok := err.(*shared.BadRequestError); ok {
+				logger.Error("domain does not exist", zap.String("domain", domain), zap.Error(err))
+				return err
+			}
+			// on any other error, just return true
+			logger.Warn("unable to verify if domain exist", zap.String("domain", domain), zap.Error(err))
 		}
-		if _, ok := err.(*shared.BadRequestError); ok {
-			logger.Error("domain does not exist", zap.String("domain", domain), zap.Error(err))
-			return err
-		}
-		// on any other error, just return true
-		logger.Warn("unable to verify if domain exist", zap.String("domain", domain), zap.Error(err))
+		return nil
 	}
 
-	return nil
+	// exponential backoff retry for upto a minute
+	return backoff.Retry(descDomainOp, serviceOperationRetryPolicy, isServiceTransientError)
 }
 
 func newWorkflowWorkerInternal(

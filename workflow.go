@@ -269,7 +269,12 @@ func NewFuture(ctx Context) (Future, Settable) {
 func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.
 	future, settable := newDecodeFuture(ctx, f)
-	activityType, input, err := getValidatedActivityFunction(f, args)
+	workflowEnv := getWorkflowEnvironment(ctx)
+	activityType, input, err := getValidatedActivityFunction(
+		f,
+		args,
+		workflowEnv.GetHostEnvironment(),
+	)
 	if err != nil {
 		settable.Set(nil, err)
 		return future
@@ -284,7 +289,7 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	parameters.ActivityType = *activityType
 	parameters.Input = input
 
-	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
+	a := workflowEnv.ExecuteActivity(*parameters, func(r []byte, e error) {
 		settable.Set(r, e)
 	})
 	Go(ctx, func(ctx Context) {

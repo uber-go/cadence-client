@@ -36,6 +36,7 @@ type (
 	activity interface {
 		Execute(ctx context.Context, input []byte) ([]byte, error)
 		ActivityType() ActivityType
+		GetFunction() interface{}
 	}
 
 	activityInfo struct {
@@ -76,6 +77,7 @@ type (
 		activityType      ActivityType
 		serviceInvoker    ServiceInvoker
 		logger            *zap.Logger
+		env               *hostEnvImpl
 	}
 )
 
@@ -194,7 +196,11 @@ func validateFunctionResults(f interface{}, result interface{}) ([]byte, error) 
 	return data, nil
 }
 
-func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityType, []byte, error) {
+func getValidatedActivityFunction(
+	f interface{},
+	args []interface{},
+	env *hostEnvImpl,
+) (*ActivityType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(f)
 	switch fType.Kind() {
@@ -212,6 +218,9 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityT
 			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
 	}
 
+	if alias, ok := env.getActivityAlias(fnName); ok {
+		fnName = alias
+	}
 	input, err := newHostEnvironment().encodeArgs(args)
 	if err != nil {
 		return nil, nil, err
@@ -293,8 +302,8 @@ func deSerializeFunctionResult(f interface{}, result []byte, to interface{}) err
 	case reflect.String:
 		// If we know about this function through registration then we will try to return corresponding result type.
 		fnName := reflect.ValueOf(f).String()
-		if fnRegistered, ok := newHostEnvironment().getActivityFn(fnName); ok {
-			return deSerializeFnResultFromFnType(reflect.TypeOf(fnRegistered), result, to)
+		if a, ok := newHostEnvironment().getActivity(fnName); ok {
+			return deSerializeFnResultFromFnType(reflect.TypeOf(a.GetFunction()), result, to)
 		}
 	}
 

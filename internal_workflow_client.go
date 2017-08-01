@@ -268,10 +268,15 @@ func (wc *workflowClient) GetWorkflowStackTrace(workflowID string, runID string,
 		&s.WorkflowExecution{WorkflowId: common.StringPtr(workflowID), RunId: common.StringPtr(runID)},
 		atDecisionTaskCompletedEventID,
 	)
-	return getWorkflowStackTraceImpl(workflowID, runID, getHistoryPage)
+	return getWorkflowStackTraceImpl(workflowID, runID, getHistoryPage, wc.env)
 }
 
-func getWorkflowStackTraceImpl(workflowID string, runID string, getHistoryPage GetHistoryPage) (string, error) {
+func getWorkflowStackTraceImpl(
+	workflowID string,
+	runID string,
+	getHistoryPage GetHistoryPage,
+	env *hostEnvImpl,
+) (string, error) {
 	firstPage, taskToken, err := getHistoryPage([]byte{})
 	if err != nil {
 		return "", err
@@ -283,8 +288,6 @@ func getWorkflowStackTraceImpl(workflowID string, runID string, getHistoryPage G
 	if startWorkflowEvent == nil {
 		return "", errors.New("First event is not WorkflowExecutionStarted")
 	}
-	registeredWorkflowFactory := newRegisteredWorkflowFactory(newHostEnvironment())
-	workflowDefinitionFactory := getWorkflowDefinitionFactory(registeredWorkflowFactory)
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		return "", err
@@ -299,7 +302,12 @@ func getWorkflowStackTraceImpl(workflowID string, runID string, getHistoryPage G
 		UserContext:               context.Background(),
 	}
 	var maxInt64 int64 = math.MaxInt64
-	taskHandler := newWorkflowTaskHandler(workflowDefinitionFactory, "unknown", workerParams, nil)
+	taskHandler := newWorkflowTaskHandler(
+		"unknown",
+		workerParams,
+		nil,
+		env,
+	)
 	task := &s.PollForDecisionTaskResponse{
 		History:                firstPage,
 		PreviousStartedEventId: &maxInt64,

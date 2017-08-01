@@ -132,10 +132,11 @@ func NewWorkflowTaskHandler(domain string, identity string, logger *zap.Logger, 
 	}
 	ensureRequiredParams(&params)
 	return newWorkflowTaskHandler(
-		getWorkflowDefinitionFactory(newRegisteredWorkflowFactory(env)),
 		domain,
 		params,
-		nil)
+		nil,
+		env,
+	)
 }
 
 // NewActivityTaskHandler creates an instance of a WorkflowTaskHandler from a decision poll response
@@ -149,9 +150,10 @@ func NewActivityTaskHandler(service m.TChanWorkflowService, identity string, log
 	}
 	ensureRequiredParams(&params)
 	return newActivityTaskHandler(
-		newHostEnvironment().getRegisteredActivities(),
 		service,
-		params)
+		params,
+		newHostEnvironment(),
+	)
 }
 
 // AddWorkflowRegistrationInterceptor adds interceptor that is called for each RegisterWorkflow call.

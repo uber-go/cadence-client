@@ -65,7 +65,6 @@ func (ac testActivityExecutionContext) RecordActivityHeartbeat(details []byte) e
 
 // Sample Workflow task handler
 type sampleWorkflowTaskHandler struct {
-	factory workflowDefinitionFactory
 }
 
 func (wth sampleWorkflowTaskHandler) ProcessWorkflowTask(
@@ -81,17 +80,22 @@ func (wth sampleWorkflowTaskHandler) LoadWorkflowThroughReplay(task *workflowTas
 	return &helloWorldWorkflow{}, nil
 }
 
-func newSampleWorkflowTaskHandler(factory workflowDefinitionFactory) *sampleWorkflowTaskHandler {
-	return &sampleWorkflowTaskHandler{factory: factory}
+func newSampleWorkflowTaskHandler() *sampleWorkflowTaskHandler {
+	return &sampleWorkflowTaskHandler{}
 }
 
 // Sample ActivityTaskHandler
 type sampleActivityTaskHandler struct {
-	activityRegistry map[m.ActivityType]*activity
+	activityRegistry map[ActivityType]activity
 }
 
-func newSampleActivityTaskHandler(activityRegistry map[m.ActivityType]*activity) *sampleActivityTaskHandler {
+func newSampleActivityTaskHandler(activityRegistry map[ActivityType]activity) *sampleActivityTaskHandler {
 	return &sampleActivityTaskHandler{activityRegistry: activityRegistry}
+}
+
+func (ath sampleActivityTaskHandler) Register(a activity) error {
+	ath.activityRegistry[a.ActivityType()] = a
+	return nil
 }
 
 func (ath sampleActivityTaskHandler) Execute(task *m.PollForActivityTaskResponse) (interface{}, error) {
@@ -132,7 +136,7 @@ func (s *PollLayerInterfacesTestSuite) TestProcessWorkflowTaskInterface() {
 	s.NoError(err)
 
 	// Process task and respond to the service.
-	taskHandler := newSampleWorkflowTaskHandler(testWorkflowDefinitionFactory)
+	taskHandler := newSampleWorkflowTaskHandler()
 	completionRequest, _, err := taskHandler.ProcessWorkflowTask(response, nil, false)
 	s.NoError(err)
 
@@ -153,7 +157,7 @@ func (s *PollLayerInterfacesTestSuite) TestProcessActivityTaskInterface() {
 	s.NoError(err)
 
 	// Execute activity task and respond to the service.
-	activationRegistry := make(map[m.ActivityType]*activity)
+	activationRegistry := make(map[ActivityType]activity)
 	taskHandler := newSampleActivityTaskHandler(activationRegistry)
 	request, err := taskHandler.Execute(response)
 	s.NoError(err)

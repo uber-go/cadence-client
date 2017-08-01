@@ -57,7 +57,6 @@ type (
 
 // newWorkflowWorkerWithPressurePoints returns an instance of a workflow worker.
 func newWorkflowWorkerWithPressurePoints(
-	factory workflowFactory,
 	service m.TChanWorkflowService,
 	domain string,
 	params workerExecutionParameters,
@@ -65,13 +64,6 @@ func newWorkflowWorkerWithPressurePoints(
 	env *hostEnvImpl,
 ) (worker WorkflowWorker) {
 	return newWorkflowWorker(
-		func(workflowType WorkflowType) (workflowDefinition, error) {
-			wd, err := factory(workflowType)
-			if err != nil {
-				return nil, err
-			}
-			return newWorkflowDefinition(wd), nil
-		},
 		service,
 		domain,
 		params,

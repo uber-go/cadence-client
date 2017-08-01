@@ -94,18 +94,37 @@ func (wf helloWorldWorkflow) Execute(env workflowEnvironment, input []byte) {
 	}
 }
 
+func helloWorldWorkflowFunc(ctx Context, cancelActivity bool) error {
+	activityName := "Greeter_Activity"
+	ao := ActivityOptions{
+		TaskList:   "taskList",
+		ActivityID: activityName,
+	}
+	ctx = WithActivityOptions(ctx, ao)
+	var result []byte
+	err := ExecuteActivity(ctx, greeterActivityFunc).Get(ctx, result)
+	if err == nil {
+		fmt.Println("Result", result)
+	}
+	return err
+}
+
 // Greeter activity methods
 func (ga greeterActivity) ActivityType() ActivityType {
 	activityName := "Greeter_Activity"
 	return ActivityType{Name: activityName}
 }
+
 func (ga greeterActivity) Execute(ctx context.Context, input []byte) ([]byte, error) {
 	return []byte("World"), nil
 }
 
-// testWorkflowDefinitionFactory
-func testWorkflowDefinitionFactory(workflowType WorkflowType) (workflowDefinition, error) {
-	return &helloWorldWorkflow{}, nil
+func (ga greeterActivity) GetFunction() interface{} {
+	return ga.Execute
+}
+
+func greeterActivityFunc(ctx context.Context, input []byte) ([]byte, error) {
+	return []byte("Hello world"), nil
 }
 
 // Test suite.
@@ -139,7 +158,6 @@ func (s *InterfacesTestSuite) TestInterface() {
 	env := newHostEnvironment()
 	// Launch worker.
 	workflowWorker := newWorkflowWorker(
-		testWorkflowDefinitionFactory,
 		service,
 		domain,
 		workflowExecutionParameters,
@@ -158,7 +176,6 @@ func (s *InterfacesTestSuite) TestInterface() {
 
 	// Register activity instances and launch the worker.
 	activityWorker := newActivityWorker(
-		[]activity{&greeterActivity{}},
 		service,
 		domain,
 		activityExecutionParameters,

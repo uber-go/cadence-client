@@ -62,6 +62,7 @@ type (
 		ExecuteChildWorkflow(options workflowOptions, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error
 		GetLogger() *zap.Logger
 		RegisterSignalHandler(handler func(name string, input []byte))
+		GetHostEnvironment() *hostEnvImpl
 	}
 
 	// WorkflowDefinition wraps the code that can execute a workflow.

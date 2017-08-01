@@ -45,28 +45,30 @@ import (
 var registeredActivities []string
 var registeredWorkflows []string
 
-func init() {
-	RegisterWorkflow(sampleWorkflowExecute)
-	AddWorkflowRegistrationInterceptor(func(workflowName string, workflow interface{}) (string, interface{}) {
+func newHostEnvWithSample() *hostEnvImpl {
+	env := newHostEnvironment()
+	env.RegisterWorkflow(sampleWorkflowExecute, RegisterWorkflowOptions{})
+	env.AddWorkflowRegistrationInterceptor(func(workflowName string, workflow interface{}) (string, interface{}) {
 		registeredWorkflows = append(registeredWorkflows, workflowName)
 		return workflowName, workflow
 	})
-	RegisterWorkflow(testReplayWorkflow)
+	env.RegisterWorkflow(testReplayWorkflow, RegisterWorkflowOptions{})
 
-	RegisterActivity(testActivity)
-	RegisterActivity(testActivityByteArgs)
-	AddActivityRegistrationInterceptor(func(activityName string, activity interface{}) (string, interface{}) {
+	env.RegisterActivity(testActivity, RegisterActivityOptions{})
+	env.RegisterActivity(testActivityByteArgs, RegisterActivityOptions{})
+	env.AddActivityRegistrationInterceptor(func(activityName string, activity interface{}) (string, interface{}) {
 		registeredActivities = append(registeredActivities, activityName)
 		return activityName, activity
 	})
-	RegisterActivity(testActivityMultipleArgs)
-	RegisterActivity(testActivityReturnString)
-	RegisterActivity(testActivityReturnEmptyString)
-	RegisterActivity(testActivityReturnEmptyStruct)
+	env.RegisterActivity(testActivityMultipleArgs, RegisterActivityOptions{})
+	env.RegisterActivity(testActivityReturnString, RegisterActivityOptions{})
+	env.RegisterActivity(testActivityReturnEmptyString, RegisterActivityOptions{})
+	env.RegisterActivity(testActivityReturnEmptyStruct, RegisterActivityOptions{})
+	return env
 }
 
-func TestActivityRegistrationListener(t *testing.T) {
-	require.Equal(t, 7, len(registeredActivities))
+func testActivityRegistrationListener(t *testing.T) {
+	require.Equal(t, 6, len(registeredActivities))
 	expectedActivities := []string{
 		"go.uber.org/cadence.testActivity",
 		"go.uber.org/cadence.testActivityByteArgs",
@@ -74,7 +76,6 @@ func TestActivityRegistrationListener(t *testing.T) {
 		"go.uber.org/cadence.testActivityReturnString",
 		"go.uber.org/cadence.testActivityReturnEmptyString",
 		"go.uber.org/cadence.testActivityReturnEmptyStruct",
-		"go.uber.org/cadence.stackTraceActivity", // from internal_task_handlers_test.go
 	}
 	sort.Strings(expectedActivities)
 	expected := strings.Join(expectedActivities, ",")
@@ -83,12 +84,11 @@ func TestActivityRegistrationListener(t *testing.T) {
 	require.Equal(t, expected, registered)
 }
 
-func TestWorkflowRegistrationListener(t *testing.T) {
-	require.Equal(t, 3, len(registeredWorkflows))
+func testWorkflowRegistrationListener(t *testing.T) {
+	require.Equal(t, 2, len(registeredWorkflows))
 	expectedWorkflows := []string{
 		"go.uber.org/cadence.sampleWorkflowExecute",
 		"go.uber.org/cadence.testReplayWorkflow",
-		"go.uber.org/cadence.stackTraceWorkflow", // from internal_task_handlers_test.go
 	}
 	sort.Strings(expectedWorkflows)
 	expected := strings.Join(expectedWorkflows, ",")
@@ -150,11 +150,15 @@ func TestDecisionTaskHandler(t *testing.T) {
 		PreviousStartedEventId: common.Int64Ptr(5),
 	}
 
-	r := NewWorkflowTaskHandler(testDomain, "identity", logger, newHostEnvironment())
+	env := newHostEnvWithSample()
+	r := NewWorkflowTaskHandler(testDomain, "identity", logger, env)
 	_, stackTrace, err := r.ProcessWorkflowTask(task, nil, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, stackTrace, stackTrace)
 	require.Contains(t, stackTrace, "cadence.(*decodeFutureImpl).Get")
+
+	testActivityRegistrationListener(t)
+	testWorkflowRegistrationListener(t)
 }
 
 // testSampleWorkflow
@@ -262,6 +266,8 @@ func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 		domain,
 		"testGroupName2",
 		workerOptions)
+	require.NoError(t, worker.RegisterWorkflow(sampleWorkflowExecute, RegisterWorkflowOptions{}))
+	require.NoError(t, worker.RegisterActivity(testActivity, RegisterActivityOptions{}))
 	return worker
 }
 

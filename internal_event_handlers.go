@@ -68,8 +68,7 @@ type (
 
 	// workflowEnvironmentImpl an implementation of workflowEnvironment represents a environment for workflow execution.
 	workflowEnvironmentImpl struct {
-		workflowInfo              *WorkflowInfo
-		workflowDefinitionFactory workflowDefinitionFactory
+		workflowInfo *WorkflowInfo
 
 		decisionsHelper  *decisionsHelper
 		sideEffectResult map[int32][]byte
@@ -85,6 +84,8 @@ type (
 		logger                *zap.Logger
 		isReplay              bool // flag to indicate if workflow is in replay mode
 		enableLoggingInReplay bool // flag to indicate if workflow should enable logging in replay mode
+
+		env *hostEnvImpl
 	}
 
 	// wrapper around zapcore.Core that will be aware of replay
@@ -113,16 +114,21 @@ func (c *replayAwareZapCore) With(fields []zapcore.Field) zapcore.Core {
 	return &replayAwareZapCore{coreWithFields, c.isReplay, c.enableLoggingInReplay}
 }
 
-func newWorkflowExecutionEventHandler(workflowInfo *WorkflowInfo, workflowDefinitionFactory workflowDefinitionFactory,
-	completeHandler completionHandler, logger *zap.Logger, enableLoggingInReplay bool) workflowExecutionEventHandler {
+func newWorkflowExecutionEventHandler(
+	workflowInfo *WorkflowInfo,
+	completeHandler completionHandler,
+	logger *zap.Logger,
+	enableLoggingInReplay bool,
+	env *hostEnvImpl,
+) workflowExecutionEventHandler {
 	context := &workflowEnvironmentImpl{
-		workflowInfo:              workflowInfo,
-		workflowDefinitionFactory: workflowDefinitionFactory,
-		decisionsHelper:           newDecisionsHelper(),
-		sideEffectResult:          make(map[int32][]byte),
-		changeVersions:            make(map[string]Version),
-		completeHandler:           completeHandler,
-		enableLoggingInReplay:     enableLoggingInReplay,
+		workflowInfo:          workflowInfo,
+		decisionsHelper:       newDecisionsHelper(),
+		sideEffectResult:      make(map[int32][]byte),
+		changeVersions:        make(map[string]Version),
+		completeHandler:       completeHandler,
+		enableLoggingInReplay: enableLoggingInReplay,
+		env: env,
 	}
 	context.logger = logger.With(
 		zapcore.Field{Key: tagWorkflowType, Type: zapcore.StringType, String: workflowInfo.WorkflowType.Name},
@@ -229,6 +235,10 @@ func (wc *workflowEnvironmentImpl) RegisterSignalHandler(handler func(name strin
 
 func (wc *workflowEnvironmentImpl) GetLogger() *zap.Logger {
 	return wc.logger
+}
+
+func (wc *workflowEnvironmentImpl) GetHostEnvironment() *hostEnvImpl {
+	return wc.env
 }
 
 func (wc *workflowEnvironmentImpl) GenerateSequenceID() string {
@@ -566,7 +576,7 @@ func (weh *workflowExecutionEventHandlerImpl) Close() {
 
 func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionStarted(
 	attributes *m.WorkflowExecutionStartedEventAttributes) (err error) {
-	weh.workflowDefinition, err = weh.workflowDefinitionFactory(weh.workflowInfo.WorkflowType)
+	weh.workflowDefinition, err = getWorkflowDefinition(weh.env, weh.workflowInfo.WorkflowType)
 	if err != nil {
 		return err
 	}

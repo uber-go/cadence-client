@@ -34,11 +34,18 @@ import (
 type (
 	WorkersTestSuite struct {
 		suite.Suite
+		hostEnv *hostEnvImpl
 	}
 )
 
 // Test suite.
 func (s *WorkersTestSuite) SetupTest() {
+}
+
+func (s *WorkersTestSuite) SetupSuite() {
+	s.hostEnv = newHostEnvironment()
+	s.NoError(s.hostEnv.RegisterWorkflow(stackTraceWorkflow, RegisterWorkflowOptions{}))
+	s.NoError(s.hostEnv.RegisterActivity(stackTraceActivity, RegisterActivityOptions{}))
 }
 
 func TestWorkersTestSuite(t *testing.T) {
@@ -63,15 +70,14 @@ func (s *WorkersTestSuite) TestWorkflowWorker() {
 		ConcurrentPollRoutineSize: 5,
 		Logger: logger,
 	}
-	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler(nil)}
+	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
-		testWorkflowDefinitionFactory,
 		service,
 		domain,
 		executionParameters,
 		nil,
 		overrides,
-		newHostEnvironment(),
+		s.hostEnv,
 	)
 	workflowWorker.Start()
 	workflowWorker.Stop()
@@ -90,13 +96,14 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 		ConcurrentPollRoutineSize: 5,
 		Logger: logger,
 	}
-	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler(nil)}
+	taskHandler := newSampleActivityTaskHandler(nil)
+	s.NoError(taskHandler.Register(&greeterActivity{}))
+	overrides := &workerOverrides{activityTaskHandler: taskHandler}
 	activityWorker := newActivityWorker(
-		[]activity{&greeterActivity{}},
 		service, domain,
 		executionParameters,
 		overrides,
-		newHostEnvironment(),
+		s.hostEnv,
 	)
 	activityWorker.Start()
 	activityWorker.Stop()
@@ -112,15 +119,14 @@ func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 		TaskList:                  "testDecisionTaskList",
 		ConcurrentPollRoutineSize: 5,
 	}
-	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler(nil)}
+	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
-		testWorkflowDefinitionFactory,
 		service,
 		domain,
 		executionParameters,
 		nil,
 		overrides,
-		newHostEnvironment(),
+		s.hostEnv,
 	)
 	workflowWorker.Start()
 	workflowWorker.Stop()

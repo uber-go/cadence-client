@@ -76,7 +76,7 @@ func (s *WorkflowTestSuite) initIfNotDoneYet() {
 		s.hostEnv = &hostEnvImpl{
 			workflowFuncMap:  make(map[string]interface{}),
 			workflowAliasMap: make(map[string]string),
-			activityFuncMap:  make(map[string]interface{}),
+			activityFuncMap:  make(map[string]activity),
 			activityAliasMap: make(map[string]string),
 			encoding:         gobEncoding{},
 		}
@@ -121,7 +121,7 @@ func (s *WorkflowTestSuite) RegisterActivity(
 ) {
 	s.initIfNotDoneYet()
 	fnName := getFunctionName(activityFn)
-	_, ok := s.hostEnv.activityFuncMap[fnName]
+	_, ok := s.hostEnv.getActivity(fnName)
 	if !ok {
 		// activity not registered yet, register now
 		err := s.hostEnv.RegisterActivity(activityFn, options)

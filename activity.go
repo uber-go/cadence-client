@@ -141,7 +141,8 @@ func WithActivityTask(
 		activityID:     *task.ActivityId,
 		workflowExecution: WorkflowExecution{
 			RunID: *task.WorkflowExecution.RunId,
-			ID:    *task.WorkflowExecution.WorkflowId},
+			ID:    *task.WorkflowExecution.WorkflowId,
+		},
 		logger: logger,
 	})
 }

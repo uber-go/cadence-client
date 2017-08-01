@@ -126,13 +126,13 @@ func NewWorker(
 	return newAggregatedWorker(service, domain, taskList, options)
 }
 
-// GetWorkflowStackTrace returns a stack trace of all goroutines of a workflow given its current history.
+// getWorkflowStackTrace returns a stack trace of all goroutines of a workflow given its current history.
 // It requires workflow function that was used to create the history to be registered
 // through RegisterWorkflow.
 // Use Client.GetWorkflowStackTrace to get a stack trace given workflowID and runID.
-func GetWorkflowStackTrace(h *s.History) (string, error) {
+func getWorkflowStackTrace(h *s.History, env *hostEnvImpl) (string, error) {
 	getHistoryPage := func(nextPageToken []byte) (*s.History, []byte, error) {
 		return h, nil, nil
 	}
-	return getWorkflowStackTraceImpl("unknown", "unknown", getHistoryPage)
+	return getWorkflowStackTraceImpl("unknown", "unknown", getHistoryPage, env)
 }

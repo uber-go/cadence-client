@@ -71,7 +71,9 @@ type (
 	}
 )
 
-// WrapScope wraps a scope and skip recording metrics when isReplay is true
+// WrapScope wraps a scope and skip recording metrics when isReplay is true.
+// This is designed to be used by only by workflowEnvironmentImpl so we suppress metrics while replaying history events.
+// Parameter isReplay is a pointer to workflowEnvironmentImpl.isReplay which will be updated when replaying history events.
 func WrapScope(isReplay *bool, scope tally.Scope, clock Clock) tally.Scope {
 	return &replayAwareScope{isReplay, scope, clock}
 }

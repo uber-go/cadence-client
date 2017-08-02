@@ -105,12 +105,10 @@ func helloWorldWorkflowFunc(ctx Context, input []byte) error {
 	}
 	ctx = WithActivityOptions(ctx, ao)
 	var result []byte
-	fmt.Println("Executing activity")
 	err := ExecuteActivity(ctx, activityName).Get(ctx, &result)
 	if err == nil {
 		fmt.Println("Result", result)
 	}
-	fmt.Println("Error", err)
 	return err
 }
 

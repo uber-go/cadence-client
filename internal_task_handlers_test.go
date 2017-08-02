@@ -244,7 +244,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {
 	// Schedule an activity and see if we complete workflow.
 	taskList := "tl1"
 	testEvents := []*s.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventWorkflowExecutionStarted(
+			1,
+			&s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}},
+		),
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
 	}

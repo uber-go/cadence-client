@@ -505,6 +505,12 @@ func (th *hostEnvImpl) addActivityFn(fnName string, af interface{}) {
 	th.activityFuncMap[fnName] = &activityExecutor{name: fnName, fn: af}
 }
 
+func (th *hostEnvImpl) addActivity(fnName string, a activity) {
+	th.Lock()
+	defer th.Unlock()
+	th.activityFuncMap[fnName] = a
+}
+
 func (th *hostEnvImpl) getActivity(fnName string) (activity, bool) {
 	th.Lock()
 	defer th.Unlock()

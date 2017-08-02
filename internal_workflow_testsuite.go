@@ -952,28 +952,17 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 	}
 	ensureRequiredParams(&params)
 
-	var activities []activity
 	for fnName, tasklistActivity := range env.taskListSpecificActivities {
 		if _, ok := tasklistActivity.taskLists[taskList]; ok {
 			ae := &activityExecutor{name: fnName, fn: tasklistActivity.fn}
-			activities = append(activities, &activityExecutorWrapper{activityExecutor: ae, env: env})
+			env.testSuite.hostEnv.addActivity(
+				fnName,
+				&activityExecutorWrapper{activityExecutor: ae, env: env},
+			)
 		}
 	}
 
-	addActivities := func(hostEnv *hostEnvImpl) {
-		for fnName, a := range hostEnv.activityFuncMap {
-			if _, ok := env.taskListSpecificActivities[fnName]; ok {
-				// activity is registered to a specific taskList, so ignore it from the global registered activities.
-				continue
-			}
-			activities = append(activities, &activityExecutorWrapper{activityExecutor: a.(*activityExecutor), env: env})
-		}
-	}
-
-	// TODO (madhu): Fix
-	addActivities(env.testSuite.hostEnv)
-
-	if len(activities) == 0 {
+	if len(env.testSuite.hostEnv.activityFuncMap) == 0 {
 		panic(fmt.Sprintf("no activity is registered for tasklist '%v'", taskList))
 	}
 

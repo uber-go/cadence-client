@@ -45,6 +45,7 @@ func (s *WorkflowUnitTest) SetupSuite() {
 		StartToCloseTimeout:    time.Minute,
 		HeartbeatTimeout:       20 * time.Second,
 	}
+	s.hostEnv = newHostEnvironment()
 	options := RegisterActivityOptions{}
 	s.hostEnv.RegisterActivity(testAct, options)
 	s.hostEnv.RegisterActivity(getGreetingActivity, options)
@@ -147,6 +148,7 @@ func splitJoinActivityWorkflow(ctx Context, testPanic bool) (result string, err 
 
 func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.SetActivityTaskList(defaultTestTaskList, testAct)
 	env.OverrideActivity(testAct, func(ctx context.Context) (string, error) {
 		activityID := GetActivityInfo(ctx).ActivityID
 		switch activityID {

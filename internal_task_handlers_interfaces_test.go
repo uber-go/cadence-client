@@ -89,8 +89,8 @@ type sampleActivityTaskHandler struct {
 	activityRegistry map[ActivityType]activity
 }
 
-func newSampleActivityTaskHandler(activityRegistry map[ActivityType]activity) *sampleActivityTaskHandler {
-	return &sampleActivityTaskHandler{activityRegistry: activityRegistry}
+func newSampleActivityTaskHandler() *sampleActivityTaskHandler {
+	return &sampleActivityTaskHandler{activityRegistry: make(map[ActivityType]activity)}
 }
 
 func (ath sampleActivityTaskHandler) Register(a activity) error {
@@ -156,9 +156,8 @@ func (s *PollLayerInterfacesTestSuite) TestProcessActivityTaskInterface() {
 	response, err := service.PollForActivityTask(ctx, &m.PollForActivityTaskRequest{})
 	s.NoError(err)
 
-	// Execute activity task and respond to the service.
-	activationRegistry := make(map[ActivityType]activity)
-	taskHandler := newSampleActivityTaskHandler(activationRegistry)
+	// Execute activity task and respond to the service
+	taskHandler := newSampleActivityTaskHandler()
 	request, err := taskHandler.Execute(response)
 	s.NoError(err)
 	switch request.(type) {

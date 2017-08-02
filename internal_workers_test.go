@@ -96,7 +96,7 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 		ConcurrentPollRoutineSize: 5,
 		Logger: logger,
 	}
-	taskHandler := newSampleActivityTaskHandler(nil)
+	taskHandler := newSampleActivityTaskHandler()
 	s.NoError(taskHandler.Register(&greeterActivity{}))
 	overrides := &workerOverrides{activityTaskHandler: taskHandler}
 	activityWorker := newActivityWorker(

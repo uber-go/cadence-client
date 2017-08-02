@@ -271,7 +271,12 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	return result, errInterface
 }
 
-func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interface{}) error {
+func deSerializeFnResultFromFnType(
+	fnType reflect.Type,
+	result []byte,
+	to interface{},
+	env *hostEnvImpl,
+) error {
 	if fnType.Kind() != reflect.Func {
 		return fmt.Errorf("expecting only function type but got type: %v", fnType)
 	}
@@ -283,7 +288,7 @@ func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interf
 		if result == nil {
 			return nil
 		}
-		err := newHostEnvironment().decodeArg(result, to)
+		err := env.decodeArg(result, to)
 		if err != nil {
 			return err
 		}
@@ -291,24 +296,29 @@ func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interf
 	return nil
 }
 
-func deSerializeFunctionResult(f interface{}, result []byte, to interface{}) error {
+func deSerializeFunctionResult(
+	f interface{},
+	result []byte,
+	to interface{},
+	env *hostEnvImpl,
+) error {
 	fType := reflect.TypeOf(f)
 
 	switch fType.Kind() {
 	case reflect.Func:
 		// We already validated that it either have (result, error) (or) just error.
-		return deSerializeFnResultFromFnType(fType, result, to)
+		return deSerializeFnResultFromFnType(fType, result, to, env)
 
 	case reflect.String:
 		// If we know about this function through registration then we will try to return corresponding result type.
 		fnName := reflect.ValueOf(f).String()
-		if a, ok := newHostEnvironment().getActivity(fnName); ok {
-			return deSerializeFnResultFromFnType(reflect.TypeOf(a.GetFunction()), result, to)
+		if a, ok := env.getActivity(fnName); ok {
+			return deSerializeFnResultFromFnType(reflect.TypeOf(a.GetFunction()), result, to, env)
 		}
 	}
 
 	// For everything we return result.
-	return newHostEnvironment().decodeArg(result, to)
+	return env.decodeArg(result, to)
 }
 
 func setActivityParametersIfNotExist(ctx Context) Context {

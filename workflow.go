@@ -245,8 +245,8 @@ func NewFuture(ctx Context) (Future, Settable) {
 // - returns Future with activity result or failure
 func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.
-	future, settable := newDecodeFuture(ctx, f)
 	workflowEnv := getWorkflowEnvironment(ctx)
+	future, settable := newDecodeFuture(ctx, f, workflowEnv.GetHostEnvironment())
 	activityType, input, err := getValidatedActivityFunction(
 		f,
 		args,
@@ -297,12 +297,14 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 // error CanceledError.
 // - returns ChildWorkflowFuture
 func ExecuteChildWorkflow(ctx Context, f interface{}, args ...interface{}) ChildWorkflowFuture {
-	mainFuture, mainSettable := newDecodeFuture(ctx, f)
+	workflowEnv := getWorkflowEnvironment(ctx)
+	hostEnv := workflowEnv.GetHostEnvironment()
+	mainFuture, mainSettable := newDecodeFuture(ctx, f, hostEnv)
 	executionFuture, executionSettable := NewFuture(ctx)
 	result := childWorkflowFutureImpl{
 		decodeFutureImpl: mainFuture.(*decodeFutureImpl),
 		executionFuture:  executionFuture.(*futureImpl)}
-	wfType, input, err := getValidatedWorkerFunction(f, args, newHostEnvironment())
+	wfType, input, err := getValidatedWorkerFunction(f, args, hostEnv)
 	if err != nil {
 		mainSettable.Set(nil, err)
 		return result
@@ -316,7 +318,7 @@ func ExecuteChildWorkflow(ctx Context, f interface{}, args ...interface{}) Child
 	options.input = input
 	options.workflowType = wfType
 	var childWorkflowExecution *WorkflowExecution
-	getWorkflowEnvironment(ctx).ExecuteChildWorkflow(*options, func(r []byte, e error) {
+	workflowEnv.ExecuteChildWorkflow(*options, func(r []byte, e error) {
 		mainSettable.Set(r, e)
 	}, func(r WorkflowExecution, e error) {
 		if e == nil {
@@ -522,14 +524,15 @@ func (b EncodedValue) Get(valuePtr interface{}) error {
 // }
 func SideEffect(ctx Context, f func(ctx Context) interface{}) EncodedValue {
 	future, settable := NewFuture(ctx)
+	workflowEnv := getWorkflowEnvironment(ctx)
 	wrapperFunc := func() ([]byte, error) {
 		r := f(ctx)
-		return newHostEnvironment().encodeArg(r)
+		return workflowEnv.GetHostEnvironment().encodeArg(r)
 	}
 	resultCallback := func(result []byte, err error) {
 		settable.Set(EncodedValue(result), err)
 	}
-	getWorkflowEnvironment(ctx).SideEffect(wrapperFunc, resultCallback)
+	workflowEnv.SideEffect(wrapperFunc, resultCallback)
 	var encoded EncodedValue
 	if err := future.Get(ctx, &encoded); err != nil {
 		panic(err)

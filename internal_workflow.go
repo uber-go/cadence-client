@@ -165,7 +165,8 @@ type (
 	// decodeFutureImpl
 	decodeFutureImpl struct {
 		*futureImpl
-		fn interface{}
+		fn  interface{}
+		env *hostEnvImpl
 	}
 
 	childWorkflowFutureImpl struct {
@@ -1039,7 +1040,7 @@ func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
 		return errors.New("value parameter is not a pointer")
 	}
 
-	err := deSerializeFunctionResult(d.fn, d.futureImpl.value.([]byte), value)
+	err := deSerializeFunctionResult(d.fn, d.futureImpl.value.([]byte), value, d.env)
 	if err != nil {
 		return err
 	}
@@ -1080,8 +1081,11 @@ func (p ChildWorkflowPolicy) toThriftChildPolicyPtr() *shared.ChildPolicy {
 
 // newDecodeFuture creates a new future as well as associated Settable that is used to set its value.
 // fn - the decoded value needs to be validated against a function.
-func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
+func newDecodeFuture(ctx Context, fn interface{}, env *hostEnvImpl) (Future, Settable) {
 	impl := &decodeFutureImpl{
-		&futureImpl{channel: NewChannel(ctx).(*channelImpl)}, fn}
+		&futureImpl{channel: NewChannel(ctx).(*channelImpl)},
+		fn,
+		env,
+	}
 	return impl, impl
 }

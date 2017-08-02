@@ -610,14 +610,17 @@ func testWorkflowReturnStructPtrPtr(ctx Context, arg1 int) (result **testWorkflo
 }
 
 func TestRegisterVariousWorkflowTypes(t *testing.T) {
-	RegisterWorkflow(testWorkflowSample)
-	RegisterWorkflow(testWorkflowMultipleArgs)
-	RegisterWorkflow(testWorkflowNoArgs)
-	RegisterWorkflow(testWorkflowReturnInt)
-	RegisterWorkflow(testWorkflowReturnString)
-	RegisterWorkflow(testWorkflowReturnStruct)
-	RegisterWorkflow(testWorkflowReturnStructPtr)
-	RegisterWorkflow(testWorkflowReturnStructPtrPtr)
+	service := new(mocks.TChanWorkflowService)
+	worker := createWorker(t, service)
+	opts := RegisterWorkflowOptions{}
+	worker.RegisterWorkflow(testWorkflowSample, opts)
+	worker.RegisterWorkflow(testWorkflowMultipleArgs, opts)
+	worker.RegisterWorkflow(testWorkflowNoArgs, opts)
+	worker.RegisterWorkflow(testWorkflowReturnInt, RegisterWorkflowOptions{Name: "intWf"})
+	worker.RegisterWorkflow(testWorkflowReturnString, opts)
+	worker.RegisterWorkflow(testWorkflowReturnStruct, opts)
+	worker.RegisterWorkflow(testWorkflowReturnStructPtr, RegisterWorkflowOptions{Name: "structWf"})
+	worker.RegisterWorkflow(testWorkflowReturnStructPtrPtr, opts)
 }
 
 type testErrorDetails struct {

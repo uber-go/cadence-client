@@ -46,10 +46,10 @@ func (s *WorkflowUnitTest) SetupSuite() {
 		HeartbeatTimeout:       20 * time.Second,
 	}
 	options := RegisterActivityOptions{}
-	s.RegisterActivity(testAct, options)
-	s.RegisterActivity(getGreetingActivity, options)
-	s.RegisterActivity(getNameActivity, options)
-	s.RegisterActivity(sayGreetingActivity, options)
+	s.hostEnv.RegisterActivity(testAct, options)
+	s.hostEnv.RegisterActivity(getGreetingActivity, options)
+	s.hostEnv.RegisterActivity(getNameActivity, options)
+	s.hostEnv.RegisterActivity(sayGreetingActivity, options)
 }
 
 func TestWorkflowUnitTest(t *testing.T) {

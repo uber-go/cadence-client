@@ -543,7 +543,7 @@ func testActivityReturnStructPtrPtr() (**testActivityResult, error) {
 }
 
 func TestVariousActivitySchedulingOption(t *testing.T) {
-	ts := &WorkflowTestSuite{}
+	ts := &WorkflowTestSuite{hostEnv: newHostEnvWithSample()}
 	nopOptions := RegisterActivityOptions{}
 	ts.RegisterActivity(
 		testActivityNoResult,

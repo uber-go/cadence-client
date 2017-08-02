@@ -421,9 +421,9 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 		}
 	}
 
+	env := getWorkflowEnvironment(ctx)
 	panicErr := dispatcher.ExecuteUntilAllBlocked()
 	if panicErr != nil {
-		env := getWorkflowEnvironment(ctx)
 		env.GetLogger().Error("Dispatcher panic.",
 			zap.String("PanicError", panicErr.Error()),
 			zap.String("PanicStack", panicErr.StackTrace()))
@@ -437,7 +437,7 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 		return
 	}
 	checkUnhandledSigFn(ctx)
-	getWorkflowEnvironment(ctx).Complete(rp.workflowResult, rp.error)
+	env.Complete(rp.workflowResult, rp.error)
 }
 
 // For troubleshooting stack pretty printing only.

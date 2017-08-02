@@ -73,7 +73,11 @@ func TestTaskHandlersTestSuite(t *testing.T) {
 }
 
 func createTestEventWorkflowExecutionStarted(eventID int64, attr *s.WorkflowExecutionStartedEventAttributes) *s.HistoryEvent {
-	return &s.HistoryEvent{EventId: common.Int64Ptr(eventID), EventType: common.EventTypePtr(s.EventType_WorkflowExecutionStarted), WorkflowExecutionStartedEventAttributes: attr}
+	return &s.HistoryEvent{
+		EventId:   common.Int64Ptr(eventID),
+		EventType: common.EventTypePtr(s.EventType_WorkflowExecutionStarted),
+		WorkflowExecutionStartedEventAttributes: attr,
+	}
 }
 
 func createTestEventActivityTaskScheduled(eventID int64, attr *s.ActivityTaskScheduledEventAttributes) *s.HistoryEvent {
@@ -158,7 +162,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 	// Schedule an activity and see if we complete workflow.
 	taskList := "tl1"
 	testEvents := []*s.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventWorkflowExecutionStarted(
+			1,
+			&s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}},
+		),
 		createTestEventActivityTaskScheduled(2, &s.ActivityTaskScheduledEventAttributes{
 			ActivityId:   common.StringPtr("0"),
 			ActivityType: &s.ActivityType{Name: common.StringPtr("Greeter_Activity")},

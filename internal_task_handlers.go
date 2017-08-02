@@ -380,7 +380,10 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		wth.env,
 	)
 	defer eventHandler.Close()
-	reorderedHistory := newHistory(&workflowTask{task: task, getHistoryPageFunc: getHistoryPage}, eventHandler.(*workflowExecutionEventHandlerImpl))
+	reorderedHistory := newHistory(
+		&workflowTask{task: task, getHistoryPageFunc: getHistoryPage},
+		eventHandler.(*workflowExecutionEventHandlerImpl),
+	)
 	decisions := []*s.Decision{}
 	replayDecisions := []*s.Decision{}
 	respondEvents := []*s.HistoryEvent{}

@@ -246,12 +246,9 @@ func NewFuture(ctx Context) (Future, Settable) {
 func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.
 	workflowEnv := getWorkflowEnvironment(ctx)
-	future, settable := newDecodeFuture(ctx, f, workflowEnv.GetHostEnvironment())
-	activityType, input, err := getValidatedActivityFunction(
-		f,
-		args,
-		workflowEnv.GetHostEnvironment(),
-	)
+	hostEnv := workflowEnv.GetHostEnvironment()
+	future, settable := newDecodeFuture(ctx, f, hostEnv)
+	activityType, input, err := getValidatedActivityFunction(f, args, hostEnv)
 	if err != nil {
 		settable.Set(nil, err)
 		return future

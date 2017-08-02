@@ -279,7 +279,7 @@ func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityPar
 		waitForCancelRequest: parameters.WaitForCancellation,
 	})
 
-	wc.logger.Debug("ExectueActivity",
+	wc.logger.Debug("ExecuteActivity",
 		zap.String(tagActivityID, activityID),
 		zap.String(tagActivityType, scheduleTaskAttr.GetActivityType().GetName()))
 

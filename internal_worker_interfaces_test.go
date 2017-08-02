@@ -94,18 +94,23 @@ func (wf helloWorldWorkflow) Execute(env workflowEnvironment, input []byte) {
 	}
 }
 
-func helloWorldWorkflowFunc(ctx Context, cancelActivity bool) error {
+func helloWorldWorkflowFunc(ctx Context, input []byte) error {
 	activityName := "Greeter_Activity"
 	ao := ActivityOptions{
-		TaskList:   "taskList",
-		ActivityID: activityName,
+		TaskList:               "taskList",
+		ActivityID:             "0",
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+		HeartbeatTimeout:       20 * time.Second,
 	}
 	ctx = WithActivityOptions(ctx, ao)
 	var result []byte
-	err := ExecuteActivity(ctx, greeterActivityFunc).Get(ctx, result)
+	fmt.Println("Executing activity")
+	err := ExecuteActivity(ctx, activityName).Get(ctx, &result)
 	if err == nil {
 		fmt.Println("Result", result)
 	}
+	fmt.Println("Error", err)
 	return err
 }
 

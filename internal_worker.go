@@ -229,7 +229,6 @@ func newWorkflowTaskWorkerInternal(
 		maxTaskRate:                defaultMaxWorkflowExecutionRate,
 		maxTaskRateRefreshDuration: time.Second,
 		taskWorker:                 poller,
-		workflowService:            service,
 		identity:                   params.Identity,
 		workerType:                 "DecisionWorker"},
 		params.Logger)
@@ -304,7 +303,6 @@ func newActivityTaskWorker(
 		maxTaskRate:                workerParams.MaxActivityExecutionRate,
 		maxTaskRateRefreshDuration: workerParams.MaxActivityExecutionRateRefreshDuration,
 		taskWorker:                 poller,
-		workflowService:            service,
 		identity:                   workerParams.Identity,
 		workerType:                 "ActivityWorker"},
 		workerParams.Logger)

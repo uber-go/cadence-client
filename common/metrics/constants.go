@@ -63,4 +63,8 @@ const (
 	ActivityTaskCanceledCounter    = "activity-task-canceled"
 
 	UnhandledSignalsCounter = "unhandled-signals"
+
+	CadenceRequest = "cadence-request"
+	CadenceError   = "cadence-error"
+	CadenceLatency = "cadence-latency"
 )

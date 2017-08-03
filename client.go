@@ -127,10 +127,28 @@ type (
 		//  - EntityNotExistError
 		ListOpenWorkflow(request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error)
 
-		// RegisterWorkflow registers the workflow function with options
+		// RegisterWorkflow - registers a workflow function with provided options with the framework.
+		// A workflow function takes a cadence context and input and returns a (result, error) or just error.
+		// Examples:
+		//	func sampleWorkflow(ctx cadence.Context, input []byte) (result []byte, err error)
+		//	func sampleWorkflow(ctx cadence.Context, arg1 int, arg2 string) (result []byte, err error)
+		//	func sampleWorkflow(ctx cadence.Context) (result []byte, err error)
+		//	func sampleWorkflow(ctx cadence.Context, arg1 int) (result string, err error)
+		// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
+		// This method calls panic if workflowFunc doesn't comply with the expected format.
 		RegisterWorkflow(interface{}, RegisterWorkflowOptions) error
 
-		// RegisterActivity registers the activity function with options
+		// RegisterActivity - register a activity function with provided options with the framework.
+		// A activity takes a context and input and returns a (result, error) or just error.
+		// Examples:
+		//	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
+		//	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error)
+		//	func sampleActivity(ctx context.Context) (err error)
+		//	func sampleActivity() (result string, err error)
+		//	func sampleActivity(arg1 bool) (result int, err error)
+		//	func sampleActivity(arg1 bool) (err error)
+		// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
+		// This method calls panic if activityFunc doesn't comply with the expected format.
 		RegisterActivity(interface{}, RegisterActivityOptions) error
 	}
 

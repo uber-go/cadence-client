@@ -73,13 +73,7 @@ func (s *WorkflowTestSuite) initIfNotDoneYet() {
 	}
 	s.locker.Lock()
 	if s.hostEnv == nil {
-		s.hostEnv = &hostEnvImpl{
-			workflowFuncMap:  make(map[string]interface{}),
-			workflowAliasMap: make(map[string]string),
-			activityFuncMap:  make(map[string]activity),
-			activityAliasMap: make(map[string]string),
-			encoding:         gobEncoding{},
-		}
+		s.hostEnv = newHostEnvironment()
 	}
 	s.locker.Unlock()
 }

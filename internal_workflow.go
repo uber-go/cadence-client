@@ -923,39 +923,6 @@ func newWorkflowDefinition(workflow workflow) workflowDefinition {
 	return &syncWorkflowDefinition{workflow: workflow}
 }
 
-func getValidatedWorkerFunction(
-	workflowFunc interface{},
-	args []interface{},
-	env *hostEnvImpl,
-) (*WorkflowType, []byte, error) {
-	fnName := ""
-	fType := reflect.TypeOf(workflowFunc)
-	switch fType.Kind() {
-	case reflect.String:
-		fnName = reflect.ValueOf(workflowFunc).String()
-
-	case reflect.Func:
-		if err := validateFunctionArgs(workflowFunc, args, true); err != nil {
-			return nil, nil, err
-		}
-		fnName = getFunctionName(workflowFunc)
-
-	default:
-		return nil, nil, fmt.Errorf(
-			"Invalid type 'workflowFunc' parameter provided, it can be either worker function or name of the worker type: %v",
-			workflowFunc)
-	}
-
-	if alias, ok := env.getWorkflowAlias(fnName); ok {
-		fnName = alias
-	}
-	input, err := env.encodeArgs(args)
-	if err != nil {
-		return nil, nil, err
-	}
-	return &WorkflowType{Name: fnName}, input, nil
-}
-
 func getValidatedWorkflowOptions(ctx Context) (*workflowOptions, error) {
 	p := getWorkflowEnvOptions(ctx)
 	if p == nil {
@@ -1040,7 +1007,7 @@ func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
 		return errors.New("value parameter is not a pointer")
 	}
 
-	err := deSerializeFunctionResult(d.fn, d.futureImpl.value.([]byte), value, d.env)
+	err := d.env.deserializeFnResult(d.fn, d.futureImpl.value.([]byte), value)
 	if err != nil {
 		return err
 	}

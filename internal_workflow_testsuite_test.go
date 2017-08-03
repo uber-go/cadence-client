@@ -47,10 +47,11 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 		StartToCloseTimeout:    time.Minute,
 		HeartbeatTimeout:       20 * time.Second,
 	}
-	s.RegisterWorkflow(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
-	s.RegisterWorkflow(testWorkflowHeartbeat, RegisterWorkflowOptions{Name: "testWorkflowHeartbeat"})
-	s.RegisterActivity(testActivityHello, RegisterActivityOptions{Name: "testActivityHello"})
-	s.RegisterActivity(testActivityHeartbeat, RegisterActivityOptions{Name: "testActivityHeartbeat"})
+	s.hostEnv = newHostEnvironment()
+	s.hostEnv.RegisterWorkflow(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
+	s.hostEnv.RegisterWorkflow(testWorkflowHeartbeat, RegisterWorkflowOptions{Name: "testWorkflowHeartbeat"})
+	s.hostEnv.RegisterActivity(testActivityHello, RegisterActivityOptions{Name: "testActivityHello"})
+	s.hostEnv.RegisterActivity(testActivityHeartbeat, RegisterActivityOptions{Name: "testActivityHeartbeat"})
 }
 
 func TestUnitTestSuite(t *testing.T) {
@@ -63,6 +64,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityOverride() {
 	}
 
 	env := s.NewTestWorkflowEnvironment()
+	env.SetActivityTaskList(defaultTestTaskList, testActivityHello)
 	env.OverrideActivity(testActivityHello, fakeActivity)
 
 	env.ExecuteWorkflow(testWorkflowHello)

@@ -301,7 +301,7 @@ func ExecuteChildWorkflow(ctx Context, f interface{}, args ...interface{}) Child
 	result := childWorkflowFutureImpl{
 		decodeFutureImpl: mainFuture.(*decodeFutureImpl),
 		executionFuture:  executionFuture.(*futureImpl)}
-	wfType, input, err := getValidatedWorkerFunction(f, args, hostEnv)
+	wfType, input, err := hostEnv.getValidatedWorkerFunction(f, args)
 	if err != nil {
 		mainSettable.Set(nil, err)
 		return result

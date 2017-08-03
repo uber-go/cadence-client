@@ -675,6 +675,82 @@ func (th *hostEnvImpl) decodeArg(data []byte, to interface{}) error {
 	return th.decode(data, []interface{}{to})
 }
 
+func (th *hostEnvImpl) getValidatedWorkerFunction(
+	workflowFunc interface{},
+	args []interface{},
+) (*WorkflowType, []byte, error) {
+	fnName := ""
+	fType := reflect.TypeOf(workflowFunc)
+	switch fType.Kind() {
+	case reflect.String:
+		fnName = reflect.ValueOf(workflowFunc).String()
+
+	case reflect.Func:
+		if err := validateFunctionArgs(workflowFunc, args, true); err != nil {
+			return nil, nil, err
+		}
+		fnName = getFunctionName(workflowFunc)
+
+	default:
+		return nil, nil, fmt.Errorf(
+			"Invalid type 'workflowFunc' parameter provided, it can be either worker function or name of the worker type: %v",
+			workflowFunc)
+	}
+
+	if alias, ok := th.getWorkflowAlias(fnName); ok {
+		fnName = alias
+	}
+	input, err := th.encodeArgs(args)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &WorkflowType{Name: fnName}, input, nil
+}
+
+func (th *hostEnvImpl) deserializeFnResult(f interface{}, result []byte, to interface{}) error {
+	fType := reflect.TypeOf(f)
+
+	switch fType.Kind() {
+	case reflect.Func:
+		// We already validated that it either have (result, error) (or) just error.
+		return th.deserializeFnResultFromType(fType, result, to)
+
+	case reflect.String:
+		// If we know about this function through registration then we will try to return corresponding result type.
+		fnName := reflect.ValueOf(f).String()
+		if a, ok := th.getActivity(fnName); ok {
+			return th.deserializeFnResultFromType(reflect.TypeOf(a.GetFunction()), result, to)
+		}
+	}
+
+	// For everything we return result.
+	return th.decodeArg(result, to)
+}
+
+func (th *hostEnvImpl) deserializeFnResultFromType(
+	fnType reflect.Type,
+	result []byte,
+	to interface{},
+) error {
+	if fnType.Kind() != reflect.Func {
+		return fmt.Errorf("expecting only function type but got type: %v", fnType)
+	}
+
+	// We already validated during registration that it either have (result, error) (or) just error.
+	if fnType.NumOut() <= 1 {
+		return nil
+	} else if fnType.NumOut() == 2 {
+		if result == nil {
+			return nil
+		}
+		err := th.decodeArg(result, to)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func isTypeByteSlice(inType reflect.Type) bool {
 	r := reflect.TypeOf(([]byte)(nil))
 	return inType == r || inType == reflect.PtrTo(r)

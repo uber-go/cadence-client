@@ -76,10 +76,6 @@ func (wth sampleWorkflowTaskHandler) ProcessWorkflowTask(
 	}, "", nil
 }
 
-func (wth sampleWorkflowTaskHandler) LoadWorkflowThroughReplay(task *workflowTask) (workflowDefinition, error) {
-	return &helloWorldWorkflow{}, nil
-}
-
 func newSampleWorkflowTaskHandler() *sampleWorkflowTaskHandler {
 	return &sampleWorkflowTaskHandler{}
 }

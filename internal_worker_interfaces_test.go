@@ -40,11 +40,6 @@ var (
 )
 
 type (
-	// Workflow decider
-	helloWorldWorkflow struct {
-		cancelActivity bool
-	}
-
 	// Greeter activity
 	greeterActivity struct {
 	}
@@ -53,46 +48,6 @@ type (
 		suite.Suite
 	}
 )
-
-// Workflow methods.
-func (wf helloWorldWorkflow) WorkflowType() m.WorkflowType {
-	workflowName := "HelloWorld_Workflow"
-	return m.WorkflowType{Name: &workflowName}
-}
-
-func (wf helloWorldWorkflow) StackTrace() string {
-	return ""
-}
-
-func (wf helloWorldWorkflow) Close() {
-
-}
-
-func (wf helloWorldWorkflow) OnDecisionTaskStarted() {
-
-}
-
-func (wf helloWorldWorkflow) Execute(env workflowEnvironment, input []byte) {
-	activityName := "Greeter_Activity"
-	activityParameters := executeActivityParameters{
-		TaskListName: "taskList",
-		ActivityType: ActivityType{activityName},
-		Input:        nil,
-	}
-	a := env.ExecuteActivity(activityParameters, func(result []byte, err error) {
-		if err != nil {
-			if _, ok := err.(*CanceledError); !ok {
-				env.Complete(nil, err)
-				return
-			}
-		}
-		fmt.Println("Hello " + string(result) + "!")
-		env.Complete(result, nil)
-	})
-	if wf.cancelActivity {
-		env.RequestCancelActivity(a.activityID)
-	}
-}
 
 func helloWorldWorkflowFunc(ctx Context, input []byte) error {
 	activityName := "Greeter_Activity"
@@ -110,6 +65,21 @@ func helloWorldWorkflowFunc(ctx Context, input []byte) error {
 		fmt.Println("Result", result)
 	}
 	return err
+}
+
+func helloWorldWorkflowCancelFunc(ctx Context, input []byte) error {
+	activityName := "Greeter_Activity"
+	ao := ActivityOptions{
+		TaskList:               "taskList",
+		ActivityID:             "0",
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+		HeartbeatTimeout:       20 * time.Second,
+	}
+	ctx = WithActivityOptions(ctx, ao)
+	ExecuteActivity(ctx, activityName)
+	getWorkflowEnvironment(ctx).RequestCancelActivity("0")
+	return nil
 }
 
 // Greeter activity methods

@@ -60,12 +60,18 @@ func (t *TaskHandlersTestSuite) SetupSuite() {
 	t.env = newHostEnvironment()
 	t.NoError(t.env.RegisterWorkflow(stackTraceWorkflow, RegisterWorkflowOptions{}))
 	t.NoError(t.env.RegisterActivity(stackTraceActivity, RegisterActivityOptions{}))
-	t.NoError(
-		t.env.RegisterWorkflow(helloWorldWorkflowFunc, RegisterWorkflowOptions{Name: "HelloWorld_Workflow"}),
-	)
-	t.NoError(
-		t.env.RegisterActivity(greeterActivityFunc, RegisterActivityOptions{Name: "Greeter_Activity"}),
-	)
+	t.NoError(t.env.RegisterWorkflow(
+		helloWorldWorkflowFunc,
+		RegisterWorkflowOptions{Name: "HelloWorld_Workflow"},
+	))
+	t.NoError(t.env.RegisterWorkflow(
+		helloWorldWorkflowCancelFunc,
+		RegisterWorkflowOptions{Name: "HelloWorld_WorkflowCancel"},
+	))
+	t.NoError(t.env.RegisterActivity(
+		greeterActivityFunc,
+		RegisterActivityOptions{Name: "Greeter_Activity"},
+	))
 }
 
 func TestTaskHandlersTestSuite(t *testing.T) {
@@ -121,10 +127,14 @@ func createTestEventDecisionTaskCompleted(eventID int64, attr *s.DecisionTaskCom
 		DecisionTaskCompletedEventAttributes: attr}
 }
 
-func createWorkflowTask(events []*s.HistoryEvent, previousStartEventID int64) *s.PollForDecisionTaskResponse {
+func createWorkflowTask(
+	events []*s.HistoryEvent,
+	previousStartEventID int64,
+	workflowName string,
+) *s.PollForDecisionTaskResponse {
 	return &s.PollForDecisionTaskResponse{
 		PreviousStartedEventId: common.Int64Ptr(previousStartEventID),
-		WorkflowType:           workflowTypePtr(WorkflowType{"HelloWorld_Workflow"}),
+		WorkflowType:           workflowTypePtr(WorkflowType{workflowName}),
 		History:                &s.History{Events: events},
 		WorkflowExecution: &s.WorkflowExecution{
 			WorkflowId: common.StringPtr("fake-workflow-id"),
@@ -138,7 +148,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
 	testEvents := []*s.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
 	}
-	task := createWorkflowTask(testEvents, 0)
+	task := createWorkflowTask(testEvents, 0, "HelloWorld_Workflow")
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		Identity: "test-id-1",
@@ -175,7 +185,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 		createTestEventActivityTaskCompleted(4, &s.ActivityTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
 		createTestEventDecisionTaskStarted(5),
 	}
-	task := createWorkflowTask(testEvents[0:1], 0)
+	task := createWorkflowTask(testEvents[0:1], 0, "HelloWorld_Workflow")
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		Identity: "test-id-1",
@@ -195,7 +205,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 	t.NotNil(response.GetDecisions()[0].GetScheduleActivityTaskDecisionAttributes())
 
 	// Schedule an activity and see if we complete workflow, Having only one last decision.
-	task = createWorkflowTask(testEvents, 2)
+	task = createWorkflowTask(testEvents, 2, "HelloWorld_Workflow")
 	response, _, err = taskHandler.ProcessWorkflowTask(task, nil, false)
 	t.NoError(err)
 	t.NotNil(response)
@@ -214,7 +224,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 			TaskList:     &s.TaskList{Name: &taskList},
 		}),
 	}
-	task := createWorkflowTask(testEvents, 2)
+	task := createWorkflowTask(testEvents, 2, "HelloWorld_Workflow")
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		Identity: "test-id-1",
@@ -251,7 +261,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
 	}
-	task := createWorkflowTask(testEvents, 0)
+	task := createWorkflowTask(testEvents, 0, "HelloWorld_WorkflowCancel")
 
 	params := workerExecutionParameters{
 		TaskList: taskList,
@@ -263,7 +273,6 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {
 
 	t.NoError(err)
 	t.NotNil(response)
-	//t.printAllDecisions(response.GetDecisions())
 	t.Equal(1, len(response.GetDecisions()))
 	t.Equal(s.DecisionType_CompleteWorkflowExecution, response.GetDecisions()[0].GetDecisionType())
 	t.NotNil(response.GetDecisions()[0].GetCompleteWorkflowExecutionDecisionAttributes())
@@ -276,7 +285,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
 		createTestEventActivityTaskScheduled(2, &s.ActivityTaskScheduledEventAttributes{ActivityId: common.StringPtr("0")}),
 	}
-	task := createWorkflowTask(testEvents, 0)
+	task := createWorkflowTask(testEvents, 0, "HelloWorld_Workflow")
 
 	pressurePoints := make(map[string]map[string]string)
 	pressurePoints[pressurePointTypeActivityTaskScheduleTimeout] = map[string]string{pressurePointConfigProbability: "100"}
@@ -306,7 +315,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PageToken() {
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 	}
-	task := createWorkflowTask(testEvents, 0)
+	task := createWorkflowTask(testEvents, 0, "HelloWorld_Workflow")
 	task.NextPageToken = []byte("token")
 
 	params := workerExecutionParameters{

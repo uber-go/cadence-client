@@ -256,6 +256,7 @@ func (wc *workflowClient) GetWorkflowStackTrace(workflowID string, runID string,
 		wc.domain,
 		&s.WorkflowExecution{WorkflowId: common.StringPtr(workflowID), RunId: common.StringPtr(runID)},
 		atDecisionTaskCompletedEventID,
+		wc.metricsScope,
 	)
 	return getWorkflowStackTraceImpl(workflowID, runID, getHistoryPage)
 }
@@ -328,7 +329,7 @@ func (wc *workflowClient) CompleteActivity(taskToken []byte, result interface{},
 		}
 	}
 	request := convertActivityResultToRespondRequest(wc.identity, taskToken, data, err)
-	return reportActivityComplete(wc.workflowService, request)
+	return reportActivityComplete(wc.workflowService, request, wc.metricsScope)
 }
 
 // RecordActivityHeartbeat records heartbeat for an activity.

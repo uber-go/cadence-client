@@ -22,10 +22,17 @@ package metrics
 
 // Workflow Creation metrics
 const (
-	WorkflowStartCounter     = "workflow-start"
-	WorkflowCompletedCounter = "workflow-completed"
-	WorkflowEndToEndLatency  = "workflow-endtoend-latency" // measure workflow execution from start to close
-	DecisionTimeoutCounter   = "decision-timeout"
+	WorkflowStartCounter             = "workflow-start"
+	WorkflowCompletedCounter         = "workflow-completed"
+	WorkflowCanceledCounter          = "workflow-canceled"
+	WorkflowFailedCounter            = "workflow-failed"
+	WorkflowContinueAsNewCounter     = "workflow-continue-as-new"
+	WorkflowEndToEndLatency          = "workflow-endtoend-latency" // measure workflow execution from start to close
+	WorkflowGetHistoryCounter        = "workflow-get-history-total"
+	WorkflowGetHistoryFailedCounter  = "workflow-get-history-failed"
+	WorkflowGetHistorySucceedCounter = "workflow-get-history-succeed"
+	WorkflowGetHistoryLatency        = "workflow-get-history-latency"
+	DecisionTimeoutCounter           = "decision-timeout"
 
 	DecisionPollCounter            = "decision-poll-total"
 	DecisionPollFailedCounter      = "decision-poll-failed"
@@ -52,6 +59,8 @@ const (
 	ActivityEndToEndLatency        = "activity-endtoend-latency"
 	ActivityTaskPanicCounter       = "activity-task-panic"
 	ActivityTaskCompletedCounter   = "activity-task-completed"
+	ActivityTaskFailedCounter      = "activity-task-failed"
+	ActivityTaskCanceledCounter    = "activity-task-canceled"
 
 	UnhandledSignalsCounter = "unhandled-signals"
 )

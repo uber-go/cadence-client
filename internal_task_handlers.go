@@ -451,10 +451,21 @@ ProcessEvents:
 	closeDecision := wth.completeWorkflow(isWorkflowCompleted, completionResult, failure, startAttributes)
 	if closeDecision != nil {
 		decisions = append(decisions, closeDecision)
-		wth.metricsScope.Counter(metrics.WorkflowCompletedCounter).Inc(1)
+
 		wfStartTime := time.Unix(0, startEvent.GetTimestamp())
 		elapsed := time.Now().Sub(wfStartTime)
 		wth.metricsScope.Timer(metrics.WorkflowEndToEndLatency).Record(elapsed)
+
+		switch closeDecision.GetDecisionType() {
+		case s.DecisionType_CompleteWorkflowExecution:
+			wth.metricsScope.Counter(metrics.WorkflowCompletedCounter).Inc(1)
+		case s.DecisionType_FailWorkflowExecution:
+			wth.metricsScope.Counter(metrics.WorkflowFailedCounter).Inc(1)
+		case s.DecisionType_CancelWorkflowExecution:
+			wth.metricsScope.Counter(metrics.WorkflowCanceledCounter).Inc(1)
+		case s.DecisionType_ContinueAsNewWorkflowExecution:
+			wth.metricsScope.Counter(metrics.WorkflowContinueAsNewCounter).Inc(1)
+		}
 	}
 
 	// Fill the response.

@@ -181,6 +181,7 @@ func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 	wtp.metricsScope.Timer(metrics.DecisionResponseLatency).Record(time.Now().Sub(responseStartTime))
 	wtp.metricsScope.Timer(metrics.DecisionEndToEndLatency).Record(time.Now().Sub(workflowTask.pollStartTime))
 	wtp.metricsScope.Counter(metrics.DecisionTaskCompletedCounter).Inc(1)
+
 	return nil
 }
 
@@ -213,7 +214,7 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 	}
 
 	execution := response.GetWorkflowExecution()
-	iterator := newGetHistoryPageFunc(wtp.service, wtp.domain, execution, math.MaxInt64)
+	iterator := newGetHistoryPageFunc(wtp.service, wtp.domain, execution, math.MaxInt64, wtp.metricsScope)
 	task := &workflowTask{task: response, getHistoryPageFunc: iterator, pollStartTime: startTime}
 	wtp.metricsScope.Counter(metrics.DecisionPollSucceedCounter).Inc(1)
 	wtp.metricsScope.Timer(metrics.DecisionPollLatency).Record(time.Now().Sub(startTime))
@@ -224,8 +225,12 @@ func newGetHistoryPageFunc(
 	service m.TChanWorkflowService,
 	domain string,
 	execution *s.WorkflowExecution,
-	atDecisionTaskCompletedEventID int64) func(nextPageToken []byte) (*s.History, []byte, error) {
+	atDecisionTaskCompletedEventID int64,
+	metricsScope tally.Scope,
+) func(nextPageToken []byte) (*s.History, []byte, error) {
 	return func(nextPageToken []byte) (*s.History, []byte, error) {
+		metricsScope.Counter(metrics.WorkflowGetHistoryCounter).Inc(1)
+		startTime := time.Now()
 		var resp *s.GetWorkflowExecutionHistoryResponse
 		err := backoff.Retry(
 			func() error {
@@ -241,8 +246,12 @@ func newGetHistoryPageFunc(
 				return err1
 			}, serviceOperationRetryPolicy, isServiceTransientError)
 		if err != nil {
+			metricsScope.Counter(metrics.WorkflowGetHistoryFailedCounter).Inc(1)
 			return nil, nil, err
 		}
+
+		metricsScope.Counter(metrics.WorkflowGetHistorySucceedCounter).Inc(1)
+		metricsScope.Timer(metrics.WorkflowGetHistoryLatency).Record(time.Now().Sub(startTime))
 		h := resp.GetHistory()
 		size := len(h.Events)
 		if size > 0 && atDecisionTaskCompletedEventID > 0 &&
@@ -340,20 +349,21 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 	}
 
 	responseStartTime := time.Now()
-	reportErr := reportActivityComplete(atp.service, request)
+	reportErr := reportActivityComplete(atp.service, request, atp.metricsScope)
 	if reportErr != nil {
 		atp.metricsScope.Counter(metrics.ActivityResponseFailedCounter).Inc(1)
 		traceLog(func() {
 			atp.logger.Debug("reportActivityComplete failed", zap.Error(reportErr))
 		})
+		return reportErr
 	}
+
 	atp.metricsScope.Timer(metrics.ActivityResponseLatency).Record(time.Now().Sub(responseStartTime))
 	atp.metricsScope.Timer(metrics.ActivityEndToEndLatency).Record(time.Now().Sub(activityTask.pollStartTime))
-	atp.metricsScope.Counter(metrics.ActivityTaskCompletedCounter).Inc(1)
-	return reportErr
+	return nil
 }
 
-func reportActivityComplete(service m.TChanWorkflowService, request interface{}) error {
+func reportActivityComplete(service m.TChanWorkflowService, request interface{}, metricsScope tally.Scope) error {
 	if request == nil {
 		// nothing to report
 		return nil
@@ -378,6 +388,16 @@ func reportActivityComplete(service m.TChanWorkflowService, request interface{})
 			func() error {
 				return service.RespondActivityTaskCompleted(ctx, request)
 			}, serviceOperationRetryPolicy, isServiceTransientError)
+	}
+	if reportErr == nil {
+		switch request.(type) {
+		case *s.RespondActivityTaskCanceledRequest:
+			metricsScope.Counter(metrics.ActivityTaskCanceledCounter).Inc(1)
+		case *s.RespondActivityTaskFailedRequest:
+			metricsScope.Counter(metrics.ActivityTaskFailedCounter).Inc(1)
+		case *s.RespondActivityTaskCompletedRequest:
+			metricsScope.Counter(metrics.ActivityTaskCompletedCounter).Inc(1)
+		}
 	}
 
 	return reportErr

@@ -37,6 +37,27 @@ type workflowServiceMetricsWrapper struct {
 	mutex       sync.Mutex
 }
 
+const (
+	scopeNameDeprecateDomain                = "DeprecateDomain"
+	scopeNameDescribeDomain                 = "DescribeDomain"
+	scopeNameGetWorkflowExecutionHistory    = "GetWorkflowExecutionHistory"
+	scopeNameListClosedWorkflowExecutions   = "ListClosedWorkflowExecutions"
+	scopeNameListOpenWorkflowExecutions     = "ListOpenWorkflowExecutions"
+	scopeNamePollForActivityTask            = "PollForActivityTask"
+	scopeNamePollForDecisionTask            = "PollForDecisionTask"
+	scopeNameRecordActivityTaskHeartbeat    = "RecordActivityTaskHeartbeat"
+	scopeNameRegisterDomain                 = "RegisterDomain"
+	scopeNameRequestCancelWorkflowExecution = "RequestCancelWorkflowExecution"
+	scopeNameRespondActivityTaskCanceled    = "RespondActivityTaskCanceled"
+	scopeNameRespondActivityTaskCompleted   = "RespondActivityTaskCompleted"
+	scopeNameRespondActivityTaskFailed      = "RespondActivityTaskFailed"
+	scopeNameRespondDecisionTaskCompleted   = "RespondDecisionTaskCompleted"
+	scopeNameSignalWorkflowExecution        = "SignalWorkflowExecution"
+	scopeNameStartWorkflowExecution         = "StartWorkflowExecution"
+	scopeNameTerminateWorkflowExecution     = "TerminateWorkflowExecution"
+	scopeNameUpdateDomain                   = "UpdateDomain"
+)
+
 // NewWorkflowServiceWrapper creates a new wrapper to WorkflowService that will emit metrics for each service call.
 func NewWorkflowServiceWrapper(service m.TChanWorkflowService, scope tally.Scope) m.TChanWorkflowService {
 	return &workflowServiceMetricsWrapper{service: service, scope: scope, childScopes: make(map[string]tally.Scope)}
@@ -56,7 +77,7 @@ func (w *workflowServiceMetricsWrapper) getScope(scopeName string) tally.Scope {
 }
 
 func (w *workflowServiceMetricsWrapper) DeprecateDomain(ctx thrift.Context, request *shared.DeprecateDomainRequest) error {
-	scope := w.getScope("DeprecateDomain")
+	scope := w.getScope(scopeNameDeprecateDomain)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	err := w.service.DeprecateDomain(ctx, request)
@@ -68,7 +89,7 @@ func (w *workflowServiceMetricsWrapper) DeprecateDomain(ctx thrift.Context, requ
 }
 
 func (w *workflowServiceMetricsWrapper) DescribeDomain(ctx thrift.Context, request *shared.DescribeDomainRequest) (*shared.DescribeDomainResponse, error) {
-	scope := w.getScope("DescribeDomain")
+	scope := w.getScope(scopeNameDescribeDomain)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	result, err := w.service.DescribeDomain(ctx, request)
@@ -80,7 +101,7 @@ func (w *workflowServiceMetricsWrapper) DescribeDomain(ctx thrift.Context, reque
 }
 
 func (w *workflowServiceMetricsWrapper) GetWorkflowExecutionHistory(ctx thrift.Context, request *shared.GetWorkflowExecutionHistoryRequest) (*shared.GetWorkflowExecutionHistoryResponse, error) {
-	scope := w.getScope("GetWorkflowExecutionHistory")
+	scope := w.getScope(scopeNameGetWorkflowExecutionHistory)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	result, err := w.service.GetWorkflowExecutionHistory(ctx, request)
@@ -92,7 +113,7 @@ func (w *workflowServiceMetricsWrapper) GetWorkflowExecutionHistory(ctx thrift.C
 }
 
 func (w *workflowServiceMetricsWrapper) ListClosedWorkflowExecutions(ctx thrift.Context, request *shared.ListClosedWorkflowExecutionsRequest) (*shared.ListClosedWorkflowExecutionsResponse, error) {
-	scope := w.getScope("ListClosedWorkflowExecutions")
+	scope := w.getScope(scopeNameListClosedWorkflowExecutions)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	result, err := w.service.ListClosedWorkflowExecutions(ctx, request)
@@ -104,7 +125,7 @@ func (w *workflowServiceMetricsWrapper) ListClosedWorkflowExecutions(ctx thrift.
 }
 
 func (w *workflowServiceMetricsWrapper) ListOpenWorkflowExecutions(ctx thrift.Context, request *shared.ListOpenWorkflowExecutionsRequest) (*shared.ListOpenWorkflowExecutionsResponse, error) {
-	scope := w.getScope("ListOpenWorkflowExecutions")
+	scope := w.getScope(scopeNameListOpenWorkflowExecutions)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	result, err := w.service.ListOpenWorkflowExecutions(ctx, request)
@@ -116,7 +137,7 @@ func (w *workflowServiceMetricsWrapper) ListOpenWorkflowExecutions(ctx thrift.Co
 }
 
 func (w *workflowServiceMetricsWrapper) PollForActivityTask(ctx thrift.Context, request *shared.PollForActivityTaskRequest) (*shared.PollForActivityTaskResponse, error) {
-	scope := w.getScope("PollForActivityTask")
+	scope := w.getScope(scopeNamePollForActivityTask)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	result, err := w.service.PollForActivityTask(ctx, request)
@@ -128,7 +149,7 @@ func (w *workflowServiceMetricsWrapper) PollForActivityTask(ctx thrift.Context, 
 }
 
 func (w *workflowServiceMetricsWrapper) PollForDecisionTask(ctx thrift.Context, request *shared.PollForDecisionTaskRequest) (*shared.PollForDecisionTaskResponse, error) {
-	scope := w.getScope("PollForDecisionTask")
+	scope := w.getScope(scopeNamePollForDecisionTask)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	result, err := w.service.PollForDecisionTask(ctx, request)
@@ -140,7 +161,7 @@ func (w *workflowServiceMetricsWrapper) PollForDecisionTask(ctx thrift.Context, 
 }
 
 func (w *workflowServiceMetricsWrapper) RecordActivityTaskHeartbeat(ctx thrift.Context, request *shared.RecordActivityTaskHeartbeatRequest) (*shared.RecordActivityTaskHeartbeatResponse, error) {
-	scope := w.getScope("RecordActivityTaskHeartbeat")
+	scope := w.getScope(scopeNameRecordActivityTaskHeartbeat)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	result, err := w.service.RecordActivityTaskHeartbeat(ctx, request)
@@ -152,7 +173,7 @@ func (w *workflowServiceMetricsWrapper) RecordActivityTaskHeartbeat(ctx thrift.C
 }
 
 func (w *workflowServiceMetricsWrapper) RegisterDomain(ctx thrift.Context, request *shared.RegisterDomainRequest) error {
-	scope := w.getScope("RegisterDomain")
+	scope := w.getScope(scopeNameRegisterDomain)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	err := w.service.RegisterDomain(ctx, request)
@@ -164,7 +185,7 @@ func (w *workflowServiceMetricsWrapper) RegisterDomain(ctx thrift.Context, reque
 }
 
 func (w *workflowServiceMetricsWrapper) RequestCancelWorkflowExecution(ctx thrift.Context, request *shared.RequestCancelWorkflowExecutionRequest) error {
-	scope := w.getScope("RequestCancelWorkflowExecution")
+	scope := w.getScope(scopeNameRequestCancelWorkflowExecution)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	err := w.service.RequestCancelWorkflowExecution(ctx, request)
@@ -176,7 +197,7 @@ func (w *workflowServiceMetricsWrapper) RequestCancelWorkflowExecution(ctx thrif
 }
 
 func (w *workflowServiceMetricsWrapper) RespondActivityTaskCanceled(ctx thrift.Context, request *shared.RespondActivityTaskCanceledRequest) error {
-	scope := w.getScope("RespondActivityTaskCanceled")
+	scope := w.getScope(scopeNameRespondActivityTaskCanceled)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	err := w.service.RespondActivityTaskCanceled(ctx, request)
@@ -188,7 +209,7 @@ func (w *workflowServiceMetricsWrapper) RespondActivityTaskCanceled(ctx thrift.C
 }
 
 func (w *workflowServiceMetricsWrapper) RespondActivityTaskCompleted(ctx thrift.Context, request *shared.RespondActivityTaskCompletedRequest) error {
-	scope := w.getScope("RespondActivityTaskCompleted")
+	scope := w.getScope(scopeNameRespondActivityTaskCompleted)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	err := w.service.RespondActivityTaskCompleted(ctx, request)
@@ -200,7 +221,7 @@ func (w *workflowServiceMetricsWrapper) RespondActivityTaskCompleted(ctx thrift.
 }
 
 func (w *workflowServiceMetricsWrapper) RespondActivityTaskFailed(ctx thrift.Context, request *shared.RespondActivityTaskFailedRequest) error {
-	scope := w.getScope("RespondActivityTaskFailed")
+	scope := w.getScope(scopeNameRespondActivityTaskFailed)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	err := w.service.RespondActivityTaskFailed(ctx, request)
@@ -212,7 +233,7 @@ func (w *workflowServiceMetricsWrapper) RespondActivityTaskFailed(ctx thrift.Con
 }
 
 func (w *workflowServiceMetricsWrapper) RespondDecisionTaskCompleted(ctx thrift.Context, request *shared.RespondDecisionTaskCompletedRequest) error {
-	scope := w.getScope("RespondDecisionTaskCompleted")
+	scope := w.getScope(scopeNameRespondDecisionTaskCompleted)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	err := w.service.RespondDecisionTaskCompleted(ctx, request)
@@ -224,7 +245,7 @@ func (w *workflowServiceMetricsWrapper) RespondDecisionTaskCompleted(ctx thrift.
 }
 
 func (w *workflowServiceMetricsWrapper) SignalWorkflowExecution(ctx thrift.Context, request *shared.SignalWorkflowExecutionRequest) error {
-	scope := w.getScope("SignalWorkflowExecution")
+	scope := w.getScope(scopeNameSignalWorkflowExecution)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	err := w.service.SignalWorkflowExecution(ctx, request)
@@ -236,7 +257,7 @@ func (w *workflowServiceMetricsWrapper) SignalWorkflowExecution(ctx thrift.Conte
 }
 
 func (w *workflowServiceMetricsWrapper) StartWorkflowExecution(ctx thrift.Context, request *shared.StartWorkflowExecutionRequest) (*shared.StartWorkflowExecutionResponse, error) {
-	scope := w.getScope("StartWorkflowExecution")
+	scope := w.getScope(scopeNameStartWorkflowExecution)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	result, err := w.service.StartWorkflowExecution(ctx, request)
@@ -248,7 +269,7 @@ func (w *workflowServiceMetricsWrapper) StartWorkflowExecution(ctx thrift.Contex
 }
 
 func (w *workflowServiceMetricsWrapper) TerminateWorkflowExecution(ctx thrift.Context, request *shared.TerminateWorkflowExecutionRequest) error {
-	scope := w.getScope("TerminateWorkflowExecution")
+	scope := w.getScope(scopeNameTerminateWorkflowExecution)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	err := w.service.TerminateWorkflowExecution(ctx, request)
@@ -260,7 +281,7 @@ func (w *workflowServiceMetricsWrapper) TerminateWorkflowExecution(ctx thrift.Co
 }
 
 func (w *workflowServiceMetricsWrapper) UpdateDomain(ctx thrift.Context, request *shared.UpdateDomainRequest) (*shared.UpdateDomainResponse, error) {
-	scope := w.getScope("UpdateDomain")
+	scope := w.getScope(scopeNameUpdateDomain)
 	scope.Counter(CadenceRequest).Inc(1)
 	startTime := time.Now()
 	result, err := w.service.UpdateDomain(ctx, request)

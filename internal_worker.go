@@ -83,7 +83,7 @@ type (
 		activityRegistry    activityRegistry
 		workflowService     m.TChanWorkflowService
 		domain              string
-		poller              *activityTaskPoller
+		poller              taskPoller
 		worker              *baseWorker
 		identity            string
 		env                 *hostEnvImpl
@@ -184,6 +184,10 @@ func verifyDomainExist(client m.TChanWorkflowService, domain string, logger *zap
 		return nil
 	}
 
+	if len(domain) == 0 {
+		return errors.New("domain cannot be empty")
+	}
+
 	// exponential backoff retry for upto a minute
 	return backoff.Retry(descDomainOp, serviceOperationRetryPolicy, isServiceTransientError)
 }
@@ -238,6 +242,7 @@ func newWorkflowTaskWorkerInternal(
 		poller:              poller,
 		worker:              worker,
 		identity:            params.Identity,
+		domain:              domain,
 		env:                 env,
 	}
 }
@@ -321,6 +326,7 @@ func newActivityTaskWorker(
 		worker:              base,
 		poller:              poller,
 		identity:            workerParams.Identity,
+		domain:              domain,
 		env:                 env,
 	}
 }

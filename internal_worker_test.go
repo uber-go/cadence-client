@@ -46,28 +46,42 @@ var registeredActivities []string
 var registeredWorkflows []string
 
 func init() {
-	RegisterWorkflow(sampleWorkflowExecute)
-	AddWorkflowRegistrationInterceptor(func(workflowName string, workflow interface{}) (string, interface{}) {
-		registeredWorkflows = append(registeredWorkflows, workflowName)
-		return workflowName, workflow
-	})
+	RegisterWorkflowWithOptions(
+		sampleWorkflowExecute,
+		RegisterWorkflowOptions{Name: "sampleWorkflowExecute"},
+	)
+	AddWorkflowRegistrationInterceptor(
+		func(workflowName string, workflow interface{}) (string, interface{}) {
+			registeredWorkflows = append(registeredWorkflows, workflowName)
+			return workflowName, workflow
+		},
+	)
 	RegisterWorkflow(testReplayWorkflow)
 
-	RegisterActivity(testActivity)
+	RegisterActivityWithOptions(
+		testActivity,
+		RegisterActivityOptions{Name: "testActivity"},
+	)
 	RegisterActivity(testActivityByteArgs)
-	AddActivityRegistrationInterceptor(func(activityName string, activity interface{}) (string, interface{}) {
-		registeredActivities = append(registeredActivities, activityName)
-		return activityName, activity
-	})
-	RegisterActivity(testActivityMultipleArgs)
+	AddActivityRegistrationInterceptor(
+		func(activityName string, activity interface{}) (string, interface{}) {
+			registeredActivities = append(registeredActivities, activityName)
+			return activityName, activity
+		},
+	)
+	RegisterActivityWithOptions(
+		testActivityMultipleArgs,
+		RegisterActivityOptions{Name: "testActivityMultipleArgs"},
+	)
 	RegisterActivity(testActivityReturnString)
 	RegisterActivity(testActivityReturnEmptyString)
 	RegisterActivity(testActivityReturnEmptyStruct)
 }
 
 func TestActivityRegistrationListener(t *testing.T) {
-	require.Equal(t, 7, len(registeredActivities))
 	expectedActivities := []string{
+		"testActivity",
+		"testActivityMultipleArgs",
 		"go.uber.org/cadence.testActivity",
 		"go.uber.org/cadence.testActivityByteArgs",
 		"go.uber.org/cadence.testActivityMultipleArgs",
@@ -76,6 +90,7 @@ func TestActivityRegistrationListener(t *testing.T) {
 		"go.uber.org/cadence.testActivityReturnEmptyStruct",
 		"go.uber.org/cadence.stackTraceActivity", // from internal_task_handlers_test.go
 	}
+	require.Equal(t, len(expectedActivities), len(registeredActivities))
 	sort.Strings(expectedActivities)
 	expected := strings.Join(expectedActivities, ",")
 	sort.Strings(registeredActivities)
@@ -84,12 +99,13 @@ func TestActivityRegistrationListener(t *testing.T) {
 }
 
 func TestWorkflowRegistrationListener(t *testing.T) {
-	require.Equal(t, 3, len(registeredWorkflows))
 	expectedWorkflows := []string{
+		"sampleWorkflowExecute",
 		"go.uber.org/cadence.sampleWorkflowExecute",
 		"go.uber.org/cadence.testReplayWorkflow",
 		"go.uber.org/cadence.stackTraceWorkflow", // from internal_task_handlers_test.go
 	}
+	require.Equal(t, len(expectedWorkflows), len(registeredWorkflows))
 	sort.Strings(expectedWorkflows)
 	expected := strings.Join(expectedWorkflows, ",")
 	sort.Strings(registeredWorkflows)

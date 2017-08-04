@@ -370,7 +370,9 @@ type interceptorFn func(name string, workflow interface{}) (string, interface{})
 type hostEnvImpl struct {
 	sync.Mutex
 	workflowFuncMap                  map[string]interface{}
+	workflowAliasMap                 map[string]string
 	activityFuncMap                  map[string]interface{}
+	activityAliasMap                 map[string]string
 	encoding                         gobEncoding
 	activityRegistrationInterceptors []interceptorFn
 	workflowRegistrationInterceptors []interceptorFn
@@ -412,45 +414,86 @@ func (th *hostEnvImpl) AddActivityRegistrationInterceptor(i interceptorFn) {
 		th.activityFuncMap[intw] = intf
 		th.Unlock()
 	}
+	fmt.Println("Hello")
 }
 
 func (th *hostEnvImpl) RegisterWorkflow(af interface{}) error {
+	return th.RegisterWorkflowWithOptions(af, RegisterWorkflowOptions{})
+}
+
+func (th *hostEnvImpl) RegisterWorkflowWithOptions(
+	af interface{},
+	options RegisterWorkflowOptions,
+) error {
 	// Validate that it is a function
 	fnType := reflect.TypeOf(af)
 	if err := validateFnFormat(fnType, true); err != nil {
 		return err
 	}
-	// Check if already registered
 	fnName := getFunctionName(af)
-	if _, ok := th.getWorkflowFn(fnName); ok {
-		return fmt.Errorf("workflow type \"%v\" is already registered", fnName)
+	alias := options.Name
+	names := make([]string, 0, 2)
+	names = append(names, fnName)
+	if len(alias) > 0 {
+		names = append(names, alias)
+	}
+	for _, name := range names {
+		// Check if already registered
+		if _, ok := th.getWorkflowFn(name); ok {
+			return fmt.Errorf("workflow name \"%v\" is already registered", name)
+		}
 	}
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
-	fnName, af = th.invokeInterceptors(fnName, af, th.workflowRegistrationInterceptors)
-	th.addWorkflowFn(fnName, af)
+	for _, name := range names {
+		name, af = th.invokeInterceptors(name, af, th.workflowRegistrationInterceptors)
+		th.addWorkflowFn(name, af)
+	}
+	if len(alias) > 0 {
+		th.addWorkflowAlias(fnName, alias)
+	}
 	return nil
 }
 
 func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
+	return th.RegisterActivityWithOptions(af, RegisterActivityOptions{})
+}
+
+func (th *hostEnvImpl) RegisterActivityWithOptions(
+	af interface{},
+	options RegisterActivityOptions,
+) error {
 	// Validate that it is a function
 	fnType := reflect.TypeOf(af)
 	if err := validateFnFormat(fnType, false); err != nil {
 		return err
 	}
-	// Check if already registered
 	fnName := getFunctionName(af)
-	if _, ok := th.getActivityFn(fnName); ok {
-		return fmt.Errorf("activity type \"%v\" is already registered", fnName)
+	alias := options.Name
+	names := make([]string, 0, 2)
+	names = append(names, fnName)
+	if len(alias) > 0 {
+		names = append(names, alias)
+	}
+	for _, name := range names {
+		// Check if already registered
+		if _, ok := th.getActivityFn(name); ok {
+			return fmt.Errorf("activity type \"%v\" is already registered", name)
+		}
 	}
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
-	fnName, af = th.invokeInterceptors(fnName, af, th.activityRegistrationInterceptors)
-	th.addActivityFn(fnName, af)
+	for _, name := range names {
+		name, af = th.invokeInterceptors(name, af, th.activityRegistrationInterceptors)
+		th.addActivityFn(name, af)
+	}
+	if len(alias) > 0 {
+		th.addActivityAlias(fnName, alias)
+	}
 	return nil
 }
 
@@ -475,6 +518,19 @@ func (th *hostEnvImpl) Encoder() encoding {
 // Register all function args and return types with encoder.
 func (th *hostEnvImpl) RegisterFnType(fnType reflect.Type) error {
 	return th.registerEncodingTypes(fnType)
+}
+
+func (th *hostEnvImpl) addWorkflowAlias(fnName string, alias string) {
+	th.Lock()
+	defer th.Unlock()
+	th.workflowAliasMap[fnName] = alias
+}
+
+func (th *hostEnvImpl) getWorkflowAlias(fnName string) (string, bool) {
+	th.Lock()
+	defer th.Unlock()
+	alias, ok := th.workflowAliasMap[fnName]
+	return alias, ok
 }
 
 func (th *hostEnvImpl) addWorkflowFn(fnName string, wf interface{}) {
@@ -504,6 +560,19 @@ func (th *hostEnvImpl) lenWorkflowFns() int {
 	th.Lock()
 	defer th.Unlock()
 	return len(th.workflowFuncMap)
+}
+
+func (th *hostEnvImpl) addActivityAlias(fnName string, alias string) {
+	th.Lock()
+	defer th.Unlock()
+	th.activityAliasMap[fnName] = alias
+}
+
+func (th *hostEnvImpl) getActivityAlias(fnName string) (string, bool) {
+	th.Lock()
+	defer th.Unlock()
+	alias, ok := th.activityAliasMap[fnName]
+	return alias, ok
 }
 
 func (th *hostEnvImpl) addActivityFn(fnName string, af interface{}) {
@@ -709,9 +778,11 @@ var thImpl *hostEnvImpl
 func getHostEnvironment() *hostEnvImpl {
 	once.Do(func() {
 		thImpl = &hostEnvImpl{
-			workflowFuncMap: make(map[string]interface{}),
-			activityFuncMap: make(map[string]interface{}),
-			encoding:        gobEncoding{},
+			workflowFuncMap:  make(map[string]interface{}),
+			workflowAliasMap: make(map[string]string),
+			activityFuncMap:  make(map[string]interface{}),
+			activityAliasMap: make(map[string]string),
+			encoding:         gobEncoding{},
 		}
 	})
 	return thImpl

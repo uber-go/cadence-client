@@ -65,7 +65,7 @@ func TListSerialize(ts []thrift.TStruct) (b []byte, err error) {
 		return
 	}
 
-	b = append(b, t.Transport.Bytes()...)
+	b = t.Transport.Bytes()
 	return
 }
 

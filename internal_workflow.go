@@ -166,7 +166,8 @@ type (
 	// decodeFutureImpl
 	decodeFutureImpl struct {
 		*futureImpl
-		fn interface{}
+		fn  interface{}
+		env *hostEnvImpl
 	}
 
 	childWorkflowFutureImpl struct {
@@ -579,7 +580,7 @@ func (c *channelImpl) Close() {
 
 // Takes a value and assigns that 'to' value.
 func (c *channelImpl) assignValue(from interface{}, to interface{}) {
-	err := decodeAndAssignValue(from, to)
+	err := newHostEnvironment().decodeAndAssignValue(from, to)
 	if err != nil {
 		panic(err)
 	}
@@ -916,32 +917,6 @@ func newWorkflowDefinition(workflow workflow) workflowDefinition {
 	return &syncWorkflowDefinition{workflow: workflow}
 }
 
-func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*WorkflowType, []byte, error) {
-	fnName := ""
-	fType := reflect.TypeOf(workflowFunc)
-	switch fType.Kind() {
-	case reflect.String:
-		fnName = reflect.ValueOf(workflowFunc).String()
-
-	case reflect.Func:
-		if err := validateFunctionArgs(workflowFunc, args, true); err != nil {
-			return nil, nil, err
-		}
-		fnName = getFunctionName(workflowFunc)
-
-	default:
-		return nil, nil, fmt.Errorf(
-			"Invalid type 'workflowFunc' parameter provided, it can be either worker function or name of the worker type: %v",
-			workflowFunc)
-	}
-
-	input, err := getHostEnvironment().encodeArgs(args)
-	if err != nil {
-		return nil, nil, err
-	}
-	return &WorkflowType{Name: fnName}, input, nil
-}
-
 func getValidatedWorkflowOptions(ctx Context) (*workflowOptions, error) {
 	p := getWorkflowEnvOptions(ctx)
 	if p == nil {
@@ -1026,28 +1001,11 @@ func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
 		return errors.New("value parameter is not a pointer")
 	}
 
-	err := deSerializeFunctionResult(d.fn, d.futureImpl.value.([]byte), value)
+	err := d.env.deserializeFnResult(d.fn, d.futureImpl.value.([]byte), value)
 	if err != nil {
 		return err
 	}
 	return d.futureImpl.err
-}
-
-func decodeAndAssignValue(from interface{}, toValuePtr interface{}) error {
-	if toValuePtr == nil {
-		return nil
-	}
-	if rf := reflect.ValueOf(toValuePtr); rf.Type().Kind() != reflect.Ptr {
-		return errors.New("value parameter provided is not a pointer")
-	}
-	if data, ok := from.([]byte); ok {
-		if err := getHostEnvironment().decodeArg(data, toValuePtr); err != nil {
-			return err
-		}
-	} else if fv := reflect.ValueOf(from); fv.IsValid() {
-		reflect.ValueOf(toValuePtr).Elem().Set(fv)
-	}
-	return nil
 }
 
 func (p ChildWorkflowPolicy) toThriftChildPolicyPtr() *shared.ChildPolicy {
@@ -1067,8 +1025,12 @@ func (p ChildWorkflowPolicy) toThriftChildPolicyPtr() *shared.ChildPolicy {
 
 // newDecodeFuture creates a new future as well as associated Settable that is used to set its value.
 // fn - the decoded value needs to be validated against a function.
-func newDecodeFuture(ctx Context, fn interface{}) (Future, Settable) {
+func newDecodeFuture(ctx Context, fn interface{}, env *hostEnvImpl) (Future, Settable) {
+	c := NewChannel(ctx).(*channelImpl)
 	impl := &decodeFutureImpl{
-		&futureImpl{channel: NewChannel(ctx).(*channelImpl)}, fn}
+		&futureImpl{channel: c},
+		fn,
+		env,
+	}
 	return impl, impl
 }

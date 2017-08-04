@@ -53,6 +53,7 @@ type (
 		domain            string
 		metricsScope      tally.Scope
 		identity          string
+		env               *hostEnvImpl
 	}
 
 	// domainClient is the client for managing domains.
@@ -62,6 +63,24 @@ type (
 		identity        string
 	}
 )
+
+// RegisterWorkflow registers the workflow function with options
+// The user can use options to provide an external name for the workflow or leave it empty if no
+// external name is required. This can be used as
+// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{})
+// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{Name: "fooExternal"})
+func (wc *workflowClient) RegisterWorkflow(wf interface{}, opts RegisterWorkflowOptions) error {
+	return wc.env.RegisterWorkflow(wf, opts)
+}
+
+// RegisterActivity registers the activity function with options
+// The user can use options to provide an external name for the activity or leave it empty if no
+// external name is required. This can be used as
+// client.RegisterActivity(barActivity, RegisterActivityOptions{})
+// client.RegisterActivity(barActivity, RegisterActivityOptions{Name: "barExternal"})
+func (wc *workflowClient) RegisterActivity(af interface{}, opts RegisterActivityOptions) error {
+	return wc.env.RegisterActivity(af, opts)
+}
 
 // StartWorkflow starts a workflow execution
 // The user can use this to start using a functor like.
@@ -97,7 +116,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	// Validate type and its arguments.
-	workflowType, input, err := getValidatedWorkerFunction(workflowFunc, args)
+	workflowType, input, err := wc.env.getValidatedWorkerFunction(workflowFunc, args)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +164,7 @@ func (wc *workflowClient) SignalWorkflow(workflowID string, runID string, signal
 	var input []byte
 	if arg != nil {
 		var err error
-		if input, err = getHostEnvironment().encodeArg(arg); err != nil {
+		if input, err = wc.env.encodeArg(arg); err != nil {
 			return err
 		}
 	}
@@ -258,10 +277,15 @@ func (wc *workflowClient) GetWorkflowStackTrace(workflowID string, runID string,
 		atDecisionTaskCompletedEventID,
 		wc.metricsScope,
 	)
-	return getWorkflowStackTraceImpl(workflowID, runID, getHistoryPage)
+	return getWorkflowStackTraceImpl(workflowID, runID, getHistoryPage, wc.env)
 }
 
-func getWorkflowStackTraceImpl(workflowID string, runID string, getHistoryPage GetHistoryPage) (string, error) {
+func getWorkflowStackTraceImpl(
+	workflowID string,
+	runID string,
+	getHistoryPage GetHistoryPage,
+	env *hostEnvImpl,
+) (string, error) {
 	firstPage, taskToken, err := getHistoryPage([]byte{})
 	if err != nil {
 		return "", err
@@ -273,8 +297,6 @@ func getWorkflowStackTraceImpl(workflowID string, runID string, getHistoryPage G
 	if startWorkflowEvent == nil {
 		return "", errors.New("First event is not WorkflowExecutionStarted")
 	}
-	registeredWorkflowFactory := newRegisteredWorkflowFactory()
-	workflowDefinitionFactory := getWorkflowDefinitionFactory(registeredWorkflowFactory)
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		return "", err
@@ -289,7 +311,12 @@ func getWorkflowStackTraceImpl(workflowID string, runID string, getHistoryPage G
 		UserContext:               context.Background(),
 	}
 	var maxInt64 int64 = math.MaxInt64
-	taskHandler := newWorkflowTaskHandler(workflowDefinitionFactory, "unknown", workerParams, nil)
+	taskHandler := newWorkflowTaskHandler(
+		"unknown",
+		workerParams,
+		nil,
+		env,
+	)
 	task := &s.PollForDecisionTaskResponse{
 		History:                firstPage,
 		PreviousStartedEventId: &maxInt64,
@@ -323,7 +350,7 @@ func (wc *workflowClient) CompleteActivity(taskToken []byte, result interface{},
 	var data []byte
 	if result != nil {
 		var err0 error
-		data, err0 = getHostEnvironment().encodeArg(result)
+		data, err0 = wc.env.encodeArg(result)
 		if err0 != nil {
 			return err0
 		}
@@ -334,7 +361,7 @@ func (wc *workflowClient) CompleteActivity(taskToken []byte, result interface{},
 
 // RecordActivityHeartbeat records heartbeat for an activity.
 func (wc *workflowClient) RecordActivityHeartbeat(taskToken []byte, details ...interface{}) error {
-	data, err := getHostEnvironment().encodeArgs(details)
+	data, err := wc.env.encodeArgs(details)
 	if err != nil {
 		return err
 	}

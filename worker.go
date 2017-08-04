@@ -32,8 +32,8 @@ import (
 )
 
 type (
-	// Worker represents objects that can be started and stopped.
-	Worker interface {
+	// BaseWorker represents objects that can be started and stopped.
+	BaseWorker interface {
 		// Start starts the worker in a non-blocking fashion
 		Start() error
 		// Run is a blocking start and cleans up resources when killed
@@ -41,6 +41,22 @@ type (
 		Run() error
 		// Stop cleans up any resources opened by worker
 		Stop()
+	}
+	// Worker represents workflows and activities that can be started and stopped.
+	Worker interface {
+		BaseWorker
+		// RegisterWorkflow registers the workflow function with options
+		// The user can use options to provide an external name for the workflow or leave it empty if no
+		// external name is required. This can be used as
+		// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{})
+		// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{Name: "fooExternal"})
+		RegisterWorkflow(interface{}, RegisterWorkflowOptions) error
+		// RegisterActivity registers the activity function with options
+		// The user can use options to provide an external name for the activity or leave it empty if no
+		// external name is required. This can be used as
+		// client.RegisterActivity(barActivity, RegisterActivityOptions{})
+		// client.RegisterActivity(barActivity, RegisterActivityOptions{Name: "barExternal"})
+		RegisterActivity(interface{}, RegisterActivityOptions) error
 	}
 
 	// WorkerOptions is to configure a worker instance,
@@ -119,13 +135,13 @@ func NewWorker(
 	return newAggregatedWorker(service, domain, taskList, options)
 }
 
-// GetWorkflowStackTrace returns a stack trace of all goroutines of a workflow given its current history.
+// getWorkflowStackTrace returns a stack trace of all goroutines of a workflow given its current history.
 // It requires workflow function that was used to create the history to be registered
 // through RegisterWorkflow.
 // Use Client.GetWorkflowStackTrace to get a stack trace given workflowID and runID.
-func GetWorkflowStackTrace(h *s.History) (string, error) {
+func getWorkflowStackTrace(h *s.History, env *hostEnvImpl) (string, error) {
 	getHistoryPage := func(nextPageToken []byte) (*s.History, []byte, error) {
 		return h, nil, nil
 	}
-	return getWorkflowStackTraceImpl("unknown", "unknown", getHistoryPage)
+	return getWorkflowStackTraceImpl("unknown", "unknown", getHistoryPage, env)
 }

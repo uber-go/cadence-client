@@ -122,7 +122,7 @@ func getErrorDetails(err error) (string, []byte) {
 	case *CanceledError:
 		return errReasonCanceled, err.details
 	case *PanicError:
-		data, gobErr := getHostEnvironment().encodeArgs([]interface{}{err.Error(), err.StackTrace()})
+		data, gobErr := newHostEnvironment().encodeArgs([]interface{}{err.Error(), err.StackTrace()})
 		if gobErr != nil {
 			panic(gobErr)
 		}

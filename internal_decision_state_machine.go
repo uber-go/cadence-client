@@ -683,7 +683,7 @@ func (h *decisionsHelper) getActivityID(event *s.HistoryEvent) string {
 
 func (h *decisionsHelper) recordVersionMarker(changeID string, version Version) decisionStateMachine {
 	markerID := fmt.Sprintf("%v_%v", versionMarkerName, changeID)
-	details, err := getHostEnvironment().encodeArgs([]interface{}{changeID, version})
+	details, err := newHostEnvironment().encodeArgs([]interface{}{changeID, version})
 	if err != nil {
 		panic(err)
 	}

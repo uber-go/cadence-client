@@ -57,6 +57,18 @@ type (
 		// - RespondActivityTaskCancelRequest
 		Execute(task *s.PollForActivityTaskResponse) (interface{}, error)
 	}
+	// WorkflowWorker represents workflows that can be started and stopped.
+	WorkflowWorker interface {
+		BaseWorker
+		// Register registers the workflow function with options
+		Register(interface{}, RegisterWorkflowOptions) error
+	}
+	// ActivityWorker represents activities that can be started and stopped.
+	ActivityWorker interface {
+		BaseWorker
+		// Register registers the activity function with options
+		Register(interface{}, RegisterActivityOptions) error
+	}
 )
 
 var enableVerboseLogging = false
@@ -69,7 +81,7 @@ func NewWorkflowTaskWorker(
 	domain string,
 	taskList string,
 	options WorkerOptions,
-) (worker Worker) {
+) WorkflowWorker {
 	wOptions := fillWorkerOptionsDefaults(options)
 	workerParams := workerExecutionParameters{
 		TaskList:                  taskList,
@@ -80,7 +92,7 @@ func NewWorkflowTaskWorker(
 	}
 
 	processTestTags(&wOptions, &workerParams)
-	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, workerParams)
+	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, workerParams, newHostEnvironment())
 }
 
 // NewActivityTaskWorker returns instance of an activity task handler worker.
@@ -91,7 +103,7 @@ func NewActivityTaskWorker(
 	domain string,
 	taskList string,
 	options WorkerOptions,
-) Worker {
+) ActivityWorker {
 	wOptions := fillWorkerOptionsDefaults(options)
 	workerParams := workerExecutionParameters{
 		TaskList:                                taskList,
@@ -107,22 +119,23 @@ func NewActivityTaskWorker(
 	}
 
 	processTestTags(&wOptions, &workerParams)
-	return newActivityTaskWorker(taskHandler, service, domain, workerParams)
+	return newActivityTaskWorker(taskHandler, service, domain, workerParams, newHostEnvironment())
 }
 
 // NewWorkflowTaskHandler creates an instance of a WorkflowTaskHandler from a decision poll response
 // using workflow functions registered through RegisterWorkflow
 // To be used to replay a workflow in a debugger.
-func NewWorkflowTaskHandler(domain string, identity string, logger *zap.Logger) WorkflowTaskHandler {
+func NewWorkflowTaskHandler(domain string, identity string, logger *zap.Logger, env *hostEnvImpl) WorkflowTaskHandler {
 	params := workerExecutionParameters{
 		Identity: identity,
 		Logger:   logger,
 	}
 	return newWorkflowTaskHandler(
-		getWorkflowDefinitionFactory(newRegisteredWorkflowFactory()),
 		domain,
 		params,
-		nil)
+		nil,
+		env,
+	)
 }
 
 // NewActivityTaskHandler creates an instance of a WorkflowTaskHandler from a decision poll response
@@ -136,9 +149,10 @@ func NewActivityTaskHandler(service m.TChanWorkflowService, identity string, log
 	}
 	ensureRequiredParams(&params)
 	return newActivityTaskHandler(
-		getHostEnvironment().getRegisteredActivities(),
 		service,
-		params)
+		params,
+		newHostEnvironment(),
+	)
 }
 
 // AddWorkflowRegistrationInterceptor adds interceptor that is called for each RegisterWorkflow call.
@@ -147,7 +161,7 @@ func NewActivityTaskHandler(service m.TChanWorkflowService, identity string, log
 func AddWorkflowRegistrationInterceptor(
 	i func(name string, workflow interface{}) (string, interface{}),
 ) {
-	getHostEnvironment().AddWorkflowRegistrationInterceptor(i)
+	newHostEnvironment().AddWorkflowRegistrationInterceptor(i)
 }
 
 // AddActivityRegistrationInterceptor adds interceptor that is called for each RegisterActivity call.
@@ -155,19 +169,19 @@ func AddWorkflowRegistrationInterceptor(
 // if it itself is called from init()
 func AddActivityRegistrationInterceptor(
 	i func(name string, activity interface{}) (string, interface{})) {
-	getHostEnvironment().AddActivityRegistrationInterceptor(i)
+	newHostEnvironment().AddActivityRegistrationInterceptor(i)
 }
 
 // SerializeFnArgs serializes an activity function arguments.
 func SerializeFnArgs(args ...interface{}) ([]byte, error) {
-	return getHostEnvironment().encodeArgs(args)
+	return newHostEnvironment().encodeArgs(args)
 }
 
 // DeserializeFnResults de-serializes a function results.
 // The input result doesn't include the error. The cadence server has result, error.
 // This is to de-serialize the result.
 func DeserializeFnResults(result []byte, to interface{}) error {
-	return getHostEnvironment().decodeArg(result, to)
+	return newHostEnvironment().decodeArg(result, to)
 }
 
 // EnableVerboseLogging enable or disable verbose logging. This is for internal use only.

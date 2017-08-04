@@ -45,28 +45,30 @@ import (
 var registeredActivities []string
 var registeredWorkflows []string
 
-func init() {
-	RegisterWorkflow(sampleWorkflowExecute)
-	AddWorkflowRegistrationInterceptor(func(workflowName string, workflow interface{}) (string, interface{}) {
+func registerHostEnvWithSampleWorkflow(env *hostEnvImpl) {
+	env.RegisterWorkflow(sampleWorkflowExecute, RegisterWorkflowOptions{})
+	env.AddWorkflowRegistrationInterceptor(func(workflowName string, workflow interface{}) (string, interface{}) {
 		registeredWorkflows = append(registeredWorkflows, workflowName)
 		return workflowName, workflow
 	})
-	RegisterWorkflow(testReplayWorkflow)
+	env.RegisterWorkflow(testReplayWorkflow, RegisterWorkflowOptions{})
+}
 
-	RegisterActivity(testActivity)
-	RegisterActivity(testActivityByteArgs)
-	AddActivityRegistrationInterceptor(func(activityName string, activity interface{}) (string, interface{}) {
+func registerHostEnvWithSampleActiviy(env *hostEnvImpl) {
+	env.RegisterActivity(testActivity, RegisterActivityOptions{})
+	env.RegisterActivity(testActivityByteArgs, RegisterActivityOptions{})
+	env.AddActivityRegistrationInterceptor(func(activityName string, activity interface{}) (string, interface{}) {
 		registeredActivities = append(registeredActivities, activityName)
 		return activityName, activity
 	})
-	RegisterActivity(testActivityMultipleArgs)
-	RegisterActivity(testActivityReturnString)
-	RegisterActivity(testActivityReturnEmptyString)
-	RegisterActivity(testActivityReturnEmptyStruct)
+	env.RegisterActivity(testActivityMultipleArgs, RegisterActivityOptions{})
+	env.RegisterActivity(testActivityReturnString, RegisterActivityOptions{})
+	env.RegisterActivity(testActivityReturnEmptyString, RegisterActivityOptions{})
+	env.RegisterActivity(testActivityReturnEmptyStruct, RegisterActivityOptions{})
 }
 
-func TestActivityRegistrationListener(t *testing.T) {
-	require.Equal(t, 7, len(registeredActivities))
+func testActivityRegistrationListener(t *testing.T) {
+	require.Equal(t, 6, len(registeredActivities))
 	expectedActivities := []string{
 		"go.uber.org/cadence.testActivity",
 		"go.uber.org/cadence.testActivityByteArgs",
@@ -74,7 +76,6 @@ func TestActivityRegistrationListener(t *testing.T) {
 		"go.uber.org/cadence.testActivityReturnString",
 		"go.uber.org/cadence.testActivityReturnEmptyString",
 		"go.uber.org/cadence.testActivityReturnEmptyStruct",
-		"go.uber.org/cadence.stackTraceActivity", // from internal_task_handlers_test.go
 	}
 	sort.Strings(expectedActivities)
 	expected := strings.Join(expectedActivities, ",")
@@ -83,12 +84,11 @@ func TestActivityRegistrationListener(t *testing.T) {
 	require.Equal(t, expected, registered)
 }
 
-func TestWorkflowRegistrationListener(t *testing.T) {
-	require.Equal(t, 3, len(registeredWorkflows))
+func testWorkflowRegistrationListener(t *testing.T) {
+	require.Equal(t, 2, len(registeredWorkflows))
 	expectedWorkflows := []string{
 		"go.uber.org/cadence.sampleWorkflowExecute",
 		"go.uber.org/cadence.testReplayWorkflow",
-		"go.uber.org/cadence.stackTraceWorkflow", // from internal_task_handlers_test.go
 	}
 	sort.Strings(expectedWorkflows)
 	expected := strings.Join(expectedWorkflows, ",")
@@ -150,11 +150,17 @@ func TestDecisionTaskHandler(t *testing.T) {
 		PreviousStartedEventId: common.Int64Ptr(5),
 	}
 
-	r := NewWorkflowTaskHandler(testDomain, "identity", logger)
+	hostEnv := newHostEnvironment()
+	registerHostEnvWithSampleWorkflow(hostEnv)
+	registerHostEnvWithSampleActiviy(hostEnv)
+	r := NewWorkflowTaskHandler(testDomain, "identity", logger, hostEnv)
 	_, stackTrace, err := r.ProcessWorkflowTask(task, nil, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, stackTrace, stackTrace)
 	require.Contains(t, stackTrace, "cadence.(*decodeFutureImpl).Get")
+
+	testActivityRegistrationListener(t)
+	testWorkflowRegistrationListener(t)
 }
 
 // testSampleWorkflow
@@ -252,7 +258,7 @@ func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 	activityID := "a1"
 	taskList := "tl1"
 	var startedEventID int64 = 10
-	input, err := getHostEnvironment().encodeArgs([]interface{}{})
+	input, err := newHostEnvironment().encodeArgs([]interface{}{})
 	require.NoError(t, err)
 
 	activityTask := &s.PollForActivityTaskResponse{
@@ -305,6 +311,9 @@ func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 		domain,
 		"testGroupName2",
 		workerOptions)
+	require.NoError(t, worker.RegisterWorkflow(sampleWorkflowExecute, RegisterWorkflowOptions{}))
+	require.NoError(t, worker.RegisterActivity(testActivity, RegisterActivityOptions{}))
+	require.NoError(t, worker.RegisterActivity(testActivityMultipleArgs, RegisterActivityOptions{}))
 	return worker
 }
 
@@ -354,7 +363,7 @@ func TestRecordActivityHeartbeat(t *testing.T) {
 }
 
 func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string {
-	input, err := getHostEnvironment().Encoder().Marshal(args)
+	input, err := newHostEnvironment().Encoder().Marshal(args)
 	require.NoError(t, err, err)
 
 	var result []interface{}
@@ -362,7 +371,7 @@ func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string
 		arg := reflect.New(reflect.TypeOf(v)).Interface()
 		result = append(result, arg)
 	}
-	err = getHostEnvironment().Encoder().Unmarshal(input, result)
+	err = newHostEnvironment().Encoder().Unmarshal(input, result)
 	require.NoError(t, err, err)
 
 	targetArgs := []reflect.Value{}
@@ -375,7 +384,7 @@ func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string
 }
 
 func TestEncoder(t *testing.T) {
-	getHostEnvironment().Encoder().Register(new(emptyCtx))
+	newHostEnvironment().Encoder().Register(new(emptyCtx))
 	// Two param functor.
 	f1 := func(ctx Context, r []byte) string {
 		return "result"
@@ -473,7 +482,7 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	require.NoError(w.t, err, err)
 	require.True(w.t, **rStruct2Ptr == testActivityResult{Index: 10})
 
-	// By names.
+	// By fully qualified function names.
 	err = ExecuteActivity(ctx, "go.uber.org/cadence.testActivityByteArgs", input).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
@@ -501,6 +510,24 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	err = f.Get(ctx, &r2Struct)
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, testActivityResult{}, r2Struct)
+
+	// By custom names.
+
+	err = ExecuteActivity(ctx, "testActivityNoResult", 2, "test").Get(ctx, nil)
+	require.NoError(w.t, err, err)
+
+	err = ExecuteActivity(ctx, "testActivityNoContextArg", 2, "test").Get(ctx, nil)
+	require.NoError(w.t, err, err)
+
+	f = ExecuteActivity(ctx, "testActivityReturnByteArray")
+	err = f.Get(ctx, &r)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, []byte("testActivity"), r)
+
+	f = ExecuteActivity(ctx, "testActivityReturnInt")
+	err = f.Get(ctx, &rInt)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, 5, rInt)
 
 	return []byte("Done"), nil
 }
@@ -563,17 +590,37 @@ func testActivityReturnStructPtrPtr() (**testActivityResult, error) {
 
 func TestVariousActivitySchedulingOption(t *testing.T) {
 	ts := &WorkflowTestSuite{}
-	ts.RegisterActivity(testActivityNoResult)
-	ts.RegisterActivity(testActivityNoContextArg)
-	ts.RegisterActivity(testActivityReturnByteArray)
-	ts.RegisterActivity(testActivityReturnInt)
-	ts.RegisterActivity(testActivityByteArgs)
-	ts.RegisterActivity(testActivityReturnNilStructPtr)
-	ts.RegisterActivity(testActivityReturnStructPtr)
-	ts.RegisterActivity(testActivityReturnNilStructPtrPtr)
-	ts.RegisterActivity(testActivityReturnStructPtrPtr)
 	env := ts.NewTestWorkflowEnvironment()
+
+	nopOptions := RegisterActivityOptions{}
+	env.impl.hostEnv.RegisterActivity(
+		testActivityNoResult,
+		RegisterActivityOptions{Name: "testActivityNoResult"},
+	)
+	env.impl.hostEnv.RegisterActivity(
+		testActivityNoContextArg,
+		RegisterActivityOptions{Name: "testActivityNoContextArg"},
+	)
+	env.impl.hostEnv.RegisterActivity(
+		testActivityReturnByteArray,
+		RegisterActivityOptions{Name: "testActivityReturnByteArray"},
+	)
+	env.impl.hostEnv.RegisterActivity(
+		testActivityReturnInt,
+		RegisterActivityOptions{Name: "testActivityReturnInt"},
+	)
+	env.impl.hostEnv.RegisterActivity(testActivityByteArgs, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityMultipleArgs, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnString, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnEmptyString, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnNilStructPtr, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnEmptyStruct, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnStructPtr, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnNilStructPtrPtr, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnStructPtrPtr, nopOptions)
+
 	w := &activitiesCallingOptionsWorkflow{t: t}
+	env.impl.hostEnv.RegisterWorkflow(w.Execute, RegisterWorkflowOptions{})
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
 	require.True(t, env.IsWorkflowCompleted())
 	require.NoError(t, env.GetWorkflowError())
@@ -616,14 +663,17 @@ func testWorkflowReturnStructPtrPtr(ctx Context, arg1 int) (result **testWorkflo
 }
 
 func TestRegisterVariousWorkflowTypes(t *testing.T) {
-	RegisterWorkflow(testWorkflowSample)
-	RegisterWorkflow(testWorkflowMultipleArgs)
-	RegisterWorkflow(testWorkflowNoArgs)
-	RegisterWorkflow(testWorkflowReturnInt)
-	RegisterWorkflow(testWorkflowReturnString)
-	RegisterWorkflow(testWorkflowReturnStruct)
-	RegisterWorkflow(testWorkflowReturnStructPtr)
-	RegisterWorkflow(testWorkflowReturnStructPtrPtr)
+	service := new(mocks.TChanWorkflowService)
+	worker := createWorker(t, service)
+	opts := RegisterWorkflowOptions{}
+	worker.RegisterWorkflow(testWorkflowSample, opts)
+	worker.RegisterWorkflow(testWorkflowMultipleArgs, opts)
+	worker.RegisterWorkflow(testWorkflowNoArgs, opts)
+	worker.RegisterWorkflow(testWorkflowReturnInt, RegisterWorkflowOptions{Name: "intWf"})
+	worker.RegisterWorkflow(testWorkflowReturnString, opts)
+	worker.RegisterWorkflow(testWorkflowReturnStruct, opts)
+	worker.RegisterWorkflow(testWorkflowReturnStructPtr, RegisterWorkflowOptions{Name: "structWf"})
+	worker.RegisterWorkflow(testWorkflowReturnStructPtrPtr, opts)
 }
 
 type testErrorDetails struct {
@@ -631,6 +681,7 @@ type testErrorDetails struct {
 }
 
 func TestActivityErrorWithDetails(t *testing.T) {
+	env := newHostEnvironment()
 	a1 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (err error) {
@@ -638,7 +689,7 @@ func TestActivityErrorWithDetails(t *testing.T) {
 		}}
 	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
 
-	err := deSerializeFunctionResult(a1.fn, encResult, nil)
+	err := env.deserializeFnResult(a1.fn, encResult, nil)
 	require.NoError(t, err)
 	require.Error(t, e)
 	errWD := e.(*CustomError)
@@ -653,7 +704,7 @@ func TestActivityErrorWithDetails(t *testing.T) {
 			return NewCustomError("testReason", testErrorDetails{T: "testErrorStack"})
 		}}
 	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
-	err = deSerializeFunctionResult(a2.fn, encResult, nil)
+	err = env.deserializeFnResult(a2.fn, encResult, nil)
 	require.NoError(t, err)
 	require.Error(t, e)
 	errWD = e.(*CustomError)
@@ -669,7 +720,7 @@ func TestActivityErrorWithDetails(t *testing.T) {
 		}}
 	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a3.fn, 1))
 	var result string
-	err = deSerializeFunctionResult(a3.fn, encResult, &result)
+	err = env.deserializeFnResult(a3.fn, encResult, &result)
 	require.NoError(t, err)
 	require.Equal(t, "testResult", result)
 	require.Error(t, e)
@@ -684,7 +735,7 @@ func TestActivityErrorWithDetails(t *testing.T) {
 			return "testResult4", NewCustomError("testReason", "testMultipleString", testErrorDetails{T: "testErrorStack4"})
 		}}
 	encResult, e = a4.Execute(context.Background(), testEncodeFunctionArgs(a4.fn, 1))
-	err = deSerializeFunctionResult(a3.fn, encResult, &result)
+	err = env.deserializeFnResult(a3.fn, encResult, &result)
 	require.NoError(t, err)
 	require.Equal(t, "testResult4", result)
 	require.Error(t, e)
@@ -697,13 +748,14 @@ func TestActivityErrorWithDetails(t *testing.T) {
 }
 
 func TestActivityCancelledError(t *testing.T) {
+	env := newHostEnvironment()
 	a1 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (err error) {
 			return NewCanceledError("testCancelStringDetails")
 		}}
 	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, 1))
-	err := deSerializeFunctionResult(a1.fn, encResult, nil)
+	err := env.deserializeFnResult(a1.fn, encResult, nil)
 	require.NoError(t, err)
 	require.Error(t, e)
 	errWD := e.(*CanceledError)
@@ -717,7 +769,7 @@ func TestActivityCancelledError(t *testing.T) {
 			return NewCanceledError(testErrorDetails{T: "testCancelErrorStack"})
 		}}
 	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
-	err = deSerializeFunctionResult(a2.fn, encResult, nil)
+	err = env.deserializeFnResult(a2.fn, encResult, nil)
 	require.NoError(t, err)
 	require.Error(t, e)
 	errWD = e.(*CanceledError)
@@ -732,7 +784,7 @@ func TestActivityCancelledError(t *testing.T) {
 		}}
 	encResult, e = a3.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
 	var r string
-	err = deSerializeFunctionResult(a3.fn, encResult, &r)
+	err = env.deserializeFnResult(a3.fn, encResult, &r)
 	require.NoError(t, err)
 	require.Equal(t, "testResult", r)
 	require.Error(t, e)
@@ -746,7 +798,7 @@ func TestActivityCancelledError(t *testing.T) {
 			return "testResult4", NewCanceledError("testMultipleString", testErrorDetails{T: "testErrorStack4"})
 		}}
 	encResult, e = a4.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, 1))
-	err = deSerializeFunctionResult(a3.fn, encResult, &r)
+	err = env.deserializeFnResult(a3.fn, encResult, &r)
 	require.NoError(t, err)
 	require.Equal(t, "testResult4", r)
 	require.Error(t, e)
@@ -758,6 +810,7 @@ func TestActivityCancelledError(t *testing.T) {
 }
 
 func TestActivityExecutionVariousTypes(t *testing.T) {
+	env := newHostEnvironment()
 	a1 := activityExecutor{
 		fn: func(ctx context.Context, arg1 string) (*testWorkflowResult, error) {
 			return &testWorkflowResult{V: 1}, nil
@@ -765,7 +818,7 @@ func TestActivityExecutionVariousTypes(t *testing.T) {
 	encResult, e := a1.Execute(context.Background(), testEncodeFunctionArgs(a1.fn, "test"))
 	require.NoError(t, e)
 	var r *testWorkflowResult
-	err := deSerializeFunctionResult(a1.fn, encResult, &r)
+	err := env.deserializeFnResult(a1.fn, encResult, &r)
 	require.NoError(t, err)
 	require.Equal(t, 1, r.V)
 
@@ -775,7 +828,7 @@ func TestActivityExecutionVariousTypes(t *testing.T) {
 		}}
 	encResult, e = a2.Execute(context.Background(), testEncodeFunctionArgs(a2.fn, r))
 	require.NoError(t, e)
-	err = deSerializeFunctionResult(a2.fn, encResult, &r)
+	err = env.deserializeFnResult(a2.fn, encResult, &r)
 	require.NoError(t, err)
 	require.Equal(t, 2, r.V)
 }
@@ -829,7 +882,7 @@ func TestGobEncoding(t *testing.T) {
 
 // Encode function result.
 func testEncodeFunctionResult(r interface{}) []byte {
-	result, err := getHostEnvironment().encodeArg(r)
+	result, err := newHostEnvironment().encodeArg(r)
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to encode")
@@ -839,12 +892,12 @@ func testEncodeFunctionResult(r interface{}) []byte {
 
 // Encode function args
 func testEncodeFunctionArgs(workflowFunc interface{}, args ...interface{}) []byte {
-	err := getHostEnvironment().RegisterFnType(reflect.TypeOf(workflowFunc))
+	err := newHostEnvironment().RegisterFnType(reflect.TypeOf(workflowFunc))
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to register function types")
 	}
-	input, err := getHostEnvironment().encodeArgs(args)
+	input, err := newHostEnvironment().encodeArgs(args)
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to encode arguments")

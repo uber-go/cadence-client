@@ -79,6 +79,7 @@ func Test_WorkflowError(t *testing.T) {
 	s := &WorkflowTestSuite{}
 	for i := 0; i < len(errs); i++ {
 		wfEnv := s.NewTestWorkflowEnvironment()
+		wfEnv.impl.hostEnv.RegisterWorkflow(errorWorkflowFn, RegisterWorkflowOptions{})
 		wfEnv.ExecuteWorkflow(errorWorkflowFn, i)
 		err := wfEnv.GetWorkflowError()
 		require.Error(t, err)

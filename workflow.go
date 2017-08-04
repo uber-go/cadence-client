@@ -159,21 +159,9 @@ const (
 	ChildWorkflowPolicyAbandon ChildWorkflowPolicy = 2
 )
 
-// RegisterWorkflow - registers a workflow function with the framework.
-// A workflow takes a cadence context and input and returns a (result, error) or just error.
-// Examples:
-//	func sampleWorkflow(ctx cadence.Context, input []byte) (result []byte, err error)
-//	func sampleWorkflow(ctx cadence.Context, arg1 int, arg2 string) (result []byte, err error)
-//	func sampleWorkflow(ctx cadence.Context) (result []byte, err error)
-//	func sampleWorkflow(ctx cadence.Context, arg1 int) (result string, err error)
-// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
-// This method calls panic if workflowFunc doesn't comply with the expected format.
-func RegisterWorkflow(workflowFunc interface{}) {
-	thImpl := getHostEnvironment()
-	err := thImpl.RegisterWorkflow(workflowFunc)
-	if err != nil {
-		panic(err)
-	}
+// RegisterWorkflowOptions consists of options for registering a workflow
+type RegisterWorkflowOptions struct {
+	Name string
 }
 
 // NewChannel create new Channel instance
@@ -258,8 +246,10 @@ func NewFuture(ctx Context) (Future, Settable) {
 // - returns Future with activity result or failure
 func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.
-	future, settable := newDecodeFuture(ctx, f)
-	activityType, input, err := getValidatedActivityFunction(f, args)
+	workflowEnv := getWorkflowEnvironment(ctx)
+	hostEnv := workflowEnv.GetHostEnvironment()
+	future, settable := newDecodeFuture(ctx, f, hostEnv)
+	activityType, input, err := getValidatedActivityFunction(f, args, hostEnv)
 	if err != nil {
 		settable.Set(nil, err)
 		return future
@@ -274,7 +264,7 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 	parameters.ActivityType = *activityType
 	parameters.Input = input
 
-	a := getWorkflowEnvironment(ctx).ExecuteActivity(*parameters, func(r []byte, e error) {
+	a := workflowEnv.ExecuteActivity(*parameters, func(r []byte, e error) {
 		settable.Set(r, e)
 	})
 	Go(ctx, func(ctx Context) {
@@ -305,12 +295,14 @@ func ExecuteActivity(ctx Context, f interface{}, args ...interface{}) Future {
 // error CanceledError.
 // - returns ChildWorkflowFuture
 func ExecuteChildWorkflow(ctx Context, f interface{}, args ...interface{}) ChildWorkflowFuture {
-	mainFuture, mainSettable := newDecodeFuture(ctx, f)
+	workflowEnv := getWorkflowEnvironment(ctx)
+	hostEnv := workflowEnv.GetHostEnvironment()
+	mainFuture, mainSettable := newDecodeFuture(ctx, f, hostEnv)
 	executionFuture, executionSettable := NewFuture(ctx)
 	result := childWorkflowFutureImpl{
 		decodeFutureImpl: mainFuture.(*decodeFutureImpl),
 		executionFuture:  executionFuture.(*futureImpl)}
-	wfType, input, err := getValidatedWorkerFunction(f, args)
+	wfType, input, err := hostEnv.getValidatedWorkerFunction(f, args)
 	if err != nil {
 		mainSettable.Set(nil, err)
 		return result
@@ -324,7 +316,7 @@ func ExecuteChildWorkflow(ctx Context, f interface{}, args ...interface{}) Child
 	options.input = input
 	options.workflowType = wfType
 	var childWorkflowExecution *WorkflowExecution
-	getWorkflowEnvironment(ctx).ExecuteChildWorkflow(*options, func(r []byte, e error) {
+	workflowEnv.ExecuteChildWorkflow(*options, func(r []byte, e error) {
 		mainSettable.Set(r, e)
 	}, func(r WorkflowExecution, e error) {
 		if e == nil {
@@ -497,7 +489,7 @@ func GetSignalChannel(ctx Context, signalName string) Channel {
 
 // Get extract data from encoded data to desired value type. valuePtr is pointer to the actual value type.
 func (b EncodedValue) Get(valuePtr interface{}) error {
-	return getHostEnvironment().decodeArg(b, valuePtr)
+	return newHostEnvironment().decodeArg(b, valuePtr)
 }
 
 // SideEffect executes provided function once, records its result into the workflow history and doesn't
@@ -535,14 +527,15 @@ func (b EncodedValue) Get(valuePtr interface{}) error {
 // }
 func SideEffect(ctx Context, f func(ctx Context) interface{}) EncodedValue {
 	future, settable := NewFuture(ctx)
+	workflowEnv := getWorkflowEnvironment(ctx)
 	wrapperFunc := func() ([]byte, error) {
 		r := f(ctx)
-		return getHostEnvironment().encodeArg(r)
+		return workflowEnv.GetHostEnvironment().encodeArg(r)
 	}
 	resultCallback := func(result []byte, err error) {
 		settable.Set(EncodedValue(result), err)
 	}
-	getWorkflowEnvironment(ctx).SideEffect(wrapperFunc, resultCallback)
+	workflowEnv.SideEffect(wrapperFunc, resultCallback)
 	var encoded EncodedValue
 	if err := future.Get(ctx, &encoded); err != nil {
 		panic(err)

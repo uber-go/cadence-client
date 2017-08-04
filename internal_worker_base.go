@@ -64,6 +64,7 @@ type (
 		GetLogger() *zap.Logger
 		GetMetricsScope() tally.Scope
 		RegisterSignalHandler(handler func(name string, input []byte))
+		GetHostEnvironment() *hostEnvImpl
 	}
 
 	// WorkflowDefinition wraps the code that can execute a workflow.

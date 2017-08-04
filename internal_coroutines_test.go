@@ -899,10 +899,11 @@ func TestSelectFuture(t *testing.T) {
 }
 
 func TestSelectDecodeFuture(t *testing.T) {
+	hostEnv := newHostEnvironment()
 	var history []string
 	d := newDispatcher(background, func(ctx Context) {
-		future1, settable1 := newDecodeFuture(ctx, "testFn1")
-		future2, settable2 := newDecodeFuture(ctx, "testFn2")
+		future1, settable1 := newDecodeFuture(ctx, "testFn1", hostEnv)
+		future2, settable2 := newDecodeFuture(ctx, "testFn2", hostEnv)
 		Go(ctx, func(ctx Context) {
 			history = append(history, "add-one")
 			settable1.SetValue([]byte("one"))
@@ -955,11 +956,13 @@ func TestDecodeFutureChain(t *testing.T) {
 	var f1, cf1, f2, cf2 Future
 	var s1, cs1, s2, cs2 Settable
 
+	hostEnv := newHostEnvironment()
+
 	d := newDispatcher(background, func(ctx Context) {
-		f1, s1 = newDecodeFuture(ctx, "testFn")
-		cf1, cs1 = newDecodeFuture(ctx, "testFun")
-		f2, s2 = newDecodeFuture(ctx, "testFn")
-		cf2, cs2 = newDecodeFuture(ctx, "testFun")
+		f1, s1 = newDecodeFuture(ctx, "testFn", hostEnv)
+		cf1, cs1 = newDecodeFuture(ctx, "testFun", hostEnv)
+		f2, s2 = newDecodeFuture(ctx, "testFn", hostEnv)
+		cf2, cs2 = newDecodeFuture(ctx, "testFun", hostEnv)
 		s1.Chain(cf1)
 		s2.Chain(cf2)
 		Go(ctx, func(ctx Context) {

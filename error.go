@@ -139,7 +139,7 @@ func NewCustomError(reason string, details ...interface{}) *CustomError {
 		panic("'cadenceInternal:' is reserved prefix, please use different reason")
 	}
 
-	data, err := getHostEnvironment().encodeArgs(details)
+	data, err := newHostEnvironment().encodeArgs(details)
 	if err != nil {
 		panic(err)
 	}
@@ -158,7 +158,7 @@ func NewTimeoutError(timeoutType shared.TimeoutType) *TimeoutError {
 // WARNING: This function is public only to support unit testing of workflows.
 // It shouldn't be used by application level code.
 func NewHeartbeatTimeoutError(details ...interface{}) *TimeoutError {
-	data, err := getHostEnvironment().encodeArgs(details)
+	data, err := newHostEnvironment().encodeArgs(details)
 	if err != nil {
 		panic(err)
 	}
@@ -167,7 +167,7 @@ func NewHeartbeatTimeoutError(details ...interface{}) *TimeoutError {
 
 // NewCanceledError creates CanceledError instance
 func NewCanceledError(details ...interface{}) *CanceledError {
-	data, err := getHostEnvironment().encodeArgs(details)
+	data, err := newHostEnvironment().encodeArgs(details)
 	if err != nil {
 		panic(err)
 	}
@@ -188,7 +188,7 @@ func NewCanceledError(details ...interface{}) *CanceledError {
 //
 func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *ContinueAsNewError {
 	// Validate type and its arguments.
-	workflowType, input, err := getValidatedWorkerFunction(wfn, args)
+	workflowType, input, err := newHostEnvironment().getValidatedWorkerFunction(wfn, args)
 	if err != nil {
 		panic(err)
 	}
@@ -223,7 +223,7 @@ func (e *CustomError) Reason() string {
 
 // Details extracts strong typed detail data of this custom error
 func (e *CustomError) Details(d ...interface{}) {
-	if err := getHostEnvironment().decode(e.details, d); err != nil {
+	if err := newHostEnvironment().decode(e.details, d); err != nil {
 		panic(err)
 	}
 }
@@ -245,7 +245,7 @@ func (e *TimeoutError) TimeoutType() shared.TimeoutType {
 
 // Details extracts strong typed detail data of this error
 func (e *TimeoutError) Details(d ...interface{}) {
-	if err := getHostEnvironment().decode(e.details, d); err != nil {
+	if err := newHostEnvironment().decode(e.details, d); err != nil {
 		panic(err)
 	}
 }
@@ -257,7 +257,7 @@ func (e *CanceledError) Error() string {
 
 // Details extracts strong typed detail data of this error.
 func (e *CanceledError) Details(d ...interface{}) {
-	if err := getHostEnvironment().decode(e.details, d); err != nil {
+	if err := newHostEnvironment().decode(e.details, d); err != nil {
 		panic(err)
 	}
 }

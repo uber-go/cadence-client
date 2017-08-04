@@ -37,6 +37,7 @@ type (
 	activity interface {
 		Execute(ctx context.Context, input []byte) ([]byte, error)
 		ActivityType() ActivityType
+		GetFunction() interface{}
 	}
 
 	activityInfo struct {
@@ -78,6 +79,7 @@ type (
 		serviceInvoker    ServiceInvoker
 		logger            *zap.Logger
 		metricsScope      tally.Scope
+		env               *hostEnvImpl
 	}
 )
 
@@ -189,14 +191,18 @@ func validateFunctionResults(f interface{}, result interface{}) ([]byte, error) 
 		return nil, nil
 	}
 
-	data, err := getHostEnvironment().encodeArg(result)
+	data, err := newHostEnvironment().encodeArg(result)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityType, []byte, error) {
+func getValidatedActivityFunction(
+	f interface{},
+	args []interface{},
+	env *hostEnvImpl,
+) (*ActivityType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(f)
 	switch fType.Kind() {
@@ -214,7 +220,10 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityT
 			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
 	}
 
-	input, err := getHostEnvironment().encodeArgs(args)
+	if alias, ok := env.getActivityAlias(fnName); ok {
+		fnName = alias
+	}
+	input, err := newHostEnvironment().encodeArgs(args)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -243,7 +252,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 	if resultSize > 1 {
 		retValue := values[0]
 		if retValue.Kind() != reflect.Ptr || !retValue.IsNil() {
-			result, err = getHostEnvironment().encodeArg(retValue.Interface())
+			result, err = newHostEnvironment().encodeArg(retValue.Interface())
 			if err != nil {
 				return nil, err
 			}
@@ -262,46 +271,6 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value) ([]byt
 			errValue)
 	}
 	return result, errInterface
-}
-
-func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interface{}) error {
-	if fnType.Kind() != reflect.Func {
-		return fmt.Errorf("expecting only function type but got type: %v", fnType)
-	}
-
-	// We already validated during registration that it either have (result, error) (or) just error.
-	if fnType.NumOut() <= 1 {
-		return nil
-	} else if fnType.NumOut() == 2 {
-		if result == nil {
-			return nil
-		}
-		err := getHostEnvironment().decodeArg(result, to)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func deSerializeFunctionResult(f interface{}, result []byte, to interface{}) error {
-	fType := reflect.TypeOf(f)
-
-	switch fType.Kind() {
-	case reflect.Func:
-		// We already validated that it either have (result, error) (or) just error.
-		return deSerializeFnResultFromFnType(fType, result, to)
-
-	case reflect.String:
-		// If we know about this function through registration then we will try to return corresponding result type.
-		fnName := reflect.ValueOf(f).String()
-		if fnRegistered, ok := getHostEnvironment().getActivityFn(fnName); ok {
-			return deSerializeFnResultFromFnType(reflect.TypeOf(fnRegistered), result, to)
-		}
-	}
-
-	// For everything we return result.
-	return getHostEnvironment().decodeArg(result, to)
 }
 
 func setActivityParametersIfNotExist(ctx Context) Context {

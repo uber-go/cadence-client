@@ -43,26 +43,12 @@ type (
 		ActivityID        string
 		ActivityType      ActivityType
 	}
-)
 
-// RegisterActivity - register a activity function with the framework.
-// A activity takes a context and input and returns a (result, error) or just error.
-// Examples:
-//	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
-//	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error)
-//	func sampleActivity(ctx context.Context) (err error)
-//	func sampleActivity() (result string, err error)
-//	func sampleActivity(arg1 bool) (result int, err error)
-//	func sampleActivity(arg1 bool) (err error)
-// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
-// This method calls panic if activityFunc doesn't comply with the expected format.
-func RegisterActivity(activityFunc interface{}) {
-	thImpl := getHostEnvironment()
-	err := thImpl.RegisterActivity(activityFunc)
-	if err != nil {
-		panic(err)
+	// RegisterActivityOptions consists of options for registering an activity
+	RegisterActivityOptions struct {
+		Name string
 	}
-}
+)
 
 // GetActivityInfo returns information about currently executing activity.
 func GetActivityInfo(ctx context.Context) ActivityInfo {
@@ -100,7 +86,7 @@ func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 	var err error
 	// We would like to be a able to pass in "nil" as part of details(that is no progress to report to)
 	if len(details) != 1 || details[0] != nil {
-		data, err = getHostEnvironment().encodeArgs(details)
+		data, err = newHostEnvironment().encodeArgs(details)
 		if err != nil {
 			panic(err)
 		}
@@ -138,7 +124,8 @@ func WithActivityTask(
 		activityID:     *task.ActivityId,
 		workflowExecution: WorkflowExecution{
 			RunID: *task.WorkflowExecution.RunId,
-			ID:    *task.WorkflowExecution.WorkflowId},
+			ID:    *task.WorkflowExecution.WorkflowId,
+		},
 		logger:       logger,
 		metricsScope: scope,
 	})

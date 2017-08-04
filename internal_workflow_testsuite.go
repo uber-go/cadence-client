@@ -299,9 +299,7 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, 
 
 func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(workflowType string, input []byte) {
 	env.workflowInfo.WorkflowType.Name = workflowType
-	workflowDefinition, err := env.getWorkflowDefinition(
-		env.workflowInfo.WorkflowType,
-	)
+	workflowDefinition, err := env.getWorkflowDefinition(env.workflowInfo.WorkflowType)
 	if err != nil {
 		panic(err)
 	}
@@ -309,9 +307,7 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(workflowType str
 	// env.workflowDef.Execute() method will execute dispatcher. We want the dispatcher to only run in main loop.
 	// In case of child workflow, this executeWorkflowInternal() is run in separate goroutinue, so use postCallback
 	// to make sure workflowDef.Execute() is run in main loop.
-	env.postCallback(func() {
-		env.workflowDef.Execute(env, input)
-	}, false)
+	env.postCallback(func() { env.workflowDef.Execute(env, input) }, false)
 	env.startMainLoop()
 }
 
@@ -1086,7 +1082,6 @@ func (env *testWorkflowEnvironmentImpl) ExecuteChildWorkflow(options workflowOpt
 
 	// run child workflow in separate goroutinue
 	go childEnv.executeWorkflowInternal(options.workflowType.Name, options.input)
-
 	return nil
 }
 

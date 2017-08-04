@@ -53,7 +53,7 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 
 func registerOnEnv(env *hostEnvImpl) {
 	env.RegisterWorkflow(testWorkflowHello, RegisterWorkflowOptions{})
-	env.RegisterWorkflow(testWorkflowHeartbeat, RegisterWorkflowOptions{Name: "testWorkflowHeartbeat"})
+	env.RegisterWorkflow(testWorkflowHeartbeat, RegisterWorkflowOptions{})
 	env.RegisterActivity(testActivityHello, RegisterActivityOptions{})
 	env.RegisterActivity(testActivityHeartbeat, RegisterActivityOptions{})
 }
@@ -572,7 +572,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowCancel() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Override() {
-	s.T().Skip()
 	workflowFn := func(ctx Context) (string, error) {
 		ctx = WithActivityOptions(ctx, s.activityOptions)
 		var helloActivityResult string
@@ -589,7 +588,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Override() {
 			return "", err
 		}
 		var heartbeatWorkflowResult string
-		err = ExecuteChildWorkflow(ctx, testWorkflowHeartbeat, "slow", time.Hour).Get(ctx, &heartbeatWorkflowResult)
+		err = ExecuteChildWorkflow(ctx, testWorkflowHeartbeat, "slow", time.Minute).Get(ctx, &heartbeatWorkflowResult)
 		if err != nil {
 			return "", err
 		}
@@ -598,6 +597,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Override() {
 	}
 
 	env := s.newRegisteredWorkflowEnvironment()
+	env.SetActivityTaskList(defaultTestTaskList, testActivityHello)
 	env.OverrideActivity(testActivityHello, func(ctx context.Context, msg string) (string, error) {
 		return "fake_" + msg, nil
 	})
@@ -614,7 +614,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Override() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock() {
-	s.T().Skip()
 	workflowFn := func(ctx Context) (string, error) {
 		ctx = WithActivityOptions(ctx, s.activityOptions)
 		var helloActivityResult string
@@ -640,6 +639,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock() {
 	}
 
 	env := s.newRegisteredWorkflowEnvironment()
+	env.SetActivityTaskList(defaultTestTaskList, testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("mock_msg", nil)
 	env.OnWorkflow(testWorkflowHeartbeat, mock.Anything, mock.Anything, mock.Anything).
 		Return("mock_heartbeat", nil)

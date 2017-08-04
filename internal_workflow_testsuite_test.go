@@ -979,7 +979,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithThriftTypes() {
 	blob.Get(&ret)
 	s.Equal(retVal, ret)
 
-	expectedValues := []string {
+	expectedValues := []string{
 		"wID1",
 		"rID1",
 		"wID2",

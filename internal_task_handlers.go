@@ -61,11 +61,13 @@ type (
 	workflowTask struct {
 		task               *s.PollForDecisionTaskResponse
 		getHistoryPageFunc GetHistoryPage
+		pollStartTime      time.Time
 	}
 
 	// activityTask wraps a activity task.
 	activityTask struct {
-		task *s.PollForActivityTaskResponse
+		task          *s.PollForActivityTaskResponse
+		pollStartTime time.Time
 	}
 )
 
@@ -117,13 +119,13 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 	return result
 }
 
-// Get workflow start attributes.
-func (eh *history) GetWorkflowStartedAttr() (*s.WorkflowExecutionStartedEventAttributes, error) {
+// Get workflow start event.
+func (eh *history) GetWorkflowStartedEvent() (*s.HistoryEvent, error) {
 	events := eh.workflowTask.task.History.Events
 	if len(events) == 0 || events[0].GetEventType() != s.EventType_WorkflowExecutionStarted {
 		return nil, errors.New("unable to find WorkflowExecutionStartedEventAttributes in the history")
 	}
-	return events[0].WorkflowExecutionStartedEventAttributes, nil
+	return events[0], nil
 }
 
 // Get last non replayed event ID.
@@ -296,6 +298,7 @@ func newWorkflowTaskHandler(
 	ppMgr pressurePointMgr,
 	env *hostEnvImpl,
 ) WorkflowTaskHandler {
+	ensureRequiredParams(&params)
 	return &workflowTaskHandlerImpl{
 		domain:                domain,
 		logger:                params.Logger,
@@ -313,14 +316,6 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	getHistoryPage GetHistoryPage,
 	emitStack bool,
 ) (result *s.RespondDecisionTaskCompletedRequest, stackTrace string, err error) {
-	currentTime := time.Now()
-	defer func() {
-		deltaTime := time.Now().Sub(currentTime)
-		if wth.metricsScope != nil {
-			wth.metricsScope.Timer(metrics.DecisionsExecutionLatency).Record(deltaTime)
-		}
-	}()
-
 	if task == nil {
 		return nil, "", errors.New("nil workflowtask provided")
 	}
@@ -377,6 +372,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		completeHandler,
 		wth.logger,
 		wth.enableLoggingInReplay,
+		wth.metricsScope,
 		wth.env,
 	)
 	defer eventHandler.Close()
@@ -387,8 +383,6 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	decisions := []*s.Decision{}
 	replayDecisions := []*s.Decision{}
 	respondEvents := []*s.HistoryEvent{}
-
-	startTime := time.Now()
 
 	// Process events
 ProcessEvents:
@@ -450,25 +444,40 @@ ProcessEvents:
 		return nil, "", err
 	}
 
-	startAttributes, err := reorderedHistory.GetWorkflowStartedAttr()
+	startEvent, err := reorderedHistory.GetWorkflowStartedEvent()
 	if err != nil {
 		wth.logger.Error("Unable to read workflow start attributes.", zap.Error(err))
 		return nil, "", err
 	}
 
-	if _, ok := failure.(*PanicError); ok {
+	if panicErr, ok := failure.(*PanicError); ok {
 		// Timeout the Decision instead of failing workflow.
 		// TODO: Pump this stack trace on to workflow history for debuggability by exposing decision type fail to client.
+		wth.metricsScope.Counter(metrics.DecisionTaskPanicCounter).Inc(1)
+		wth.logger.Error("Workflow panic.",
+			zap.String("PanicError", panicErr.Error()),
+			zap.String("PanicStack", panicErr.StackTrace()))
+
 		return nil, "", failure
 	}
-
+	startAttributes := startEvent.WorkflowExecutionStartedEventAttributes
 	closeDecision := wth.completeWorkflow(isWorkflowCompleted, completionResult, failure, startAttributes)
 	if closeDecision != nil {
 		decisions = append(decisions, closeDecision)
-		if wth.metricsScope != nil {
-			wth.metricsScope.Counter(metrics.WorkflowsCompletionTotalCounter).Inc(1)
-			elapsed := time.Now().Sub(startTime)
-			wth.metricsScope.Timer(metrics.WorkflowEndToEndLatency).Record(elapsed)
+
+		wfStartTime := time.Unix(0, startEvent.GetTimestamp())
+		elapsed := time.Now().Sub(wfStartTime)
+		wth.metricsScope.Timer(metrics.WorkflowEndToEndLatency).Record(elapsed)
+
+		switch closeDecision.GetDecisionType() {
+		case s.DecisionType_CompleteWorkflowExecution:
+			wth.metricsScope.Counter(metrics.WorkflowCompletedCounter).Inc(1)
+		case s.DecisionType_FailWorkflowExecution:
+			wth.metricsScope.Counter(metrics.WorkflowFailedCounter).Inc(1)
+		case s.DecisionType_CancelWorkflowExecution:
+			wth.metricsScope.Counter(metrics.WorkflowCanceledCounter).Inc(1)
+		case s.DecisionType_ContinueAsNewWorkflowExecution:
+			wth.metricsScope.Counter(metrics.WorkflowContinueAsNewCounter).Inc(1)
 		}
 	}
 
@@ -769,7 +778,7 @@ func (wth *workflowTaskHandlerImpl) reportAnyMetrics(event *s.HistoryEvent, isIn
 	if wth.metricsScope != nil && !isInReplay {
 		switch event.GetEventType() {
 		case s.EventType_DecisionTaskTimedOut:
-			wth.metricsScope.Counter(metrics.DecisionsTimeoutCounter).Inc(1)
+			wth.metricsScope.Counter(metrics.DecisionTimeoutCounter).Inc(1)
 		}
 	}
 }
@@ -911,14 +920,6 @@ func newServiceInvoker(
 
 // Execute executes an implementation of the activity.
 func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (result interface{}, err error) {
-	startTime := time.Now()
-	defer func() {
-		deltaTime := time.Now().Sub(startTime)
-		if ath.metricsScope != nil {
-			ath.metricsScope.Timer(metrics.ActivityExecutionLatency).Record(deltaTime)
-		}
-	}()
-
 	traceLog(func() {
 		ath.logger.Debug("Processing new activity task",
 			zap.String(tagWorkflowID, t.GetWorkflowExecution().GetWorkflowId()),
@@ -933,7 +934,7 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 	canCtx, cancel := context.WithCancel(rootCtx)
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds())
 	defer invoker.Close()
-	ctx := WithActivityTask(canCtx, t, invoker, ath.logger)
+	ctx := WithActivityTask(canCtx, t, invoker, ath.logger, ath.metricsScope)
 	activityType := *t.GetActivityType()
 	activityImplementation, ok := ath.env.getActivity(activityType.GetName())
 	if !ok {
@@ -949,6 +950,7 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 			ath.logger.Error("Activity panic.",
 				zap.String("PanicError", fmt.Sprintf("%v", p)),
 				zap.String("PanicStack", st))
+			ath.metricsScope.Counter(metrics.ActivityTaskPanicCounter).Inc(1)
 			panicErr := newPanicError(p, st)
 			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr), nil
 		}

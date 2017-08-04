@@ -27,8 +27,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/uber-go/tally"
 	m "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
+	"go.uber.org/cadence/common/metrics"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -84,8 +86,8 @@ type (
 		logger                *zap.Logger
 		isReplay              bool // flag to indicate if workflow is in replay mode
 		enableLoggingInReplay bool // flag to indicate if workflow should enable logging in replay mode
-
-		env *hostEnvImpl
+		metricsScope          tally.Scope
+		env                   *hostEnvImpl
 	}
 
 	// wrapper around zapcore.Core that will be aware of replay
@@ -119,6 +121,7 @@ func newWorkflowExecutionEventHandler(
 	completeHandler completionHandler,
 	logger *zap.Logger,
 	enableLoggingInReplay bool,
+	scope tally.Scope,
 	env *hostEnvImpl,
 ) workflowExecutionEventHandler {
 	context := &workflowEnvironmentImpl{
@@ -135,6 +138,10 @@ func newWorkflowExecutionEventHandler(
 		zapcore.Field{Key: tagWorkflowID, Type: zapcore.StringType, String: workflowInfo.WorkflowExecution.ID},
 		zapcore.Field{Key: tagRunID, Type: zapcore.StringType, String: workflowInfo.WorkflowExecution.RunID},
 	).WithOptions(zap.WrapCore(wrapLogger(&context.isReplay, &context.enableLoggingInReplay)))
+
+	if scope != nil {
+		context.metricsScope = metrics.WrapScope(&context.isReplay, scope, context)
+	}
 
 	return &workflowExecutionEventHandlerImpl{context, nil}
 }
@@ -235,6 +242,10 @@ func (wc *workflowEnvironmentImpl) RegisterSignalHandler(handler func(name strin
 
 func (wc *workflowEnvironmentImpl) GetLogger() *zap.Logger {
 	return wc.logger
+}
+
+func (wc *workflowEnvironmentImpl) GetMetricsScope() tally.Scope {
+	return wc.metricsScope
 }
 
 func (wc *workflowEnvironmentImpl) GetHostEnvironment() *hostEnvImpl {

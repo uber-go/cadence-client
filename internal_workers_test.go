@@ -62,6 +62,7 @@ func (s *WorkersTestSuite) TestWorkflowWorker() {
 	// mocks
 	logger, _ := zap.NewDevelopment()
 	service := new(mocks.TChanWorkflowService)
+	service.On("DescribeDomain", mock.Anything, mock.Anything).Return(nil, nil)
 	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(&m.PollForDecisionTaskResponse{}, nil)
 	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 
@@ -88,6 +89,7 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 	// mocks
 	logger, _ := zap.NewDevelopment()
 	service := new(mocks.TChanWorkflowService)
+	service.On("DescribeDomain", mock.Anything, mock.Anything).Return(nil, nil)
 	service.On("PollForActivityTask", mock.Anything, mock.Anything).Return(&m.PollForActivityTaskResponse{}, nil)
 	service.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 
@@ -113,6 +115,7 @@ func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 	domain := "testDomain"
 	// mocks
 	service := new(mocks.TChanWorkflowService)
+	service.On("DescribeDomain", mock.Anything, mock.Anything).Return(nil, nil)
 	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(&m.PollForDecisionTaskResponse{}, &m.InternalServiceError{})
 
 	executionParameters := workerExecutionParameters{

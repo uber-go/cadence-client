@@ -576,7 +576,7 @@ func (weh *workflowExecutionEventHandlerImpl) Close() {
 
 func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionStarted(
 	attributes *m.WorkflowExecutionStartedEventAttributes) (err error) {
-	weh.workflowDefinition, err = getWorkflowDefinition(weh.env, weh.workflowInfo.WorkflowType)
+	weh.workflowDefinition, err = weh.env.getWorkflowDefinition(weh.workflowInfo.WorkflowType)
 	if err != nil {
 		return err
 	}

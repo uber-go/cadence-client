@@ -104,7 +104,7 @@ type (
 		blockedReceives []receiveCallback   // receives waiting when no messages are available.
 		closed          bool                // true if channel is closed.
 		recValue        *interface{}        // Used only while receiving value, this is used as pre-fetch buffer value from the channel.
-	}
+  }
 
 	// Single case statement of the Select
 	selectCase struct {
@@ -586,7 +586,7 @@ func (c *channelImpl) Close() {
 
 // Takes a value and assigns that 'to' value.
 func (c *channelImpl) assignValue(from interface{}, to interface{}) {
-	err := decodeAndAssignValue(from, to)
+	err := newHostEnvironment().decodeAndAssignValue(from, to)
 	if err != nil {
 		panic(err)
 	}
@@ -1014,23 +1014,6 @@ func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {
 	return d.futureImpl.err
 }
 
-func decodeAndAssignValue(from interface{}, toValuePtr interface{}) error {
-	if toValuePtr == nil {
-		return nil
-	}
-	if rf := reflect.ValueOf(toValuePtr); rf.Type().Kind() != reflect.Ptr {
-		return errors.New("value parameter provided is not a pointer")
-	}
-	if data, ok := from.([]byte); ok {
-		if err := newHostEnvironment().decodeArg(data, toValuePtr); err != nil {
-			return err
-		}
-	} else if fv := reflect.ValueOf(from); fv.IsValid() {
-		reflect.ValueOf(toValuePtr).Elem().Set(fv)
-	}
-	return nil
-}
-
 func (p ChildWorkflowPolicy) toThriftChildPolicyPtr() *shared.ChildPolicy {
 	var childPolicy shared.ChildPolicy
 	switch p {
@@ -1049,8 +1032,9 @@ func (p ChildWorkflowPolicy) toThriftChildPolicyPtr() *shared.ChildPolicy {
 // newDecodeFuture creates a new future as well as associated Settable that is used to set its value.
 // fn - the decoded value needs to be validated against a function.
 func newDecodeFuture(ctx Context, fn interface{}, env *hostEnvImpl) (Future, Settable) {
+  c := NewChannel(ctx).(*channelImpl)
 	impl := &decodeFutureImpl{
-		&futureImpl{channel: NewChannel(ctx).(*channelImpl)},
+		&futureImpl{channel: c},
 		fn,
 		env,
 	}

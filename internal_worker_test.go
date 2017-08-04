@@ -45,15 +45,16 @@ import (
 var registeredActivities []string
 var registeredWorkflows []string
 
-func newHostEnvWithSample() *hostEnvImpl {
-	env := newHostEnvironment()
+func registerHostEnvWithSampleWorkflow(env *hostEnvImpl) {
 	env.RegisterWorkflow(sampleWorkflowExecute, RegisterWorkflowOptions{})
 	env.AddWorkflowRegistrationInterceptor(func(workflowName string, workflow interface{}) (string, interface{}) {
 		registeredWorkflows = append(registeredWorkflows, workflowName)
 		return workflowName, workflow
 	})
 	env.RegisterWorkflow(testReplayWorkflow, RegisterWorkflowOptions{})
+}
 
+func registerHostEnvWithSampleActiviy(env *hostEnvImpl) {
 	env.RegisterActivity(testActivity, RegisterActivityOptions{})
 	env.RegisterActivity(testActivityByteArgs, RegisterActivityOptions{})
 	env.AddActivityRegistrationInterceptor(func(activityName string, activity interface{}) (string, interface{}) {
@@ -64,7 +65,6 @@ func newHostEnvWithSample() *hostEnvImpl {
 	env.RegisterActivity(testActivityReturnString, RegisterActivityOptions{})
 	env.RegisterActivity(testActivityReturnEmptyString, RegisterActivityOptions{})
 	env.RegisterActivity(testActivityReturnEmptyStruct, RegisterActivityOptions{})
-	return env
 }
 
 func testActivityRegistrationListener(t *testing.T) {
@@ -150,8 +150,10 @@ func TestDecisionTaskHandler(t *testing.T) {
 		PreviousStartedEventId: common.Int64Ptr(5),
 	}
 
-	env := newHostEnvWithSample()
-	r := NewWorkflowTaskHandler(testDomain, "identity", logger, env)
+	hostEnv := newHostEnvironment()
+	registerHostEnvWithSampleWorkflow(hostEnv)
+	registerHostEnvWithSampleActiviy(hostEnv)
+	r := NewWorkflowTaskHandler(testDomain, "identity", logger, hostEnv)
 	_, stackTrace, err := r.ProcessWorkflowTask(task, nil, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, stackTrace, stackTrace)
@@ -268,6 +270,7 @@ func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 		workerOptions)
 	require.NoError(t, worker.RegisterWorkflow(sampleWorkflowExecute, RegisterWorkflowOptions{}))
 	require.NoError(t, worker.RegisterActivity(testActivity, RegisterActivityOptions{}))
+	require.NoError(t, worker.RegisterActivity(testActivityMultipleArgs, RegisterActivityOptions{}))
 	return worker
 }
 
@@ -543,31 +546,38 @@ func testActivityReturnStructPtrPtr() (**testActivityResult, error) {
 }
 
 func TestVariousActivitySchedulingOption(t *testing.T) {
-	ts := &WorkflowTestSuite{hostEnv: newHostEnvWithSample()}
+	ts := &WorkflowTestSuite{}
+	env := ts.NewTestWorkflowEnvironment()
+
 	nopOptions := RegisterActivityOptions{}
-	ts.RegisterActivity(
+	env.impl.hostEnv.RegisterActivity(
 		testActivityNoResult,
 		RegisterActivityOptions{Name: "testActivityNoResult"},
 	)
-	ts.RegisterActivity(
+	env.impl.hostEnv.RegisterActivity(
 		testActivityNoContextArg,
 		RegisterActivityOptions{Name: "testActivityNoContextArg"},
 	)
-	ts.RegisterActivity(
+	env.impl.hostEnv.RegisterActivity(
 		testActivityReturnByteArray,
 		RegisterActivityOptions{Name: "testActivityReturnByteArray"},
 	)
-	ts.RegisterActivity(
+	env.impl.hostEnv.RegisterActivity(
 		testActivityReturnInt,
 		RegisterActivityOptions{Name: "testActivityReturnInt"},
 	)
-	ts.RegisterActivity(testActivityByteArgs, nopOptions)
-	ts.RegisterActivity(testActivityReturnNilStructPtr, nopOptions)
-	ts.RegisterActivity(testActivityReturnStructPtr, nopOptions)
-	ts.RegisterActivity(testActivityReturnNilStructPtrPtr, nopOptions)
-	ts.RegisterActivity(testActivityReturnStructPtrPtr, nopOptions)
-	env := ts.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterActivity(testActivityByteArgs, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityMultipleArgs, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnString, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnEmptyString, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnNilStructPtr, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnEmptyStruct, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnStructPtr, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnNilStructPtrPtr, nopOptions)
+	env.impl.hostEnv.RegisterActivity(testActivityReturnStructPtrPtr, nopOptions)
+
 	w := &activitiesCallingOptionsWorkflow{t: t}
+	env.impl.hostEnv.RegisterWorkflow(w.Execute, RegisterWorkflowOptions{})
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
 	require.True(t, env.IsWorkflowCompleted())
 	require.NoError(t, env.GetWorkflowError())

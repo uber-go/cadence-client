@@ -26,6 +26,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -751,6 +752,33 @@ func (th *hostEnvImpl) deserializeFnResultFromType(
 	return nil
 }
 
+func (th *hostEnvImpl) decodeAndAssignValue(from interface{}, toValuePtr interface{}) error {
+	if toValuePtr == nil {
+		return nil
+	}
+	if rf := reflect.ValueOf(toValuePtr); rf.Type().Kind() != reflect.Ptr {
+		return errors.New("value parameter provided is not a pointer")
+	}
+	if data, ok := from.([]byte); ok {
+		if err := th.decodeArg(data, toValuePtr); err != nil {
+			return err
+		}
+	} else if fv := reflect.ValueOf(from); fv.IsValid() {
+		reflect.ValueOf(toValuePtr).Elem().Set(fv)
+	}
+	return nil
+}
+
+func (th *hostEnvImpl) getWorkflowDefinition(wt WorkflowType) (workflowDefinition, error) {
+	wf, ok := th.getWorkflowFn(wt.Name)
+	if !ok {
+		supported := strings.Join(th.getRegisteredWorkflowTypes(), ", ")
+		return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
+	}
+	wd := &workflowExecutor{name: wt.Name, fn: wf}
+	return newWorkflowDefinition(wd), nil
+}
+
 func isTypeByteSlice(inType reflect.Type) bool {
 	r := reflect.TypeOf(([]byte)(nil))
 	return inType == r || inType == reflect.PtrTo(r)
@@ -1055,16 +1083,6 @@ func (g gobEncoding) Unmarshal(data []byte, objs []interface{}) error {
 		}
 	}
 	return nil
-}
-
-func getWorkflowDefinition(env *hostEnvImpl, wt WorkflowType) (workflowDefinition, error) {
-	wf, ok := env.getWorkflowFn(wt.Name)
-	if !ok {
-		supported := strings.Join(env.getRegisteredWorkflowTypes(), ", ")
-		return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
-	}
-	wd := &workflowExecutor{name: wt.Name, fn: wf}
-	return newWorkflowDefinition(wd), nil
 }
 
 func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {

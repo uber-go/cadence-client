@@ -46,11 +46,6 @@ func (s *WorkflowUnitTest) SetupSuite() {
 		HeartbeatTimeout:       20 * time.Second,
 	}
 	s.hostEnv = newHostEnvironment()
-	options := RegisterActivityOptions{}
-	s.hostEnv.RegisterActivity(testAct, options)
-	s.hostEnv.RegisterActivity(getGreetingActivity, options)
-	s.hostEnv.RegisterActivity(getNameActivity, options)
-	s.hostEnv.RegisterActivity(sayGreetingActivity, options)
 }
 
 func TestWorkflowUnitTest(t *testing.T) {
@@ -63,6 +58,7 @@ func helloWorldWorklfow(ctx Context, input string) (result string, err error) {
 
 func (s *WorkflowUnitTest) Test_HelloWorldWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(helloWorldWorklfow, RegisterWorkflowOptions{})
 	env.ExecuteWorkflow(helloWorldWorklfow, "Hello")
 	s.True(env.IsWorkflowCompleted())
 }
@@ -85,6 +81,8 @@ func helloWorldActivityWorkflow(ctx Context, input string) (result string, err e
 
 func (s *WorkflowUnitTest) Test_SingleActivityWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(helloWorldActivityWorkflow, RegisterWorkflowOptions{})
+	env.impl.hostEnv.RegisterActivity(testAct, RegisterActivityOptions{})
 	env.ExecuteWorkflow(helloWorldActivityWorkflow, "Hello")
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -148,6 +146,8 @@ func splitJoinActivityWorkflow(ctx Context, testPanic bool) (result string, err 
 
 func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(splitJoinActivityWorkflow, RegisterWorkflowOptions{})
+	env.impl.hostEnv.RegisterActivity(testAct, RegisterActivityOptions{})
 	env.SetActivityTaskList(defaultTestTaskList, testAct)
 	env.OverrideActivity(testAct, func(ctx context.Context) (string, error) {
 		activityID := GetActivityInfo(ctx).ActivityID
@@ -171,8 +171,9 @@ func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 func TestWorkflowPanic(t *testing.T) {
 	ts := &WorkflowTestSuite{}
 	ts.SetLogger(zap.NewNop()) // this test simulate panic, use nop logger to avoid logging noise
-	ts.RegisterActivity(testAct, RegisterActivityOptions{})
 	env := ts.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(splitJoinActivityWorkflow, RegisterWorkflowOptions{})
+	env.impl.hostEnv.RegisterActivity(testAct, RegisterActivityOptions{})
 	env.ExecuteWorkflow(splitJoinActivityWorkflow, true)
 	require.True(t, env.IsWorkflowCompleted())
 	require.NotNil(t, env.GetWorkflowError())
@@ -188,6 +189,7 @@ func testClockWorkflow(ctx Context) (time.Time, error) {
 
 func (s *WorkflowUnitTest) Test_ClockWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(testClockWorkflow, RegisterWorkflowOptions{})
 	env.ExecuteWorkflow(testClockWorkflow)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -245,6 +247,7 @@ func TestTimerWorkflow(t *testing.T) {
 	ts := &WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 	w := &testTimerWorkflow{t: t}
+	env.impl.hostEnv.RegisterWorkflow(w.Execute, RegisterWorkflowOptions{})
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
 	require.True(t, env.IsWorkflowCompleted())
 	require.NoError(t, env.GetWorkflowError())
@@ -293,10 +296,10 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 
 func TestActivityCancellation(t *testing.T) {
 	ts := &WorkflowTestSuite{}
-	ao := RegisterActivityOptions{}
-	ts.RegisterActivity(testAct, ao)
 	env := ts.NewTestWorkflowEnvironment()
 	w := &testActivityCancelWorkflow{t: t}
+	env.impl.hostEnv.RegisterWorkflow(w.Execute, RegisterWorkflowOptions{})
+	env.impl.hostEnv.RegisterActivity(testAct, RegisterActivityOptions{})
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
 	require.True(t, env.IsWorkflowCompleted())
 	require.NoError(t, env.GetWorkflowError())
@@ -352,6 +355,11 @@ func greetingsWorkflow(ctx Context) (result string, err error) {
 
 func (s *WorkflowUnitTest) Test_ExternalExampleWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(greetingsWorkflow, RegisterWorkflowOptions{})
+	ao := RegisterActivityOptions{}
+	env.impl.hostEnv.RegisterActivity(getGreetingActivity, ao)
+	env.impl.hostEnv.RegisterActivity(getNameActivity, ao)
+	env.impl.hostEnv.RegisterActivity(sayGreetingActivity, ao)
 	env.ExecuteWorkflow(greetingsWorkflow)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -366,6 +374,7 @@ func continueAsNewWorkflowTest(ctx Context) error {
 
 func (s *WorkflowUnitTest) Test_ContinueAsNewWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(continueAsNewWorkflowTest, RegisterWorkflowOptions{})
 	env.ExecuteWorkflow(continueAsNewWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NotNil(env.GetWorkflowError())
@@ -385,6 +394,7 @@ func cancelWorkflowTest(ctx Context) (string, error) {
 
 func (s *WorkflowUnitTest) Test_CancelWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(cancelWorkflowTest, RegisterWorkflowOptions{})
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
 	}, time.Hour)
@@ -422,6 +432,8 @@ func cancelWorkflowAfterActivityTest(ctx Context) ([]byte, error) {
 
 func (s *WorkflowUnitTest) Test_CancelWorkflowAfterActivity() {
 	env := s.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(cancelWorkflowAfterActivityTest, RegisterWorkflowOptions{})
+	env.impl.hostEnv.RegisterActivity(testAct, RegisterActivityOptions{})
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
 	}, time.Hour)
@@ -490,6 +502,7 @@ func (s *WorkflowUnitTest) Test_SignalWorkflow() {
 		"Sig3Value1;",
 	}
 	env := s.NewTestWorkflowEnvironment()
+	env.impl.hostEnv.RegisterWorkflow(signalWorkflowTest, RegisterWorkflowOptions{})
 
 	// Setup signals.
 	for i := 0; i < 2; i++ {

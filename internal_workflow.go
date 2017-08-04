@@ -104,7 +104,7 @@ type (
 		blockedReceives []receiveCallback   // receives waiting when no messages are available.
 		closed          bool                // true if channel is closed.
 		recValue        *interface{}        // Used only while receiving value, this is used as pre-fetch buffer value from the channel.
-  }
+	}
 
 	// Single case statement of the Select
 	selectCase struct {
@@ -1032,7 +1032,7 @@ func (p ChildWorkflowPolicy) toThriftChildPolicyPtr() *shared.ChildPolicy {
 // newDecodeFuture creates a new future as well as associated Settable that is used to set its value.
 // fn - the decoded value needs to be validated against a function.
 func newDecodeFuture(ctx Context, fn interface{}, env *hostEnvImpl) (Future, Settable) {
-  c := NewChannel(ctx).(*channelImpl)
+	c := NewChannel(ctx).(*channelImpl)
 	impl := &decodeFutureImpl{
 		&futureImpl{channel: c},
 		fn,

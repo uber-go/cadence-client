@@ -64,7 +64,8 @@ const (
 
 	UnhandledSignalsCounter = "unhandled-signals"
 
-	CadenceRequest = "cadence-request"
-	CadenceError   = "cadence-error"
-	CadenceLatency = "cadence-latency"
+	CadenceRequest        = "cadence-request"
+	CadenceError          = "cadence-error"
+	CadenceLatency        = "cadence-latency"
+	CadenceInvalidRequest = "cadence-invalid-request"
 )

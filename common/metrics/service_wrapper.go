@@ -30,12 +30,19 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 )
 
-type workflowServiceMetricsWrapper struct {
-	service     m.TChanWorkflowService
-	scope       tally.Scope
-	childScopes map[string]tally.Scope
-	mutex       sync.Mutex
-}
+type (
+	workflowServiceMetricsWrapper struct {
+		service     m.TChanWorkflowService
+		scope       tally.Scope
+		childScopes map[string]tally.Scope
+		mutex       sync.Mutex
+	}
+
+	operationScope struct {
+		scope     tally.Scope
+		startTime time.Time
+	}
+)
 
 const (
 	scopeNameDeprecateDomain                = "DeprecateDomain"
@@ -76,218 +83,150 @@ func (w *workflowServiceMetricsWrapper) getScope(scopeName string) tally.Scope {
 	return scope
 }
 
-func (w *workflowServiceMetricsWrapper) DeprecateDomain(ctx thrift.Context, request *shared.DeprecateDomainRequest) error {
-	scope := w.getScope(scopeNameDeprecateDomain)
+func (w *workflowServiceMetricsWrapper) getOperationScope(scopeName string) *operationScope {
+	scope := w.getScope(scopeName)
 	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
-	err := w.service.DeprecateDomain(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
+
+	return &operationScope{scope: scope, startTime: time.Now()}
+}
+
+func (s *operationScope) handleError(err error) {
+	s.scope.Timer(CadenceLatency).Record(time.Now().Sub(s.startTime))
 	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
+		switch err.(type) {
+		case *shared.EntityNotExistsError,
+			*shared.BadRequestError,
+			*shared.DomainAlreadyExistsError,
+			*shared.WorkflowExecutionAlreadyStartedError:
+			s.scope.Counter(CadenceInvalidRequest).Inc(1)
+		default:
+			s.scope.Counter(CadenceError).Inc(1)
+		}
 	}
+}
+
+func (w *workflowServiceMetricsWrapper) DeprecateDomain(ctx thrift.Context, request *shared.DeprecateDomainRequest) error {
+	scope := w.getOperationScope(scopeNameDeprecateDomain)
+	err := w.service.DeprecateDomain(ctx, request)
+	scope.handleError(err)
 	return err
 }
 
 func (w *workflowServiceMetricsWrapper) DescribeDomain(ctx thrift.Context, request *shared.DescribeDomainRequest) (*shared.DescribeDomainResponse, error) {
-	scope := w.getScope(scopeNameDescribeDomain)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameDescribeDomain)
 	result, err := w.service.DescribeDomain(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return result, err
 }
 
 func (w *workflowServiceMetricsWrapper) GetWorkflowExecutionHistory(ctx thrift.Context, request *shared.GetWorkflowExecutionHistoryRequest) (*shared.GetWorkflowExecutionHistoryResponse, error) {
-	scope := w.getScope(scopeNameGetWorkflowExecutionHistory)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameGetWorkflowExecutionHistory)
 	result, err := w.service.GetWorkflowExecutionHistory(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return result, err
 }
 
 func (w *workflowServiceMetricsWrapper) ListClosedWorkflowExecutions(ctx thrift.Context, request *shared.ListClosedWorkflowExecutionsRequest) (*shared.ListClosedWorkflowExecutionsResponse, error) {
-	scope := w.getScope(scopeNameListClosedWorkflowExecutions)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameListClosedWorkflowExecutions)
 	result, err := w.service.ListClosedWorkflowExecutions(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return result, err
 }
 
 func (w *workflowServiceMetricsWrapper) ListOpenWorkflowExecutions(ctx thrift.Context, request *shared.ListOpenWorkflowExecutionsRequest) (*shared.ListOpenWorkflowExecutionsResponse, error) {
-	scope := w.getScope(scopeNameListOpenWorkflowExecutions)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameListOpenWorkflowExecutions)
 	result, err := w.service.ListOpenWorkflowExecutions(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return result, err
 }
 
 func (w *workflowServiceMetricsWrapper) PollForActivityTask(ctx thrift.Context, request *shared.PollForActivityTaskRequest) (*shared.PollForActivityTaskResponse, error) {
-	scope := w.getScope(scopeNamePollForActivityTask)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNamePollForActivityTask)
 	result, err := w.service.PollForActivityTask(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return result, err
 }
 
 func (w *workflowServiceMetricsWrapper) PollForDecisionTask(ctx thrift.Context, request *shared.PollForDecisionTaskRequest) (*shared.PollForDecisionTaskResponse, error) {
-	scope := w.getScope(scopeNamePollForDecisionTask)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNamePollForDecisionTask)
 	result, err := w.service.PollForDecisionTask(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return result, err
 }
 
 func (w *workflowServiceMetricsWrapper) RecordActivityTaskHeartbeat(ctx thrift.Context, request *shared.RecordActivityTaskHeartbeatRequest) (*shared.RecordActivityTaskHeartbeatResponse, error) {
-	scope := w.getScope(scopeNameRecordActivityTaskHeartbeat)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameRecordActivityTaskHeartbeat)
 	result, err := w.service.RecordActivityTaskHeartbeat(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return result, err
 }
 
 func (w *workflowServiceMetricsWrapper) RegisterDomain(ctx thrift.Context, request *shared.RegisterDomainRequest) error {
-	scope := w.getScope(scopeNameRegisterDomain)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameRegisterDomain)
 	err := w.service.RegisterDomain(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return err
 }
 
 func (w *workflowServiceMetricsWrapper) RequestCancelWorkflowExecution(ctx thrift.Context, request *shared.RequestCancelWorkflowExecutionRequest) error {
-	scope := w.getScope(scopeNameRequestCancelWorkflowExecution)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameRequestCancelWorkflowExecution)
 	err := w.service.RequestCancelWorkflowExecution(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return err
 }
 
 func (w *workflowServiceMetricsWrapper) RespondActivityTaskCanceled(ctx thrift.Context, request *shared.RespondActivityTaskCanceledRequest) error {
-	scope := w.getScope(scopeNameRespondActivityTaskCanceled)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameRespondActivityTaskCanceled)
 	err := w.service.RespondActivityTaskCanceled(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return err
 }
 
 func (w *workflowServiceMetricsWrapper) RespondActivityTaskCompleted(ctx thrift.Context, request *shared.RespondActivityTaskCompletedRequest) error {
-	scope := w.getScope(scopeNameRespondActivityTaskCompleted)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameRespondActivityTaskCompleted)
 	err := w.service.RespondActivityTaskCompleted(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return err
 }
 
 func (w *workflowServiceMetricsWrapper) RespondActivityTaskFailed(ctx thrift.Context, request *shared.RespondActivityTaskFailedRequest) error {
-	scope := w.getScope(scopeNameRespondActivityTaskFailed)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameRespondActivityTaskFailed)
 	err := w.service.RespondActivityTaskFailed(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return err
 }
 
 func (w *workflowServiceMetricsWrapper) RespondDecisionTaskCompleted(ctx thrift.Context, request *shared.RespondDecisionTaskCompletedRequest) error {
-	scope := w.getScope(scopeNameRespondDecisionTaskCompleted)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameRespondDecisionTaskCompleted)
 	err := w.service.RespondDecisionTaskCompleted(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return err
 }
 
 func (w *workflowServiceMetricsWrapper) SignalWorkflowExecution(ctx thrift.Context, request *shared.SignalWorkflowExecutionRequest) error {
-	scope := w.getScope(scopeNameSignalWorkflowExecution)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameSignalWorkflowExecution)
 	err := w.service.SignalWorkflowExecution(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return err
 }
 
 func (w *workflowServiceMetricsWrapper) StartWorkflowExecution(ctx thrift.Context, request *shared.StartWorkflowExecutionRequest) (*shared.StartWorkflowExecutionResponse, error) {
-	scope := w.getScope(scopeNameStartWorkflowExecution)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameStartWorkflowExecution)
 	result, err := w.service.StartWorkflowExecution(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return result, err
 }
 
 func (w *workflowServiceMetricsWrapper) TerminateWorkflowExecution(ctx thrift.Context, request *shared.TerminateWorkflowExecutionRequest) error {
-	scope := w.getScope(scopeNameTerminateWorkflowExecution)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameTerminateWorkflowExecution)
 	err := w.service.TerminateWorkflowExecution(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return err
 }
 
 func (w *workflowServiceMetricsWrapper) UpdateDomain(ctx thrift.Context, request *shared.UpdateDomainRequest) (*shared.UpdateDomainResponse, error) {
-	scope := w.getScope(scopeNameUpdateDomain)
-	scope.Counter(CadenceRequest).Inc(1)
-	startTime := time.Now()
+	scope := w.getOperationScope(scopeNameUpdateDomain)
 	result, err := w.service.UpdateDomain(ctx, request)
-	scope.Timer(CadenceLatency).Record(time.Now().Sub(startTime))
-	if err != nil {
-		scope.Counter(CadenceError).Inc(1)
-	}
+	scope.handleError(err)
 	return result, err
 }

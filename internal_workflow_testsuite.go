@@ -258,18 +258,32 @@ func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(optio
 	return childEnv
 }
 
-func (env *testWorkflowEnvironmentImpl) setActivityTaskList(tasklist string, activityFns ...interface{}) {
-	ao := RegisterActivityOptions{}
+func (env *testWorkflowEnvironmentImpl) setActivityTaskList(
+	tasklist string,
+	ao RegisterActivityOptions,
+	activityFns ...interface{},
+) {
 	for _, activityFn := range activityFns {
 		env.GetHostEnvironment().RegisterActivity(activityFn, ao)
 		fnName := getFunctionName(activityFn)
-		taskListActivity, ok := env.taskListSpecificActivities[fnName]
-		if !ok {
-			taskListActivity = &taskListSpecificActivity{fn: activityFn, taskLists: make(map[string]struct{})}
-			env.taskListSpecificActivities[fnName] = taskListActivity
+		env.addToActivityTaskList(tasklist, fnName, activityFn)
+		if alias, ok := env.hostEnv.activityAliasMap[fnName]; ok {
+			env.addToActivityTaskList(tasklist, alias, activityFn)
 		}
-		taskListActivity.taskLists[tasklist] = struct{}{}
 	}
+}
+
+func (env *testWorkflowEnvironmentImpl) addToActivityTaskList(
+	tasklist string,
+	fnName string,
+	activityFn interface{},
+) {
+	taskListActivity, ok := env.taskListSpecificActivities[fnName]
+	if !ok {
+		taskListActivity = &taskListSpecificActivity{fn: activityFn, taskLists: make(map[string]struct{})}
+		env.taskListSpecificActivities[fnName] = taskListActivity
+	}
+	taskListActivity.taskLists[tasklist] = struct{}{}
 }
 
 func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, args ...interface{}) {
@@ -384,12 +398,18 @@ func (env *testWorkflowEnvironmentImpl) overrideActivity(activityFn, fakeActivit
 	validateOverrideFunction(activityFn, fakeActivityFn, false)
 	fnName := getFunctionName(activityFn)
 	env.overrodeActivities[fnName] = fakeActivityFn
+	if alias, ok := env.hostEnv.activityAliasMap[fnName]; ok {
+		env.overrodeWorkflows[alias] = fakeActivityFn
+	}
 }
 
 func (env *testWorkflowEnvironmentImpl) overrideWorkflow(workflowFn, fakeWorkflowFn interface{}) {
 	validateOverrideFunction(workflowFn, fakeWorkflowFn, true)
 	fnName := getFunctionName(workflowFn)
 	env.overrodeWorkflows[fnName] = fakeWorkflowFn
+	if alias, ok := env.hostEnv.workflowAliasMap[fnName]; ok {
+		env.overrodeWorkflows[alias] = fakeWorkflowFn
+	}
 }
 
 func (env *testWorkflowEnvironmentImpl) startDecisionTask() {

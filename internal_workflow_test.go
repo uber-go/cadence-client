@@ -148,7 +148,7 @@ func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
 	env.impl.hostEnv.RegisterWorkflow(splitJoinActivityWorkflow, RegisterWorkflowOptions{})
 	env.impl.hostEnv.RegisterActivity(testAct, RegisterActivityOptions{})
-	env.SetActivityTaskList(defaultTestTaskList, testAct)
+	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testAct)
 	env.OverrideActivity(testAct, func(ctx context.Context) (string, error) {
 		activityID := GetActivityInfo(ctx).ActivityID
 		switch activityID {

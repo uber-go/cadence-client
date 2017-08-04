@@ -128,6 +128,10 @@ type (
 		ListOpenWorkflow(request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error)
 
 		// RegisterWorkflow - registers a workflow function with provided options with the framework.
+		// The user can use options to provide an external name for the workflow or leave it empty if no
+		// external name is required. This can be used as
+		// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{})
+		// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{Name: "fooExternal"})
 		// A workflow function takes a cadence context and input and returns a (result, error) or just error.
 		// Examples:
 		//	func sampleWorkflow(ctx cadence.Context, input []byte) (result []byte, err error)
@@ -139,6 +143,10 @@ type (
 		RegisterWorkflow(interface{}, RegisterWorkflowOptions) error
 
 		// RegisterActivity - register a activity function with provided options with the framework.
+		// The user can use options to provide an external name for the activity or leave it empty if no
+		// external name is required. This can be used as
+		// client.RegisterActivity(barActivity, RegisterActivityOptions{})
+		// client.RegisterActivity(barActivity, RegisterActivityOptions{Name: "barExternal"})
 		// A activity takes a context and input and returns a (result, error) or just error.
 		// Examples:
 		//	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)

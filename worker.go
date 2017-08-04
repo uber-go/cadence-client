@@ -46,8 +46,16 @@ type (
 	Worker interface {
 		BaseWorker
 		// RegisterWorkflow registers the workflow function with options
+		// The user can use options to provide an external name for the workflow or leave it empty if no
+		// external name is required. This can be used as
+		// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{})
+		// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{Name: "fooExternal"})
 		RegisterWorkflow(interface{}, RegisterWorkflowOptions) error
 		// RegisterActivity registers the activity function with options
+		// The user can use options to provide an external name for the activity or leave it empty if no
+		// external name is required. This can be used as
+		// client.RegisterActivity(barActivity, RegisterActivityOptions{})
+		// client.RegisterActivity(barActivity, RegisterActivityOptions{Name: "barExternal"})
 		RegisterActivity(interface{}, RegisterActivityOptions) error
 	}
 

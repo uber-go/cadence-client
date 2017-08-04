@@ -65,11 +65,19 @@ type (
 )
 
 // RegisterWorkflow registers the workflow function with options
+// The user can use options to provide an external name for the workflow or leave it empty if no
+// external name is required. This can be used as
+// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{})
+// client.RegisterWorkflow(fooWorkflow, RegisterWorkflowOptions{Name: "fooExternal"})
 func (wc *workflowClient) RegisterWorkflow(wf interface{}, opts RegisterWorkflowOptions) error {
 	return wc.env.RegisterWorkflow(wf, opts)
 }
 
 // RegisterActivity registers the activity function with options
+// The user can use options to provide an external name for the activity or leave it empty if no
+// external name is required. This can be used as
+// client.RegisterActivity(barActivity, RegisterActivityOptions{})
+// client.RegisterActivity(barActivity, RegisterActivityOptions{Name: "barExternal"})
 func (wc *workflowClient) RegisterActivity(af interface{}, opts RegisterActivityOptions) error {
 	return wc.env.RegisterActivity(af, opts)
 }

@@ -26,6 +26,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -89,7 +90,7 @@ type (
 		activityRegistry    activityRegistry
 		workflowService     m.TChanWorkflowService
 		domain              string
-		poller              *activityTaskPoller
+		poller              taskPoller
 		worker              *baseWorker
 		identity            string
 	}
@@ -161,6 +162,7 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 
 	if params.MetricsScope == nil {
 		params.MetricsScope = tally.NoopScope
+		params.Logger.Info("No metrics scope configured for cadence worker. Use NoopScope as default.")
 	}
 }
 
@@ -186,6 +188,10 @@ func verifyDomainExist(client m.TChanWorkflowService, domain string, logger *zap
 			logger.Warn("unable to verify if domain exist", zap.String("domain", domain), zap.Error(err))
 		}
 		return nil
+	}
+
+	if len(domain) == 0 {
+		return errors.New("domain cannot be empty")
 	}
 
 	// exponential backoff retry for upto a minute
@@ -241,6 +247,7 @@ func newWorkflowTaskWorkerInternal(
 		poller:              poller,
 		worker:              worker,
 		identity:            params.Identity,
+		domain:              domain,
 	}
 }
 
@@ -317,6 +324,7 @@ func newActivityTaskWorker(
 		worker:              base,
 		poller:              poller,
 		identity:            workerParams.Identity,
+		domain:              domain,
 	}
 }
 
@@ -906,6 +914,10 @@ func newAggregatedWorker(
 	}
 
 	ensureRequiredParams(&workerParams)
+	tags := map[string]string{
+		tagDomain: domain,
+	}
+	workerParams.MetricsScope = workerParams.MetricsScope.Tagged(tags)
 	workerParams.Logger = workerParams.Logger.With(
 		zapcore.Field{Key: tagDomain, Type: zapcore.StringType, String: domain},
 		zapcore.Field{Key: tagTaskList, Type: zapcore.StringType, String: taskList},

@@ -59,7 +59,6 @@ const (
 
 // Assert that structs do indeed implement the interfaces
 var _ Worker = (*aggregatedWorker)(nil)
-var _ hostEnv = (*hostEnvImpl)(nil)
 
 type (
 
@@ -353,16 +352,6 @@ func (aw *activityWorker) Stop() {
 
 type workerFunc func(ctx Context, input []byte) ([]byte, error)
 type activityFunc func(ctx context.Context, input []byte) ([]byte, error)
-
-// hostEnv stores all worker-specific parameters that will
-// be stored inside of a context.
-type hostEnv interface {
-	RegisterWorkflow(wf interface{}) error
-	RegisterActivity(af interface{}) error
-	// TODO: This encoder should be pluggable.
-	Encoder() encoding
-	RegisterFnType(fnType reflect.Type) error
-}
 
 type interceptorFn func(name string, workflow interface{}) (string, interface{})
 
@@ -841,6 +830,23 @@ func (th *hostEnvImpl) encodeArg(arg interface{}) ([]byte, error) {
 // decode single value(like return parameter).
 func (th *hostEnvImpl) decodeArg(data []byte, to interface{}) error {
 	return th.decode(data, []interface{}{to})
+}
+
+func (th *hostEnvImpl) decodeAndAssignValue(from interface{}, toValuePtr interface{}) error {
+	if toValuePtr == nil {
+		return nil
+	}
+	if rf := reflect.ValueOf(toValuePtr); rf.Type().Kind() != reflect.Ptr {
+		return errors.New("value parameter provided is not a pointer")
+	}
+	if data, ok := from.([]byte); ok {
+		if err := th.decodeArg(data, toValuePtr); err != nil {
+			return err
+		}
+	} else if fv := reflect.ValueOf(from); fv.IsValid() {
+		reflect.ValueOf(toValuePtr).Elem().Set(fv)
+	}
+	return nil
 }
 
 func isTypeByteSlice(inType reflect.Type) bool {

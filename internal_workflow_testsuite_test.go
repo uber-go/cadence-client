@@ -30,6 +30,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/common"
 	"go.uber.org/zap"
 )
 
@@ -55,23 +57,6 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 
 func TestUnitTestSuite(t *testing.T) {
 	suite.Run(t, new(WorkflowTestSuiteUnitTest))
-}
-
-func (s *WorkflowTestSuiteUnitTest) Test_ActivityOverride() {
-	fakeActivity := func(ctx context.Context, msg string) (string, error) {
-		return "fake_" + msg, nil
-	}
-
-	env := s.NewTestWorkflowEnvironment()
-	env.OverrideActivity(testActivityHello, fakeActivity)
-
-	env.ExecuteWorkflow(testWorkflowHello)
-
-	s.True(env.IsWorkflowCompleted())
-	s.NoError(env.GetWorkflowError())
-	var result string
-	env.GetWorkflowResult(&result)
-	s.Equal("fake_world", result)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockFunction() {
@@ -325,7 +310,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
 	env := s.NewTestWorkflowEnvironment()
 	var activityInfo ActivityInfo
-	fakeActivity := func(ctx context.Context, msg string) (string, error) {
+	mockActivity := func(ctx context.Context, msg string) (string, error) {
 		activityInfo = GetActivityInfo(ctx)
 		env.RegisterDelayedCallback(func() {
 			err := env.CompleteActivity(activityInfo.TaskToken, "async_complete", nil)
@@ -334,12 +319,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
 		return "", ErrActivityResultPending
 	}
 
-	env.OverrideActivity(testActivityHello, fakeActivity)
+	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return(mockActivity).Once()
 	env.SetTestTimeout(time.Second * 2) // don't waist time waiting
 
 	env.ExecuteWorkflow(testWorkflowHello) // workflow won't complete, as the fakeActivity returns ErrActivityResultPending
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
+	env.AssertExpectations(s.T())
 
 	var result string
 	env.GetWorkflowResult(&result)
@@ -517,47 +503,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowCancel() {
 
 	s.True(env.IsWorkflowCompleted())
 	s.Nil(env.GetWorkflowError())
-}
-
-func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Override() {
-	workflowFn := func(ctx Context) (string, error) {
-		ctx = WithActivityOptions(ctx, s.activityOptions)
-		var helloActivityResult string
-		err := ExecuteActivity(ctx, testActivityHello, "activity").Get(ctx, &helloActivityResult)
-		if err != nil {
-			return "", err
-		}
-
-		cwo := ChildWorkflowOptions{ExecutionStartToCloseTimeout: time.Minute}
-		ctx = WithChildWorkflowOptions(ctx, cwo)
-		var helloWorkflowResult string
-		err = ExecuteChildWorkflow(ctx, testWorkflowHello).Get(ctx, &helloWorkflowResult)
-		if err != nil {
-			return "", err
-		}
-		var heartbeatWorkflowResult string
-		err = ExecuteChildWorkflow(ctx, testWorkflowHeartbeat, "slow", time.Hour).Get(ctx, &heartbeatWorkflowResult)
-		if err != nil {
-			return "", err
-		}
-
-		return helloActivityResult + " " + helloWorkflowResult + " " + heartbeatWorkflowResult, nil
-	}
-
-	env := s.NewTestWorkflowEnvironment()
-	env.OverrideActivity(testActivityHello, func(ctx context.Context, msg string) (string, error) {
-		return "fake_" + msg, nil
-	})
-	env.OverrideWorkflow(testWorkflowHeartbeat, func(ctx Context, msg string, waitTime time.Duration) (string, error) {
-		return "fake_heartbeat", nil
-	})
-	env.ExecuteWorkflow(workflowFn)
-
-	s.True(env.IsWorkflowCompleted())
-	s.NoError(env.GetWorkflowError())
-	var actualResult string
-	s.NoError(env.GetWorkflowResult(&actualResult))
-	s.Equal("fake_activity fake_world fake_heartbeat", actualResult)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock() {
@@ -940,4 +885,49 @@ func (s *WorkflowTestSuiteUnitTest) Test_GetVersion() {
 	s.True(env.IsWorkflowCompleted())
 	s.Nil(env.GetWorkflowError())
 	env.AssertExpectations(s.T())
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithThriftTypes() {
+	actualValues := []string{}
+	retVal := &shared.WorkflowExecution{WorkflowId: common.StringPtr("retwID2"), RunId: common.StringPtr("retrID2")}
+
+	// Passing one argument
+	activitySingleFn := func(ctx context.Context, wf *shared.WorkflowExecution) (*shared.WorkflowExecution, error) {
+		actualValues = append(actualValues, wf.GetWorkflowId())
+		actualValues = append(actualValues, wf.GetRunId())
+		return retVal, nil
+	}
+
+	input := &shared.WorkflowExecution{WorkflowId: common.StringPtr("wID1"), RunId: common.StringPtr("rID1")}
+	env := s.NewTestActivityEnvironment()
+	blob, err := env.ExecuteActivity(activitySingleFn, input)
+	s.NoError(err)
+	var ret *shared.WorkflowExecution
+	blob.Get(&ret)
+	s.Equal(retVal, ret)
+
+	// Passing more than one argument
+	activityDoubleArgFn := func(ctx context.Context, wf *shared.WorkflowExecution, t *shared.WorkflowType) (*shared.WorkflowExecution, error) {
+		actualValues = append(actualValues, wf.GetWorkflowId())
+		actualValues = append(actualValues, wf.GetRunId())
+		actualValues = append(actualValues, t.GetName())
+		return retVal, nil
+	}
+
+	input = &shared.WorkflowExecution{WorkflowId: common.StringPtr("wID2"), RunId: common.StringPtr("rID3")}
+	wt := &shared.WorkflowType{Name: common.StringPtr("wType")}
+	env = s.NewTestActivityEnvironment()
+	blob, err = env.ExecuteActivity(activityDoubleArgFn, input, wt)
+	s.NoError(err)
+	blob.Get(&ret)
+	s.Equal(retVal, ret)
+
+	expectedValues := []string{
+		"wID1",
+		"rID1",
+		"wID2",
+		"rID3",
+		"wType",
+	}
+	s.EqualValues(expectedValues, actualValues)
 }

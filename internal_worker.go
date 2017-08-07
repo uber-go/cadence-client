@@ -460,9 +460,6 @@ func (th *hostEnvImpl) RegisterActivityWithOptions(
 	if len(alias) > 0 {
 		registerName = alias
 	}
-	if len(alias) > 0 {
-		registerName = alias
-	}
 	// Check if already registered
 	if _, ok := th.getActivityFn(registerName); ok {
 		return fmt.Errorf("activity type \"%v\" is already registered", registerName)

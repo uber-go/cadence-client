@@ -78,14 +78,10 @@ type (
 		identity            string
 	}
 
-	// activityRegistry collection of activity implementations
-	activityRegistry map[string]activity
-
 	// ActivityWorker wraps the code for hosting activity types.
 	// TODO: Worker doing heartbeating automatically while activity task is running
 	activityWorker struct {
 		executionParameters workerExecutionParameters
-		activityRegistry    activityRegistry
 		workflowService     m.TChanWorkflowService
 		domain              string
 		poller              taskPoller
@@ -134,13 +130,13 @@ type (
 
 // newWorkflowWorker returns an instance of the workflow worker.
 func newWorkflowWorker(
-	factory workflowDefinitionFactory,
 	service m.TChanWorkflowService,
 	domain string,
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
+	hostEnv *hostEnvImpl,
 ) Worker {
-	return newWorkflowWorkerInternal(factory, service, domain, params, ppMgr, nil)
+	return newWorkflowWorkerInternal(service, domain, params, ppMgr, nil, hostEnv)
 }
 
 func ensureRequiredParams(params *workerExecutionParameters) {
@@ -197,12 +193,12 @@ func verifyDomainExist(client m.TChanWorkflowService, domain string, logger *zap
 }
 
 func newWorkflowWorkerInternal(
-	factory workflowDefinitionFactory,
 	service m.TChanWorkflowService,
 	domain string,
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
 	overrides *workerOverrides,
+	hostEnv *hostEnvImpl,
 ) Worker {
 	// Get a workflow task handler.
 	ensureRequiredParams(&params)
@@ -210,7 +206,7 @@ func newWorkflowWorkerInternal(
 	if overrides != nil && overrides.workflowTaskHandler != nil {
 		taskHandler = overrides.workflowTaskHandler
 	} else {
-		taskHandler = newWorkflowTaskHandler(factory, domain, params, ppMgr)
+		taskHandler = newWorkflowTaskHandler(domain, params, ppMgr, hostEnv)
 	}
 	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params)
 }
@@ -274,11 +270,11 @@ func (ww *workflowWorker) Stop() {
 }
 
 func newActivityWorker(
-	activities []activity,
 	service m.TChanWorkflowService,
 	domain string,
 	params workerExecutionParameters,
 	overrides *workerOverrides,
+	env *hostEnvImpl,
 ) Worker {
 	ensureRequiredParams(&params)
 	// Get a activity task handler.
@@ -286,7 +282,7 @@ func newActivityWorker(
 	if overrides != nil && overrides.activityTaskHandler != nil {
 		taskHandler = overrides.activityTaskHandler
 	} else {
-		taskHandler = newActivityTaskHandler(activities, service, params)
+		taskHandler = newActivityTaskHandler(service, params, env)
 	}
 	return newActivityTaskWorker(taskHandler, service, domain, params)
 }
@@ -295,7 +291,8 @@ func newActivityTaskWorker(
 	taskHandler ActivityTaskHandler,
 	service m.TChanWorkflowService,
 	domain string,
-	workerParams workerExecutionParameters) (worker Worker) {
+	workerParams workerExecutionParameters,
+) (worker Worker) {
 	ensureRequiredParams(&workerParams)
 
 	poller := newActivityTaskPoller(
@@ -304,20 +301,22 @@ func newActivityTaskWorker(
 		domain,
 		workerParams,
 	)
-	base := newBaseWorker(baseWorkerOptions{
-		pollerCount:                workerParams.ConcurrentPollRoutineSize,
-		maxConcurrentTask:          workerParams.ConcurrentActivityExecutionSize,
-		maxTaskRate:                workerParams.MaxActivityExecutionRate,
-		maxTaskRateRefreshDuration: workerParams.MaxActivityExecutionRateRefreshDuration,
-		taskWorker:                 poller,
-		workflowService:            service,
-		identity:                   workerParams.Identity,
-		workerType:                 "ActivityWorker"},
-		workerParams.Logger)
+	base := newBaseWorker(
+		baseWorkerOptions{
+			pollerCount:                workerParams.ConcurrentPollRoutineSize,
+			maxConcurrentTask:          workerParams.ConcurrentActivityExecutionSize,
+			maxTaskRate:                workerParams.MaxActivityExecutionRate,
+			maxTaskRateRefreshDuration: workerParams.MaxActivityExecutionRateRefreshDuration,
+			taskWorker:                 poller,
+			workflowService:            service,
+			identity:                   workerParams.Identity,
+			workerType:                 "ActivityWorker",
+		},
+		workerParams.Logger,
+	)
 
 	return &activityWorker{
 		executionParameters: workerParams,
-		activityRegistry:    make(map[string]activity),
 		workflowService:     service,
 		worker:              base,
 		poller:              poller,
@@ -371,7 +370,7 @@ type hostEnvImpl struct {
 	sync.Mutex
 	workflowFuncMap                  map[string]interface{}
 	workflowAliasMap                 map[string]string
-	activityFuncMap                  map[string]interface{}
+	activityFuncMap                  map[string]activity
 	activityAliasMap                 map[string]string
 	encoding                         gobEncoding
 	activityRegistrationInterceptors []interceptorFn
@@ -406,15 +405,14 @@ func (th *hostEnvImpl) AddActivityRegistrationInterceptor(i interceptorFn) {
 	th.Lock()
 	funcMapCopy := th.activityFuncMap // used to call listener outside of the lock.
 	th.activityRegistrationInterceptors = append(th.activityRegistrationInterceptors, i)
-	th.activityFuncMap = make(map[string]interface{}) // clear map
+	th.activityFuncMap = make(map[string]activity) // clear map
 	th.Unlock()
-	for w, f := range funcMapCopy {
-		intw, intf := i(w, f)
+	for w, a := range funcMapCopy {
+		intw, intf := i(w, a.GetFunction())
 		th.Lock()
-		th.activityFuncMap[intw] = intf
+		th.activityFuncMap[intw] = &activityExecutor{intw, intf}
 		th.Unlock()
 	}
-	fmt.Println("Hello")
 }
 
 func (th *hostEnvImpl) RegisterWorkflow(af interface{}) error {
@@ -432,25 +430,20 @@ func (th *hostEnvImpl) RegisterWorkflowWithOptions(
 	}
 	fnName := getFunctionName(af)
 	alias := options.Name
-	names := make([]string, 0, 2)
-	names = append(names, fnName)
+	registerName := fnName
 	if len(alias) > 0 {
-		names = append(names, alias)
+		registerName = alias
 	}
-	for _, name := range names {
-		// Check if already registered
-		if _, ok := th.getWorkflowFn(name); ok {
-			return fmt.Errorf("workflow name \"%v\" is already registered", name)
-		}
+	// Check if already registered
+	if _, ok := th.getWorkflowFn(registerName); ok {
+		return fmt.Errorf("workflow name \"%v\" is already registered", registerName)
 	}
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
-	for _, name := range names {
-		name, af = th.invokeInterceptors(name, af, th.workflowRegistrationInterceptors)
-		th.addWorkflowFn(name, af)
-	}
+	registerName, af = th.invokeInterceptors(registerName, af, th.workflowRegistrationInterceptors)
+	th.addWorkflowFn(registerName, af)
 	if len(alias) > 0 {
 		th.addWorkflowAlias(fnName, alias)
 	}
@@ -472,25 +465,23 @@ func (th *hostEnvImpl) RegisterActivityWithOptions(
 	}
 	fnName := getFunctionName(af)
 	alias := options.Name
-	names := make([]string, 0, 2)
-	names = append(names, fnName)
+	registerName := fnName
 	if len(alias) > 0 {
-		names = append(names, alias)
+		registerName = alias
 	}
-	for _, name := range names {
-		// Check if already registered
-		if _, ok := th.getActivityFn(name); ok {
-			return fmt.Errorf("activity type \"%v\" is already registered", name)
-		}
+	if len(alias) > 0 {
+		registerName = alias
+	}
+	// Check if already registered
+	if _, ok := th.getActivityFn(registerName); ok {
+		return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 	}
 	// Register args with encoding.
 	if err := th.registerEncodingTypes(fnType); err != nil {
 		return err
 	}
-	for _, name := range names {
-		name, af = th.invokeInterceptors(name, af, th.activityRegistrationInterceptors)
-		th.addActivityFn(name, af)
-	}
+	registerName, af = th.invokeInterceptors(registerName, af, th.activityRegistrationInterceptors)
+	th.addActivityFn(registerName, af)
 	if len(alias) > 0 {
 		th.addActivityAlias(fnName, alias)
 	}
@@ -562,6 +553,14 @@ func (th *hostEnvImpl) lenWorkflowFns() int {
 	return len(th.workflowFuncMap)
 }
 
+func (th *hostEnvImpl) lookupActivity(fnName string) (activity, bool) {
+	lookup := fnName
+	if alias, ok := th.getActivityAlias(fnName); ok {
+		lookup = alias
+	}
+	return th.getActivity(lookup)
+}
+
 func (th *hostEnvImpl) addActivityAlias(fnName string, alias string) {
 	th.Lock()
 	defer th.Unlock()
@@ -575,17 +574,36 @@ func (th *hostEnvImpl) getActivityAlias(fnName string) (string, bool) {
 	return alias, ok
 }
 
-func (th *hostEnvImpl) addActivityFn(fnName string, af interface{}) {
+func (th *hostEnvImpl) addActivity(fnName string, a activity) {
 	th.Lock()
 	defer th.Unlock()
-	th.activityFuncMap[fnName] = af
+	th.activityFuncMap[fnName] = a
+}
+
+func (th *hostEnvImpl) addActivityFn(fnName string, af interface{}) {
+	th.addActivity(fnName, &activityExecutor{fnName, af})
+}
+
+func (th *hostEnvImpl) getActivity(fnName string) (activity, bool) {
+	th.Lock()
+	defer th.Unlock()
+	a, ok := th.activityFuncMap[fnName]
+	return a, ok
 }
 
 func (th *hostEnvImpl) getActivityFn(fnName string) (interface{}, bool) {
-	th.Lock()
-	defer th.Unlock()
-	fn, ok := th.activityFuncMap[fnName]
-	return fn, ok
+	if a, ok := th.getActivity(fnName); ok {
+		return a.GetFunction(), ok
+	}
+	return nil, false
+}
+
+func (th *hostEnvImpl) getRegisteredActivities() []activity {
+	activities := make([]activity, 0, len(th.activityFuncMap))
+	for _, a := range th.activityFuncMap {
+		activities = append(activities, a)
+	}
+	return activities
 }
 
 func (th *hostEnvImpl) getRegisteredActivityTypes() []string {
@@ -639,6 +657,16 @@ func (th *hostEnvImpl) registerType(t reflect.Type) error {
 	return th.Encoder().Register(arg)
 }
 
+func (th *hostEnvImpl) getWorkflowDefinition(wt WorkflowType) (workflowDefinition, error) {
+	wf, ok := th.getWorkflowFn(wt.Name)
+	if !ok {
+		supported := strings.Join(th.getRegisteredWorkflowTypes(), ", ")
+		return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
+	}
+	wd := &workflowExecutor{name: wt.Name, fn: wf}
+	return newWorkflowDefinition(wd), nil
+}
+
 // Validate function parameters.
 func validateFnFormat(fnType reflect.Type, isWorkflow bool) error {
 	if fnType.Kind() != reflect.Func {
@@ -678,16 +706,6 @@ func validateFnFormat(fnType reflect.Type, isWorkflow bool) error {
 	return nil
 }
 
-func (th *hostEnvImpl) getRegisteredActivities() []activity {
-	result := []activity{}
-	th.Lock()
-	for name, af := range th.activityFuncMap {
-		result = append(result, &activityExecutor{name: name, fn: af})
-	}
-	th.Unlock()
-	return result
-}
-
 // encode set of values.
 func (th *hostEnvImpl) encode(r []interface{}) ([]byte, error) {
 	if len(r) == 1 && isTypeByteSlice(reflect.TypeOf(r[0])) {
@@ -701,7 +719,7 @@ func (th *hostEnvImpl) encode(r []interface{}) ([]byte, error) {
 		}
 	}
 
-	data, err := getHostEnvironment().Encoder().Marshal(r)
+	data, err := th.Encoder().Marshal(r)
 	if err != nil {
 		return nil, err
 	}
@@ -722,7 +740,7 @@ func (th *hostEnvImpl) decode(data []byte, to []interface{}) error {
 		}
 	}
 
-	if err := getHostEnvironment().Encoder().Unmarshal(data, to); err != nil {
+	if err := th.Encoder().Unmarshal(data, to); err != nil {
 		return err
 	}
 	return nil
@@ -775,15 +793,19 @@ var once sync.Once
 // Singleton to hold the host registration details.
 var thImpl *hostEnvImpl
 
+func newHostEnvironment() *hostEnvImpl {
+	return &hostEnvImpl{
+		workflowFuncMap:  make(map[string]interface{}),
+		workflowAliasMap: make(map[string]string),
+		activityFuncMap:  make(map[string]activity),
+		activityAliasMap: make(map[string]string),
+		encoding:         gobEncoding{},
+	}
+}
+
 func getHostEnvironment() *hostEnvImpl {
 	once.Do(func() {
-		thImpl = &hostEnvImpl{
-			workflowFuncMap:  make(map[string]interface{}),
-			workflowAliasMap: make(map[string]string),
-			activityFuncMap:  make(map[string]interface{}),
-			activityAliasMap: make(map[string]string),
-			encoding:         gobEncoding{},
-		}
+		thImpl = newHostEnvironment()
 	})
 	return thImpl
 }
@@ -827,6 +849,10 @@ type activityExecutor struct {
 
 func (ae *activityExecutor) ActivityType() ActivityType {
 	return ActivityType{Name: ae.name}
+}
+
+func (ae *activityExecutor) GetFunction() interface{} {
+	return ae.fn
 }
 
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
@@ -937,31 +963,27 @@ func newAggregatedWorker(
 
 	processTestTags(&wOptions, &workerParams)
 
-	env := getHostEnvironment()
+	hostEnv := getHostEnvironment()
 	// workflow factory.
 	var workflowWorker Worker
 	if !wOptions.DisableWorkflowWorker {
-		if env.lenWorkflowFns() > 0 {
-			workflowFactory := newRegisteredWorkflowFactory()
-			testTags := getTestTags(wOptions.BackgroundActivityContext)
-			if testTags != nil && len(testTags) > 0 {
-				workflowWorker = newWorkflowWorkerWithPressurePoints(
-					workflowFactory,
-					service,
-					domain,
-					workerParams,
-					testTags,
-				)
-			} else {
-				workflowWorker = newWorkflowWorker(
-					getWorkflowDefinitionFactory(workflowFactory),
-					service,
-					domain,
-					workerParams,
-					nil)
-			}
+		testTags := getTestTags(wOptions.BackgroundActivityContext)
+		if testTags != nil && len(testTags) > 0 {
+			workflowWorker = newWorkflowWorkerWithPressurePoints(
+				service,
+				domain,
+				workerParams,
+				testTags,
+				hostEnv,
+			)
 		} else {
-			logger.Warn("Workflow worker is enabled but no workflow is registered. Use cadence.RegisterWorkflow() to register your workflow.")
+			workflowWorker = newWorkflowWorker(
+				service,
+				domain,
+				workerParams,
+				nil,
+				hostEnv,
+			)
 		}
 	}
 
@@ -969,39 +991,19 @@ func newAggregatedWorker(
 	var activityWorker Worker
 
 	if !wOptions.DisableActivityWorker {
-		activityTypes := env.getRegisteredActivities()
-		if len(activityTypes) > 0 {
-			activityWorker = newActivityWorker(
-				activityTypes,
-				service,
-				domain,
-				workerParams,
-				nil,
-			)
-		} else {
-			logger.Warn("Activity worker is enabled but no activity is registered. Use cadence.RegisterActivity() to register your activity.")
-		}
+		activityWorker = newActivityWorker(
+			service,
+			domain,
+			workerParams,
+			nil,
+			hostEnv,
+		)
 	}
 	return &aggregatedWorker{
 		workflowWorker: workflowWorker,
 		activityWorker: activityWorker,
 		logger:         logger,
 	}
-}
-
-func (th *hostEnvImpl) newRegisteredWorkflowFactory() workflowFactory {
-	return func(wt WorkflowType) (workflow, error) {
-		wf, ok := th.getWorkflowFn(wt.Name)
-		if !ok {
-			supported := strings.Join(th.getRegisteredWorkflowTypes(), ", ")
-			return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
-		}
-		return &workflowExecutor{name: wt.Name, fn: wf}, nil
-	}
-}
-
-func newRegisteredWorkflowFactory() workflowFactory {
-	return getHostEnvironment().newRegisteredWorkflowFactory()
 }
 
 func processTestTags(wOptions *WorkerOptions, ep *workerExecutionParameters) {
@@ -1090,16 +1092,6 @@ func (g gobEncoding) Unmarshal(data []byte, objs []interface{}) error {
 		}
 	}
 	return nil
-}
-
-func getWorkflowDefinitionFactory(factory workflowFactory) workflowDefinitionFactory {
-	return func(workflowType WorkflowType) (workflowDefinition, error) {
-		wd, err := factory(workflowType)
-		if err != nil {
-			return nil, err
-		}
-		return newWorkflowDefinition(wd), nil
-	}
 }
 
 func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {

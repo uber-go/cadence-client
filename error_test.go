@@ -50,6 +50,7 @@ func Test_ActivityError(t *testing.T) {
 	s := &WorkflowTestSuite{}
 	for i := 0; i < len(errs); i++ {
 		env := s.NewTestActivityEnvironment()
+		env.impl.setActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, errorActivityFn)
 		_, err := env.ExecuteActivity(errorActivityFn, i)
 		require.Error(t, err)
 		printError(err)

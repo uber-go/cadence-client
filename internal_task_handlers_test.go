@@ -52,6 +52,18 @@ type (
 func init() {
 	RegisterWorkflow(stackTraceWorkflow)
 	RegisterActivity(stackTraceActivity)
+	RegisterWorkflowWithOptions(
+		helloWorldWorkflowFunc,
+		RegisterWorkflowOptions{Name: "HelloWorld_Workflow"},
+	)
+	RegisterWorkflowWithOptions(
+		helloWorldWorkflowCancelFunc,
+		RegisterWorkflowOptions{Name: "HelloWorld_WorkflowCancel"},
+	)
+	RegisterActivityWithOptions(
+		greeterActivityFunc,
+		RegisterActivityOptions{Name: "Greeter_Activity"},
+	)
 }
 
 // Test suite.
@@ -112,10 +124,14 @@ func createTestEventDecisionTaskCompleted(eventID int64, attr *s.DecisionTaskCom
 		DecisionTaskCompletedEventAttributes: attr}
 }
 
-func createWorkflowTask(events []*s.HistoryEvent, previousStartEventID int64) *s.PollForDecisionTaskResponse {
+func createWorkflowTask(
+	events []*s.HistoryEvent,
+	previousStartEventID int64,
+	workflowName string,
+) *s.PollForDecisionTaskResponse {
 	return &s.PollForDecisionTaskResponse{
 		PreviousStartedEventId: common.Int64Ptr(previousStartEventID),
-		WorkflowType:           workflowTypePtr(WorkflowType{"testWorkflow"}),
+		WorkflowType:           workflowTypePtr(WorkflowType{workflowName}),
 		History:                &s.History{Events: events},
 		WorkflowExecution: &s.WorkflowExecution{
 			WorkflowId: common.StringPtr("fake-workflow-id"),
@@ -129,13 +145,13 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
 	testEvents := []*s.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
 	}
-	task := createWorkflowTask(testEvents, 0)
+	task := createWorkflowTask(testEvents, 0, "HelloWorld_Workflow")
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		Identity: "test-id-1",
 		Logger:   t.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, nil)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
 	t.NoError(err)
 	t.NotNil(response)
@@ -158,13 +174,13 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 		createTestEventActivityTaskCompleted(4, &s.ActivityTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
 		createTestEventDecisionTaskStarted(5),
 	}
-	task := createWorkflowTask(testEvents[0:1], 0)
+	task := createWorkflowTask(testEvents[0:1], 0, "HelloWorld_Workflow")
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		Identity: "test-id-1",
 		Logger:   t.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, nil)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
 
 	t.NoError(err)
@@ -174,7 +190,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 	t.NotNil(response.GetDecisions()[0].GetScheduleActivityTaskDecisionAttributes())
 
 	// Schedule an activity and see if we complete workflow, Having only one last decision.
-	task = createWorkflowTask(testEvents, 2)
+	task = createWorkflowTask(testEvents, 2, "HelloWorld_Workflow")
 	response, _, err = taskHandler.ProcessWorkflowTask(task, nil, false)
 	t.NoError(err)
 	t.NotNil(response)
@@ -193,13 +209,13 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 			TaskList:     &s.TaskList{Name: &taskList},
 		}),
 	}
-	task := createWorkflowTask(testEvents, 2)
+	task := createWorkflowTask(testEvents, 2, "HelloWorld_Workflow")
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		Identity: "test-id-1",
 		Logger:   zap.NewNop(),
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, nil)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
 
 	// there should be no error as the history events matched the decisions.
@@ -222,18 +238,14 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
 	}
-	task := createWorkflowTask(testEvents, 0)
-
-	twdFactory := func(workflowType WorkflowType) (workflowDefinition, error) {
-		return &helloWorldWorkflow{cancelActivity: true}, nil
-	}
+	task := createWorkflowTask(testEvents, 0, "HelloWorld_WorkflowCancel")
 
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		Identity: "test-id-1",
 		Logger:   t.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(twdFactory, testDomain, params, nil)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
 
 	t.NoError(err)
@@ -251,7 +263,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
 		createTestEventActivityTaskScheduled(2, &s.ActivityTaskScheduledEventAttributes{ActivityId: common.StringPtr("0")}),
 	}
-	task := createWorkflowTask(testEvents, 0)
+	task := createWorkflowTask(testEvents, 0, "HelloWorld_Workflow")
 
 	pressurePoints := make(map[string]map[string]string)
 	pressurePoints[pressurePointTypeActivityTaskScheduleTimeout] = map[string]string{pressurePointConfigProbability: "100"}
@@ -262,7 +274,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 		Identity: "test-id-1",
 		Logger:   t.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, ppMgr)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, ppMgr, getHostEnvironment())
 	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
 
 	t.Error(err)
@@ -276,7 +288,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PageToken() {
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 	}
-	task := createWorkflowTask(testEvents, 0)
+	task := createWorkflowTask(testEvents, 0, "HelloWorld_Workflow")
 	task.NextPageToken = []byte("token")
 
 	params := workerExecutionParameters{
@@ -291,7 +303,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PageToken() {
 	iteratorfn := func(nextToken []byte) (*s.History, []byte, error) {
 		return &s.History{nextEvents}, nil, nil
 	}
-	taskHandler := newWorkflowTaskHandler(testWorkflowDefinitionFactory, testDomain, params, nil)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	response, _, err := taskHandler.ProcessWorkflowTask(task, iteratorfn, false)
 
 	t.NoError(err)
@@ -348,12 +360,16 @@ func (t testActivityDeadline) Execute(ctx context.Context, input []byte) ([]byte
 	}
 	return nil, nil
 }
+
 func (t testActivityDeadline) ActivityType() ActivityType {
 	return ActivityType{Name: "test"}
 }
 
+func (t testActivityDeadline) GetFunction() interface{} {
+	return t.Execute
+}
+
 type deadlineTest struct {
-	activities       []activity
 	ScheduleTS       time.Time
 	ScheduleDuration int32
 	StartTS          time.Time
@@ -362,25 +378,28 @@ type deadlineTest struct {
 }
 
 var deadlineTests = []deadlineTest{
-	{[]activity{&testActivityDeadline{}}, time.Now(), 3, time.Now(), 3, nil},
-	{[]activity{&testActivityDeadline{}}, time.Now(), 4, time.Now(), 3, nil},
-	{[]activity{&testActivityDeadline{}}, time.Now(), 3, time.Now(), 4, nil},
-	{[]activity{&testActivityDeadline{}}, time.Now().Add(-1 * time.Second), 1, time.Now(), 1, context.DeadlineExceeded},
-	{[]activity{&testActivityDeadline{}}, time.Now(), 1, time.Now().Add(-1 * time.Second), 1, context.DeadlineExceeded},
-	{[]activity{&testActivityDeadline{}}, time.Now().Add(-1 * time.Second), 1, time.Now().Add(-1 * time.Second), 1, context.DeadlineExceeded},
-	{[]activity{&testActivityDeadline{d: 2 * time.Second}}, time.Now(), 1, time.Now(), 1, context.DeadlineExceeded},
-	{[]activity{&testActivityDeadline{d: 2 * time.Second}}, time.Now(), 2, time.Now(), 1, context.DeadlineExceeded},
-	{[]activity{&testActivityDeadline{d: 2 * time.Second}}, time.Now(), 1, time.Now(), 2, context.DeadlineExceeded},
+	{time.Now(), 3, time.Now(), 3, nil},
+	{time.Now(), 4, time.Now(), 3, nil},
+	{time.Now(), 3, time.Now(), 4, nil},
+	{time.Now().Add(-1 * time.Second), 1, time.Now(), 1, context.DeadlineExceeded},
+	{time.Now(), 1, time.Now().Add(-1 * time.Second), 1, context.DeadlineExceeded},
+	{time.Now().Add(-1 * time.Second), 1, time.Now().Add(-1 * time.Second), 1, context.DeadlineExceeded},
+	{time.Now(), 1, time.Now(), 1, context.DeadlineExceeded},
+	{time.Now(), 2, time.Now(), 1, context.DeadlineExceeded},
+	{time.Now(), 1, time.Now(), 2, context.DeadlineExceeded},
 }
 
 func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
+	a := testActivityDeadline{}
+	hostEnv := getHostEnvironment()
+	hostEnv.addActivity(a.ActivityType().Name, a)
 	mockService := &mocks.TChanWorkflowService{}
 
 	for i, d := range deadlineTests {
 		wep := workerExecutionParameters{
 			Logger: t.logger,
 		}
-		activityHandler := newActivityTaskHandler(d.activities, mockService, wep)
+		activityHandler := newActivityTaskHandler(mockService, wep, hostEnv)
 		pats := &s.PollForActivityTaskResponse{
 			TaskToken: []byte("token"),
 			WorkflowExecution: &s.WorkflowExecution{

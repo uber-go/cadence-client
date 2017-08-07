@@ -85,8 +85,17 @@ func Test_Wrapper(t *testing.T) {
 
 func assertMetrics(t *testing.T, reporter *capturingStatsReporter, scopeName string, counterNames []string) {
 	require.Equal(t, len(counterNames), len(reporter.counts))
-	for i, counterName := range counterNames {
-		require.Equal(t, scopeName+"."+counterName, reporter.counts[i].name)
+	for _, name := range counterNames {
+		counterName := scopeName + "." + name
+		find := false
+		// counters are not in order
+		for _, counter := range reporter.counts {
+			if counterName == counter.name {
+				find = true
+				break
+			}
+		}
+		require.True(t, find)
 	}
 	require.Equal(t, 1, len(reporter.timers))
 	require.Equal(t, scopeName+"."+CadenceLatency, reporter.timers[0].name)

@@ -233,7 +233,9 @@ func newWorkflowTaskWorkerInternal(
 		taskWorker:                 poller,
 		identity:                   params.Identity,
 		workerType:                 "DecisionWorker"},
-		params.Logger)
+		params.Logger,
+		params.MetricsScope,
+	)
 
 	return &workflowWorker{
 		executionParameters: params,
@@ -313,6 +315,7 @@ func newActivityTaskWorker(
 			workerType:                 "ActivityWorker",
 		},
 		workerParams.Logger,
+		workerParams.MetricsScope,
 	)
 
 	return &activityWorker{
@@ -1026,10 +1029,7 @@ func newAggregatedWorker(
 	}
 
 	ensureRequiredParams(&workerParams)
-	tags := map[string]string{
-		tagDomain: domain,
-	}
-	workerParams.MetricsScope = workerParams.MetricsScope.Tagged(tags)
+	workerParams.MetricsScope = tagScope(workerParams.MetricsScope, tagDomain, domain)
 	workerParams.Logger = workerParams.Logger.With(
 		zapcore.Field{Key: tagDomain, Type: zapcore.StringType, String: domain},
 		zapcore.Field{Key: tagTaskList, Type: zapcore.StringType, String: taskList},
@@ -1081,6 +1081,20 @@ func newAggregatedWorker(
 		logger:         logger,
 		hostEnv:        hostEnv,
 	}
+}
+
+func tagScope(metricsScope tally.Scope, tags ...string) tally.Scope {
+	if len(tags)%2 != 0 {
+		panic("tags must be in the form of tagName, tagValue...")
+	}
+	if metricsScope == nil {
+		metricsScope = tally.NoopScope
+	}
+	tagsMap := make(map[string]string, len(tags)/2)
+	for i := 0; i < len(tags); i += 2 {
+		tagsMap[tags[i]] = tags[i+1]
+	}
+	return metricsScope.Tagged(tagsMap)
 }
 
 func processTestTags(wOptions *WorkerOptions, ep *workerExecutionParameters) {

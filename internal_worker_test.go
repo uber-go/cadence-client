@@ -607,7 +607,7 @@ func testActivityReturnStructPtrPtr() (**testActivityResult, error) {
 }
 
 func TestVariousActivitySchedulingOption(t *testing.T) {
-	ts := newWorkflowTestSuite()
+	ts := &WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 	w := &activitiesCallingOptionsWorkflow{t: t}
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})

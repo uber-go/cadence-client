@@ -1083,17 +1083,11 @@ func newAggregatedWorker(
 	}
 }
 
-func tagScope(metricsScope tally.Scope, tags ...string) tally.Scope {
-	if len(tags)%2 != 0 {
-		panic("tags must be in the form of tagName, tagValue...")
-	}
+func tagScope(metricsScope tally.Scope, tagName, tagValue string) tally.Scope {
 	if metricsScope == nil {
 		metricsScope = tally.NoopScope
 	}
-	tagsMap := make(map[string]string, len(tags)/2)
-	for i := 0; i < len(tags); i += 2 {
-		tagsMap[tags[i]] = tags[i+1]
-	}
+	tagsMap := map[string]string{tagName: tagValue}
 	return metricsScope.Tagged(tagsMap)
 }
 

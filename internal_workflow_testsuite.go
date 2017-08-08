@@ -284,7 +284,6 @@ func (env *testWorkflowEnvironmentImpl) addToActivityTaskList(
 }
 
 func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, args ...interface{}) {
-	s := env.testSuite
 	var workflowType string
 	fnType := reflect.TypeOf(workflowFn)
 	switch fnType.Kind() {
@@ -294,7 +293,7 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, 
 		// auto register workflow if it is not already registered
 		fnName := getFunctionName(workflowFn)
 		if _, ok := env.getHostEnv().getWorkflowFn(fnName); !ok {
-			s.RegisterWorkflow(workflowFn)
+			env.getHostEnv().RegisterWorkflow(workflowFn)
 		}
 		workflowType = getFunctionName(workflowFn)
 	default:
@@ -358,7 +357,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	)
 
 	// ensure activityFn is registered to defaultTestTaskList
-	env.testSuite.RegisterActivity(activityFn)
+	env.getHostEnv().RegisterActivity(activityFn)
 	taskHandler := env.newTestActivityTaskHandler(defaultTestTaskList)
 	result, err := taskHandler.Execute(task)
 	if err != nil {
@@ -965,9 +964,13 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 			continue
 		}
 		var ae *activityExecutor
-		ae, ok := a.(*activityExecutor)
-		if !ok {
-			ae = a.(*activityExecutorWrapper).activityExecutor
+		switch v := a.(type) {
+		case *activityExecutor:
+			ae = v
+		case *activityExecutorWrapper:
+			ae = v.activityExecutor
+		default:
+			ae = &activityExecutor{name: v.ActivityType().Name, fn: v.GetFunction()}
 		}
 		env.getHostEnv().addActivity(
 			fnName,

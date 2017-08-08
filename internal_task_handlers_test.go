@@ -369,7 +369,7 @@ type testActivityDeadline struct {
 	d time.Duration
 }
 
-func (t testActivityDeadline) Execute(ctx context.Context, input []byte) ([]byte, error) {
+func (t *testActivityDeadline) Execute(ctx context.Context, input []byte) ([]byte, error) {
 	if d, _ := ctx.Deadline(); d.IsZero() {
 		panic("invalid deadline provided")
 	}
@@ -381,11 +381,11 @@ func (t testActivityDeadline) Execute(ctx context.Context, input []byte) ([]byte
 	return nil, nil
 }
 
-func (t testActivityDeadline) ActivityType() ActivityType {
+func (t *testActivityDeadline) ActivityType() ActivityType {
 	return ActivityType{Name: "test"}
 }
 
-func (t testActivityDeadline) GetFunction() interface{} {
+func (t *testActivityDeadline) GetFunction() interface{} {
 	return t.Execute
 }
 
@@ -410,7 +410,7 @@ var deadlineTests = []deadlineTest{
 }
 
 func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
-	a := testActivityDeadline{}
+	a := &testActivityDeadline{}
 	hostEnv := getHostEnvironment()
 	hostEnv.addActivity(a.ActivityType().Name, a)
 	mockService := &mocks.TChanWorkflowService{}

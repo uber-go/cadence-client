@@ -64,80 +64,41 @@ type (
 	}
 )
 
+func newWorkflowTestSuite() *WorkflowTestSuite {
+	return &WorkflowTestSuite{hostEnv: getHostEnvironment()}
+}
+
 // Get extract data from encoded data to desired value type. valuePtr is pointer to the actual value type.
 func (b EncodedValues) Get(valuePtr ...interface{}) error {
 	return getHostEnvironment().decode(b, valuePtr)
 }
 
-func (s *WorkflowTestSuite) initIfNotDoneYet() {
-	if s.hostEnv != nil {
-		return
-	}
-	s.locker.Lock()
-	if s.hostEnv == nil {
-		s.hostEnv = newHostEnvironment()
-	}
-	s.locker.Unlock()
-}
-
 // NewTestWorkflowEnvironment creates a new instance of TestWorkflowEnvironment. You can use the returned TestWorkflowEnvironment
 // to run your workflow in the test environment.
 func (s *WorkflowTestSuite) NewTestWorkflowEnvironment() *TestWorkflowEnvironment {
-	s.initIfNotDoneYet()
 	return &TestWorkflowEnvironment{impl: newTestWorkflowEnvironmentImpl(s)}
 }
 
 // NewTestActivityEnvironment creates a new instance of TestActivityEnvironment. You can use the returned TestActivityEnvironment
 // to run your activity in the test environment.
 func (s *WorkflowTestSuite) NewTestActivityEnvironment() *TestActivityEnvironment {
-	s.initIfNotDoneYet()
 	return &TestActivityEnvironment{impl: newTestWorkflowEnvironmentImpl(s)}
-}
-
-// RegisterWorkflow registers a workflow that could be used by tests of this WorkflowTestSuite instance. All workflow registered
-// via cadence.RegisterWorkflow() are still valid and will be available to all tests of all instance of WorkflowTestSuite.
-// In the context of unit tests, workflow registration is only required if you are invoking workflow by name.
-func (s *WorkflowTestSuite) RegisterWorkflow(workflowFn interface{}) {
-	s.initIfNotDoneYet()
-	err := s.hostEnv.RegisterWorkflow(workflowFn)
-	if err != nil {
-		panic(err)
-	}
-}
-
-// RegisterActivity registers an activity to this WorkflowTestSuite instance. Activities registered here will be available
-// and only available to all tests of this WorkflowTestSuite instance. Activities registered via cadence.RegisterActivity()
-// are still valid and will be available to all tests of all instances of WorkflowTestSuite.
-func (s *WorkflowTestSuite) RegisterActivity(activityFn interface{}) {
-	s.initIfNotDoneYet()
-	fnName := getFunctionName(activityFn)
-	_, ok := s.hostEnv.getActivity(fnName)
-	if !ok {
-		// activity not registered yet, register now
-		err := s.hostEnv.RegisterActivity(activityFn)
-		if err != nil {
-			panic(err)
-		}
-	}
 }
 
 // SetLogger sets the logger for this WorkflowTestSuite. If you don't set logger, test suite will create a default logger
 // with Debug level logging enabled.
 func (s *WorkflowTestSuite) SetLogger(logger *zap.Logger) {
-	s.initIfNotDoneYet()
 	s.logger = logger
 }
 
 // GetLogger gets the logger for this WorkflowTestSuite.
 func (s *WorkflowTestSuite) GetLogger() *zap.Logger {
-	s.initIfNotDoneYet()
 	return s.logger
 }
 
 // SetMetricsScope sets the metrics scope for this WorkflowTestSuite. If you don't set scope, test suite will use
 // tally.NoopScope
 func (s *WorkflowTestSuite) SetMetricsScope(scope tally.Scope) {
-	s.initIfNotDoneYet()
 	s.scope = scope
 }
 

@@ -80,6 +80,15 @@ func registerWithSample(hostEnv *hostEnvImpl) {
 	hostEnv.RegisterActivity(testActivityReturnString)
 	hostEnv.RegisterActivity(testActivityReturnEmptyString)
 	hostEnv.RegisterActivity(testActivityReturnEmptyStruct)
+
+	hostEnv.RegisterActivity(testActivityNoResult)
+	hostEnv.RegisterActivity(testActivityNoContextArg)
+	hostEnv.RegisterActivity(testActivityReturnByteArray)
+	hostEnv.RegisterActivity(testActivityReturnInt)
+	hostEnv.RegisterActivity(testActivityReturnNilStructPtr)
+	hostEnv.RegisterActivity(testActivityReturnStructPtr)
+	hostEnv.RegisterActivity(testActivityReturnNilStructPtrPtr)
+	hostEnv.RegisterActivity(testActivityReturnStructPtrPtr)
 }
 
 func TestActivityRegistrationListener(t *testing.T) {
@@ -90,33 +99,32 @@ func TestActivityRegistrationListener(t *testing.T) {
 		"go.uber.org/cadence.testActivityReturnString",
 		"go.uber.org/cadence.testActivityReturnEmptyString",
 		"go.uber.org/cadence.testActivityReturnEmptyStruct",
-		// External files
-		"Greeter_Activity",
-		"go.uber.org/cadence.stackTraceActivity", // from internal_task_handlers_test.go
+		"go.uber.org/cadence.testActivityNoResult",
+		"go.uber.org/cadence.testActivityNoContextArg",
+		"go.uber.org/cadence.testActivityReturnByteArray",
+		"go.uber.org/cadence.testActivityReturnInt",
+		"go.uber.org/cadence.testActivityReturnNilStructPtr",
+		"go.uber.org/cadence.testActivityReturnStructPtr",
+		"go.uber.org/cadence.testActivityReturnNilStructPtrPtr",
+		"go.uber.org/cadence.testActivityReturnStructPtrPtr",
 	}
-	require.Equal(t, len(expectedActivities), len(registeredActivities))
-	sort.Strings(expectedActivities)
-	expected := strings.Join(expectedActivities, ",")
 	sort.Strings(registeredActivities)
 	registered := strings.Join(registeredActivities, ",")
-	require.Equal(t, expected, registered)
+	for _, a := range expectedActivities {
+		require.Contains(t, registered, a)
+	}
 }
 
 func TestWorkflowRegistrationListener(t *testing.T) {
 	expectedWorkflows := []string{
 		"sampleWorkflowExecute",
 		"go.uber.org/cadence.testReplayWorkflow",
-		// External files
-		"HelloWorld_Workflow",
-		"HelloWorld_WorkflowCancel",
-		"go.uber.org/cadence.stackTraceWorkflow", // from internal_task_handlers_test.go
 	}
-	require.Equal(t, len(expectedWorkflows), len(registeredWorkflows))
-	sort.Strings(expectedWorkflows)
-	expected := strings.Join(expectedWorkflows, ",")
 	sort.Strings(registeredWorkflows)
 	registered := strings.Join(registeredWorkflows, ",")
-	require.Equal(t, expected, registered)
+	for _, w := range expectedWorkflows {
+		require.Contains(t, registered, w)
+	}
 }
 
 func getLogger() *zap.Logger {
@@ -599,18 +607,8 @@ func testActivityReturnStructPtrPtr() (**testActivityResult, error) {
 }
 
 func TestVariousActivitySchedulingOption(t *testing.T) {
-	ts := &WorkflowTestSuite{}
-	ts.RegisterActivity(testActivityNoResult)
-	ts.RegisterActivity(testActivityNoContextArg)
-	ts.RegisterActivity(testActivityReturnByteArray)
-	ts.RegisterActivity(testActivityReturnInt)
-	ts.RegisterActivity(testActivityByteArgs)
-	ts.RegisterActivity(testActivityReturnNilStructPtr)
-	ts.RegisterActivity(testActivityReturnStructPtr)
-	ts.RegisterActivity(testActivityReturnNilStructPtrPtr)
-	ts.RegisterActivity(testActivityReturnStructPtrPtr)
+	ts := newWorkflowTestSuite()
 	env := ts.NewTestWorkflowEnvironment()
-	registerWithSample(env.impl.testSuite.hostEnv)
 	w := &activitiesCallingOptionsWorkflow{t: t}
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
 	require.True(t, env.IsWorkflowCompleted())

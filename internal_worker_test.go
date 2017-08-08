@@ -231,6 +231,16 @@ func TestCreateWorkerRun(t *testing.T) {
 	service.AssertExpectations(t)
 }
 
+func TestNoActivitiesOrWorkflows(t *testing.T) {
+	service := new(mocks.TChanWorkflowService)
+	w := createWorker(t, service)
+	aw := w.(*aggregatedWorker)
+	aw.hostEnv = newHostEnvironment()
+	assert.Empty(t, aw.hostEnv.getRegisteredActivities())
+	assert.Empty(t, aw.hostEnv.getRegisteredWorkflowTypes())
+	assert.NoError(t, aw.Start())
+}
+
 func TestWorkerStartFailsWithInvalidDomain(t *testing.T) {
 
 	testCases := []struct {
@@ -280,6 +290,15 @@ func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 	var startedEventID int64 = 10
 	input, err := getHostEnvironment().encodeArgs([]interface{}{})
 	require.NoError(t, err)
+	domainStatus := s.DomainStatus_REGISTERED
+	domainDesc := &s.DescribeDomainResponse{
+		DomainInfo: &s.DomainInfo{
+			Name:   &domain,
+			Status: &domainStatus,
+		},
+	}
+	// mocks
+	service.On("DescribeDomain", mock.Anything, mock.Anything).Return(domainDesc, nil)
 
 	activityTask := &s.PollForActivityTaskResponse{
 		TaskToken:                     []byte("taskToken1"),
@@ -293,6 +312,9 @@ func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 		StartedTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
 		StartToCloseTimeoutSeconds:    common.Int32Ptr(2),
 	}
+	service.On("PollForActivityTask", mock.Anything, mock.Anything).Return(activityTask, nil)
+	service.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil)
+
 	decisionTask := &s.PollForDecisionTaskResponse{
 		TaskToken:              []byte("taskToken1"),
 		WorkflowExecution:      &s.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
@@ -307,17 +329,6 @@ func createWorker(t *testing.T, service *mocks.TChanWorkflowService) Worker {
 			},
 		},
 	}
-	domainStatus := s.DomainStatus_REGISTERED
-	domainDesc := &s.DescribeDomainResponse{
-		DomainInfo: &s.DomainInfo{
-			Name:   &domain,
-			Status: &domainStatus,
-		},
-	}
-	// mocks
-	service.On("DescribeDomain", mock.Anything, mock.Anything).Return(domainDesc, nil)
-	service.On("PollForActivityTask", mock.Anything, mock.Anything).Return(activityTask, nil)
-	service.On("RespondActivityTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 	service.On("PollForDecisionTask", mock.Anything, mock.Anything).Return(decisionTask, nil)
 	service.On("RespondDecisionTaskCompleted", mock.Anything, mock.Anything).Return(nil)
 

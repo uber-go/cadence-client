@@ -948,15 +948,26 @@ type aggregatedWorker struct {
 	workflowWorker Worker
 	activityWorker Worker
 	logger         *zap.Logger
+	hostEnv        *hostEnvImpl
 }
 
 func (aw *aggregatedWorker) Start() error {
 	if !isInterfaceNil(aw.workflowWorker) {
+		if len(aw.hostEnv.getRegisteredWorkflowTypes()) == 0 {
+			aw.logger.Warn(
+				"Starting worker without any workflows. Workflows must be registered before start.",
+			)
+		}
 		if err := aw.workflowWorker.Start(); err != nil {
 			return err
 		}
 	}
 	if !isInterfaceNil(aw.activityWorker) {
+		if len(aw.hostEnv.getRegisteredActivities()) == 0 {
+			aw.logger.Warn(
+				"Starting worker without any activities. Activities must be registered before start.",
+			)
+		}
 		if err := aw.activityWorker.Start(); err != nil {
 			// stop workflow worker.
 			aw.workflowWorker.Stop()
@@ -1064,6 +1075,7 @@ func newAggregatedWorker(
 		workflowWorker: workflowWorker,
 		activityWorker: activityWorker,
 		logger:         logger,
+		hostEnv:        hostEnv,
 	}
 }
 

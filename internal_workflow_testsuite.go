@@ -267,9 +267,6 @@ func (env *testWorkflowEnvironmentImpl) setActivityTaskList(
 		env.getHostEnv().RegisterActivityWithOptions(activityFn, ao)
 		fnName := getFunctionName(activityFn)
 		env.addToActivityTaskList(tasklist, fnName, activityFn)
-		if alias, ok := env.getHostEnv().getActivityAlias(fnName); ok {
-			env.addToActivityTaskList(tasklist, alias, activityFn)
-		}
 	}
 }
 
@@ -957,26 +954,25 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 		}
 	}
 
-	addActivities := func(registeredActivities []activity) {
-		for _, a := range registeredActivities {
-			fnName := a.ActivityType().Name
-			if _, ok := env.taskListSpecificActivities[fnName]; ok {
-				// activity is registered to a specific taskList, so ignore it from the global registered activities.
-				continue
-			}
-			if aew, ok := a.(*activityExecutor); ok {
-				env.getHostEnv().addActivity(
-					fnName,
-					&activityExecutorWrapper{activityExecutor: aew, env: env},
-				)
-			}
-		}
-	}
-
-	addActivities(env.getHostEnv().getRegisteredActivities())
-
 	if len(env.getHostEnv().getRegisteredActivities()) == 0 {
 		panic(fmt.Sprintf("no activity is registered for tasklist '%v'", taskList))
+	}
+
+	for _, a := range env.getHostEnv().getRegisteredActivities() {
+		fnName := a.ActivityType().Name
+		if _, ok := env.taskListSpecificActivities[fnName]; ok {
+			// activity is registered to a specific taskList, so ignore it from the global registered activities.
+			continue
+		}
+		var ae *activityExecutor
+		ae, ok := a.(*activityExecutor)
+		if !ok {
+			ae = a.(*activityExecutorWrapper).activityExecutor
+		}
+		env.getHostEnv().addActivity(
+			fnName,
+			&activityExecutorWrapper{activityExecutor: ae, env: env},
+		)
 	}
 
 	taskHandler := newActivityTaskHandler(env.service, params, env.getHostEnv())

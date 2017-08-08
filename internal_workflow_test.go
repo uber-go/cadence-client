@@ -148,7 +148,6 @@ func splitJoinActivityWorkflow(ctx Context, testPanic bool) (result string, err 
 func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
 	registerWithSample(env.impl.getHostEnv())
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testAct)
 	env.OnActivity(testAct, mock.Anything).Return(func(ctx context.Context) (string, error) {
 		activityID := GetActivityInfo(ctx).ActivityID
 		switch activityID {

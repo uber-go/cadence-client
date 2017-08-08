@@ -400,9 +400,7 @@ func (th *hostEnvImpl) AddActivityRegistrationInterceptor(i interceptorFn) {
 	th.Unlock()
 	for w, a := range funcMapCopy {
 		intw, intf := i(w, a.GetFunction())
-		th.Lock()
-		th.activityFuncMap[intw] = &activityExecutor{intw, intf}
-		th.Unlock()
+		th.addActivity(intw, &activityExecutor{intw, intf})
 	}
 }
 

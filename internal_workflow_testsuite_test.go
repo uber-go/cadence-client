@@ -79,7 +79,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockFunction() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockValues() {
 	env := s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("mock_value", nil).Once()
 
 	env.ExecuteWorkflow(testWorkflowHello)
@@ -106,7 +105,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 	} // END of workflow code
 
 	env := s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testActivityHello)
 
 	var activityCalls []string
 	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args EncodedValues) {
@@ -262,11 +260,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowActivityCancellation() {
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(
-		defaultTestTaskList,
-		RegisterActivityOptions{Name: "testActivityHeartbeat"},
-		testActivityHeartbeat,
-	)
 	activityMap := make(map[string]string) // msg -> activityID
 	var completedActivityID, cancelledActivityID string
 	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args EncodedValues) {
@@ -316,7 +309,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
 	env := s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testActivityHello)
 	var activityInfo ActivityInfo
 	mockActivity := func(ctx context.Context, msg string) (string, error) {
 		activityInfo = GetActivityInfo(ctx)
@@ -539,7 +531,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock() {
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("mock_msg", nil)
 	env.OnWorkflow(testWorkflowHeartbeat, mock.Anything, mock.Anything, mock.Anything).
 		Return("mock_heartbeat", nil)
@@ -688,7 +679,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWait() {
 
 	// no delay to the mock call, workflow should return no error
 	env := s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
@@ -697,7 +687,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWait() {
 
 	// delay 10 minutes, which is shorter than the 1 hour timer, so workflow should return no error.
 	env = s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).After(time.Minute*10).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
@@ -706,7 +695,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWait() {
 
 	// delay 2 hours, which is longer than the 1 hour timer, and workflow should return error.
 	env = s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).After(time.Hour*2).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
@@ -715,7 +703,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWait() {
 
 	// no mock
 	env = s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testActivityHello)
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -779,7 +766,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockPanic() {
 	oldLogger := s.GetLogger()
 	s.SetLogger(zap.NewNop()) // use no-op logger to avoid noisy logging by panic
 	env := s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).
 		Return("hello_mock_panic", nil).
 		Run(func(args mock.Arguments) {
@@ -893,7 +879,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_GetVersion() {
 	s.RegisterActivity(oldActivity)
 	s.RegisterActivity(newActivity)
 	env := s.NewTestWorkflowEnvironment()
-	env.SetActivityTaskList(defaultTestTaskList, RegisterActivityOptions{}, newActivity)
 	env.OnActivity(newActivity, mock.Anything, "new_msg").Return("hell new_mock_msg", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 

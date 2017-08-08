@@ -688,12 +688,16 @@ func (th *hostEnvImpl) isUseThriftDecoding(objs []interface{}) bool {
 }
 
 func (th *hostEnvImpl) getWorkflowDefinition(wt WorkflowType) (workflowDefinition, error) {
-	wf, ok := th.getWorkflowFn(wt.Name)
+	lookup := wt.Name
+	if alias, ok := th.getWorkflowAlias(lookup); ok {
+		lookup = alias
+	}
+	wf, ok := th.getWorkflowFn(lookup)
 	if !ok {
 		supported := strings.Join(th.getRegisteredWorkflowTypes(), ", ")
-		return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
+		return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", lookup, supported)
 	}
-	wd := &workflowExecutor{name: wt.Name, fn: wf}
+	wd := &workflowExecutor{name: lookup, fn: wf}
 	return newWorkflowDefinition(wd), nil
 }
 

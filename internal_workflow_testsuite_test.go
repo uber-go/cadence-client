@@ -580,7 +580,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Listener() {
 	s.NoError(env.GetWorkflowResult(&actualResult))
 	s.Equal("hello_activity hello_world", actualResult)
 	s.Equal("hello_world", childWorkflowResult)
-	s.Equal(getFunctionName(testWorkflowHello), childWorkflowName)
+	s.Equal("testWorkflowHello", childWorkflowName)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Clock() {
@@ -732,7 +732,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockWorkflowWait() {
 
 	// no delay to the mock call, workflow should return no error
 	env := s.NewTestWorkflowEnvironment()
-	env.OnWorkflow(testWorkflowHello, mock.Anything, mock.Anything).Return("hello_mock_delayed", nil).Once()
+	env.OnWorkflow(testWorkflowHello, mock.Anything).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -740,7 +740,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockWorkflowWait() {
 
 	// delay 10 minutes, which is shorter than the 1 hour timer, so workflow should return no error.
 	env = s.NewTestWorkflowEnvironment()
-	env.OnWorkflow(testWorkflowHello, mock.Anything, mock.Anything).After(time.Minute*10).Return("hello_mock_delayed", nil).Once()
+	env.OnWorkflow(testWorkflowHello, mock.Anything).After(time.Minute*10).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -748,7 +748,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockWorkflowWait() {
 
 	// delay 2 hours, which is longer than the 1 hour timer, and workflow should return error.
 	env = s.NewTestWorkflowEnvironment()
-	env.OnWorkflow(testWorkflowHello, mock.Anything, mock.Anything).After(time.Hour*2).Return("hello_mock_delayed", nil).Once()
+	env.OnWorkflow(testWorkflowHello, mock.Anything).After(time.Hour*2).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.Error(env.GetWorkflowError())
@@ -827,7 +827,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWithChild() {
 
 	// no delay to the mock call, workflow should return no error
 	env := s.NewTestWorkflowEnvironment()
-	env.OnWorkflow(testWorkflowHello, mock.Anything, mock.Anything).Return("hello_mock_delayed", nil).Once()
+	env.OnWorkflow(testWorkflowHello, mock.Anything).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -835,7 +835,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWithChild() {
 
 	// delay 10 minutes, which is shorter than the 1 hour timer, so workflow should return no error.
 	env = s.NewTestWorkflowEnvironment()
-	env.OnWorkflow(testWorkflowHello, mock.Anything, mock.Anything).After(time.Minute*10).Return("hello_mock_delayed", nil).Once()
+	env.OnWorkflow(testWorkflowHello, mock.Anything).After(time.Minute*10).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -843,7 +843,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWithChild() {
 
 	// delay 2 hours, which is longer than the 1 hour timer, and workflow should return error.
 	env = s.NewTestWorkflowEnvironment()
-	env.OnWorkflow(testWorkflowHello, mock.Anything, mock.Anything).After(time.Hour*2).Return("hello_mock_delayed", nil).Once()
+	env.OnWorkflow(testWorkflowHello, mock.Anything).After(time.Hour*2).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.Error(env.GetWorkflowError())

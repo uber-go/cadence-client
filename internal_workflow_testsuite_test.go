@@ -51,7 +51,7 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 	}
 	RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
 	RegisterWorkflow(testWorkflowHeartbeat)
-	RegisterActivity(testActivityHello)
+	RegisterActivityWithOptions(testActivityHello, RegisterActivityOptions{Name: "testActivityHello"})
 	RegisterActivity(testActivityHeartbeat)
 }
 
@@ -113,9 +113,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 		activityCalls = append(activityCalls, fmt.Sprintf("%s:%s", activityInfo.ActivityType.Name, input))
 	})
 	expectedCalls := []string{
-		"go.uber.org/cadence.testActivityHello:msg1",
-		"go.uber.org/cadence.testActivityHello:msg2",
-		"go.uber.org/cadence.testActivityHello:msg3",
+		"testActivityHello:msg1",
+		"testActivityHello:msg2",
+		"testActivityHello:msg3",
 	}
 
 	env.ExecuteWorkflow(workflowFn)
@@ -993,4 +993,28 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFriendlyName() {
 	s.Equal(2, len(called))
 	s.Equal("testWorkflowHello", called[0])
 	s.Equal("testWorkflowHello", called[1])
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_ActivityFullyQualifiedName() {
+	workflowFn := func(ctx Context) error {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+		var result string
+		err := ExecuteActivity(ctx, "go.uber.org/cadence.testActivityHello", "friendly_name").Get(ctx, &result)
+		return err
+	}
+
+	RegisterWorkflow(workflowFn)
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFullyQualifiedName() {
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow("go.uber.org/cadence.testWorkflowHello")
+
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
 }

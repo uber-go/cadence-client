@@ -167,7 +167,6 @@ func (t *TestWorkflowEnvironment) OnWorkflow(workflow interface{}, args ...inter
 		if err := validateFnFormat(fnType, true); err != nil {
 			panic(err)
 		}
-		// TODO (madhu): Remove this
 		fnName := getFunctionName(workflow)
 		if alias, ok := getHostEnvironment().getWorkflowAlias(fnName); ok {
 			fnName = alias

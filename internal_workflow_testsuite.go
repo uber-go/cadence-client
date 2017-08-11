@@ -310,7 +310,6 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(workflowType str
 
 func (env *testWorkflowEnvironmentImpl) getWorkflowDefinition(wt WorkflowType) (workflowDefinition, error) {
 	hostEnv := getHostEnvironment()
-	fmt.Println("Workflow type, list of types", wt.Name, hostEnv.getRegisteredWorkflowTypes())
 	wf, ok := hostEnv.getWorkflowFn(wt.Name)
 	if !ok {
 		supported := strings.Join(hostEnv.getRegisteredWorkflowTypes(), ", ")

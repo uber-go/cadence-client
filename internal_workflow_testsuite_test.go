@@ -1015,6 +1015,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFriendlyName() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityFullyQualifiedName() {
 	// TODO (madhu): Add this back once test workflow environment is able to handle panics gracefully
+	// Right now, the panic happens in a different goroutine and there is no way to catch it
 	s.T().Skip()
 	workflowFn := func(ctx Context) error {
 		ctx = WithActivityOptions(ctx, s.activityOptions)

@@ -102,6 +102,7 @@ func isServiceTransientError(err error) bool {
 	}
 
 	// s.InternalServiceError
+	// s.ServiceBusyError
 	return true
 }
 

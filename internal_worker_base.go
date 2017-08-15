@@ -36,8 +36,8 @@ import (
 )
 
 const (
-	retryPollOperationInitialInterval    = time.Millisecond
-	retryPollOperationMaxInterval        = 1 * time.Second
+	retryPollOperationInitialInterval    = 20 * time.Millisecond
+	retryPollOperationMaxInterval        = 60 * time.Second
 	retryPollOperationExpirationInterval = backoff.NoInterval // We don't ever expire
 )
 

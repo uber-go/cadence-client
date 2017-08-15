@@ -37,7 +37,7 @@ import (
 
 const (
 	retryPollOperationInitialInterval    = 20 * time.Millisecond
-	retryPollOperationMaxInterval        = 60 * time.Second
+	retryPollOperationMaxInterval        = 10 * time.Second
 	retryPollOperationExpirationInterval = backoff.NoInterval // We don't ever expire
 )
 
@@ -225,11 +225,11 @@ func (bw *baseWorker) pollTask() {
 	bw.retrier.Throttle()
 	if bw.pollLimiter.Wait(bw.limiterContext) == nil {
 		task, err = bw.options.taskWorker.PollTask()
-		if err != nil {
+		if err != nil && enableVerboseLogging {
+			bw.logger.Debug("Failed to poll for task.", zap.Error(err))
+		}
+		if err != nil && isServiceTransientError(err) {
 			bw.retrier.Failed()
-			if enableVerboseLogging {
-				bw.logger.Debug("Failed to poll for task.", zap.Error(err))
-			}
 		} else {
 			bw.retrier.Succeeded()
 		}

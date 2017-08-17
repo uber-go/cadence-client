@@ -36,8 +36,8 @@ import (
 )
 
 const (
-	retryPollOperationInitialInterval    = 20 * time.Millisecond
-	retryPollOperationMaxInterval        = 10 * time.Second
+	retryPollOperationInitialInterval = 20 * time.Millisecond
+	retryPollOperationMaxInterval     = 10 * time.Second
 )
 
 var (

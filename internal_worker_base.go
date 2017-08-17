@@ -38,7 +38,6 @@ import (
 const (
 	retryPollOperationInitialInterval    = 20 * time.Millisecond
 	retryPollOperationMaxInterval        = 10 * time.Second
-	retryPollOperationExpirationInterval = backoff.NoInterval // We don't ever expire
 )
 
 var (
@@ -113,7 +112,12 @@ type (
 func createPollRetryPolicy() backoff.RetryPolicy {
 	policy := backoff.NewExponentialRetryPolicy(retryPollOperationInitialInterval)
 	policy.SetMaximumInterval(retryPollOperationMaxInterval)
-	policy.SetExpirationInterval(retryPollOperationExpirationInterval)
+
+	// NOTE: We don't use expiration interval since we don't use retries from retrier class.
+	// We use it to calculate next backoff. We have additional layer that is built on poller
+	// in the worker layer for to add some middleware for any poll retry that includes
+	// (a) rate limiting across pollers (b) back-off across pollers when server is busy
+	policy.SetExpirationInterval(backoff.NoInterval) // We don't ever expire
 	return policy
 }
 

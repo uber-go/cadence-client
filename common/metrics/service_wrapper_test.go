@@ -86,7 +86,7 @@ func Test_Wrapper(t *testing.T) {
 func assertMetrics(t *testing.T, reporter *capturingStatsReporter, methodName string, counterNames []string) {
 	require.Equal(t, len(counterNames), len(reporter.counts))
 	for _, name := range counterNames {
-		counterName := "cadence-" + methodName + "." + name
+		counterName := CadenceMetricsPrefix + methodName + "." + name
 		find := false
 		// counters are not in order
 		for _, counter := range reporter.counts {
@@ -98,7 +98,7 @@ func assertMetrics(t *testing.T, reporter *capturingStatsReporter, methodName st
 		require.True(t, find)
 	}
 	require.Equal(t, 1, len(reporter.timers))
-	require.Equal(t, "cadence-"+methodName+"."+CadenceLatency, reporter.timers[0].name)
+	require.Equal(t, CadenceMetricsPrefix+methodName+"."+CadenceLatency, reporter.timers[0].name)
 }
 
 func newService() (mockService *mocks.TChanWorkflowService,

@@ -152,7 +152,8 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
 		Logger:   t.logger,
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
-	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
+	request, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
+	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
 	t.NotNil(response)
 	t.Equal(1, len(response.GetDecisions()))
@@ -181,7 +182,8 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 		Logger:   t.logger,
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
-	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
+	request, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
+	response := request.(*s.RespondDecisionTaskCompletedRequest)
 
 	t.NoError(err)
 	t.NotNil(response)
@@ -191,7 +193,8 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 
 	// Schedule an activity and see if we complete workflow, Having only one last decision.
 	task = createWorkflowTask(testEvents, 2, "HelloWorld_Workflow")
-	response, _, err = taskHandler.ProcessWorkflowTask(task, nil, false)
+	request, _, err = taskHandler.ProcessWorkflowTask(task, nil, false)
+	response = request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
 	t.NotNil(response)
 	t.Equal(1, len(response.GetDecisions()))
@@ -216,17 +219,17 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 		Logger:   zap.NewNop(),
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
-	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
-
+	request, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
+	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	// there should be no error as the history events matched the decisions.
 	t.NoError(err)
 	t.NotNil(response)
 
 	// now change the history event so it does not match to decision produced via replay
 	testEvents[1].ActivityTaskScheduledEventAttributes.ActivityType.Name = common.StringPtr("some-other-activity")
-	response, _, err = taskHandler.ProcessWorkflowTask(task, nil, false)
+	request, _, err = taskHandler.ProcessWorkflowTask(task, nil, false)
 	t.Error(err)
-	t.Nil(response)
+	t.Nil(request)
 	t.Contains(err.Error(), "nondeterministic")
 }
 
@@ -246,8 +249,8 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {
 		Logger:   t.logger,
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
-	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
-
+	request, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
+	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
 	t.NotNil(response)
 	//t.printAllDecisions(response.GetDecisions())
@@ -275,10 +278,9 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PressurePoints() {
 		Logger:   t.logger,
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, ppMgr, getHostEnvironment())
-	response, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
-
+	request, _, err := taskHandler.ProcessWorkflowTask(task, nil, false)
 	t.Error(err)
-	t.Nil(response)
+	t.Nil(request)
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_PageToken() {
@@ -304,8 +306,8 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PageToken() {
 		return &s.History{nextEvents}, nil, nil
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
-	response, _, err := taskHandler.ProcessWorkflowTask(task, iteratorfn, false)
-
+	request, _, err := taskHandler.ProcessWorkflowTask(task, iteratorfn, false)
+	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
 	t.NotNil(response)
 }

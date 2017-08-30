@@ -39,6 +39,8 @@ import (
 var _ workflowEnvironment = (*workflowEnvironmentImpl)(nil)
 var _ workflowExecutionEventHandler = (*workflowExecutionEventHandlerImpl)(nil)
 
+const queryTypeStackTrace string = "__stack_trace"
+
 type (
 	// completionHandler Handler to indicate completion result
 	completionHandler func(result []byte, err error)
@@ -82,6 +84,7 @@ type (
 		completeHandler completionHandler               // events completion handler
 		cancelHandler   func()                          // A cancel handler to be invoked on a cancel notification
 		signalHandler   func(name string, input []byte) // A signal handler to be invoked on a signal event
+		queryHandler    func(queryType string, queryArgs []byte) ([]byte, error)
 
 		logger                *zap.Logger
 		isReplay              bool // flag to indicate if workflow is in replay mode
@@ -239,6 +242,10 @@ func (wc *workflowEnvironmentImpl) ExecuteChildWorkflow(
 
 func (wc *workflowEnvironmentImpl) RegisterSignalHandler(handler func(name string, input []byte)) {
 	wc.signalHandler = handler
+}
+
+func (wc *workflowEnvironmentImpl) RegisterQueryHandler(handler func(string, []byte) ([]byte, error)) {
+	wc.queryHandler = handler
 }
 
 func (wc *workflowEnvironmentImpl) GetLogger() *zap.Logger {
@@ -570,6 +577,13 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	}
 
 	return weh.decisionsHelper.getDecisions(true), nil
+}
+
+func (weh *workflowExecutionEventHandlerImpl) ProcessQuery(queryType string, queryArgs []byte) ([]byte, error) {
+	if queryType == queryTypeStackTrace {
+		return getHostEnvironment().encodeArg(weh.StackTrace())
+	}
+	return weh.queryHandler(queryType, queryArgs)
 }
 
 func (weh *workflowExecutionEventHandlerImpl) StackTrace() string {

@@ -39,8 +39,6 @@ import (
 var _ workflowEnvironment = (*workflowEnvironmentImpl)(nil)
 var _ workflowExecutionEventHandler = (*workflowExecutionEventHandlerImpl)(nil)
 
-const queryTypeStackTrace string = "__stack_trace"
-
 type (
 	// completionHandler Handler to indicate completion result
 	completionHandler func(result []byte, err error)
@@ -580,7 +578,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 }
 
 func (weh *workflowExecutionEventHandlerImpl) ProcessQuery(queryType string, queryArgs []byte) ([]byte, error) {
-	if queryType == queryTypeStackTrace {
+	if queryType == QueryTypeStackTrace {
 		return getHostEnvironment().encodeArg(weh.StackTrace())
 	}
 	return weh.queryHandler(queryType, queryArgs)

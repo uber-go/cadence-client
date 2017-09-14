@@ -29,6 +29,10 @@ import (
 	"go.uber.org/cadence/common/metrics"
 )
 
+// QueryTypeStackTrace is the build in query type for Client.QueryWorkflow() call. Use this query type to get the call
+// stack of the workflow. The result will be a string encoded in the EncodedValue.
+const QueryTypeStackTrace string = "__stack_trace"
+
 type (
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.

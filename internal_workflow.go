@@ -380,7 +380,7 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 		eo := getWorkflowEnvOptions(d.rootCtx)
 		handler, ok := eo.queryHandlers[queryType]
 		if !ok {
-			keys := []string{queryTypeStackTrace}
+			keys := []string{QueryTypeStackTrace}
 			for k := range eo.queryHandlers {
 				keys = append(keys, k)
 			}

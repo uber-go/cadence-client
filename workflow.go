@@ -631,7 +631,10 @@ func GetVersion(ctx Context, changeID string, minSupported, maxSupported Version
 // should handle. The handler must be a function that returns 2 values. The first return value must be a serializable
 // result. The second return value must be an error. The handler function could receive any number of input parameters.
 // All the input parameter must be serializable. You should call cadence.SetQueryHandler() at the beginning of the workflow
-// code.
+// code. When client calls Client.QueryWorkflow() to cadence server, a task will be generated on server that will be dispatched
+// to a workflow worker, which will replay the history events and then execute a query handler based on the query type.
+// The query handler will be invoked out of the context of the workflow, meaning that the handler must not use cadence
+// context to call any workflow blocking functions like Channel.Get() or Future.Get().
 // Example of workflow code that support query type "current_state":
 //  func MyWorkflow(ctx cadence.Context, input string) error {
 //    currentState := "started" // this could be any serializable struct

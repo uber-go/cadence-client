@@ -441,10 +441,13 @@ ProcessEvents:
 			}
 		}
 	}
-	// check if decisions from reply matches to the history events
-	if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
-		wth.logger.Error("Replay and history mismatch.", zap.Error(err))
-		return nil, "", err
+
+	if task.Query == nil {
+		// check if decisions from reply matches to the history events
+		if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
+			wth.logger.Error("Replay and history mismatch.", zap.Error(err))
+			return nil, "", err
+		}
 	}
 
 	startEvent, err := reorderedHistory.GetWorkflowStartedEvent()

@@ -117,6 +117,17 @@ func createTestEventDecisionTaskStarted(eventID int64) *s.HistoryEvent {
 		EventType: common.EventTypePtr(s.EventType_DecisionTaskStarted)}
 }
 
+func createTestEventWorkflowExecutionSignaled(eventID int64, signalName string) *s.HistoryEvent {
+	return &s.HistoryEvent{
+		EventId:   common.Int64Ptr(eventID),
+		EventType: common.EventTypePtr(s.EventType_WorkflowExecutionSignaled),
+		WorkflowExecutionSignaledEventAttributes: &s.WorkflowExecutionSignaledEventAttributes{
+			SignalName: common.StringPtr(signalName),
+			Identity:   common.StringPtr("test-identity"),
+		},
+	}
+}
+
 func createTestEventDecisionTaskCompleted(eventID int64, attr *s.DecisionTaskCompletedEventAttributes) *s.HistoryEvent {
 	return &s.HistoryEvent{
 		EventId:   common.Int64Ptr(eventID),
@@ -138,6 +149,19 @@ func createWorkflowTask(
 			RunId:      common.StringPtr("fake-run-id"),
 		},
 	}
+}
+
+func createQueryTask(
+	events []*s.HistoryEvent,
+	previousStartEventID int64,
+	workflowName string,
+	queryType string,
+) *s.PollForDecisionTaskResponse {
+	task := createWorkflowTask(events, previousStartEventID, workflowName)
+	task.Query = &s.WorkflowQuery{
+		QueryType: common.StringPtr(queryType),
+	}
+	return task
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
@@ -200,6 +224,77 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 	t.Equal(1, len(response.GetDecisions()))
 	t.Equal(s.DecisionType_CompleteWorkflowExecution, response.GetDecisions()[0].GetDecisionType())
 	t.NotNil(response.GetDecisions()[0].GetCompleteWorkflowExecutionDecisionAttributes())
+}
+
+func (t *TaskHandlersTestSuite) TestWorkflowTask_QueryWorkflow() {
+	// Schedule an activity and see if we complete workflow.
+	taskList := "tl1"
+	testEvents := []*s.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
+		createTestEventActivityTaskScheduled(5, &s.ActivityTaskScheduledEventAttributes{
+			ActivityId:   common.StringPtr("0"),
+			ActivityType: &s.ActivityType{Name: common.StringPtr("Greeter_Activity")},
+			TaskList:     &s.TaskList{Name: &taskList},
+		}),
+		createTestEventActivityTaskStarted(6, &s.ActivityTaskStartedEventAttributes{}),
+		createTestEventActivityTaskCompleted(7, &s.ActivityTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(5)}),
+		createTestEventDecisionTaskStarted(8),
+		createTestEventWorkflowExecutionSignaled(9, "test-signal"),
+	}
+	params := workerExecutionParameters{
+		TaskList: taskList,
+		Identity: "test-id-1",
+		Logger:   t.logger,
+	}
+
+	// query after first decision task (notice the previousStartEventID is always the last eventID for query task)
+	task := createQueryTask(testEvents[0:3], 3, "HelloWorld_Workflow", "test-query")
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	response, _, _ := taskHandler.ProcessWorkflowTask(task, nil, false)
+	t.verifyQueryResult(response, "waiting-activity-result")
+
+	// query after activity task complete but before second decision task started
+	task = createQueryTask(testEvents[0:7], 7, "HelloWorld_Workflow", "test-query")
+	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	response, _, _ = taskHandler.ProcessWorkflowTask(task, nil, false)
+	t.verifyQueryResult(response, "waiting-activity-result")
+
+	// query after second decision task
+	task = createQueryTask(testEvents[0:8], 8, "HelloWorld_Workflow", "test-query")
+	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	response, _, _ = taskHandler.ProcessWorkflowTask(task, nil, false)
+	t.verifyQueryResult(response, "done")
+
+	// query after second decision task with extra events
+	task = createQueryTask(testEvents[0:9], 9, "HelloWorld_Workflow", "test-query")
+	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	response, _, _ = taskHandler.ProcessWorkflowTask(task, nil, false)
+	t.verifyQueryResult(response, "done")
+
+	task = createQueryTask(testEvents[0:9], 9, "HelloWorld_Workflow", "invalid-query-type")
+	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	response, _, _ = taskHandler.ProcessWorkflowTask(task, nil, false)
+	t.NotNil(response)
+	queryResp, ok := response.(*s.RespondQueryTaskCompletedRequest)
+	t.True(ok)
+	t.NotNil(queryResp.ErrorMessage)
+	t.Contains(*queryResp.ErrorMessage, "unkonwn queryType")
+}
+
+func (t *TaskHandlersTestSuite) verifyQueryResult(response interface{}, expectedResult string) {
+	t.NotNil(response)
+	queryResp, ok := response.(*s.RespondQueryTaskCompletedRequest)
+	t.True(ok)
+	t.Nil(queryResp.ErrorMessage)
+	t.NotNil(queryResp.QueryResult_)
+	encodedValue := EncodedValue(queryResp.QueryResult_)
+	var queryResult string
+	err := encodedValue.Get(&queryResult)
+	t.NoError(err)
+	t.Equal(expectedResult, queryResult)
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {

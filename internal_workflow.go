@@ -461,7 +461,11 @@ func getState(ctx Context) *coroutineState {
 	if s == nil {
 		panic("getState: not workflow context")
 	}
-	return s.(*coroutineState)
+	state := s.(*coroutineState)
+	if !state.dispatcher.executing {
+		panic("getState: access from outside of workflow context")
+	}
+	return state
 }
 
 func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
@@ -1122,7 +1126,8 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 	defer func() {
 		if p := recover(); p != nil {
 			result = nil
-			err = fmt.Errorf("handler for query type %s failed: %v", h.queryType, p)
+			st := getStackTraceRaw("query handler [panic]:", 7, 0)
+			err = fmt.Errorf("query handler panic: %v, stack trace: %v", p, st)
 		}
 	}()
 

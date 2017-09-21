@@ -126,7 +126,7 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 	return &baseWorker{
 		options:         options,
 		shutdownCh:      make(chan struct{}),
-		pollLimiter:     rate.NewLimiter(1000, 1),
+		pollLimiter:     rate.NewLimiter(rate.Limit(1000), 1),
 		taskLimiter:     rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
 		retrier:         backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
 		logger:          logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),

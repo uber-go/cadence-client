@@ -52,8 +52,10 @@ type (
 		// default: defaultMaxConcurrentActivityExecutionSize(1k)
 		MaxConcurrentActivityExecutionSize int
 
-		// Optional: Sets the rate limiting on number of activities that can be executed per second.
-		// This can be used to protect down stream services from flooding.
+		// Optional: Sets the rate limiting on number of activities that can be executed per second. Notice that the
+		// number is represented in float, so that you can set it to less than 1 if needed. For example, set the number
+		// to 0.1 means you want your activity to be executed once for every 10 seconds. This can be used to protect
+		// down stream services from flooding.
 		// The zero value of this uses the default value.
 		// default: defaultMaxActivityExecutionRate(100k)
 		// Warning: activity's StartToCloseTimeout starts ticking even if a task is blocked due to rate limiting.

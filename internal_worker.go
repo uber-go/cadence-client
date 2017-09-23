@@ -360,8 +360,8 @@ type hostEnvImpl struct {
 	workflowAliasMap                 map[string]string
 	activityFuncMap                  map[string]activity
 	activityAliasMap                 map[string]string
-	encoding                         jsonEncoding
-	tEncoding                        thriftEncoding
+	encoding                         encoding
+	tEncoding                        encoding
 	activityRegistrationInterceptors []interceptorFn
 	workflowRegistrationInterceptors []interceptorFn
 }
@@ -852,6 +852,7 @@ func newHostEnvironment() *hostEnvImpl {
 		activityFuncMap:  make(map[string]activity),
 		activityAliasMap: make(map[string]string),
 		encoding:         jsonEncoding{},
+		tEncoding:        thriftEncoding{},
 	}
 }
 

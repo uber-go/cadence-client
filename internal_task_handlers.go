@@ -85,6 +85,7 @@ type (
 		hostEnv               *hostEnvImpl
 	}
 
+	activityProvider func(name string) activity
 	// activityTaskHandlerImpl is the implementation of ActivityTaskHandler
 	activityTaskHandlerImpl struct {
 		taskListName     string
@@ -94,7 +95,7 @@ type (
 		logger           *zap.Logger
 		userContext      context.Context
 		hostEnv          *hostEnvImpl
-		activityProvider func(name string) activity
+		activityProvider activityProvider
 	}
 
 	// history wrapper method to help information about events.
@@ -818,7 +819,7 @@ func newActivityTaskHandlerWithCustomProvider(
 	service m.TChanWorkflowService,
 	params workerExecutionParameters,
 	env *hostEnvImpl,
-	activityProvider func(name string) activity,
+	activityProvider activityProvider,
 ) ActivityTaskHandler {
 	return &activityTaskHandlerImpl{
 		taskListName:     params.TaskList,

@@ -21,6 +21,7 @@
 package backoff
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -62,7 +63,7 @@ func (s *RetrySuite) TestRetrySuccess() {
 	policy.SetMaximumInterval(5 * time.Millisecond)
 	policy.SetMaximumAttempts(10)
 
-	err := Retry(op, policy, nil)
+	err := Retry(context.Background(), op, policy, nil)
 	s.NoError(err)
 	s.Equal(5, i)
 }
@@ -83,7 +84,7 @@ func (s *RetrySuite) TestRetryFailed() {
 	policy.SetMaximumInterval(5 * time.Millisecond)
 	policy.SetMaximumAttempts(5)
 
-	err := Retry(op, policy, nil)
+	err := Retry(context.Background(), op, policy, nil)
 	s.Error(err)
 }
 
@@ -111,7 +112,7 @@ func (s *RetrySuite) TestIsRetryableSuccess() {
 	policy.SetMaximumInterval(5 * time.Millisecond)
 	policy.SetMaximumAttempts(10)
 
-	err := Retry(op, policy, isRetryable)
+	err := Retry(context.Background(), op, policy, isRetryable)
 	s.NoError(err, "Retry count: %v", i)
 	s.Equal(5, i)
 }
@@ -132,7 +133,7 @@ func (s *RetrySuite) TestIsRetryableFailure() {
 	policy.SetMaximumInterval(5 * time.Millisecond)
 	policy.SetMaximumAttempts(10)
 
-	err := Retry(op, policy, IgnoreErrors([]error{&someError{}}))
+	err := Retry(context.Background(), op, policy, IgnoreErrors([]error{&someError{}}))
 	s.Error(err)
 	s.Equal(1, i)
 }

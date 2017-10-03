@@ -68,6 +68,30 @@ func (s *RetrySuite) TestRetrySuccess() {
 	s.Equal(5, i)
 }
 
+func (s *RetrySuite) TestNoRetryAfterContextDone() {
+	i := 0
+	op := func() error {
+		i++
+
+		if i == 5 {
+			return nil
+		}
+
+		return &someError{}
+	}
+
+	policy := NewExponentialRetryPolicy(1 * time.Millisecond)
+	policy.SetMaximumInterval(5 * time.Millisecond)
+	policy.SetMaximumAttempts(10)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*5)
+	defer cancel()
+
+	err := Retry(ctx, op, policy, nil)
+	s.Error(err)
+	s.True(i >= 2) // verify that we did retried
+}
+
 func (s *RetrySuite) TestRetryFailed() {
 	i := 0
 	op := func() error {

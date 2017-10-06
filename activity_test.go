@@ -25,13 +25,13 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
 	"go.uber.org/cadence/common/backoff"
-	"fmt"
 )
 
 func TestActivityHeartbeat(t *testing.T) {
@@ -64,7 +64,7 @@ func TestActivityHeartbeat_InternalError(t *testing.T) {
 
 	service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any()).
 		Return(nil, &s.InternalServiceError{}).
-		Do(func(ctx context.Context, request *s.RecordActivityTaskHeartbeatRequest ) {
+		Do(func(ctx context.Context, request *s.RecordActivityTaskHeartbeatRequest) {
 			fmt.Println("MOCK RecordActivityTaskHeartbeat executed")
 		}).AnyTimes()
 

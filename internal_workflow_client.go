@@ -417,7 +417,7 @@ func (wc *workflowClient) QueryWorkflow(ctx context.Context, workflowID string, 
 			RunId:      getRunID(runID),
 		},
 		Query: &s.WorkflowQuery{
-			QueryType:  common.StringPtr(queryType),
+			QueryType: common.StringPtr(queryType),
 			QueryArgs: input,
 		},
 	}

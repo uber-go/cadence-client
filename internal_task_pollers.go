@@ -441,7 +441,7 @@ func convertActivityResultToRespondRequest(identity string, taskToken, result []
 	if err == nil {
 		return &s.RespondActivityTaskCompletedRequest{
 			TaskToken: taskToken,
-			Result:   result,
+			Result:    result,
 			Identity:  common.StringPtr(identity)}
 	}
 

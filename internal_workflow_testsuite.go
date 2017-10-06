@@ -228,8 +228,11 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 	em := mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any()).
 		Return(&shared.RecordActivityTaskHeartbeatResponse{CancelRequested: common.BoolPtr(false)}, nil)
 	em.Do(func(ctx context.Context, r *shared.RecordActivityTaskHeartbeatRequest) {
-		err := mockHeartbeatFn(ctx, r)
-		em.Return(&shared.RecordActivityTaskHeartbeatResponse{CancelRequested: common.BoolPtr(false)}, err)
+		// TODO: The following will hit a data race in the gomock code where the Do() action is executed outside
+		// the lock and setting return value from inside the action is going to run into races.
+		// err := mockHeartbeatFn(ctx, r)
+		// em.Return(&shared.RecordActivityTaskHeartbeatResponse{CancelRequested: common.BoolPtr(false)}, err)
+		mockHeartbeatFn(ctx, r)
 	}).AnyTimes()
 
 	env.service = mockService

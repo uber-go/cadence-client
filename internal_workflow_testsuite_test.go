@@ -1094,3 +1094,27 @@ func (s *WorkflowTestSuiteUnitTest) Test_QueryWorkflow() {
 	env.AssertExpectations(s.T())
 	verifyStateWithQuery(stateDone)
 }
+
+func (s *WorkflowTestSuiteUnitTest) Test_MockOnTimeAsParameter() {
+	activityFn := func(v1 time.Time, v2 *time.Time, v3 string) error {
+		return nil
+	}
+	workflowFn := func(ctx Context, v1 time.Time, v2 *time.Time, v3 string) error {
+		ctx = WithActivityOptions(ctx, s.activityOptions)
+		return ExecuteActivity(ctx, activityFn, v1, v2, v3).Get(ctx, nil)
+	}
+
+	RegisterActivity(activityFn)
+	RegisterWorkflow(workflowFn)
+
+	now := time.Now()
+
+	env := s.NewTestWorkflowEnvironment()
+	env.OnActivity(activityFn, now, &now, mock.MatchedBy(func(v string) bool {
+		return v == "test-value"
+	})).Return(nil)
+	env.ExecuteWorkflow(workflowFn, now, &now, "test-value")
+
+	s.True(env.IsWorkflowCompleted())
+	env.AssertExpectations(s.T())
+}

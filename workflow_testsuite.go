@@ -123,26 +123,61 @@ func (t *TestActivityEnvironment) SetWorkerOptions(options WorkerOptions) *TestA
 //   t.OnActivity(MyActivity, mock.Anything, mock.Anything).Return("mock_result", nil)
 func (t *TestWorkflowEnvironment) OnActivity(activity interface{}, args ...interface{}) *MockCallWrapper {
 	fType := reflect.TypeOf(activity)
-	var call *mock.Call
+	var fnName string
 	switch fType.Kind() {
 	case reflect.Func:
 		fnType := reflect.TypeOf(activity)
 		if err := validateFnFormat(fnType, false); err != nil {
 			panic(err)
 		}
-		fnName := getFunctionName(activity)
+		fnName = getFunctionName(activity)
 		if alias, ok := getHostEnvironment().getActivityAlias(fnName); ok {
 			fnName = alias
 		}
-		call = t.Mock.On(fnName, args...)
 
 	case reflect.String:
-		call = t.Mock.On(activity.(string), args...)
+		fnName = activity.(string)
 	default:
 		panic("activity must be function or string")
 	}
 
+	processedArgs := processArgs(args)
+	call := t.Mock.On(fnName, processedArgs...)
 	return t.wrapCall(call)
+}
+
+var mockPkg = reflect.TypeOf(mock.AnythingOfType("")).PkgPath()
+
+// Cadence internally would marshal/unmarshal the parameters because activities are called on distributed systems.
+// However, marshal/unmarshal could potentially alter some data. For example, private fields of a struct will be striped.
+// One special case is the time.Time, which will lost its monotonic value after marshal/unmarshal, see details at:
+// (https://github.com/golang/go/issues/22251). Testify internally uses reflect.DeepEqual() to compare the parameters that
+// was used to setup the mock to the actual value. This lead to confusing result because the value before/after
+// marshal/unmarshal could return false using reflect.DeepEqual(). So, the work around is to do marshal/unmarshal before
+// we setup the mock expectation.
+func processArgs(args []interface{}) []interface{} {
+	processedArgs := []interface{}{}
+
+	for _, v := range args {
+		vt := reflect.TypeOf(v)
+		if vt.Kind() == reflect.String || vt.PkgPath() == mockPkg {
+			processedArgs = append(processedArgs, v)
+		} else {
+			blob, err := getHostEnvironment().encodeArg(v)
+			if err != nil {
+				panic(err)
+			}
+			toPtr := reflect.New(reflect.ValueOf(v).Type()).Interface()
+			err = getHostEnvironment().decodeArg(blob, toPtr)
+			if err != nil {
+				panic(err)
+			}
+			toValue := reflect.ValueOf(toPtr).Elem().Interface()
+			processedArgs = append(processedArgs, toValue)
+		}
+	}
+
+	return processedArgs
 }
 
 // OnWorkflow setup a mock call for workflow. Parameter workflow must be workflow function (func) or workflow name (string).
@@ -160,24 +195,25 @@ func (t *TestWorkflowEnvironment) OnActivity(activity interface{}, args ...inter
 //   t.OnWorkflow(MyChildWorkflow, mock.Anything, mock.Anything).Return("mock_result", nil)
 func (t *TestWorkflowEnvironment) OnWorkflow(workflow interface{}, args ...interface{}) *MockCallWrapper {
 	fType := reflect.TypeOf(workflow)
-	var call *mock.Call
+	var fnName string
 	switch fType.Kind() {
 	case reflect.Func:
 		fnType := reflect.TypeOf(workflow)
 		if err := validateFnFormat(fnType, true); err != nil {
 			panic(err)
 		}
-		fnName := getFunctionName(workflow)
+		fnName = getFunctionName(workflow)
 		if alias, ok := getHostEnvironment().getWorkflowAlias(fnName); ok {
 			fnName = alias
 		}
-		call = t.Mock.On(fnName, args...)
 	case reflect.String:
-		call = t.Mock.On(workflow.(string), args...)
+		fnName = workflow.(string)
 	default:
 		panic("activity must be function or string")
 	}
 
+	processedArgs := processArgs(args)
+	call := t.Mock.On(fnName, processedArgs...)
 	return t.wrapCall(call)
 }
 

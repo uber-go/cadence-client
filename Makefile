@@ -71,6 +71,9 @@ bins: glide thriftc copyright lint
 	done;
 
 cover_profile: clean copyright lint glide
+	@mkdir -p $(BUILD)
+	@echo "mode: atomic" > $(BUILD)/cover.out
+
 	@echo Testing packages:
 	@for dir in $(TEST_DIRS); do \
 		mkdir -p $(BUILD)/"$$dir"; \

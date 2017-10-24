@@ -363,7 +363,6 @@ struct ActivityTaskStartedEventAttributes {
 struct ActivityTaskCompletedEventAttributes {
   10: optional binary result
   20: optional i64 (js.type = "Long") scheduledEventId
-  30: optional i64 (js.type = "Long") startedEventId
   40: optional string identity
 }
 
@@ -371,14 +370,12 @@ struct ActivityTaskFailedEventAttributes {
   10: optional string reason
   20: optional binary details
   30: optional i64 (js.type = "Long") scheduledEventId
-  40: optional i64 (js.type = "Long") startedEventId
   50: optional string identity
 }
 
 struct ActivityTaskTimedOutEventAttributes {
   05: optional binary details
   10: optional i64 (js.type = "Long") scheduledEventId
-  20: optional i64 (js.type = "Long") startedEventId
   30: optional TimeoutType timeoutType
 }
 
@@ -397,7 +394,6 @@ struct ActivityTaskCanceledEventAttributes {
   10: optional binary details
   20: optional i64 (js.type = "Long") latestCancelRequestedEventId
   30: optional i64 (js.type = "Long") scheduledEventId
-  40: optional i64 (js.type = "Long") startedEventId
   50: optional string identity
 }
 
@@ -409,12 +405,10 @@ struct TimerStartedEventAttributes {
 
 struct TimerFiredEventAttributes {
   10: optional string timerId
-  20: optional i64 (js.type = "Long") startedEventId
 }
 
 struct TimerCanceledEventAttributes {
   10: optional string timerId
-  20: optional i64 (js.type = "Long") startedEventId
   30: optional i64 (js.type = "Long") decisionTaskCompletedEventId
   40: optional string identity
 }
@@ -514,7 +508,6 @@ struct ChildWorkflowExecutionCompletedEventAttributes {
   30: optional WorkflowExecution workflowExecution
   40: optional WorkflowType workflowType
   50: optional i64 (js.type = "Long") initiatedEventId
-  60: optional i64 (js.type = "Long") startedEventId
 }
 
 struct ChildWorkflowExecutionFailedEventAttributes {
@@ -524,7 +517,6 @@ struct ChildWorkflowExecutionFailedEventAttributes {
   40: optional WorkflowExecution workflowExecution
   50: optional WorkflowType workflowType
   60: optional i64 (js.type = "Long") initiatedEventId
-  70: optional i64 (js.type = "Long") startedEventId
 }
 
 struct ChildWorkflowExecutionCanceledEventAttributes {
@@ -533,7 +525,6 @@ struct ChildWorkflowExecutionCanceledEventAttributes {
   30: optional WorkflowExecution workflowExecution
   40: optional WorkflowType workflowType
   50: optional i64 (js.type = "Long") initiatedEventId
-  60: optional i64 (js.type = "Long") startedEventId
 }
 
 struct ChildWorkflowExecutionTimedOutEventAttributes {
@@ -542,7 +533,6 @@ struct ChildWorkflowExecutionTimedOutEventAttributes {
   30: optional WorkflowExecution workflowExecution
   40: optional WorkflowType workflowType
   50: optional i64 (js.type = "Long") initiatedEventId
-  60: optional i64 (js.type = "Long") startedEventId
 }
 
 struct ChildWorkflowExecutionTerminatedEventAttributes {
@@ -550,7 +540,6 @@ struct ChildWorkflowExecutionTerminatedEventAttributes {
   20: optional WorkflowExecution workflowExecution
   30: optional WorkflowType workflowType
   40: optional i64 (js.type = "Long") initiatedEventId
-  50: optional i64 (js.type = "Long") startedEventId
 }
 
 struct HistoryEvent {
@@ -715,7 +704,6 @@ struct PollForActivityTaskResponse {
   30:  optional string activityId
   40:  optional ActivityType activityType
   50:  optional binary input
-  60:  optional i64 (js.type = "Long") startedEventId
   70:  optional i64 (js.type = "Long") scheduledTimestamp
   80:  optional i32 scheduleToCloseTimeoutSeconds
   90:  optional i64 (js.type = "Long") startedTimestamp

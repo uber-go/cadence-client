@@ -406,11 +406,11 @@ func Now(ctx Context) time.Time {
 	return getWorkflowEnvironment(ctx).Now()
 }
 
-// NewTimer returns immediately and the future becomes ready after the specified timeout.
-//  - The current timer resolution implementation is in seconds but is subjected to change.
-//  - The workflow needs to use this NewTimer() to get the timer instead of the Go lang library one(timer.NewTimer())
-//  - You can also cancel the pending timer using context(WithCancel(ctx)) and that will cancel the timer with
-// error TimerCanceledError.
+// NewTimer returns immediately and the future becomes ready after the specified duration d. The workflow needs to use
+// this NewTimer() to get the timer instead of the Go lang library one(timer.NewTimer()). You can cancel the pending
+// timer by cancel the Context (using context from cadence.WithCancel(ctx)) and that will cancel the timer. After timer
+// is canceled, the returned Future become ready, and Future.Get() will return *CanceledError.
+// The current timer resolution implementation is in seconds but is subjected to change.
 func NewTimer(ctx Context, d time.Duration) Future {
 	future, settable := NewFuture(ctx)
 	if d <= 0 {

@@ -97,6 +97,10 @@ type (
 		// like common logger for all activities.
 		BackgroundActivityContext context.Context
 	}
+
+	// ActivityContextValueKey is a type to be used as the key for data attached
+	// as values to the BackgroundActivityContext.
+	ActivityContextValueKey int
 )
 
 // NewWorker creates an instance of worker for managing workflow and activity executions.

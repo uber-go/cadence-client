@@ -116,9 +116,9 @@ func getHostName() string {
 // worker uuid per process
 var workerUUID string = uuid.New()
 
-func getWorkerTaskList(tasklist string) string {
-	// includes original tasklist and hostname for debuggability, workerUUID guarantees the uniqueness
-	return fmt.Sprintf("%s@%s:%s", tasklist, getHostName(), workerUUID)
+func getWorkerTaskList() string {
+	// includes hostname for debuggability, workerUUID guarantees the uniqueness
+	return fmt.Sprintf("%s:%s", getHostName(), workerUUID)
 }
 
 func flowActivityTypeFrom(v s.ActivityType) ActivityType {

@@ -248,7 +248,7 @@ func (wtp *workflowTaskPoller) getNextPollRequest() (request *s.PollForDecisionT
 			}
 		} else {
 			wtp.pendingStickyPollCount++
-			taskList = getWorkerTaskList(wtp.taskListName)
+			taskList = getWorkerTaskList()
 			release = func() {
 				wtp.requestLock.Lock()
 				wtp.pendingStickyPollCount--

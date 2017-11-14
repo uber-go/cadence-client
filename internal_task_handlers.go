@@ -44,6 +44,8 @@ import (
 
 const (
 	defaultHeartBeatIntervalInSec = 10 * 60
+
+	defaultStickyCacheSize = 10000
 )
 
 type (
@@ -336,7 +338,7 @@ func newWorkflowTaskHandler(
 }
 
 // TODO: need a better eviction policy based on memory usage
-var workflowCache = cache.New(1000, &cache.Options{
+var workflowCache = cache.New(defaultStickyCacheSize, &cache.Options{
 	RemovedFunc: func(cachedEntity interface{}) {
 		wc := cachedEntity.(*workflowExecutionContext)
 		wc.onEviction()

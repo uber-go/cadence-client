@@ -8,7 +8,7 @@
 Make sure you clone this repo into the correct location.
 
 ```bash
-git clone git@github.com:uber/cadence.git $GOPATH/src/go.uber.org/cadence
+git clone git@github.com:uber-go/cadence-client.git $GOPATH/src/go.uber.org/cadence
 ```
 
 or

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
+	common2 "github.com/uber/cadence/common"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
@@ -586,4 +587,23 @@ func convertActivityResultToRespondRequest(identity string, taskToken, result []
 		Reason:    common.StringPtr(reason),
 		Details:   details,
 		Identity:  common.StringPtr(identity)}
+}
+
+func convertActivityResultToRespondRequestByID(identity, domainID, workflowID, activityID string,
+	result []byte, err error) (interface{}, error) {
+
+	// Generate taskToken with ID and Empty ScheduleID, which will be recognized in server side
+	taskToken := &common2.TaskToken{
+		DomainID:   domainID,
+		WorkflowID: workflowID,
+		ScheduleID: common2.EmptyEventID,
+		ActivityID: activityID,
+	}
+	taskTokenSerializer := common2.NewJSONTaskTokenSerializer()
+	token, err0 := taskTokenSerializer.Serialize(taskToken)
+	if err0 != nil {
+		return nil, err0
+	}
+
+	return convertActivityResultToRespondRequest(identity, token, result, err), nil
 }

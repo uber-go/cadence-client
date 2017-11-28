@@ -359,6 +359,40 @@ func TestCompleteActivity(t *testing.T) {
 	require.NotNil(t, failedRequest)
 }
 
+func TestCompleteActivityById(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	mockService := workflowservicetest.NewMockClient(mockCtrl)
+
+	domain := "testDomain"
+	wfClient := NewClient(mockService, domain, nil)
+	var completedRequest, canceledRequest, failedRequest interface{}
+	mockService.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any()).Return(nil).Do(
+		func(ctx context.Context, request *s.RespondActivityTaskCompletedRequest) {
+			completedRequest = request
+		})
+	mockService.EXPECT().RespondActivityTaskCanceled(gomock.Any(), gomock.Any()).Return(nil).Do(
+		func(ctx context.Context, request *s.RespondActivityTaskCanceledRequest) {
+			canceledRequest = request
+		})
+	mockService.EXPECT().RespondActivityTaskFailed(gomock.Any(), gomock.Any()).Return(nil).Do(
+		func(ctx context.Context, request *s.RespondActivityTaskFailedRequest) {
+			failedRequest = request
+		})
+
+	domainID := "domainId"
+	workflowID := "wid"
+	activityID := "aid"
+
+	wfClient.CompleteActivityByID(context.Background(), domainID, workflowID, activityID, nil, nil)
+	require.NotNil(t, completedRequest)
+
+	wfClient.CompleteActivityByID(context.Background(), domainID, workflowID, activityID, nil, NewCanceledError())
+	require.NotNil(t, canceledRequest)
+
+	wfClient.CompleteActivityByID(context.Background(), domainID, workflowID, activityID, nil, errors.New(""))
+	require.NotNil(t, failedRequest)
+}
+
 func TestRecordActivityHeartbeat(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	mockService := workflowservicetest.NewMockClient(mockCtrl)

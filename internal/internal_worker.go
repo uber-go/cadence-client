@@ -40,8 +40,8 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/common"
-	"go.uber.org/cadence/common/backoff"
+	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

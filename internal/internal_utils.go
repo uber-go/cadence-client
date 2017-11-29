@@ -33,7 +33,7 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/uber/tchannel-go"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/common"
+	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
 	"golang.org/x/net/context"
 )
@@ -114,7 +114,7 @@ func getHostName() string {
 }
 
 // worker uuid per process
-var workerUUID string = uuid.New()
+var workerUUID = uuid.New()
 
 func getWorkerTaskList() string {
 	// includes hostname for debuggability, workerUUID guarantees the uniqueness

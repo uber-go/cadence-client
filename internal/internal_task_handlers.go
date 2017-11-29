@@ -34,11 +34,11 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/common"
-	"go.uber.org/cadence/common/backoff"
-	"go.uber.org/cadence/common/cache"
-	"go.uber.org/cadence/common/metrics"
-	"go.uber.org/cadence/common/util"
+	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/internal/common/backoff"
+	"go.uber.org/cadence/internal/common/cache"
+	"go.uber.org/cadence/internal/common/metrics"
+	"go.uber.org/cadence/internal/common/util"
 	"go.uber.org/zap"
 )
 

@@ -32,7 +32,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/common"
+	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
 )
 

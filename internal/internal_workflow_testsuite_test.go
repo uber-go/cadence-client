@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/common"
+	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
 )
 

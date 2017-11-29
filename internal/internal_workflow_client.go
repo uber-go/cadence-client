@@ -28,9 +28,9 @@ import (
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/common"
-	"go.uber.org/cadence/common/backoff"
-	"go.uber.org/cadence/common/metrics"
+	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/internal/common/backoff"
+	"go.uber.org/cadence/internal/common/metrics"
 )
 
 // Assert that structs do indeed implement the interfaces

@@ -24,8 +24,8 @@ import (
 	"fmt"
 
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/common"
-	"go.uber.org/cadence/common/util"
+	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/internal/common/util"
 )
 
 type (

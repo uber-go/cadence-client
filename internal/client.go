@@ -27,7 +27,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/common/metrics"
+	"go.uber.org/cadence/internal/common/metrics"
 )
 
 // QueryTypeStackTrace is the build in query type for Client.QueryWorkflow() call. Use this query type to get the call

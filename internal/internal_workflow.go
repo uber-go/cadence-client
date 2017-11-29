@@ -33,8 +33,8 @@ import (
 	"unicode"
 
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/common"
-	"go.uber.org/cadence/common/metrics"
+	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
 )
 

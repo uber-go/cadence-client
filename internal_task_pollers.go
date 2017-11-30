@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
-	common2 "github.com/uber/cadence/common"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/common"
@@ -560,6 +559,46 @@ func reportActivityComplete(ctx context.Context, service workflowserviceclient.I
 	return reportErr
 }
 
+func reportActivityCompleteByID(ctx context.Context, service workflowserviceclient.Interface, request interface{}, metricsScope tally.Scope) error {
+	if request == nil {
+		// nothing to report
+		return nil
+	}
+
+	tchCtx, cancel, opt := newChannelContext(ctx)
+	defer cancel()
+	var reportErr error
+	switch request := request.(type) {
+	case *s.RespondActivityTaskCanceledByIDRequest:
+		reportErr = backoff.Retry(ctx,
+			func() error {
+				return service.RespondActivityTaskCanceledByID(tchCtx, request, opt...)
+			}, serviceOperationRetryPolicy, isServiceTransientError)
+	case *s.RespondActivityTaskFailedByIDRequest:
+		reportErr = backoff.Retry(ctx,
+			func() error {
+				return service.RespondActivityTaskFailedByID(tchCtx, request, opt...)
+			}, serviceOperationRetryPolicy, isServiceTransientError)
+	case *s.RespondActivityTaskCompletedByIDRequest:
+		reportErr = backoff.Retry(ctx,
+			func() error {
+				return service.RespondActivityTaskCompletedByID(tchCtx, request, opt...)
+			}, serviceOperationRetryPolicy, isServiceTransientError)
+	}
+	if reportErr == nil {
+		switch request.(type) {
+		case *s.RespondActivityTaskCanceledByIDRequest:
+			metricsScope.Counter(metrics.ActivityTaskCanceledCounter).Inc(1)
+		case *s.RespondActivityTaskFailedByIDRequest:
+			metricsScope.Counter(metrics.ActivityTaskFailedCounter).Inc(1)
+		case *s.RespondActivityTaskCompletedByIDRequest:
+			metricsScope.Counter(metrics.ActivityTaskCompletedCounter).Inc(1)
+		}
+	}
+
+	return reportErr
+}
+
 func convertActivityResultToRespondRequest(identity string, taskToken, result []byte, err error) interface{} {
 	if err == ErrActivityResultPending {
 		// activity result is pending and will be completed asynchronously.
@@ -589,21 +628,43 @@ func convertActivityResultToRespondRequest(identity string, taskToken, result []
 		Identity:  common.StringPtr(identity)}
 }
 
-func convertActivityResultToRespondRequestByID(identity, domainID, workflowID, activityID string,
-	result []byte, err error) (interface{}, error) {
-
-	// Generate taskToken with ID and Empty ScheduleID, which will be recognized in server side
-	taskToken := &common2.TaskToken{
-		DomainID:   domainID,
-		WorkflowID: workflowID,
-		ScheduleID: common2.EmptyEventID,
-		ActivityID: activityID,
-	}
-	taskTokenSerializer := common2.NewJSONTaskTokenSerializer()
-	token, err0 := taskTokenSerializer.Serialize(taskToken)
-	if err0 != nil {
-		return nil, err0
+func convertActivityResultToRespondRequestByID(identity, domainID, workflowID, runID, activityID string,
+	result []byte, err error) interface{} {
+	if err == ErrActivityResultPending {
+		// activity result is pending and will be completed asynchronously.
+		// nothing to report at this point
+		return nil
 	}
 
-	return convertActivityResultToRespondRequest(identity, token, result, err), nil
+	if err == nil {
+		return &s.RespondActivityTaskCompletedByIDRequest{
+			DomainID:   common.StringPtr(domainID),
+			WorkflowID: common.StringPtr(workflowID),
+			RunID:      common.StringPtr(runID),
+			ActivityID: common.StringPtr(activityID),
+			Result:     result,
+			Identity:   common.StringPtr(identity)}
+	}
+
+	reason, details := getErrorDetails(err)
+	if _, ok := err.(*CanceledError); ok || err == context.Canceled {
+		return &s.RespondActivityTaskCanceledByIDRequest{
+			DomainID:   common.StringPtr(domainID),
+			WorkflowID: common.StringPtr(workflowID),
+			RunID:      common.StringPtr(runID),
+			ActivityID: common.StringPtr(activityID),
+			Details:    details,
+			Identity:   common.StringPtr(identity)}
+	}
+
+	return &s.RespondActivityTaskFailedByIDRequest{
+		DomainID:   common.StringPtr(domainID),
+		WorkflowID: common.StringPtr(workflowID),
+		RunID:      common.StringPtr(runID),
+		ActivityID: common.StringPtr(activityID),
+		Reason:     common.StringPtr(reason),
+		Details:    details,
+		Identity:   common.StringPtr(identity)}
+
+	return nil
 }

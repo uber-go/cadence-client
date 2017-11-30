@@ -270,12 +270,13 @@ func (wc *workflowClient) CompleteActivity(ctx context.Context, taskToken []byte
 }
 
 // CompleteActivityById reports activity completed. Similar to CompleteActivity
-func (wc *workflowClient) CompleteActivityByID(ctx context.Context, domainID, workflowID, activityID string,
+func (wc *workflowClient) CompleteActivityByID(ctx context.Context, domainID, workflowID, runID, activityID string,
 	result interface{}, err error) error {
 
 	if activityID == "" || workflowID == "" || domainID == "" {
 		return errors.New("empty activity or workflow id or domainId")
 	}
+
 	var data []byte
 	if result != nil {
 		var err0 error
@@ -285,11 +286,8 @@ func (wc *workflowClient) CompleteActivityByID(ctx context.Context, domainID, wo
 		}
 	}
 
-	request, err0 := convertActivityResultToRespondRequestByID(wc.identity, domainID, workflowID, activityID, data, err)
-	if err0 != nil {
-		return err0
-	}
-	return reportActivityComplete(ctx, wc.workflowService, request, wc.metricsScope)
+	request := convertActivityResultToRespondRequestByID(wc.identity, domainID, workflowID, runID, activityID, data, err)
+	return reportActivityCompleteByID(ctx, wc.workflowService, request, wc.metricsScope)
 }
 
 // RecordActivityHeartbeat records heartbeat for an activity.

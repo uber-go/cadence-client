@@ -366,30 +366,31 @@ func TestCompleteActivityById(t *testing.T) {
 	domain := "testDomain"
 	wfClient := NewClient(mockService, domain, nil)
 	var completedRequest, canceledRequest, failedRequest interface{}
-	mockService.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any()).Return(nil).Do(
-		func(ctx context.Context, request *s.RespondActivityTaskCompletedRequest) {
+	mockService.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), gomock.Any()).Return(nil).Do(
+		func(ctx context.Context, request *s.RespondActivityTaskCompletedByIDRequest) {
 			completedRequest = request
 		})
-	mockService.EXPECT().RespondActivityTaskCanceled(gomock.Any(), gomock.Any()).Return(nil).Do(
-		func(ctx context.Context, request *s.RespondActivityTaskCanceledRequest) {
+	mockService.EXPECT().RespondActivityTaskCanceledByID(gomock.Any(), gomock.Any()).Return(nil).Do(
+		func(ctx context.Context, request *s.RespondActivityTaskCanceledByIDRequest) {
 			canceledRequest = request
 		})
-	mockService.EXPECT().RespondActivityTaskFailed(gomock.Any(), gomock.Any()).Return(nil).Do(
-		func(ctx context.Context, request *s.RespondActivityTaskFailedRequest) {
+	mockService.EXPECT().RespondActivityTaskFailedByID(gomock.Any(), gomock.Any()).Return(nil).Do(
+		func(ctx context.Context, request *s.RespondActivityTaskFailedByIDRequest) {
 			failedRequest = request
 		})
 
 	domainID := "domainId"
 	workflowID := "wid"
+	runID := ""
 	activityID := "aid"
 
-	wfClient.CompleteActivityByID(context.Background(), domainID, workflowID, activityID, nil, nil)
+	wfClient.CompleteActivityByID(context.Background(), domainID, workflowID, runID, activityID, nil, nil)
 	require.NotNil(t, completedRequest)
 
-	wfClient.CompleteActivityByID(context.Background(), domainID, workflowID, activityID, nil, NewCanceledError())
+	wfClient.CompleteActivityByID(context.Background(), domainID, workflowID, runID, activityID, nil, NewCanceledError())
 	require.NotNil(t, canceledRequest)
 
-	wfClient.CompleteActivityByID(context.Background(), domainID, workflowID, activityID, nil, errors.New(""))
+	wfClient.CompleteActivityByID(context.Background(), domainID, workflowID, runID, activityID, nil, errors.New(""))
 	require.NotNil(t, failedRequest)
 }
 

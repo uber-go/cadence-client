@@ -588,11 +588,11 @@ func reportActivityCompleteByID(ctx context.Context, service workflowserviceclie
 	if reportErr == nil {
 		switch request.(type) {
 		case *s.RespondActivityTaskCanceledByIDRequest:
-			metricsScope.Counter(metrics.ActivityTaskCanceledCounter).Inc(1)
+			metricsScope.Counter(metrics.ActivityTaskCanceledByIDCounter).Inc(1)
 		case *s.RespondActivityTaskFailedByIDRequest:
-			metricsScope.Counter(metrics.ActivityTaskFailedCounter).Inc(1)
+			metricsScope.Counter(metrics.ActivityTaskFailedByIDCounter).Inc(1)
 		case *s.RespondActivityTaskCompletedByIDRequest:
-			metricsScope.Counter(metrics.ActivityTaskCompletedCounter).Inc(1)
+			metricsScope.Counter(metrics.ActivityTaskCompletedByIDCounter).Inc(1)
 		}
 	}
 

@@ -26,7 +26,7 @@ import (
 	"go.uber.org/cadence/internal"
 )
 
-// ActivityOptions stores all activity-specific parameters that will be stored inside of a context.
+// ActivityOptions stores all activity-specific invocation parameters that will be stored inside of a context.
 type ActivityOptions = internal.ActivityOptions
 
 // WithActivityOptions adds all options to the context.

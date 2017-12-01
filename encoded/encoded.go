@@ -18,16 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// This file exists to force compilation of all code that doesn't have unit tests.
-package main
+package encoded
 
 import (
-	_ "go.uber.org/cadence/activity"
-	_ "go.uber.org/cadence/client"
-	_ "go.uber.org/cadence/encoded"
-	_ "go.uber.org/cadence/testing"
-	_ "go.uber.org/cadence/workflow"
+	"go.uber.org/cadence/internal"
 )
 
-func main() {
-}
+type (
+
+	// Value is type alias used to encapsulate/extract encoded value from workflow/activity.
+	Value = internal.EncodedValue
+
+	// Values is type alias used to encapsulate/extract encoded values from workflow/activity.
+	Values = internal.EncodedValues
+)

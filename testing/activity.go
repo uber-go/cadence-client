@@ -18,15 +18,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// This file exists to force compilation of all code that doesn't have unit tests.
-package main
+package activity
 
 import (
-	_ "go.uber.org/cadence/activity"
-	_ "go.uber.org/cadence/client"
-	_ "go.uber.org/cadence/testing"
-	_ "go.uber.org/cadence/workflow"
+	"context"
+	"github.com/uber-go/tally"
+	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal"
+	"go.uber.org/zap"
 )
 
-func main() {
+// ServiceInvoker abstracts calls to the Cadence service from an activity implementation.
+// Implement to unit test activities.
+type ServiceInvoker = internal.ServiceInvoker
+
+// WithActivityTask adds activity specific information into context.
+// Use this method to unit test activity implementations that use context extractor methodshared.
+func WithActivityTask(
+	ctx context.Context,
+	task *shared.PollForActivityTaskResponse,
+	invoker ServiceInvoker,
+	logger *zap.Logger,
+	scope tally.Scope,
+) context.Context {
+	return internal.WithActivityTask(ctx, task, invoker, logger, scope)
 }

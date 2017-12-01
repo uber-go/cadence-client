@@ -50,7 +50,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	return internal.NewClient(service, domain, options)
 }
 
-// NewDomainClient creates an instance of a domain client, to manager lifecycle of domains.
+// NewDomainClient creates an instance of a domain client, to manage lifecycle of domains.
 func NewDomainClient(service workflowserviceclient.Interface, options *Options) DomainClient {
 	return internal.NewDomainClient(service, options)
 }

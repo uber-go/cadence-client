@@ -186,7 +186,7 @@ func TestWorkflowPanic(t *testing.T) {
 	require.NotNil(t, env.GetWorkflowError())
 	resultErr := env.GetWorkflowError().(*PanicError)
 	require.EqualValues(t, "simulated", resultErr.Error())
-	require.Contains(t, resultErr.StackTrace(), "cadence.splitJoinActivityWorkflow")
+	require.Contains(t, resultErr.StackTrace(), "cadence/internal.splitJoinActivityWorkflow")
 }
 
 func testClockWorkflow(ctx Context) (time.Time, error) {

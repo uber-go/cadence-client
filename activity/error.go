@@ -18,17 +18,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package cadence
+package activity
 
-import "go.uber.org/cadence/internal"
+import (
+	"go.uber.org/cadence/internal"
+)
 
-// LibraryVersion is a semver string that represents
-// the version of this cadence client library
-// it will be embedded as a "version" header in every
-// rpc call made by this client to cadence server.
-// In addition, the version string will be used by
-// the server to enforce compatibility checks
-// Update to this version number is typically done
-// by the cadence team as part of a major feature or
-// behavior change
-const LibraryVersion = internal.LibraryVersion
+// ErrActivityResultPending is returned from activity's implementation to indicate the activity is not completed when
+// activity method returns. Activity needs to be completed by Client.CompleteActivity() separately. For example, if an
+// activity require human interaction (like approve an expense report), the activity could return ErrActivityResultPending
+// which indicate the activity is not done yet. Then, when the waited human action happened, it needs to trigger something
+// that could report the activity completed event to cadence server via Client.CompleteActivity() API.
+var ErrActivityResultPending = internal.ErrActivityResultPending

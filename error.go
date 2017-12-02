@@ -20,15 +20,26 @@
 
 package cadence
 
-import "go.uber.org/cadence/internal"
+import (
+	"go.uber.org/cadence/internal"
+)
 
-// LibraryVersion is a semver string that represents
-// the version of this cadence client library
-// it will be embedded as a "version" header in every
-// rpc call made by this client to cadence server.
-// In addition, the version string will be used by
-// the server to enforce compatibility checks
-// Update to this version number is typically done
-// by the cadence team as part of a major feature or
-// behavior change
-const LibraryVersion = internal.LibraryVersion
+type (
+	// CustomError returned from workflow and activity implementations with reason and optional details.
+	CustomError = internal.CustomError
+
+	// CanceledError returned when operation was canceled.
+	CanceledError = internal.CanceledError
+)
+
+// NewCustomError create new instance of *CustomError with reason and optional details.
+// Use CustomError for any use case specific errors that cross activity and child workflow boundaries.
+func NewCustomError(reason string, details ...interface{}) *CustomError {
+	return internal.NewCustomError(reason, details)
+}
+
+// NewCanceledError creates CanceledError instance.
+// Return this error from activity or child workflow to indicate that it was successfully cancelled.
+func NewCanceledError(details ...interface{}) *CanceledError {
+	return internal.NewCanceledError(details)
+}

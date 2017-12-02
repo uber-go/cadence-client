@@ -52,6 +52,9 @@ type (
 
 	// Info information about currently executing workflow
 	Info = internal.WorkflowInfo
+
+	// ContinueAsNewError contains information about how to continue the workflow as new.
+	ContinueAsNewError = internal.ContinueAsNewError
 )
 
 const (
@@ -304,4 +307,20 @@ func GetVersion(ctx Context, changeID string, minSupported, maxSupported Version
 //  }
 func SetQueryHandler(ctx Context, queryType string, handler interface{}) error {
 	return internal.SetQueryHandler(ctx, queryType, handler)
+}
+
+// NewContinueAsNewError creates ContinueAsNewError instance
+// If the workflow main function returns this error then the current execution is ended and
+// the new execution with same workflow ID is started automatically with options
+// provided to this function.
+//  ctx - use context to override any options for the new workflow like execution time out, decision task time out, task list.
+//	  if not mentioned it would use the defaults that the current workflow is using.
+//        ctx := WithExecutionStartToCloseTimeout(ctx, 30 * time.Minute)
+//        ctx := WithWorkflowTaskStartToCloseTimeout(ctx, time.Minute)
+//	  ctx := WithWorkflowTaskList(ctx, "example-group")
+//  wfn - workflow function. for new execution it can be different from the currently running.
+//  args - arguments for the new workflow.
+//
+func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *ContinueAsNewError {
+	return internal.NewContinueAsNewError(ctx, wfn, args)
 }

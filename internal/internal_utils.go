@@ -32,7 +32,6 @@ import (
 
 	"github.com/pborman/uuid"
 	"github.com/uber/tchannel-go"
-	"go.uber.org/cadence"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
@@ -96,7 +95,7 @@ func newChannelContext(ctx context.Context, options ...func(builder *contextBuil
 	ctx, cancelFn := builder.Build()
 
 	callOptions := []yarpc.CallOption{
-		yarpc.WithHeader(versionHeaderName, cadence.LibraryVersion)}
+		yarpc.WithHeader(versionHeaderName, LibraryVersion)}
 
 	return ctx, cancelFn, callOptions
 }

@@ -383,6 +383,8 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 		return nil, constructError(request.GetReason(), request.Details)
 	case *shared.RespondActivityTaskCompletedRequest:
 		return EncodedValue(request.Result), nil
+	case nil: // when activity returns ErrActivityResultPending
+		return nil, nil
 	default:
 		// will never happen
 		return nil, fmt.Errorf("unsupported respond type %T", result)

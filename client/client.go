@@ -18,6 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// Package client contains functions to create Cadence service and domain clients.
+//
+// These clients provide higher level API to Cadence service.
+// Use this clients to perform CRUD on domains and start or query workflow executions.
 package client
 
 import (

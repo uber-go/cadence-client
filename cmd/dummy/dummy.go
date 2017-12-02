@@ -22,10 +22,12 @@
 package main
 
 import (
+	_ "go.uber.org/cadence"
 	_ "go.uber.org/cadence/activity"
 	_ "go.uber.org/cadence/client"
 	_ "go.uber.org/cadence/encoded"
 	_ "go.uber.org/cadence/testing"
+	_ "go.uber.org/cadence/worker"
 	_ "go.uber.org/cadence/workflow"
 )
 

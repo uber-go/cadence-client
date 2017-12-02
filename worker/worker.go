@@ -18,7 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package internal
+// Package worker contains functions to manage lifecycle of a Cadence client side worker.
+package worker
 
 import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"

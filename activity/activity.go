@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// Package activity contains functions and types used to implement Cadence activities.
 package activity
 
 import (
@@ -28,10 +29,10 @@ import (
 )
 
 type (
-	// Type identifies a activity type.
+	// Type identifies an activity type.
 	Type = internal.ActivityType
 
-	// Info contains information about currently executing activity.
+	// Info contains information about a currently executing activity.
 	Info = internal.ActivityInfo
 
 	// RegisterOptions consists of options for registering an activity

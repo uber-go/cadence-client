@@ -55,15 +55,15 @@ clean_thrift:
 
 thriftc: clean_thrift yarpc-install $(THRIFTRW_GEN_SRC)
 
-copyright: ./cmd/tools/copyright/licensegen.go
-	go run ./cmd/tools/copyright/licensegen.go --verifyOnly
+copyright: ./internal/cmd/tools/copyright/licensegen.go
+	go run ./internal/cmd/tools/copyright/licensegen.go --verifyOnly
 
 vendor/glide.updated: glide.lock glide.yaml
 	glide install
 	touch vendor/glide.updated
 
 dummy: vendor/glide.updated $(ALL_SRC)
-	go build -i -o dummy cmd/dummy/dummy.go
+	go build -i -o dummy internal/cmd/dummy/dummy.go
 
 test: bins
 	@rm -f test
@@ -111,3 +111,4 @@ fmt:
 clean:
 	rm -rf cadence-client
 	rm -Rf $(BUILD)
+	rm dummy

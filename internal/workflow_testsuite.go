@@ -150,9 +150,9 @@ func (t *TestWorkflowEnvironment) OnActivity(activity interface{}, args ...inter
 // the Return() call should either be a function that has exact same signature as the mocked workflow, or it should be
 // mock values with the same types as the mocked workflow function returns.
 // Example: assume the workflow you want to mock has function signature as:
-//   func MyChildWorkflow(ctx cadence.Context, msg string) (string, error)
+//   func MyChildWorkflow(ctx workflow.Context, msg string) (string, error)
 // You can mock it by return a function with exact same signature:
-//   t.OnWorkflow(MyChildWorkflow, mock.Anything, mock.Anything).Return(func(ctx cadence.Context, msg string) (string, error) {
+//   t.OnWorkflow(MyChildWorkflow, mock.Anything, mock.Anything).Return(func(ctx workflow.Context, msg string) (string, error) {
 //      // your mock function implementation
 //      return "", nil
 //   })

@@ -26,8 +26,8 @@ import (
 	"go.uber.org/cadence/internal"
 )
 
-// WithChildWorkflowOptions adds all workflow options to the context.
-func WithChildWorkflowOptions(ctx Context, cwo ChildWorkflowOptions) Context {
+// WithChildOptions adds all workflow options to the context.
+func WithChildOptions(ctx Context, cwo ChildWorkflowOptions) Context {
 	return internal.WithChildWorkflowOptions(ctx, cwo)
 }
 

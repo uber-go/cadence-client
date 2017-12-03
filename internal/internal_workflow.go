@@ -86,7 +86,7 @@ type (
 	// Code of a workflow must be deterministic. It must use cadence.Channel, cadence.Selector, and cadence.Go instead of
 	// native channels, select and go. It also must not use range operation over map as it is randomized by go runtime.
 	// All time manipulation should use current time returned by GetTime(ctx) method.
-	// Note that cadence.Context is used instead of context.Context to avoid use of raw channels.
+	// Note that workflow.Context is used instead of context.Context to avoid use of raw channels.
 	workflow interface {
 		Execute(ctx Context, input []byte) (result []byte, err error)
 	}
@@ -307,7 +307,7 @@ func (f *futureImpl) Chain(future Future) {
 
 	ch, ok := future.(asyncFuture)
 	if !ok {
-		panic("cannot chain Future that wasn't created with cadence.NewFuture")
+		panic("cannot chain Future that wasn't created with workflow.NewFuture")
 	}
 	if !ch.IsReady() {
 		ch.ChainFuture(f)
@@ -848,7 +848,7 @@ func (s *selectorImpl) AddSend(c Channel, v interface{}, f func()) Selector {
 func (s *selectorImpl) AddFuture(future Future, f func(future Future)) Selector {
 	asyncF, ok := future.(asyncFuture)
 	if !ok {
-		panic("cannot chain Future that wasn't created with cadence.NewFuture")
+		panic("cannot chain Future that wasn't created with workflow.NewFuture")
 	}
 	s.cases = append(s.cases, &selectCase{future: asyncF, futureFunc: &f})
 	return s
@@ -1132,8 +1132,8 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 			if p == panicIllegalAccessCoroutinueState {
 				// query handler code try to access workflow functions outside of workflow context, make error message
 				// more descriptive and clear.
-				p = "query handler must not use cadence context to do things like cadence.NewChannel(), " +
-					"cadence.Go() or to call any workflow blocking functions like Channel.Get() or Future.Get()"
+				p = "query handler must not use cadence context to do things like workflow.NewChannel(), " +
+					"workflow.Go() or to call any workflow blocking functions like Channel.Get() or Future.Get()"
 			}
 			err = fmt.Errorf("query handler panic: %v, stack trace: %v", p, st)
 		}

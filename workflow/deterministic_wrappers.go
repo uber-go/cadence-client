@@ -29,7 +29,7 @@ import (
 type (
 
 	// Channel must be used instead of native go channel by workflow code.
-	// Use cadence.NewChannel(ctx) method to create Channel instance.
+	// Use workflow.NewChannel(ctx) method to create Channel instance.
 	Channel = internal.Channel
 
 	// Selector must be used instead of native go select by workflow code.
@@ -40,7 +40,7 @@ type (
 	Future = internal.Future
 
 	// Settable is used to set value or error on a future.
-	// See more: cadence.NewFuture(ctx).
+	// See more: workflow.NewFuture(ctx).
 	Settable = internal.Settable
 )
 

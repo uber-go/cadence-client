@@ -52,7 +52,7 @@ Below are the possible cases that activity could fail:
 
 Workflow code could handle errors based on different types of error. Below is sample code of how error handling looks like.
 
-_, err := cadence.ExecuteActivity(ctx, MyActivity, ...).Get(nil)
+_, err := workflow.ExecuteActivity(ctx, MyActivity, ...).Get(nil)
 if err != nil {
 	switch err := err.(type) {
 	case *CustomError:

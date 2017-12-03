@@ -705,12 +705,12 @@ func validateFnFormat(fnType reflect.Type, isWorkflow bool) error {
 	if isWorkflow {
 		if fnType.NumIn() < 1 {
 			return fmt.Errorf(
-				"expected at least one argument of type cadence.Context in function, found %d input arguments",
+				"expected at least one argument of type workflow.Context in function, found %d input arguments",
 				fnType.NumIn(),
 			)
 		}
 		if !isWorkflowContext(fnType.In(0)) {
-			return fmt.Errorf("expected first argument to be cadence.Context but found %s", fnType.In(0))
+			return fmt.Errorf("expected first argument to be workflow.Context but found %s", fnType.In(0))
 		}
 	}
 

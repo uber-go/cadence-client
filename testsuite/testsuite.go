@@ -18,28 +18,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package testing
+// Package testsuite contains unit testing framework for Cadence workflows and activities.
+package testsuite
 
 import (
-	"context"
-	"github.com/uber-go/tally"
-	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal"
-	"go.uber.org/zap"
 )
 
-// ServiceInvoker abstracts calls to the Cadence service from an activity implementation.
-// Implement to unit test activities.
-type ServiceInvoker = internal.ServiceInvoker
+type (
+	// WorkflowTestSuite is the test suite to run unit tests for workflow/activity.
+	WorkflowTestSuite = internal.WorkflowTestSuite
 
-// WithActivityTask adds activity specific information into context.
-// Use this method to unit test activity implementations that use context extractor methodshared.
-func WithActivityTask(
-	ctx context.Context,
-	task *shared.PollForActivityTaskResponse,
-	invoker ServiceInvoker,
-	logger *zap.Logger,
-	scope tally.Scope,
-) context.Context {
-	return internal.WithActivityTask(ctx, task, invoker, logger, scope)
-}
+	// TestWorkflowEnvironment is the environment that you use to test workflow
+	TestWorkflowEnvironment = internal.TestWorkflowEnvironment
+
+	// TestActivityEnvironment is the environment that you use to test activity
+	TestActivityEnvironment = internal.TestActivityEnvironment
+
+	// MockCallWrapper is a wrapper to mock.Call. It offers the ability to wait on workflow's clock instead of wall clock.
+	MockCallWrapper = internal.MockCallWrapper
+)

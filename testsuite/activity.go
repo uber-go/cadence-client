@@ -18,33 +18,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// Package worker contains functions to manage lifecycle of a Cadence client side worker.
-package worker
+package testsuite
 
 import (
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	"context"
+	"github.com/uber-go/tally"
+	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal"
+	"go.uber.org/zap"
 )
 
-type (
-	// Worker represents objects that can be started and stopped.
-	Worker = internal.Worker
+// ServiceInvoker abstracts calls to the Cadence service from an activity implementation.
+// Implement to unit test activities.
+type ServiceInvoker = internal.ServiceInvoker
 
-	// Options is used to configure a worker instance.
-	Options = internal.WorkerOptions
-)
-
-// NewWorker creates an instance of worker for managing workflow and activity executions.
-// service 	- thrift connection to the cadence server.
-// domain - the name of the cadence domain.
-// taskList 	- is the task list name you use to identify your client worker, also
-// 		  identifies group of workflow and activity implementations that are hosted by a single worker process.
-// options 	-  configure any worker specific options like logger, metrics, identity.
-func NewWorker(
-	service workflowserviceclient.Interface,
-	domain string,
-	taskList string,
-	options Options,
-) Worker {
-	return internal.NewWorker(service, domain, taskList, options)
+// WithActivityTask adds activity specific information into context.
+// Use this method to unit test activity implementations that use methods that require initialized context.
+func WithActivityTask(
+	ctx context.Context,
+	task *shared.PollForActivityTaskResponse,
+	invoker ServiceInvoker,
+	logger *zap.Logger,
+	scope tally.Scope,
+) context.Context {
+	return internal.WithActivityTask(ctx, task, invoker, logger, scope)
 }

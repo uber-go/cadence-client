@@ -18,7 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// Package cadence and its subdirectories contain a Golang client to a Cadence service.
+// Package cadence and its subdirectories contain a Cadence client side framework.
+//
 // The Cadence service is a task orchestrator for your application’s tasks. Applications using Cadence can execute a logical flow of
 // tasks, especially long-running business logic, asynchronously or synchronously. and can scale runtime on distributed
 // systems without you, the service owner, worrying about infrastructure needs.
@@ -29,8 +30,7 @@
 // handling payments.
 //
 //Cadence consists of a programming framework (or client library) and a managed service (or backend). The framework
-// enables developers to author and coordinate tasks in familiar languages. Initially, as the framework only supports
-// Go, code samples in this guide focus on Go.
+// enables developers to author and coordinate tasks in Go code.
 //
 // The root cadence package contains common data structures. The subpackages are:
 //

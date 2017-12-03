@@ -48,3 +48,10 @@ func NewWorker(
 ) Worker {
 	return internal.NewWorker(service, domain, taskList, options)
 }
+
+// EnableVerboseLogging enable or disable verbose logging of internal Cadence library components.
+// Most customers don't need this feature, unless advised by the Cadence team member.
+// Also there is no guarantee that this API is not going to change.
+func EnableVerboseLogging(enable bool) {
+	internal.EnableVerboseLogging(enable)
+}

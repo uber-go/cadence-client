@@ -27,7 +27,7 @@ Activities are implemented as functions. Data can be passed directly to an activ
 
 The values passed to activities through invocation parameters or returned through the result value is recorded in the execution history. The entire execution history is transfered from the Cadence service to workflow workers with every event that the workflow logic needs to process. A large execution history can thus adversily impact the performance of your workflow. Therefore be mindful of the amount of data you transfer via activity invocation parameters or return values. Other than that no additional limitations exist on activity implementations.
 
-In order to make the activity visible to the worker process hosting it, the activity needs to be registered via a call to `activity..Register`.
+In order to make the activity visible to the worker process hosting it, the activity needs to be registered via a call to `activity.Register`.
 
 ```go
 package simple

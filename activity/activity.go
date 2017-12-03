@@ -39,6 +39,13 @@ type (
 	RegisterOptions = internal.RegisterActivityOptions
 )
 
+// ErrActivityResultPending is returned from activity's implementation to indicate the activity is not completed when
+// activity method returns. Activity needs to be completed by Client.CompleteActivity() separately. For example, if an
+// activity require human interaction (like approve an expense report), the activity could return ErrActivityResultPending
+// which indicate the activity is not done yet. Then, when the waited human action happened, it needs to trigger something
+// that could report the activity completed event to cadence server via Client.CompleteActivity() API.
+var ErrActivityResultPending = internal.ErrActivityResultPending
+
 // Register - calls RegisterActivityWithOptions with default registration options.
 func Register(activityFunc interface{}) {
 	internal.RegisterActivity(activityFunc)

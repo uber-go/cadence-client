@@ -93,7 +93,27 @@ type (
 
 	// PanicError contains information about panicked workflow/activity.
 	PanicError = internal.PanicError
+
+	// ContinueAsNewError can be returned by a workflow implementation function and indicates that
+	// the workflow should continue as new with the same WorkflowID, but new RunID and new history.
+	ContinueAsNewError = internal.ContinueAsNewError
 )
+
+// NewContinueAsNewError creates ContinueAsNewError instance
+// If the workflow main function returns this error then the current execution is ended and
+// the new execution with same workflow ID is started automatically with options
+// provided to this function.
+//  ctx - use context to override any options for the new workflow like execution time out, decision task time out, task list.
+//	  if not mentioned it would use the defaults that the current workflow is using.
+//        ctx := WithExecutionStartToCloseTimeout(ctx, 30 * time.Minute)
+//        ctx := WithWorkflowTaskStartToCloseTimeout(ctx, time.Minute)
+//	  ctx := WithWorkflowTaskList(ctx, "example-group")
+//  wfn - workflow function. for new execution it can be different from the currently running.
+//  args - arguments for the new workflow.
+//
+func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *ContinueAsNewError {
+	return internal.NewContinueAsNewError(ctx, wfn, args...)
+}
 
 // NewTimeoutError creates TimeoutError instance.
 // Use NewHeartbeatTimeoutError to create heartbeat TimeoutError

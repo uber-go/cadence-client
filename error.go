@@ -35,11 +35,11 @@ type (
 // NewCustomError create new instance of *CustomError with reason and optional details.
 // Use CustomError for any use case specific errors that cross activity and child workflow boundaries.
 func NewCustomError(reason string, details ...interface{}) *CustomError {
-	return internal.NewCustomError(reason, details)
+	return internal.NewCustomError(reason, details...)
 }
 
 // NewCanceledError creates CanceledError instance.
 // Return this error from activity or child workflow to indicate that it was successfully cancelled.
 func NewCanceledError(details ...interface{}) *CanceledError {
-	return internal.NewCanceledError(details)
+	return internal.NewCanceledError(details...)
 }

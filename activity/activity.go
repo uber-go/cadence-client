@@ -89,5 +89,5 @@ func GetMetricsScope(ctx context.Context) tally.Scope {
 // details - the details that you provided here can be seen in the worflow when it receives TimeoutError, you
 // can check error TimeOutType()/Details().
 func RecordHeartbeat(ctx context.Context, details ...interface{}) {
-	internal.RecordActivityHeartbeat(ctx, details)
+	internal.RecordActivityHeartbeat(ctx, details...)
 }

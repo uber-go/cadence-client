@@ -107,5 +107,5 @@ func NewTimeoutError(timeoutType shared.TimeoutType) *TimeoutError {
 // WARNING: This function is public only to support unit testing of workflows.
 // It shouldn't be used by application level code.
 func NewHeartbeatTimeoutError(details ...interface{}) *TimeoutError {
-	return internal.NewHeartbeatTimeoutError(details)
+	return internal.NewHeartbeatTimeoutError(details...)
 }

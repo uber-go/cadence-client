@@ -123,13 +123,13 @@ func RegisterWithOptions(workflowFunc interface{}, opts RegisterOptions) {
 //
 // ExecuteActivity returns Future with activity result or failure.
 func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Future {
-	return internal.ExecuteActivity(ctx, activity, args)
+	return internal.ExecuteActivity(ctx, activity, args...)
 }
 
 // ExecuteChild requests child workflow execution in the context of a workflow.
 // Context can be used to pass the settings for the child workflow.
 // For example: task list that this child workflow should be routed, timeouts that need to be configured.
-// Use ChildWorkflowOptions to pass down the options.
+// Use ChildWorkflowOptions to pass down th`e options.
 //  cwo := ChildWorkflowOptions{
 // 	    ExecutionStartToCloseTimeout: 10 * time.Minute,
 // 	    TaskStartToCloseTimeout: time.Minute,
@@ -143,7 +143,7 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 // error CanceledError.
 // ExecuteChild returns ChildWorkflowFuture.
 func ExecuteChild(ctx Context, childWorkflow interface{}, args ...interface{}) ChildWorkflowFuture {
-	return internal.ExecuteChildWorkflow(ctx, childWorkflow, args)
+	return internal.ExecuteChildWorkflow(ctx, childWorkflow, args...)
 }
 
 // GetWorkflowInfo extracts info of a current workflow from a context.
@@ -323,5 +323,5 @@ func SetQueryHandler(ctx Context, queryType string, handler interface{}) error {
 //  args - arguments for the new workflow.
 //
 func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *ContinueAsNewError {
-	return internal.NewContinueAsNewError(ctx, wfn, args)
+	return internal.NewContinueAsNewError(ctx, wfn, args...)
 }

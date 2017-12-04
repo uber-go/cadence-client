@@ -29,4 +29,4 @@ package internal
 // Update to this version number is typically done
 // by the cadence team as part of a major feature or
 // behavior change
-const LibraryVersion = "v0.3.1"
+const LibraryVersion = "v0.5.0"

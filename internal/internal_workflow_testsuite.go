@@ -679,7 +679,7 @@ func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, 
 		zap.String(tagActivityID, activityID), zap.String(tagActivityType, activityType))
 	activityInfo := env.getActivityInfo(activityID, activityType)
 	if result == nil {
-		// In case activity returns ErrActivityResultPending, the respond will be nil, and we don't need to do anything.
+		// In case activity returns activity.ErrResultPending, the respond will be nil, and we don't need to do anything.
 		// Activity will need to complete asynchronously using CompleteActivity().
 		if env.onActivityCompletedListener != nil {
 			env.onActivityCompletedListener(activityInfo, nil, ErrActivityResultPending)

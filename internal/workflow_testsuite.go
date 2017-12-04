@@ -338,7 +338,7 @@ func (t *TestWorkflowEnvironment) GetWorkflowError() error {
 	return t.impl.testError
 }
 
-// CompleteActivity complete an activity that had returned ErrActivityResultPending error
+// CompleteActivity complete an activity that had returned activity.ErrResultPending error
 func (t *TestWorkflowEnvironment) CompleteActivity(taskToken []byte, result interface{}, err error) error {
 	return t.impl.CompleteActivity(taskToken, result, err)
 }

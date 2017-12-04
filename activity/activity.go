@@ -39,14 +39,14 @@ type (
 	RegisterOptions = internal.RegisterActivityOptions
 )
 
-// ErrActivityResultPending is returned from activity's implementation to indicate the activity is not completed when
+// ErrResultPending is returned from activity's implementation to indicate the activity is not completed when
 // activity method returns. Activity needs to be completed by Client.CompleteActivity() separately. For example, if an
-// activity require human interaction (like approve an expense report), the activity could return ErrActivityResultPending
+// activity require human interaction (like approve an expense report), the activity could return ErrResultPending
 // which indicate the activity is not done yet. Then, when the waited human action happened, it needs to trigger something
 // that could report the activity completed event to cadence server via Client.CompleteActivity() API.
-var ErrActivityResultPending = internal.ErrActivityResultPending
+var ErrResultPending = internal.ErrActivityResultPending
 
-// Register - calls RegisterActivityWithOptions with default registration options.
+// Register - calls RegisterWithOptions with default registration options.
 func Register(activityFunc interface{}) {
 	internal.RegisterActivity(activityFunc)
 }
@@ -65,8 +65,8 @@ func Register(activityFunc interface{}) {
 //	func sampleActivity(arg1 bool) (result int, err error)
 //	func sampleActivity(arg1 bool) (err error)
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
-// If function implementation returns activity.ErrActivityResultPending then activity is not completed from the
-// calling workflow point of view. See documentation of activity.ErrActivityResultPending for more info.
+// If function implementation returns activity.ErrResultPending then activity is not completed from the
+// calling workflow point of view. See documentation of activity.ErrResultPending for more info.
 // This method calls panic if activityFunc doesn't comply with the expected format.
 func RegisterWithOptions(activityFunc interface{}, opts RegisterOptions) {
 	internal.RegisterActivityWithOptions(activityFunc, opts)

@@ -328,7 +328,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return(mockActivity).Once()
 	env.SetTestTimeout(time.Second * 2) // don't waist time waiting
 
-	env.ExecuteWorkflow(testWorkflowHello) // workflow won't complete, as the fakeActivity returns ErrActivityResultPending
+	env.ExecuteWorkflow(testWorkflowHello) // workflow won't complete, as the fakeActivity returns activity.ErrResultPending
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 	env.AssertExpectations(s.T())

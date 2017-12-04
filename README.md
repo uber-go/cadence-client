@@ -36,7 +36,7 @@ import (
 	"context"
 
     "go.uber.org/cadence/activity"
-	"go.uber.org/zap"
+    "go.uber.org/zap"
 )
 
 func init() {

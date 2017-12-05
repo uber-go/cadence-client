@@ -123,7 +123,7 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 	return internal.ExecuteActivity(ctx, activity, args...)
 }
 
-// ExecuteChild requests child workflow execution in the context of a workflow.
+// ExecuteChildWorkflow requests child workflow execution in the context of a workflow.
 // Context can be used to pass the settings for the child workflow.
 // For example: task list that this child workflow should be routed, timeouts that need to be configured.
 // Use ChildWorkflowOptions to pass down th`e options.
@@ -138,13 +138,13 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 // CustomError, TimeoutError, CanceledError, GenericError.
 // You can cancel the pending child workflow using context(cadence.WithCancel(ctx)) and that will fail the workflow with
 // error CanceledError.
-// ExecuteChild returns ChildWorkflowFuture.
-func ExecuteChild(ctx Context, childWorkflow interface{}, args ...interface{}) ChildWorkflowFuture {
+// ExecuteChildWorkflow returns ChildWorkflowFuture.
+func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interface{}) ChildWorkflowFuture {
 	return internal.ExecuteChildWorkflow(ctx, childWorkflow, args...)
 }
 
-// GetWorkflowInfo extracts info of a current workflow from a context.
-func GetWorkflowInfo(ctx Context) *Info {
+// GetInfo extracts info of a current workflow from a context.
+func GetInfo(ctx Context) *Info {
 	return internal.GetWorkflowInfo(ctx)
 }
 

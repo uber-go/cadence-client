@@ -109,4 +109,4 @@ fmt:
 clean:
 	rm -rf cadence-client
 	rm -Rf $(BUILD)
-	rm dummy
+	rm -f dummy

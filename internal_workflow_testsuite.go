@@ -736,8 +736,11 @@ func (env *testWorkflowEnvironmentImpl) runBeforeMockCallReturns(call *MockCallW
 			waitCh <- env.Now()    // this will unblock mock call
 		}, call.waitDuration)
 
-		env.runningCount.Dec() // reduce runningCount, since this mock call is about to be blocked.
-		<-waitCh               // this will block until mock clock move forward by waitDuration
+		// make sure decrease runningCount after delayed callback is posted
+		env.postCallback(func() {
+			env.runningCount.Dec() // reduce runningCount, since this mock call is about to be blocked.
+		}, false)
+		<-waitCh // this will block until mock clock move forward by waitDuration
 	}
 
 	// run the actual runFn if it was setup

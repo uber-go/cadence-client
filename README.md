@@ -67,7 +67,7 @@ Workflow functions need to execute deterministically. Therefore, here is a list 
 * Don’t use non constant global variables as multiple instances of a workflow function can be executing in parallel.
 * Don’t use any blocking functions besides belonging to `Channel`, `Selector` or `Future`
 * Don’t use any synchronization primitives as they can cause blockage and there is no possibility of races when running under dispatcher.
-* Don’t change workflow code when there are open workflows using it. Cadence is going to provide versioning mechanism to deal with deploying code changes without breaking existing workflows.
+* Don't just change workflow code when there are open workflows. Always update code using `workflow.GetVersion`.
 * Don’t perform any IO or service calls as they are not usually deterministic. Use activities for that.
 * Don’t access configuration APIs directly from a workflow as changes in configuration will affect the workflow execution path. Either return configuration from an activity or use `workflow.SideEffect` to load it.
 

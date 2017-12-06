@@ -500,7 +500,6 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 	atp.metricsScope.Timer(metrics.ActivityExecutionLatency).Record(time.Now().Sub(executionStartTime))
 
 	if request == ErrActivityResultPending {
-		// this could be true when activity returns ErrActivityResultPending.
 		return nil
 	}
 

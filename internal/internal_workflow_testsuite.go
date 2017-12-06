@@ -376,6 +376,10 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	if err != nil {
 		panic(err)
 	}
+	if result == ErrActivityResultPending {
+		return nil, ErrActivityResultPending
+	}
+
 	switch request := result.(type) {
 	case *shared.RespondActivityTaskCanceledRequest:
 		return nil, NewCanceledError(request.Details)
@@ -667,8 +671,8 @@ func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivi
 		// post activity result to workflow dispatcher
 		env.postCallback(func() {
 			env.handleActivityResult(activityInfo.activityID, result, parameters.ActivityType.Name)
+			env.runningCount.Dec()
 		}, false /* do not auto schedule decision task, because activity might be still pending */)
-		env.runningCount.Dec()
 	}()
 
 	return activityInfo
@@ -678,8 +682,8 @@ func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, 
 	env.logger.Debug(fmt.Sprintf("handleActivityResult: %T.", result),
 		zap.String(tagActivityID, activityID), zap.String(tagActivityType, activityType))
 	activityInfo := env.getActivityInfo(activityID, activityType)
-	if result == nil {
-		// In case activity returns activity.ErrResultPending, the respond will be nil, and we don't need to do anything.
+	if result == ErrActivityResultPending {
+		// In case activity returns ErrActivityResultPending, the respond will be nil, and we don't need to do anything.
 		// Activity will need to complete asynchronously using CompleteActivity().
 		if env.onActivityCompletedListener != nil {
 			env.onActivityCompletedListener(activityInfo, nil, ErrActivityResultPending)

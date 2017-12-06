@@ -343,7 +343,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityReturnsErrActivityResultPending
 	}
 	RegisterActivity(activityFn)
 	_, err := env.ExecuteActivity(activityFn)
-	s.NoError(err)
+	s.Equal(ErrActivityResultPending, err)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowCancellation() {

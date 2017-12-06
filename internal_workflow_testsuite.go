@@ -376,6 +376,10 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	if err != nil {
 		panic(err)
 	}
+	if result == ErrActivityResultPending {
+		return nil, ErrActivityResultPending
+	}
+
 	switch request := result.(type) {
 	case *shared.RespondActivityTaskCanceledRequest:
 		return nil, NewCanceledError(request.Details)
@@ -383,8 +387,6 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 		return nil, constructError(request.GetReason(), request.Details)
 	case *shared.RespondActivityTaskCompletedRequest:
 		return EncodedValue(request.Result), nil
-	case nil: // when activity returns ErrActivityResultPending
-		return nil, nil
 	default:
 		// will never happen
 		return nil, fmt.Errorf("unsupported respond type %T", result)
@@ -680,7 +682,7 @@ func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, 
 	env.logger.Debug(fmt.Sprintf("handleActivityResult: %T.", result),
 		zap.String(tagActivityID, activityID), zap.String(tagActivityType, activityType))
 	activityInfo := env.getActivityInfo(activityID, activityType)
-	if result == nil {
+	if result == ErrActivityResultPending {
 		// In case activity returns ErrActivityResultPending, the respond will be nil, and we don't need to do anything.
 		// Activity will need to complete asynchronously using CompleteActivity().
 		if env.onActivityCompletedListener != nil {

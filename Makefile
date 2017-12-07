@@ -72,7 +72,7 @@ test: bins
 
 bins: thriftc copyright lint dummy
 
-cover_profile: clean copyright lint glide
+cover_profile: clean copyright lint vendor/glide.updated
 	@mkdir -p $(BUILD)
 	@echo "mode: atomic" > $(BUILD)/cover.out
 

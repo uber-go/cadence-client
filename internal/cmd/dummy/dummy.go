@@ -22,7 +22,7 @@
 package main
 
 import (
-	_
+	_ "go.uber.org/cadence"
 	_ "go.uber.org/cadence/activity"
 	_ "go.uber.org/cadence/client"
 	_ "go.uber.org/cadence/encoded"

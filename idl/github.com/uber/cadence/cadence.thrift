@@ -131,6 +131,19 @@ service WorkflowService {
     )
 
   /**
+  * RespondDecisionTaskFailed is called by application worker to indicate failure.  This results in
+  * DecisionTaskFailedEvent written to the history and a new DecisionTask created.  This API can be used by client to
+  * either clear sticky tasklist or report any panics during DecisionTask processing.  Cadence will only append first
+  * DecisionTaskFailed event to the history of workflow execution for consecutive failures.
+  **/
+  void RespondDecisionTaskFailed(1: shared.RespondDecisionTaskFailedRequest failedRequest)
+    throws (
+      1: shared.BadRequestError badRequestError,
+      2: shared.InternalServiceError internalServiceError,
+      3: shared.EntityNotExistsError entityNotExistError,
+    )
+
+  /**
   * PollForActivityTask is called by application worker to process ActivityTask from a specific taskList.  ActivityTask
   * is dispatched to callers whenever a ScheduleTask decision is made for a workflow execution.
   * Application is expected to call 'RespondActivityTaskCompleted' or 'RespondActivityTaskFailed' once it is done
@@ -177,9 +190,9 @@ service WorkflowService {
   /**
   * RespondActivityTaskCompletedByID is called by application worker when it is done processing an ActivityTask.
   * It will result in a new 'ActivityTaskCompleted' event being written to the workflow history and a new DecisionTask
-  * created for the workflow so new decisions could be made.  Similar to RespondActivityTaskCompleted but use DomainID,
-  * WorkflowID and ActivityID instead of 'taskToken' for completion. It fails with 'EntityNotExistsError'
-  * if the these IDs are not valid anymore due to activity timeout.
+  * created for the workflow so new decisions could be made.  Use the 'taskToken' provided as response of
+  * PollForActivityTask API call for completion. It fails with 'EntityNotExistsError' if the taskToken is not valid
+  * anymore due to activity timeout.
   **/
   void  RespondActivityTaskCompletedByID(1: shared.RespondActivityTaskCompletedByIDRequest completeRequest)
     throws (
@@ -205,9 +218,9 @@ service WorkflowService {
   /**
   * RespondActivityTaskFailedByID is called by application worker when it is done processing an ActivityTask.
   * It will result in a new 'ActivityTaskFailed' event being written to the workflow history and a new DecisionTask
-  * created for the workflow instance so new decisions could be made.  Similar to RespondActivityTaskCompleted but use
-  * DomainID, WorkflowID and ActivityID instead of 'taskToken' for completion. It fails with 'EntityNotExistsError'
-  * if the these IDs are not valid anymore due to activity timeout.
+  * created for the workflow instance so new decisions could be made.  Use the 'taskToken' provided as response of
+  * PollForActivityTask API call for completion. It fails with 'EntityNotExistsError' if the taskToken is not valid
+  * anymore due to activity timeout.
   **/
   void  RespondActivityTaskFailedByID(1: shared.RespondActivityTaskFailedByIDRequest failRequest)
     throws (
@@ -233,9 +246,9 @@ service WorkflowService {
   /**
   * RespondActivityTaskCanceledByID is called by application worker when it is successfully canceled an ActivityTask.
   * It will result in a new 'ActivityTaskCanceled' event being written to the workflow history and a new DecisionTask
-  * created for the workflow instance so new decisions could be made.  Similar to RespondActivityTaskCompleted but use
-  * DomainID, WorkflowID and ActivityID instead of 'taskToken' for completion. It fails with 'EntityNotExistsError'
-  * if the these IDs are not valid anymore due to activity timeout.
+  * created for the workflow instance so new decisions could be made.  Use the 'taskToken' provided as response of
+  * PollForActivityTask API call for completion. It fails with 'EntityNotExistsError' if the taskToken is not valid
+  * anymore due to activity timeout.
   **/
   void RespondActivityTaskCanceledByID(1: shared.RespondActivityTaskCanceledByIDRequest canceledRequest)
     throws (

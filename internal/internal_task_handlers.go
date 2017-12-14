@@ -876,8 +876,29 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	eventHandler *workflowExecutionEventHandlerImpl,
 	task *s.PollForDecisionTaskResponse,
 	workflowContext *workflowExecutionContext,
-	decisions []*s.Decision) (completeRequest interface{}) {
+	decisions []*s.Decision) interface{} {
 
+	// for query task
+	if task.Query != nil {
+		queryCompletedRequest := &s.RespondQueryTaskCompletedRequest{TaskToken: task.TaskToken}
+		if panicErr, ok := workflowContext.err.(*PanicError); ok {
+			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
+			queryCompletedRequest.ErrorMessage = common.StringPtr("Workflow panic: " + panicErr.Error())
+			return queryCompletedRequest
+		}
+
+		result, err := eventHandler.ProcessQuery(task.Query.GetQueryType(), task.Query.QueryArgs)
+		if err != nil {
+			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
+			queryCompletedRequest.ErrorMessage = common.StringPtr(err.Error())
+		} else {
+			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeCompleted)
+			queryCompletedRequest.QueryResult = result
+		}
+		return queryCompletedRequest
+	}
+
+	// fail decision task on decider panic
 	if panicErr, ok := workflowContext.err.(*PanicError); ok {
 		// Workflow panic
 		wth.metricsScope.Counter(metrics.DecisionTaskPanicCounter).Inc(1)
@@ -886,84 +907,63 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			zap.String("PanicStack", panicErr.StackTrace()))
 		failedCause := s.DecisionTaskFailedCauseWorkflowWorkerUnhandledFailure
 		_, details := getErrorDetails(panicErr)
-		completeRequest = &s.RespondDecisionTaskFailedRequest{
+		return &s.RespondDecisionTaskFailedRequest{
 			TaskToken: task.TaskToken,
 			Cause:     &failedCause,
 			Details:   details,
 			Identity:  common.StringPtr(wth.identity),
 		}
-	} else {
-		var decision *s.Decision
-		if canceledErr, ok := workflowContext.err.(*CanceledError); ok {
-			// Workflow cancelled
-			decision = createNewDecision(s.DecisionTypeCancelWorkflowExecution)
-			decision.CancelWorkflowExecutionDecisionAttributes = &s.CancelWorkflowExecutionDecisionAttributes{
-				Details: canceledErr.details,
-			}
-			decisions = append(decisions, decision)
-			wth.metricsScope.Counter(metrics.WorkflowCanceledCounter).Inc(1)
-		} else if contErr, ok := workflowContext.err.(*ContinueAsNewError); ok {
-			// Continue as new error.
-			decision = createNewDecision(s.DecisionTypeContinueAsNewWorkflowExecution)
-			decision.ContinueAsNewWorkflowExecutionDecisionAttributes = &s.ContinueAsNewWorkflowExecutionDecisionAttributes{
-				WorkflowType: workflowTypePtr(*contErr.options.workflowType),
-				Input:        contErr.options.input,
-				TaskList:     common.TaskListPtr(s.TaskList{Name: contErr.options.taskListName}),
-				ExecutionStartToCloseTimeoutSeconds: contErr.options.executionStartToCloseTimeoutSeconds,
-				TaskStartToCloseTimeoutSeconds:      contErr.options.taskStartToCloseTimeoutSeconds,
-			}
-			decisions = append(decisions, decision)
-			wth.metricsScope.Counter(metrics.WorkflowContinueAsNewCounter).Inc(1)
-		} else if workflowContext.err != nil {
-			// Workflow failures
-			decision = createNewDecision(s.DecisionTypeFailWorkflowExecution)
-			reason, details := getErrorDetails(workflowContext.err)
-			decision.FailWorkflowExecutionDecisionAttributes = &s.FailWorkflowExecutionDecisionAttributes{
-				Reason:  common.StringPtr(reason),
-				Details: details,
-			}
-			decisions = append(decisions, decision)
-			wth.metricsScope.Counter(metrics.WorkflowFailedCounter).Inc(1)
-		} else if workflowContext.isWorkflowCompleted {
-			// Workflow completion
-			decision = createNewDecision(s.DecisionTypeCompleteWorkflowExecution)
-			decision.CompleteWorkflowExecutionDecisionAttributes = &s.CompleteWorkflowExecutionDecisionAttributes{
-				Result: workflowContext.result,
-			}
-			decisions = append(decisions, decision)
-			wth.metricsScope.Counter(metrics.WorkflowCompletedCounter).Inc(1)
-		}
+	}
 
-		if decision != nil {
-			elapsed := time.Now().Sub(workflowContext.workflowStartTime)
-			wth.metricsScope.Timer(metrics.WorkflowEndToEndLatency).Record(elapsed)
+	// complete decision task
+	var closeDecision *s.Decision
+	if canceledErr, ok := workflowContext.err.(*CanceledError); ok {
+		// Workflow cancelled
+		wth.metricsScope.Counter(metrics.WorkflowCanceledCounter).Inc(1)
+		closeDecision = createNewDecision(s.DecisionTypeCancelWorkflowExecution)
+		closeDecision.CancelWorkflowExecutionDecisionAttributes = &s.CancelWorkflowExecutionDecisionAttributes{
+			Details: canceledErr.details,
 		}
-
-		if task.Query != nil {
-			// for query task
-			result, err := eventHandler.ProcessQuery(task.Query.GetQueryType(), task.Query.QueryArgs)
-			queryTaskCompleteRequest := &s.RespondQueryTaskCompletedRequest{
-				TaskToken: task.TaskToken,
-			}
-			if err != nil {
-				queryTaskCompleteRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
-				queryTaskCompleteRequest.ErrorMessage = common.StringPtr(err.Error())
-			} else {
-				queryTaskCompleteRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeCompleted)
-				queryTaskCompleteRequest.QueryResult = result
-			}
-			completeRequest = queryTaskCompleteRequest
-		} else {
-			// Fill the response.
-			completeRequest = &s.RespondDecisionTaskCompletedRequest{
-				TaskToken: task.TaskToken,
-				Decisions: decisions,
-				Identity:  common.StringPtr(wth.identity),
-			}
+	} else if contErr, ok := workflowContext.err.(*ContinueAsNewError); ok {
+		// Continue as new error.
+		wth.metricsScope.Counter(metrics.WorkflowContinueAsNewCounter).Inc(1)
+		closeDecision = createNewDecision(s.DecisionTypeContinueAsNewWorkflowExecution)
+		closeDecision.ContinueAsNewWorkflowExecutionDecisionAttributes = &s.ContinueAsNewWorkflowExecutionDecisionAttributes{
+			WorkflowType: workflowTypePtr(*contErr.options.workflowType),
+			Input:        contErr.options.input,
+			TaskList:     common.TaskListPtr(s.TaskList{Name: contErr.options.taskListName}),
+			ExecutionStartToCloseTimeoutSeconds: contErr.options.executionStartToCloseTimeoutSeconds,
+			TaskStartToCloseTimeoutSeconds:      contErr.options.taskStartToCloseTimeoutSeconds,
+		}
+	} else if workflowContext.err != nil {
+		// Workflow failures
+		wth.metricsScope.Counter(metrics.WorkflowFailedCounter).Inc(1)
+		closeDecision = createNewDecision(s.DecisionTypeFailWorkflowExecution)
+		reason, details := getErrorDetails(workflowContext.err)
+		closeDecision.FailWorkflowExecutionDecisionAttributes = &s.FailWorkflowExecutionDecisionAttributes{
+			Reason:  common.StringPtr(reason),
+			Details: details,
+		}
+	} else if workflowContext.isWorkflowCompleted {
+		// Workflow completion
+		wth.metricsScope.Counter(metrics.WorkflowCompletedCounter).Inc(1)
+		closeDecision = createNewDecision(s.DecisionTypeCompleteWorkflowExecution)
+		closeDecision.CompleteWorkflowExecutionDecisionAttributes = &s.CompleteWorkflowExecutionDecisionAttributes{
+			Result: workflowContext.result,
 		}
 	}
 
-	return
+	if closeDecision != nil {
+		decisions = append(decisions, closeDecision)
+		elapsed := time.Now().Sub(workflowContext.workflowStartTime)
+		wth.metricsScope.Timer(metrics.WorkflowEndToEndLatency).Record(elapsed)
+	}
+
+	return &s.RespondDecisionTaskCompletedRequest{
+		TaskToken: task.TaskToken,
+		Decisions: decisions,
+		Identity:  common.StringPtr(wth.identity),
+	}
 }
 
 func (wth *workflowTaskHandlerImpl) executeAnyPressurePoints(event *s.HistoryEvent, isInReplay bool) error {

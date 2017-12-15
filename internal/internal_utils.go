@@ -49,11 +49,10 @@ const (
 	// feature version
 	featureVersionHeaderName = "cadence-client-feature-version"
 
-	// languageHeaderName refers to the name of the
-	// tchannel / http header that contains the client
-	// language
-	languageHeaderName  = "cadence-client-language"
-	languageHeaderValue = "go"
+	// clientImplHeaderName refers to the name of the
+	// header that contains the client implementation
+	clientImplHeaderName  = "cadence-client-name"
+	clientImplHeaderValue = "uber-go"
 
 	// defaultRPCTimeout is the default tchannel rpc call timeout
 	defaultRPCTimeout = 10 * time.Second
@@ -74,7 +73,7 @@ var (
 	yarpcCallOptions = []yarpc.CallOption{
 		yarpc.WithHeader(libraryVersionHeaderName, LibraryVersion),
 		yarpc.WithHeader(featureVersionHeaderName, FeatureVersion),
-		yarpc.WithHeader(languageHeaderName, languageHeaderValue),
+		yarpc.WithHeader(clientImplHeaderName, clientImplHeaderValue),
 	}
 )
 

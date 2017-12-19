@@ -326,7 +326,7 @@ func (wc *workflowEnvironmentImpl) NewTimer(d time.Duration, callback resultHand
 		callback(nil, errors.New("Invalid delayInSeconds provided"))
 		return nil
 	}
-	if d == 0 {
+	if d.Seconds() == 0 {
 		callback(nil, nil)
 		return nil
 	}

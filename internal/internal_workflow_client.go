@@ -110,7 +110,9 @@ func (wc *workflowClient) StartWorkflow(
 		Input:        input,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionTimeout),
 		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(decisionTaskTimeout),
-		Identity:                            common.StringPtr(wc.identity)}
+		Identity:                            common.StringPtr(wc.identity),
+		WorkflowIdReusePolicy:               &options.WorkflowIDReusePolicy,
+	}
 
 	var response *s.StartWorkflowExecutionResponse
 
@@ -137,6 +139,49 @@ func (wc *workflowClient) StartWorkflow(
 		ID:    options.ID,
 		RunID: response.GetRunId()}
 	return executionInfo, nil
+}
+
+// RunWorkflow starts a workflow execution and wait until this workflow reaches the end state, such as
+// workflow finished successfully or timeout.
+// The user can use this to start using a functor like below and get the workflow execution result, as encoded.Value
+// Either by
+//     RunWorkflow(options, "workflowTypeName", input)
+//     or
+//     RunWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+// NOTE: the context.Context should have a fairly large timeout, since workflow execution may take a while to be finished
+func (wc *workflowClient) RunWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (encoded.Value, error) {
+
+	// start the workflow execution
+	executionInfo, err := wc.StartWorkflow(ctx, options, workflow, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// wait until the workflow execution to finish by long poll on the last event
+	var history *s.History
+	var closeEvent *s.HistoryEvent
+	history, err = wc.PollWorkflowHistory(ctx, executionInfo.ID, executionInfo.RunID, s.HistoryEventFilterTypeCloseEvent)
+	if err != nil {
+		return nil, NewRunWorkflowError(executionInfo.RunID, "Error when tracking workflow history: "+err.Error())
+	}
+
+	closeEvent = history.Events[0]
+	errorMessage := ""
+	switch closeEvent.GetEventType() {
+	case s.EventTypeWorkflowExecutionCompleted:
+		return EncodedValue(closeEvent.WorkflowExecutionCompletedEventAttributes.Result), nil
+	case s.EventTypeWorkflowExecutionCanceled:
+		errorMessage = "Workflow execution is cancelled."
+	case s.EventTypeWorkflowExecutionTerminated:
+		errorMessage = "Workflow execution is terminated."
+	case s.EventTypeWorkflowExecutionTimedOut:
+		errorMessage = "Workflow execution encounters time out."
+	case s.EventTypeWorkflowExecutionContinuedAsNew:
+		errorMessage = "Workflow execution finished as 'continue as new'."
+	default:
+		errorMessage = "Unknown error occur when fetching workflow execution result."
+	}
+	return nil, NewRunWorkflowError(executionInfo.RunID, errorMessage)
 }
 
 // SignalWorkflow signals a workflow in execution.
@@ -211,42 +256,14 @@ func (wc *workflowClient) TerminateWorkflow(ctx context.Context, workflowID stri
 	return err
 }
 
-// GetWorkflowHistory gets history of a particular workflow.
+// GetWorkflowHistory gets the point in time snapshot of history of a particular workflow
 func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID string, runID string) (*s.History, error) {
-	history := &s.History{}
-	history.Events = make([]*s.HistoryEvent, 0)
-	var nextPageToken []byte
+	return wc.paginateWorkflowHistory(ctx, workflowID, runID, false, s.HistoryEventFilterTypeAllEvent)
+}
 
-GetHistoryLoop:
-	for {
-		request := &s.GetWorkflowExecutionHistoryRequest{
-			Domain: common.StringPtr(wc.domain),
-			Execution: &s.WorkflowExecution{
-				WorkflowId: common.StringPtr(workflowID),
-				RunId:      getRunID(runID),
-			},
-			NextPageToken: nextPageToken,
-		}
-
-		var response *s.GetWorkflowExecutionHistoryResponse
-		err := backoff.Retry(ctx,
-			func() error {
-				var err1 error
-				tchCtx, cancel, opt := newChannelContext(ctx)
-				defer cancel()
-				response, err1 = wc.workflowService.GetWorkflowExecutionHistory(tchCtx, request, opt...)
-				return err1
-			}, serviceOperationRetryPolicy, isServiceTransientError)
-		if err != nil {
-			return nil, err
-		}
-		history.Events = append(history.Events, response.History.Events...)
-		if response.NextPageToken == nil {
-			break GetHistoryLoop
-		}
-		nextPageToken = response.NextPageToken
-	}
-	return history, nil
+// PollWorkflowHistory polls the history of a particular workflow, tracking until workflow finishes
+func (wc *workflowClient) PollWorkflowHistory(ctx context.Context, workflowID string, runID string, filterType s.HistoryEventFilterType) (*s.History, error) {
+	return wc.paginateWorkflowHistory(ctx, workflowID, runID, true, filterType)
 }
 
 // CompleteActivity reports activity completed. activity Execute method can return acitivity.activity.ErrResultPending to
@@ -495,4 +512,46 @@ func getRunID(runID string) *string {
 		return nil
 	}
 	return common.StringPtr(runID)
+}
+
+// paginateWorkflowHistory is the internal func paginate on the whole workflow eecution history
+func (wc *workflowClient) paginateWorkflowHistory(ctx context.Context, workflowID string, runID string,
+	isLongPoll bool, filterType s.HistoryEventFilterType) (*s.History, error) {
+
+	history := &s.History{}
+	history.Events = make([]*s.HistoryEvent, 0)
+	var nexttoken []byte
+
+GetHistoryLoop:
+	for {
+		request := &s.GetWorkflowExecutionHistoryRequest{
+			Domain: common.StringPtr(wc.domain),
+			Execution: &s.WorkflowExecution{
+				WorkflowId: common.StringPtr(workflowID),
+				RunId:      getRunID(runID),
+			},
+			WaitForNewEvent:        common.BoolPtr(isLongPoll),
+			HistoryEventFilterType: &filterType,
+			NextPageToken:          nexttoken,
+		}
+
+		var response *s.GetWorkflowExecutionHistoryResponse
+		err := backoff.Retry(ctx,
+			func() error {
+				var err1 error
+				tchCtx, cancel, opt := newChannelContext(ctx)
+				defer cancel()
+				response, err1 = wc.workflowService.GetWorkflowExecutionHistory(tchCtx, request, opt...)
+				return err1
+			}, serviceOperationRetryPolicy, isServiceTransientError)
+		if err != nil {
+			return nil, err
+		}
+		history.Events = append(history.Events, response.History.Events...)
+		if response.NextPageToken == nil {
+			break GetHistoryLoop
+		}
+		nexttoken = response.NextPageToken
+	}
+	return history, nil
 }

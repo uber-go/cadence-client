@@ -70,6 +70,11 @@ type (
 		handled             bool
 	}
 
+	scheduledSignal struct {
+		callback resultHandler
+		handled  bool
+	}
+
 	// workflowEnvironmentImpl an implementation of workflowEnvironment represents a environment for workflow execution.
 	workflowEnvironmentImpl struct {
 		workflowInfo *WorkflowInfo
@@ -198,6 +203,7 @@ func (s *scheduledChildWorkflow) handle(result []byte, err error) {
 	s.resultCallback(result, err)
 }
 
+
 func (t *localActivityTask) cancel() {
 	t.Lock()
 	t.canceled = true
@@ -205,6 +211,14 @@ func (t *localActivityTask) cancel() {
 		t.cancelFunc()
 	}
 	t.Unlock()
+}
+
+func (s *scheduledSignal) handle(result []byte, err error) {
+	if s.handled {
+		panic(fmt.Sprintf("signal already handled %v", s))
+	}
+	s.handled = true
+	s.callback(result, err)
 }
 
 func (wc *workflowEnvironmentImpl) WorkflowInfo() *WorkflowInfo {
@@ -236,6 +250,22 @@ func (wc *workflowEnvironmentImpl) RequestCancelWorkflow(domainName, workflowID,
 	}
 
 	return nil
+}
+
+func (wc *workflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID, runID, signalName string,
+	input []byte, callback resultHandler) {
+
+	if domainName == "" {
+		callback(nil, errors.New("domain is empty"))
+		return
+	}
+	if workflowID == "" {
+		callback(nil, errors.New("workflow ID is empty"))
+		return
+	}
+
+	decision := wc.decisionsHelper.signalExternalWorkflowExecution(domainName, workflowID, runID, signalName, input)
+	decision.setData(&scheduledSignal{callback: callback})
 }
 
 func (wc *workflowEnvironmentImpl) RegisterCancelHandler(handler func()) {
@@ -459,7 +489,7 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 			panic(fmt.Sprintf("No cached result found for side effectID=%v. KnownSideEffects=%v",
 				sideEffectID, keys))
 		}
-		wc.logger.Debug("SideEffect returning already caclulated result.",
+		wc.logger.Debug("SideEffect returning already calculated result.",
 			zap.Int32(tagSideEffectID, sideEffectID))
 		details = result
 	} else {
@@ -593,6 +623,16 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 
 	case m.EventTypeWorkflowExecutionSignaled:
 		weh.handleWorkflowExecutionSignaled(event.WorkflowExecutionSignaledEventAttributes)
+
+	case m.EventTypeSignalExternalWorkflowExecutionInitiated:
+		weh.decisionsHelper.handleSignalExternalWorkflowExecutionInitiated(
+			event.SignalExternalWorkflowExecutionInitiatedEventAttributes.WorkflowExecution.GetWorkflowId())
+
+	case m.EventTypeSignalExternalWorkflowExecutionFailed:
+		weh.handleSignalExternalWorkflowExecutionFailed(event)
+
+	case m.EventTypeExternalWorkflowExecutionSignalRequested:
+		weh.handleSignalExternalWorkflowExecutionRequested(event)
 
 	case m.EventTypeMarkerRecorded:
 		err = weh.handleMarkerRecorded(event.GetEventId(), event.MarkerRecordedEventAttributes)
@@ -943,6 +983,33 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTermin
 	}
 	err := newTerminatedError()
 	childWorkflow.handle(nil, err)
+
+	return nil
+}
+
+func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecutionRequested(event *m.HistoryEvent) error {
+	attributes := event.ExternalWorkflowExecutionSignalRequestedEventAttributes
+	signalID := string(attributes.Control)
+	decision := weh.decisionsHelper.handleSignalExternalWorkflowExecutionRequested(signalID)
+	signal := decision.getData().(*scheduledSignal)
+	if signal.handled {
+		return nil
+	}
+	signal.handle(nil, nil)
+
+	return nil
+}
+
+func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecutionFailed(event *m.HistoryEvent) error {
+	attributes := event.SignalExternalWorkflowExecutionFailedEventAttributes
+	signalID := string(attributes.Control)
+	decision := weh.decisionsHelper.handleSignalExternalWorkflowExecutionFailed(signalID)
+	signal := decision.getData().(*scheduledSignal)
+	if signal.handled {
+		return nil
+	}
+	err := fmt.Errorf("signal external workflow failed, %v", attributes.GetCause())
+	signal.handle(nil, err)
 
 	return nil
 }

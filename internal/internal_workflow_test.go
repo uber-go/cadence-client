@@ -74,6 +74,7 @@ func (s *WorkflowUnitTest) Test_WorldWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
 	env.ExecuteWorkflow(worldWorkflow, "Hello")
 	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 }
 
 func helloWorldActivityWorkflow(ctx Context, input string) (result string, err error) {
@@ -522,4 +523,8 @@ func (s *WorkflowUnitTest) Test_SignalWorkflow() {
 	var result []byte
 	env.GetWorkflowResult(&result)
 	s.EqualValues(strings.Join(expected, ""), string(result))
+}
+
+func (s *WorkflowUnitTest) Test_SignalDecision() {
+	// TODO Bowei
 }

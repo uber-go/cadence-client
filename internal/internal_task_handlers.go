@@ -565,7 +565,7 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(task *s.PollForDe
 	return
 }
 
-// ProcessWorkflowTask processes each all the events of the workflow task.
+// ProcessWorkflowTask processes all the events of the workflow task.
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	task *s.PollForDecisionTaskResponse,
 	historyIterator HistoryIterator,

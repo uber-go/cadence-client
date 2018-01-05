@@ -35,6 +35,7 @@ const (
 	tagWorkerID        = "WorkerID"
 	tagWorkerType      = "WorkerType"
 	tagSideEffectID    = "SideEffectID"
+	tagLocalActivityID = "LocalActivityID"
 	tagMarkerName      = "MarkerName"
 	tagChangeID        = "ChangeID"
 	tagVersion         = "Version"

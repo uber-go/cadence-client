@@ -79,6 +79,7 @@ type (
 		domain              string
 		poller              taskPoller // taskPoller to poll and process the tasks.
 		worker              *baseWorker
+		localActivityWorker *baseWorker
 		identity            string
 	}
 
@@ -220,6 +221,24 @@ func newWorkflowWorkerInternal(
 	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params)
 }
 
+var localActivityChannelMap = make(map[string]*localActivityChannel)
+var localActivityChannelLock = sync.Mutex{}
+
+func registerLocalActivityChannel(taskList string, resultCh chan interface{}) {
+	localActivityChannelLock.Lock()
+	localActivityChannelMap[taskList] = &localActivityChannel{
+		taskCh:   make(chan *localActivityTask, 1000),
+		resultCh: resultCh,
+	}
+	localActivityChannelLock.Unlock()
+}
+
+func getLocalActivityChannel(taskList string) *localActivityChannel {
+	localActivityChannelLock.Lock()
+	defer localActivityChannelLock.Unlock()
+	return localActivityChannelMap[taskList]
+}
+
 func newWorkflowTaskWorkerInternal(
 	taskHandler WorkflowTaskHandler,
 	service workflowserviceclient.Interface,
@@ -243,12 +262,25 @@ func newWorkflowTaskWorkerInternal(
 		params.Logger,
 		params.MetricsScope,
 	)
+	registerLocalActivityChannel(params.TaskList, worker.taskQueueCh)
+	localActivityTaskPoller := newLocalActivityPoller(params)
+	localActivityWorker := newBaseWorker(baseWorkerOptions{
+		pollerCount:       1, // 1 poller (from local channel) is enough for local activity
+		maxConcurrentTask: params.ConcurrentActivityExecutionSize,
+		maxTaskPerSecond:  params.WorkerActivitiesPerSecond,
+		taskWorker:        localActivityTaskPoller,
+		identity:          params.Identity,
+		workerType:        "LocalActivityWorker"},
+		params.Logger,
+		params.MetricsScope,
+	)
 
 	return &workflowWorker{
 		executionParameters: params,
 		workflowService:     service,
 		poller:              poller,
 		worker:              worker,
+		localActivityWorker: localActivityWorker,
 		identity:            params.Identity,
 		domain:              domain,
 	}
@@ -260,6 +292,7 @@ func (ww *workflowWorker) Start() error {
 	if err != nil {
 		return err
 	}
+	ww.localActivityWorker.Start()
 	ww.worker.Start()
 	return nil // TODO: propagate error
 }
@@ -269,12 +302,14 @@ func (ww *workflowWorker) Run() error {
 	if err != nil {
 		return err
 	}
+	ww.localActivityWorker.Start()
 	ww.worker.Run()
 	return nil
 }
 
 // Shutdown the worker.
 func (ww *workflowWorker) Stop() {
+	ww.localActivityWorker.Stop()
 	ww.worker.Stop()
 }
 
@@ -940,7 +975,24 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 		args = append(args, decoded...)
 	}
 
-	// Invoke the activity with arguments.
+	fnValue := reflect.ValueOf(ae.fn)
+	retValues := fnValue.Call(args)
+	return validateFunctionAndGetResults(ae.fn, retValues)
+}
+
+func (ae *activityExecutor) ExecuteWithActualArgs(ctx context.Context, actualArgs []interface{}) ([]byte, error) {
+	fnType := reflect.TypeOf(ae.fn)
+	args := []reflect.Value{}
+
+	// activities optionally might not take context.
+	if fnType.NumIn() > 0 && isActivityContext(fnType.In(0)) {
+		args = append(args, reflect.ValueOf(ctx))
+	}
+
+	for _, arg := range actualArgs {
+		args = append(args, reflect.ValueOf(arg))
+	}
+
 	fnValue := reflect.ValueOf(ae.fn)
 	retValues := fnValue.Call(args)
 	return validateFunctionAndGetResults(ae.fn, retValues)

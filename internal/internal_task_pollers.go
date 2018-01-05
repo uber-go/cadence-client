@@ -100,7 +100,43 @@ type (
 		metricsScope  tally.Scope
 		maxEventID    int64
 	}
+
+	localActivityTaskPoller struct {
+		handler      *localActivityTaskHandler
+		metricsScope tally.Scope
+		logger       *zap.Logger
+		laChannel    *localActivityChannel
+	}
+
+	localActivityTaskHandler struct {
+		userContext  context.Context
+		metricsScope tally.Scope
+		logger       *zap.Logger
+	}
+
+	localActivityResult struct {
+		result []byte
+		err    error
+		task   *localActivityTask
+	}
+
+	localActivityChannel struct {
+		taskCh   chan *localActivityTask
+		resultCh chan interface{}
+	}
 )
+
+func (lam *localActivityChannel) getTask() *localActivityTask {
+	return <-lam.taskCh
+}
+
+func (lam *localActivityChannel) sendTask(task *localActivityTask) {
+	lam.taskCh <- task
+}
+
+func (lam *localActivityChannel) deliverResult(result *localActivityResult) {
+	lam.resultCh <- result
+}
 
 func createServiceRetryPolicy() backoff.RetryPolicy {
 	policy := backoff.NewExponentialRetryPolicy(retryServiceOperationInitialInterval)
@@ -164,6 +200,18 @@ func (wtp *workflowTaskPoller) PollTask() (interface{}, error) {
 
 // ProcessTask processes a task
 func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
+	if lar, ok := task.(*localActivityResult); ok {
+		completedRequest, err := wtp.taskHandler.(*workflowTaskHandlerImpl).ProcessLocalActivityResult(lar)
+		if err != nil {
+			return err
+		}
+		if completedRequest == nil {
+			return nil
+		}
+
+		return wtp.RespondTaskCompleted(completedRequest, lar.task.wc.currentDecisionTask)
+	}
+
 	workflowTask := task.(*workflowTask)
 	if workflowTask.task == nil {
 		// We didn't have task, poll might have time out.
@@ -180,10 +228,24 @@ func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 		wtp.metricsScope.Counter(metrics.DecisionExecutionFailedCounter).Inc(1)
 		return err
 	}
+	if completedRequest == nil {
+		return nil
+	}
 	wtp.metricsScope.Timer(metrics.DecisionExecutionLatency).Record(time.Now().Sub(executionStartTime))
 
-	ctx := context.Background()
 	responseStartTime := time.Now()
+	if err = wtp.RespondTaskCompleted(completedRequest, workflowTask.task); err != nil {
+		return err
+	}
+	wtp.metricsScope.Timer(metrics.DecisionResponseLatency).Record(time.Now().Sub(responseStartTime))
+	wtp.metricsScope.Timer(metrics.DecisionEndToEndLatency).Record(time.Now().Sub(workflowTask.pollStartTime))
+	wtp.metricsScope.Counter(metrics.DecisionTaskCompletedCounter).Inc(1)
+
+	return nil
+}
+
+func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}, task *s.PollForDecisionTaskResponse) (err error) {
+	ctx := context.Background()
 	// Respond task completion.
 	err = backoff.Retry(ctx,
 		func() error {
@@ -194,7 +256,7 @@ func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 			case *s.RespondDecisionTaskFailedRequest:
 				// Only fail decision on first attempt, subsequent failure on the same decision task will timeout.
 				// This is to avoid spin on the failed decision task. Checking Attempt not nil for older server.
-				if workflowTask.task.Attempt != nil && workflowTask.task.GetAttempt() == 0 {
+				if task.Attempt != nil && task.GetAttempt() == 0 {
 					err1 = wtp.service.RespondDecisionTaskFailed(tchCtx, request, opt...)
 					if err1 != nil {
 						traceLog(func() {
@@ -235,11 +297,113 @@ func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 		return err
 	}
 
-	wtp.metricsScope.Timer(metrics.DecisionResponseLatency).Record(time.Now().Sub(responseStartTime))
-	wtp.metricsScope.Timer(metrics.DecisionEndToEndLatency).Record(time.Now().Sub(workflowTask.pollStartTime))
-	wtp.metricsScope.Counter(metrics.DecisionTaskCompletedCounter).Inc(1)
-
 	return nil
+}
+
+func newLocalActivityPoller(params workerExecutionParameters) *localActivityTaskPoller {
+	handler := &localActivityTaskHandler{
+		userContext:  params.UserContext,
+		metricsScope: params.MetricsScope,
+		logger:       params.Logger,
+	}
+	lac := getLocalActivityChannel(params.TaskList)
+	return &localActivityTaskPoller{
+		handler:      handler,
+		metricsScope: params.MetricsScope,
+		logger:       params.Logger,
+		laChannel:    lac,
+	}
+}
+
+func (latp *localActivityTaskPoller) PollTask() (interface{}, error) {
+	return latp.laChannel.getTask(), nil
+}
+
+func (latp *localActivityTaskPoller) ProcessTask(task interface{}) error {
+	result := latp.handler.executeLocalActivityTask(task.(*localActivityTask))
+	latp.laChannel.deliverResult(result)
+	return nil
+}
+
+func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivityTask) (result *localActivityResult) {
+	lath.metricsScope.Counter(metrics.LocalActivityTotalCounter).Inc(1)
+	activityType := getFunctionName(task.params.ActivityFn)
+	ae := activityExecutor{name: activityType, fn: task.params.ActivityFn}
+
+	rootCtx := lath.userContext
+	if rootCtx == nil {
+		rootCtx = context.Background()
+	}
+
+	ctx := context.WithValue(rootCtx, activityEnvContextKey, &activityEnvironment{
+		activityType:      ActivityType{Name: activityType},
+		activityID:        fmt.Sprintf("%v", task.activityID),
+		workflowExecution: task.params.WorkflowInfo.WorkflowExecution,
+		logger:            lath.logger,
+		metricsScope:      lath.metricsScope,
+		isLocalActivity:   true,
+	})
+
+	// panic handler
+	defer func() {
+		if p := recover(); p != nil {
+			topLine := fmt.Sprintf("local activity for %s [panic]:", activityType)
+			st := getStackTraceRaw(topLine, 7, 0)
+			lath.logger.Error("LocalActivity panic.",
+				zap.String("PanicError", fmt.Sprintf("%v", p)),
+				zap.String("PanicStack", st))
+			lath.metricsScope.Counter(metrics.LocalActivityPanicCounter).Inc(1)
+			panicErr := newPanicError(p, st)
+			result = &localActivityResult{
+				task:   task,
+				result: nil,
+				err:    panicErr,
+			}
+		}
+		if result.err != nil {
+			lath.metricsScope.Counter(metrics.LocalActivityFailedCounter).Inc(1)
+		}
+	}()
+
+	deadline := time.Now().Add(time.Duration(task.params.ScheduleToCloseTimeoutSeconds) * time.Second)
+	ctx, cancel := context.WithDeadline(ctx, deadline)
+	task.Lock()
+	if task.canceled {
+		task.Unlock()
+		return &localActivityResult{err: ErrCanceled, task: task}
+	}
+	task.cancelFunc = cancel
+	task.Unlock()
+
+	var laResult []byte
+	var err error
+	doneCh := make(chan struct{})
+	go func(ch chan struct{}) {
+		laStartTime := time.Now()
+		laResult, err = ae.ExecuteWithActualArgs(ctx, task.params.InputArgs)
+		lath.metricsScope.Timer(metrics.LocalActivityExecutionLatency).Record(time.Now().Sub(laStartTime))
+		close(ch)
+	}(doneCh)
+
+	// block until previous poll completed or return immediately when shutdown
+	select {
+	case <-ctx.Done():
+		// context is done
+		if ctx.Err() == context.Canceled {
+			lath.metricsScope.Counter(metrics.LocalActivityCanceledCounter).Inc(1)
+			return &localActivityResult{err: ErrCanceled, task: task}
+		} else if ctx.Err() == context.DeadlineExceeded {
+			lath.metricsScope.Counter(metrics.LocalActivityTimeoutCounter).Inc(1)
+			return &localActivityResult{err: ErrDeadlineExceeded, task: task}
+		} else {
+			// should not happen
+			return &localActivityResult{err: NewCustomError("unexpected context done"), task: task}
+		}
+	case <-doneCh:
+		// local activity completed
+	}
+
+	return &localActivityResult{result: laResult, err: err, task: task}
 }
 
 type decisionTaskPollRequest struct {

@@ -82,13 +82,16 @@ type (
 		workflowInfo      *WorkflowInfo
 		wth               *workflowTaskHandlerImpl
 
-		eventHandler workflowExecutionEventHandler
+		eventHandler *workflowExecutionEventHandlerImpl
 
 		isWorkflowCompleted bool
 		result              []byte
 		err                 error
 
 		previousStartedEventID int64
+
+		newDecisions        []*s.Decision
+		currentDecisionTask *s.PollForDecisionTaskResponse
 	}
 
 	// workflowTaskHandlerImpl is the implementation of WorkflowTaskHandler
@@ -286,7 +289,7 @@ OrderEvents:
 				if isDecisionEvent(event.GetEventType()) {
 					lastDecisionIndex = len(decisionCompletionToStartEvents)
 				}
-				if event.GetEventType() == s.EventTypeMarkerRecorded {
+				if isPreloadMarkerEvent(event) {
 					markers = append(markers, event)
 				}
 				decisionCompletionToStartEvents = append(decisionCompletionToStartEvents, event)
@@ -315,6 +318,11 @@ OrderEvents:
 		reorderedEvents = append(reorderedEvents, decisionStartedEvent)
 	}
 	return reorderedEvents, markers, nil
+}
+
+func isPreloadMarkerEvent(event *s.HistoryEvent) bool {
+	return event.GetEventType() == s.EventTypeMarkerRecorded &&
+		event.MarkerRecordedEventAttributes.GetMarkerName() != localActivityMarkerName
 }
 
 // newWorkflowTaskHandler returns an implementation of workflow task handler.
@@ -367,6 +375,15 @@ func removeWorkflowContext(runID string) {
 }
 
 func (w *workflowExecutionContext) release() {
+	if w.err != nil || w.isWorkflowCompleted {
+		// TODO: in case of error, ideally, we should notify server to clear the stickiness.
+		// TODO: in case of closed, it asumes the close decision always succeed. need server side change to return
+		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
+		// if the close decision failed, the next decision will have to rebuild the state.
+		w.destroyCachedState()
+		removeWorkflowContext(w.runID)
+	}
+
 	w.Unlock()
 }
 
@@ -392,6 +409,8 @@ func (w *workflowExecutionContext) destroyCachedState() {
 	w.result = nil
 	w.err = nil
 	w.previousStartedEventID = 0
+	w.newDecisions = nil
+	w.currentDecisionTask = nil
 	if w.eventHandler != nil {
 		w.eventHandler.Close()
 		w.eventHandler = nil
@@ -406,7 +425,7 @@ func (w *workflowExecutionContext) resetWorkflowState() {
 		w.wth.logger,
 		w.wth.enableLoggingInReplay,
 		w.wth.metricsScope,
-		w.wth.hostEnv)
+		w.wth.hostEnv).(*workflowExecutionEventHandlerImpl)
 }
 
 func resetHistory(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (*s.History, error) {
@@ -568,23 +587,12 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	if err != nil {
 		return nil, "", err
 	}
-	defer func() {
-		if err != nil || workflowContext.isWorkflowCompleted {
-			// TODO: in case of error, ideally, we should notify server to clear the stickiness.
-			// TODO: in case of closed, it asumes the close decision always succeed. need server side change to return
-			// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
-			// if the close decision failed, the next decision will have to rebuild the state.
-			workflowContext.destroyCachedState()
-			removeWorkflowContext(runID)
-		}
+	workflowContext.currentDecisionTask = task
 
-		workflowContext.release()
-	}()
+	defer workflowContext.release()
 
-	eventHandler := workflowContext.eventHandler.(*workflowExecutionEventHandlerImpl)
-
+	eventHandler := workflowContext.eventHandler
 	reorderedHistory := newHistory(&workflowTask{task: task, historyIterator: historyIterator}, eventHandler)
-	var decisions []*s.Decision
 	var replayDecisions []*s.Decision
 	var respondEvents []*s.HistoryEvent
 
@@ -606,8 +614,9 @@ ProcessEvents:
 				return nil, "", err
 			}
 		}
-		isInReplay := reorderedEvents[0].GetEventId() < reorderedHistory.LastNonReplayedID()
+
 		for i, event := range reorderedEvents {
+			isInReplay := reorderedEvents[0].GetEventId() < reorderedHistory.LastNonReplayedID() || isLocalActivityMarkerEvent(event)
 			isLast := !isInReplay && i == len(reorderedEvents)-1
 			if !skipReplayCheck && isDecisionEvent(event.GetEventType()) {
 				respondEvents = append(respondEvents, event)
@@ -629,7 +638,7 @@ ProcessEvents:
 
 			if eventDecisions != nil {
 				if !isInReplay {
-					decisions = append(decisions, eventDecisions...)
+					workflowContext.newDecisions = append(workflowContext.newDecisions, eventDecisions...)
 				} else if !skipReplayCheck {
 					replayDecisions = append(replayDecisions, eventDecisions...)
 				}
@@ -651,12 +660,60 @@ ProcessEvents:
 		}
 	}
 
-	completeRequest = wth.completeWorkflow(eventHandler, task, workflowContext, decisions)
+	completeRequest = workflowContext.CompleteDecisionTask()
 
 	if emitStack {
 		stackTrace = eventHandler.StackTrace()
 	}
 	return completeRequest, stackTrace, nil
+}
+
+func (wth *workflowTaskHandlerImpl) ProcessLocalActivityResult(lar *localActivityResult) (interface{}, error) {
+	workflowContext := lar.task.wc
+	if workflowContext.currentDecisionTask != lar.task.decisionTask {
+		// The possible case is decision task timeout while waiting for local activity to complete, then server would
+		// generate a new new decision task, which could be dispatched to this same worker. In that case, the cached
+		// workflowExecutionContext will be reset because the events mismatch and the currentDecisionTask will be updated
+		// to the new decision task while the reference in the local activity task will still be the old one.
+		wth.logger.Debug("Discard local activity result because decision task that it belongs to is no longer available. " +
+			"Possible cause is local activity took too long and decision task timedout.")
+		return nil, nil
+	}
+
+	workflowContext.Lock()
+	defer workflowContext.release()
+
+	eventDecisions, err := workflowContext.eventHandler.ProcessLocalActivityResult(lar)
+	if err != nil {
+		return nil, err
+	}
+
+	if eventDecisions != nil {
+		workflowContext.newDecisions = append(workflowContext.newDecisions, eventDecisions...)
+	}
+
+	return workflowContext.CompleteDecisionTask(), nil
+}
+
+func (w *workflowExecutionContext) CompleteDecisionTask() interface{} {
+	if !w.isWorkflowCompleted && len(w.eventHandler.pendingLaTasks) > 0 {
+		lac := getLocalActivityChannel(w.workflowInfo.TaskListName)
+		for _, task := range w.eventHandler.pendingLaTasks {
+			if !task.started {
+				task.started = true
+				task.wc = w
+				task.decisionTask = w.currentDecisionTask
+				lac.sendTask(task)
+			}
+		}
+		// cannot complete decision task as there are pending local activities
+		return nil
+	}
+
+	completeRequest := w.wth.completeWorkflow(w.eventHandler, w.currentDecisionTask, w, w.newDecisions)
+	w.newDecisions = nil
+
+	return completeRequest
 }
 
 func isVersionMarkerDecision(d *s.Decision) bool {
@@ -670,6 +727,14 @@ func isVersionMarkerDecision(d *s.Decision) bool {
 func isVersionMarkerEvent(e *s.HistoryEvent) bool {
 	if e.GetEventType() == s.EventTypeMarkerRecorded &&
 		e.MarkerRecordedEventAttributes.GetMarkerName() == versionMarkerName {
+		return true
+	}
+	return false
+}
+
+func isLocalActivityMarkerEvent(e *s.HistoryEvent) bool {
+	if e.GetEventType() == s.EventTypeMarkerRecorded &&
+		e.MarkerRecordedEventAttributes.GetMarkerName() == localActivityMarkerName {
 		return true
 	}
 	return false

@@ -1037,7 +1037,8 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelWorkflow(domainName, workfl
 }
 
 func (env *testWorkflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID, runID, signalName string, input []byte, callback resultHandler) {
-	// TODO Bowei
+	env.signalHandler(signalName, input)
+	callback(nil, nil)
 }
 
 func (env *testWorkflowEnvironmentImpl) ExecuteChildWorkflow(options workflowOptions, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error {

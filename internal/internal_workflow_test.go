@@ -50,6 +50,7 @@ func (s *WorkflowUnitTest) SetupSuite() {
 	RegisterWorkflow(cancelWorkflowAfterActivityTest)
 	RegisterWorkflow(signalWorkflowTest)
 	RegisterWorkflow(splitJoinActivityWorkflow)
+	RegisterWorkflow(signalExternalWorkflowTest)
 
 	s.activityOptions = ActivityOptions{
 		ScheduleToStartTimeout: time.Minute,
@@ -525,6 +526,31 @@ func (s *WorkflowUnitTest) Test_SignalWorkflow() {
 	s.EqualValues(strings.Join(expected, ""), string(result))
 }
 
+func signalExternalWorkflowTest(ctx Context, wid, rid string) ([]byte, error) {
+	var result string
+
+	f := SignalExternalWorkflow(ctx, wid, rid, "testSig", "sigValue")
+	var r []byte
+	if err := f.Get(ctx, &r); err != nil {
+		panic("expecting signal success")
+	}
+	if r != nil {
+		panic("expecting signal success return nil")
+	}
+
+	ch := GetSignalChannel(ctx, "testSig")
+	ch.Receive(ctx, &result)
+
+	return []byte(result), nil
+}
+
 func (s *WorkflowUnitTest) Test_SignalDecision() {
-	// TODO Bowei
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(signalExternalWorkflowTest, defaultTestWorkflowID, defaultTestRunID)
+
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var result []byte
+	env.GetWorkflowResult(&result)
+	s.EqualValues("sigValue", string(result))
 }

@@ -52,7 +52,9 @@ const (
 	defaultConcurrentPollRoutineSize = 2
 
 	defaultMaxConcurrentActivityExecutionSize = 1000   // Large concurrent activity execution size (1k)
-	defaultWorkerActivitiesPerSecond          = 100000 // Large activity executions/sec (unlimited)
+	_defaultWorkerActivitiesPerSecond         = 100000 // Large activity executions/sec (unlimited)
+
+	_defaultActivitiesPerSecond = 100000.0 // Large activity executions/sec (unlimited)
 
 	defaultMaxConcurrentWorkflowExecutionSize = 50     // hardcoded max workflow execution size.
 	defaultMaxWorkflowExecutionRate           = 100000 // Large workflow execution rate (unlimited)
@@ -1269,7 +1271,10 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
 	}
 	if options.WorkerActivitiesPerSecond == 0 {
-		options.WorkerActivitiesPerSecond = defaultWorkerActivitiesPerSecond
+		options.WorkerActivitiesPerSecond = _defaultWorkerActivitiesPerSecond
+	}
+	if options.ActivitiesPerSecond == 0 {
+		options.ActivitiesPerSecond = _defaultActivitiesPerSecond
 	}
 	if options.StickyScheduleToStartTimeout.Seconds() == 0 {
 		options.StickyScheduleToStartTimeout = stickyDecisionScheduleToStartTimeoutSeconds * time.Second

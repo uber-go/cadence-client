@@ -106,6 +106,10 @@ type (
 		details []byte
 	}
 
+	// TerminatedError returned when workflow was terminated.
+	TerminatedError struct {
+	}
+
 	// PanicError contains information about panicked workflow/activity.
 	PanicError struct {
 		value      string
@@ -114,15 +118,18 @@ type (
 
 	// ContinueAsNewError contains information about how to continue the workflow as new.
 	ContinueAsNewError struct {
-		wfn     interface{}
-		args    []interface{}
-		options *workflowOptions
+		workflowType                        *WorkflowType
+		input                               []byte
+		taskListName                        *string
+		executionStartToCloseTimeoutSeconds *int32
+		taskStartToCloseTimeoutSeconds      *int32
+		NewRunID                            *string
 	}
 
 	// RunWorkflowError contains information about RunWorkflow API error.
 	RunWorkflowError struct {
-		RunID   string
-		Message string
+		RunID string
+		Err   error
 	}
 )
 
@@ -210,7 +217,18 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *C
 
 	options.workflowType = workflowType
 	options.input = input
-	return &ContinueAsNewError{wfn: wfn, args: args, options: options}
+	return &ContinueAsNewError{
+		workflowType:                        workflowType,
+		input:                               input,
+		taskListName:                        options.taskListName,
+		executionStartToCloseTimeoutSeconds: options.executionStartToCloseTimeoutSeconds,
+		taskStartToCloseTimeoutSeconds:      options.taskStartToCloseTimeoutSeconds,
+	}
+}
+
+// newContinueAsNewError creates ContinueAsNewError instance with new run ID
+func newContinueAsNewError(runID *string) *ContinueAsNewError {
+	return &ContinueAsNewError{NewRunID: runID}
 }
 
 // Error from error interface
@@ -283,9 +301,19 @@ func (e *ContinueAsNewError) Error() string {
 	return "ContinueAsNew"
 }
 
+// newTerminatedError creates NewTerminatedError instance
+func newTerminatedError() *TerminatedError {
+	return &TerminatedError{}
+}
+
+// Error from error interface
+func (e *TerminatedError) Error() string {
+	return "Terminated"
+}
+
 // NewRunWorkflowError creates RunWorkflowError instance
-func NewRunWorkflowError(runID string, message string) *RunWorkflowError {
-	return &RunWorkflowError{RunID: runID, Message: message}
+func NewRunWorkflowError(runID string, err error) *RunWorkflowError {
+	return &RunWorkflowError{RunID: runID, Err: err}
 }
 
 // GetRunID returns the successfully start workflow execution ID
@@ -295,5 +323,5 @@ func (e *RunWorkflowError) GetRunID() string {
 
 // Error from error interface
 func (e *RunWorkflowError) Error() string {
-	return e.Message
+	return e.Err.Error()
 }

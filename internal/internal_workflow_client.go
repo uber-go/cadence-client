@@ -162,26 +162,28 @@ func (wc *workflowClient) RunWorkflow(ctx context.Context, options StartWorkflow
 	var closeEvent *s.HistoryEvent
 	history, err = wc.PollWorkflowHistory(ctx, executionInfo.ID, executionInfo.RunID, s.HistoryEventFilterTypeCloseEvent)
 	if err != nil {
-		return nil, NewRunWorkflowError(executionInfo.RunID, "Error when tracking workflow history: "+err.Error())
+		return nil, NewRunWorkflowError(executionInfo.RunID, err)
 	}
 
 	closeEvent = history.Events[0]
-	errorMessage := ""
 	switch closeEvent.GetEventType() {
 	case s.EventTypeWorkflowExecutionCompleted:
 		return EncodedValue(closeEvent.WorkflowExecutionCompletedEventAttributes.Result), nil
 	case s.EventTypeWorkflowExecutionCanceled:
-		errorMessage = "Workflow execution is cancelled."
+		attributes := closeEvent.WorkflowExecutionCanceledEventAttributes
+		err = NewCanceledError(attributes.Details)
 	case s.EventTypeWorkflowExecutionTerminated:
-		errorMessage = "Workflow execution is terminated."
+		err = newTerminatedError()
 	case s.EventTypeWorkflowExecutionTimedOut:
-		errorMessage = "Workflow execution encounters time out."
+		attributes := closeEvent.WorkflowExecutionTimedOutEventAttributes
+		err = NewTimeoutError(attributes.GetTimeoutType())
 	case s.EventTypeWorkflowExecutionContinuedAsNew:
-		errorMessage = "Workflow execution finished as 'continue as new'."
+		attributes := closeEvent.WorkflowExecutionContinuedAsNewEventAttributes
+		err = newContinueAsNewError(attributes.NewExecutionRunId)
 	default:
-		errorMessage = "Unknown error occur when fetching workflow execution result."
+		err = errors.New("Unknown error occur when fetching workflow execution result")
 	}
-	return nil, NewRunWorkflowError(executionInfo.RunID, errorMessage)
+	return nil, NewRunWorkflowError(executionInfo.RunID, err)
 }
 
 // SignalWorkflow signals a workflow in execution.

@@ -91,6 +91,9 @@ type (
 	// TimeoutError returned when activity or child workflow timed out.
 	TimeoutError = internal.TimeoutError
 
+	// TerminatedError returned when workflow was terminated.
+	TerminatedError = internal.TerminatedError
+
 	// PanicError contains information about panicked workflow/activity.
 	PanicError = internal.PanicError
 

@@ -318,7 +318,7 @@ func createWorker(t *testing.T, service *workflowservicetest.MockClient) Worker 
 
 	// Configure worker options.
 	workerOptions := WorkerOptions{}
-	workerOptions.MaxActivityExecutionPerSecond = 20
+	workerOptions.WorkerActivitiesPerSecond = 20
 
 	// Start Worker.
 	worker := NewWorker(

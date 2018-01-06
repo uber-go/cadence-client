@@ -53,22 +53,28 @@ type (
 		//	- InternalServiceError
 		StartWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*WorkflowExecution, error)
 
-		// RunWorkflow starts a workflow execution and wait until this workflow reaches the end state, such as
-		// workflow finished successfully or timeout and get the workflow execution result, as encoded.Value
+		// ExecuteWorkflow starts a workflow execution and return a WorkflowRun instance and error
 		// The user can use this to start using a function or workflow type name.
 		// Either by
-		//     RunWorkflow(ctx, options, "workflowTypeName", input)
+		//     ExecuteWorkflow(ctx, options, "workflowTypeName", input)
 		//     or
-		//     RunWorkflow(ctx, options, workflowExecuteFn, arg1, arg2, arg3)
+		//     ExecuteWorkflow(ctx, options, workflowExecuteFn, arg1, arg2, arg3)
 		// The errors it can return:
 		//	- EntityNotExistsError
 		//	- BadRequestError
 		//	- WorkflowExecutionAlreadyStartedError
-		//  - RunWorkflowError if the start workflow is success, however, pagination on this workflow history is unsuccessful or
-		//                     if this workflow execution is unsuccessfully, e.g. timeout
 		//	- InternalServiceError
-		// NOTE: the context.Context should have a fairly large timeout, since workflow execution may take a while to be finished
-		RunWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (encoded.Value, error)
+		//
+		// WorkflowRun has 2 methods:
+		//  - GetRunID() string: which return the first started workflow run ID (please see below)
+		//  - Get(ctx context.Context, valuePtr interface{}) error: which will fill the workflow
+		//    execution result to valuePtr, if workflow execution is a success, or return corresponding
+		//    error. This is a blocking API.
+		// NOTE: if the started workflow return ContinueAsNewError during the workflow execution, the
+		// return result of GetRunID() will NOT be updated, however, Get(ctx context.Context, valuePtr interface{})
+		// will use the new run ID for workflow execution result.
+		// NOTE: DO NOT USE THIS API INSIDE A WORKFLOW
+		ExecuteWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (WorkflowRun, error)
 
 		// SignalWorkflow sends a signals to a workflow in execution
 		// - workflow ID of the workflow.
@@ -101,21 +107,9 @@ type (
 		// GetWorkflowHistory gets the point in time snapshot of history of a particular workflow
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
-		// The errors it can return:
-		//	- EntityNotExistsError
-		//	- BadRequestError
-		//	- InternalServiceError
-		GetWorkflowHistory(ctx context.Context, workflowID string, runID string) (*s.History, error)
-
-		// PollWorkflowHistory polls the history of a particular workflow, tracking until workflow finishes
-		// - workflow ID of the workflow.
-		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
-		// - filterType specifies return all history events or just the close event
-		// The errors it can return:
-		//	- EntityNotExistsError
-		//	- BadRequestError
-		//	- InternalServiceError
-		PollWorkflowHistory(ctx context.Context, workflowID string, runID string, filterType s.HistoryEventFilterType) (*s.History, error)
+		// - whether use long poll for tracking new events
+		// - whether return all history events or just the last event, which contains the workflow execution end result
+		GetWorkflowHistory(ctx context.Context, workflowID string, runID string, isLongPoll bool, filterType s.HistoryEventFilterType) HistoryEventIterator
 
 		// CompleteActivity reports activity completed.
 		// activity Execute method can return acitivity.activity.ErrResultPending to

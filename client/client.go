@@ -46,6 +46,12 @@ type (
 	// DomainClient is the client for managing operations on the domain.
 	// CLI, tools, ... can use this layer to manager operations on domain.
 	DomainClient = internal.DomainClient
+
+	// HistoryEventIterator is a iterator which can return history events
+	HistoryEventIterator = internal.HistoryEventIterator
+
+	// WorkflowRun represents a started non child workflow
+	WorkflowRun = internal.WorkflowRun
 )
 
 // NewClient creates an instance of a workflow client

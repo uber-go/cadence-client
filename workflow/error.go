@@ -100,10 +100,6 @@ type (
 	// ContinueAsNewError can be returned by a workflow implementation function and indicates that
 	// the workflow should continue as new with the same WorkflowID, but new RunID and new history.
 	ContinueAsNewError = internal.ContinueAsNewError
-
-	// RunWorkflowError can be returned by client API RunWorkflow when start of the workflow execution
-	// is success, however, workflow execution is not a success or pagination on this workflow is not a success.
-	RunWorkflowError = internal.RunWorkflowError
 )
 
 // NewContinueAsNewError creates ContinueAsNewError instance

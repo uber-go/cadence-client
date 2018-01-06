@@ -118,18 +118,9 @@ type (
 
 	// ContinueAsNewError contains information about how to continue the workflow as new.
 	ContinueAsNewError struct {
-		workflowType                        *WorkflowType
-		input                               []byte
-		taskListName                        *string
-		executionStartToCloseTimeoutSeconds *int32
-		taskStartToCloseTimeoutSeconds      *int32
-		NewRunID                            *string
-	}
-
-	// RunWorkflowError contains information about RunWorkflow API error.
-	RunWorkflowError struct {
-		RunID string
-		Err   error
+		wfn     interface{}
+		args    []interface{}
+		options *workflowOptions
 	}
 )
 
@@ -217,18 +208,7 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *C
 
 	options.workflowType = workflowType
 	options.input = input
-	return &ContinueAsNewError{
-		workflowType:                        workflowType,
-		input:                               input,
-		taskListName:                        options.taskListName,
-		executionStartToCloseTimeoutSeconds: options.executionStartToCloseTimeoutSeconds,
-		taskStartToCloseTimeoutSeconds:      options.taskStartToCloseTimeoutSeconds,
-	}
-}
-
-// newContinueAsNewError creates ContinueAsNewError instance with new run ID
-func newContinueAsNewError(runID *string) *ContinueAsNewError {
-	return &ContinueAsNewError{NewRunID: runID}
+	return &ContinueAsNewError{wfn: wfn, args: args, options: options}
 }
 
 // Error from error interface
@@ -309,19 +289,4 @@ func newTerminatedError() *TerminatedError {
 // Error from error interface
 func (e *TerminatedError) Error() string {
 	return "Terminated"
-}
-
-// NewRunWorkflowError creates RunWorkflowError instance
-func NewRunWorkflowError(runID string, err error) *RunWorkflowError {
-	return &RunWorkflowError{RunID: runID, Err: err}
-}
-
-// GetRunID returns the successfully start workflow execution ID
-func (e *RunWorkflowError) GetRunID() string {
-	return e.RunID
-}
-
-// Error from error interface
-func (e *RunWorkflowError) Error() string {
-	return e.Err.Error()
 }

@@ -439,7 +439,7 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserv
 		identity:            params.Identity,
 		logger:              params.Logger,
 		metricsScope:        params.MetricsScope,
-		activitiesPerSecond: params.ActivitiesPerSecond,
+		activitiesPerSecond: params.TaskListActivitiesPerSecond,
 	}
 }
 

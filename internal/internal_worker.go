@@ -54,7 +54,7 @@ const (
 	defaultMaxConcurrentActivityExecutionSize = 1000   // Large concurrent activity execution size (1k)
 	_defaultWorkerActivitiesPerSecond         = 100000 // Large activity executions/sec (unlimited)
 
-	_defaultActivitiesPerSecond = 100000.0 // Large activity executions/sec (unlimited)
+	_defaultTaskListActivitiesPerSecond = 100000.0 // Large activity executions/sec (unlimited)
 
 	defaultMaxConcurrentWorkflowExecutionSize = 50     // hardcoded max workflow execution size.
 	defaultMaxWorkflowExecutionRate           = 100000 // Large workflow execution rate (unlimited)
@@ -113,8 +113,8 @@ type (
 		// Defines rate limiting on number of activity tasks that can be executed per second per worker.
 		WorkerActivitiesPerSecond float64
 
-		// ActivitiesPerSecond is the throttling limit for activity tasks controlled by the server
-		ActivitiesPerSecond float64
+		// TaskListActivitiesPerSecond is the throttling limit for activity tasks controlled by the server
+		TaskListActivitiesPerSecond float64
 
 		// User can provide an identity for the debuggability. If not provided the framework has
 		// a default option.
@@ -1023,7 +1023,7 @@ func newAggregatedWorker(
 		UserContext:                     wOptions.BackgroundActivityContext,
 		DisableStickyExecution:          wOptions.DisableStickyExecution,
 		StickyScheduleToStartTimeout:    wOptions.StickyScheduleToStartTimeout,
-		ActivitiesPerSecond:             wOptions.ActivitiesPerSecond,
+		TaskListActivitiesPerSecond:     wOptions.TaskListActivitiesPerSecond,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -1273,8 +1273,8 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 	if options.WorkerActivitiesPerSecond == 0 {
 		options.WorkerActivitiesPerSecond = _defaultWorkerActivitiesPerSecond
 	}
-	if options.ActivitiesPerSecond == 0 {
-		options.ActivitiesPerSecond = _defaultActivitiesPerSecond
+	if options.TaskListActivitiesPerSecond == 0 {
+		options.TaskListActivitiesPerSecond = _defaultTaskListActivitiesPerSecond
 	}
 	if options.StickyScheduleToStartTimeout.Seconds() == 0 {
 		options.StickyScheduleToStartTimeout = stickyDecisionScheduleToStartTimeoutSeconds * time.Second

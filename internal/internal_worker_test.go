@@ -337,7 +337,7 @@ func createWorkerWithThrottle(
 	activityTask := &s.PollForActivityTaskResponse{}
 	expectedActivitiesPerSecond := activitiesPerSecond
 	if expectedActivitiesPerSecond == 0.0 {
-		expectedActivitiesPerSecond = _defaultActivitiesPerSecond
+		expectedActivitiesPerSecond = _defaultTaskListActivitiesPerSecond
 	}
 	service.EXPECT().PollForActivityTask(
 		gomock.Any(), ofPollForActivityTaskRequest(expectedActivitiesPerSecond), callOptions...,
@@ -351,7 +351,7 @@ func createWorkerWithThrottle(
 	// Configure worker options.
 	workerOptions := WorkerOptions{}
 	workerOptions.WorkerActivitiesPerSecond = 20
-	workerOptions.ActivitiesPerSecond = activitiesPerSecond
+	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
 
 	// Start Worker.
 	worker := NewWorker(

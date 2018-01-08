@@ -50,7 +50,8 @@ type (
 		MaxConcurrentActivityExecutionSize int
 
 		// Optional: Sets the rate limiting on number of activities that can be executed per second per
-		// worker. Notice that the number is represented in float, so that you can set it to less than
+		// worker. This can be used to limit resources used by the worker.
+		// Notice that the number is represented in float, so that you can set it to less than
 		// 1 if needed. For example, set the number to 0.1 means you want your activity to be executed
 		// once for every 10 seconds. This can be used to protect down stream services from flooding.
 		// The zero value of this uses the default value.
@@ -69,7 +70,7 @@ type (
 		// default: defaultMaxActivityExecutionRate(100k)
 		// Warning: activity's StartToCloseTimeout starts ticking even if a task is blocked due to
 		// rate limiting.
-		ActivitiesPerSecond float64
+		TaskListActivitiesPerSecond float64
 
 		// Optional: if the activities need auto heart beating for those activities
 		// by the framework

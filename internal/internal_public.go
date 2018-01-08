@@ -105,7 +105,7 @@ func NewActivityTaskWorker(
 		ConcurrentPollRoutineSize:       defaultConcurrentPollRoutineSize,
 		ConcurrentActivityExecutionSize: wOptions.MaxConcurrentActivityExecutionSize,
 		WorkerActivitiesPerSecond:       wOptions.WorkerActivitiesPerSecond,
-		ActivitiesPerSecond:             wOptions.ActivitiesPerSecond,
+		TaskListActivitiesPerSecond:     wOptions.TaskListActivitiesPerSecond,
 		Identity:                        wOptions.Identity,
 		MetricsScope:                    wOptions.MetricsScope,
 		Logger:                          wOptions.Logger,

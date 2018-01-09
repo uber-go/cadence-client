@@ -52,6 +52,9 @@ type (
 
 	// WorkflowRun represents a started non child workflow
 	WorkflowRun = internal.WorkflowRun
+
+	// WorkflowIDReusePolicy defines workflow ID reuse behavior.
+	WorkflowIDReusePolicy = internal.WorkflowIDReusePolicy
 )
 
 // NewClient creates an instance of a workflow client

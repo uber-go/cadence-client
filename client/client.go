@@ -57,6 +57,20 @@ type (
 	WorkflowIDReusePolicy = internal.WorkflowIDReusePolicy
 )
 
+const (
+	// WorkflowIDReusePolicyAllowDuplicateFailedOnly allow start a workflow execution
+	// when workflow not running, and the last execution close state is in
+	// [terminated, cancelled, timeouted, failed].
+	WorkflowIDReusePolicyAllowDuplicateFailedOnly WorkflowIDReusePolicy = internal.WorkflowIDReusePolicyAllowDuplicateFailedOnly
+
+	// WorkflowIDReusePolicyAllowDuplicate allow start a workflow execution using
+	// the same workflow ID,when workflow not running.
+	WorkflowIDReusePolicyAllowDuplicate WorkflowIDReusePolicy = internal.WorkflowIDReusePolicyAllowDuplicate
+
+	// WorkflowIDReusePolicyRejectDuplicate do not allow start a workflow execution using the same workflow ID at all
+	WorkflowIDReusePolicyRejectDuplicate WorkflowIDReusePolicy = internal.WorkflowIDReusePolicyRejectDuplicate
+)
+
 // NewClient creates an instance of a workflow client
 func NewClient(service workflowserviceclient.Interface, domain string, options *Options) Client {
 	return internal.NewClient(service, domain, options)

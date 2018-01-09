@@ -128,9 +128,6 @@ enum EventType {
   RequestCancelExternalWorkflowExecutionFailed,
   ExternalWorkflowExecutionCancelRequested,
   MarkerRecorded,
-  SignalExternalWorkflowExecutionInitiated,
-  SignalExternalWorkflowExecutionFailed,
-  ExternalWorkflowExecutionSignalRequested,
   WorkflowExecutionSignaled,
   WorkflowExecutionTerminated,
   WorkflowExecutionContinuedAsNew,
@@ -142,6 +139,9 @@ enum EventType {
   ChildWorkflowExecutionCanceled,
   ChildWorkflowExecutionTimedOut,
   ChildWorkflowExecutionTerminated,
+  SignalExternalWorkflowExecutionInitiated,
+  SignalExternalWorkflowExecutionFailed,
+  ExternalWorkflowExecutionSignalRequested,
 }
 
 enum DecisionTaskFailedCause {
@@ -922,13 +922,7 @@ struct SignalWorkflowExecutionRequest {
   40: optional binary input
   50: optional string identity
   60: optional string requestId
-}
-
-struct DeleteWorkflowExecutionSignalRequest {
-  10: optional string domain
-  20: optional WorkflowExecution workflowExecution
-  30: optional string identity
-  40: optional string requestId
+  70: optional binary control
 }
 
 struct TerminateWorkflowExecutionRequest {

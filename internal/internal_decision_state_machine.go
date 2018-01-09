@@ -23,7 +23,6 @@ package internal
 import (
 	"fmt"
 
-	"github.com/pborman/uuid"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/util"
@@ -832,8 +831,7 @@ func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionFailed(wor
 	}
 }
 
-func (h *decisionsHelper) signalExternalWorkflowExecution(domain, workflowID, runID, signalName string, input []byte) decisionStateMachine {
-	signalID := uuid.New()
+func (h *decisionsHelper) signalExternalWorkflowExecution(domain, workflowID, runID, signalName string, input []byte, signalID string) decisionStateMachine {
 	attributes := &s.SignalExternalWorkflowExecutionDecisionAttributes{
 		Domain:     common.StringPtr(domain),
 		WorkflowId: common.StringPtr(workflowID),

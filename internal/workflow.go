@@ -578,7 +578,7 @@ func SignalExternalWorkflow(ctx Context, workflowID, runID, signalName string, a
 
 	input, err := getEncodedArg(arg)
 	if err != nil {
-		settable.Set(nil, fmt.Errorf("error when encode internal_workflow_testsuite.goargument: %v", err))
+		settable.Set(nil, fmt.Errorf("error when encode internal_workflow.goargument: %v", err))
 		return future
 	}
 

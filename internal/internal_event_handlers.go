@@ -264,7 +264,8 @@ func (wc *workflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID
 		return
 	}
 
-	decision := wc.decisionsHelper.signalExternalWorkflowExecution(domainName, workflowID, runID, signalName, input)
+	signalID := wc.GenerateSequenceID()
+	decision := wc.decisionsHelper.signalExternalWorkflowExecution(domainName, workflowID, runID, signalName, input, signalID)
 	decision.setData(&scheduledSignal{callback: callback})
 }
 

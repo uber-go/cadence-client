@@ -54,8 +54,7 @@ type (
 		// Notice that the number is represented in float, so that you can set it to less than
 		// 1 if needed. For example, set the number to 0.1 means you want your activity to be executed
 		// once for every 10 seconds. This can be used to protect down stream services from flooding.
-		// The zero value of this uses the default value.
-		// default: defaultMaxActivityExecutionRate(100k)
+		// The zero value of this uses the default value. Default: 100k
 		WorkerActivitiesPerSecond float64
 
 		// Optional: Sets the rate limiting on number of activities that can be executed per second.
@@ -64,8 +63,7 @@ type (
 		// Notice that the number is represented in float, so that you can set it to less than
 		// 1 if needed. For example, set the number to 0.1 means you want your activity to be executed
 		// once for every 10 seconds. This can be used to protect down stream services from flooding.
-		// The zero value of this uses the default value.
-		// default: defaultMaxActivityExecutionRate(100k).
+		// The zero value of this uses the default value. Default: 100k
 		TaskListActivitiesPerSecond float64
 
 		// Optional: if the activities need auto heart beating for those activities

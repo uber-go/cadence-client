@@ -44,7 +44,7 @@ const (
 	tasklist              = "some random tasklist"
 	identity              = "some random identity"
 	timeoutInSeconds      = 20
-	workflowIDReusePolicy = shared.WorkflowIdReusePolicyAllowDuplicateFailedOnly
+	workflowIDReusePolicy = WorkflowIDReusePolicyAllowDuplicateFailedOnly
 )
 
 // historyEventIteratorSuite

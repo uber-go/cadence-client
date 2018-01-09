@@ -164,7 +164,7 @@ func (wc *workflowClient) StartWorkflow(
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionTimeout),
 		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(decisionTaskTimeout),
 		Identity:                            common.StringPtr(wc.identity),
-		WorkflowIdReusePolicy:               &options.WorkflowIDReusePolicy,
+		WorkflowIdReusePolicy:               options.WorkflowIDReusePolicy.toThriftPtr(),
 	}
 
 	var response *s.StartWorkflowExecutionResponse

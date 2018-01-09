@@ -22,6 +22,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/cadence/encoded"
@@ -235,9 +236,9 @@ type (
 		// Optional: defaulted to 20 secs.
 		DecisionTaskStartToCloseTimeout time.Duration
 
-		// WorkflowIdReusePolicy - Whether server allow reuse of workflow ID, can be useful
+		// WorkflowIDReusePolicy - Whether server allow reuse of workflow ID, can be useful
 		// for dedup logic if set to WorkflowIdReusePolicyRejectDuplicate
-		WorkflowIDReusePolicy s.WorkflowIdReusePolicy
+		WorkflowIDReusePolicy WorkflowIDReusePolicy
 	}
 
 	// DomainClient is the client for managing operations on the domain.
@@ -268,6 +269,23 @@ type (
 		//	- InternalServiceError
 		Update(ctx context.Context, name string, domainInfo *s.UpdateDomainInfo, domainConfig *s.DomainConfiguration) error
 	}
+
+	// WorkflowIDReusePolicy defines workflow ID reuse behavior.
+	WorkflowIDReusePolicy int
+)
+
+const (
+	// WorkflowIDReusePolicyAllowDuplicateFailedOnly allow start a workflow execution
+	// when workflow not running, and the last execution close state is in
+	// [terminated, cancelled, timeouted, failed].
+	WorkflowIDReusePolicyAllowDuplicateFailedOnly WorkflowIDReusePolicy = 0
+
+	// WorkflowIDReusePolicyAllowDuplicate allow start a workflow execution using
+	// the same workflow ID,when workflow not running.
+	WorkflowIDReusePolicyAllowDuplicate WorkflowIDReusePolicy = 1
+
+	// WorkflowIDReusePolicyRejectDuplicate do not allow start a workflow execution using the same workflow ID at all
+	WorkflowIDReusePolicyRejectDuplicate WorkflowIDReusePolicy = 2
 )
 
 // NewClient creates an instance of a workflow client
@@ -309,4 +327,19 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 		metricsScope:    metricScope,
 		identity:        identity,
 	}
+}
+
+func (p WorkflowIDReusePolicy) toThriftPtr() *s.WorkflowIdReusePolicy {
+	var policy s.WorkflowIdReusePolicy
+	switch p {
+	case WorkflowIDReusePolicyAllowDuplicate:
+		policy = s.WorkflowIdReusePolicyAllowDuplicate
+	case WorkflowIDReusePolicyAllowDuplicateFailedOnly:
+		policy = s.WorkflowIdReusePolicyAllowDuplicateFailedOnly
+	case WorkflowIDReusePolicyRejectDuplicate:
+		policy = s.WorkflowIdReusePolicyRejectDuplicate
+	default:
+		panic(fmt.Sprintf("unknown workflow reuse policy %v", p))
+	}
+	return &policy
 }

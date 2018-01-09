@@ -43,11 +43,11 @@ type (
 		// StartWorkflow starts a workflow execution
 		// The user can use this to start using a function or workflow type name.
 		// Either by
-		//     StartWorkflow(ctx, options, "workflowTypeName", input)
+		//     StartWorkflow(ctx, options, "workflowTypeName", arg1, arg2, arg3)
 		//     or
 		//     StartWorkflow(ctx, options, workflowExecuteFn, arg1, arg2, arg3)
 		// The errors it can return:
-		//	- EntityNotExistsError
+		//	- EntityNotExistsError, if domain does not exists
 		//	- BadRequestError
 		//	- WorkflowExecutionAlreadyStartedError
 		//	- InternalServiceError
@@ -56,11 +56,11 @@ type (
 		// ExecuteWorkflow starts a workflow execution and return a WorkflowRun instance and error
 		// The user can use this to start using a function or workflow type name.
 		// Either by
-		//     ExecuteWorkflow(ctx, options, "workflowTypeName", input)
+		//     ExecuteWorkflow(ctx, options, "workflowTypeName", arg1, arg2, arg3)
 		//     or
 		//     ExecuteWorkflow(ctx, options, workflowExecuteFn, arg1, arg2, arg3)
 		// The errors it can return:
-		//	- EntityNotExistsError
+		//	- EntityNotExistsError, if domain does not exists
 		//	- BadRequestError
 		//	- WorkflowExecutionAlreadyStartedError
 		//	- InternalServiceError
@@ -71,9 +71,12 @@ type (
 		//    execution result to valuePtr, if workflow execution is a success, or return corresponding
 		//    error. This is a blocking API.
 		// NOTE: if the started workflow return ContinueAsNewError during the workflow execution, the
-		// return result of GetRunID() will NOT be updated, however, Get(ctx context.Context, valuePtr interface{})
-		// will use the new run ID for workflow execution result.
-		// NOTE: DO NOT USE THIS API INSIDE A WORKFLOW
+		// return result of GetRunID() will be the started workflow run ID, not the new run ID caused by ContinueAsNewError,
+		// however, Get(ctx context.Context, valuePtr interface{}) will return result from the run which did not return ContinueAsNewError.
+		// Say ExecuteWorkflow started a workflow, in its first run, has run ID "run ID 1", and returned ContinueAsNewError,
+		// the second run has run ID "run ID 2" and return some result other than ContinueAsNewError:
+		// GetRunID() will always return "run ID 1" and  Get(ctx context.Context, valuePtr interface{}) will return the result of second run.
+		// NOTE: DO NOT USE THIS API INSIDE A WORKFLOW, USE workflow.ExecuteChildWorkflow instead
 		ExecuteWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (WorkflowRun, error)
 
 		// SignalWorkflow sends a signals to a workflow in execution
@@ -104,11 +107,24 @@ type (
 		//	- InternalServiceError
 		TerminateWorkflow(ctx context.Context, workflowID string, runID string, reason string, details []byte) error
 
-		// GetWorkflowHistory gets the point in time snapshot of history of a particular workflow
+		// GetWorkflowHistory gets history events of a particular workflow
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
-		// - whether use long poll for tracking new events
+		// - whether use long poll for tracking new events: when the workflow is running, there can be new events generated during iteration
+		// 	 of HistoryEventIterator, if isLongPoll == true, then iterator will do long poll, tracking new history event, i.e. the iteration
+		//   will not be finished until workflow is finished; if isLongPoll == false, then iterator will only return current history events.
 		// - whether return all history events or just the last event, which contains the workflow execution end result
+		// Example:-
+		//	To iterate all events,
+		//		iter := GetWorkflowHistory(ctx, workflowID, runID, isLongPoll, filterType)
+		//		events := []*shared.HistoryEvent{}
+		//		for iter.HasNext() {
+		//			event, err := iter.Next()
+		//			if err != nil {
+		//				return err
+		//			}
+		//			events = append(events, event)
+		//		}
 		GetWorkflowHistory(ctx context.Context, workflowID string, runID string, isLongPoll bool, filterType s.HistoryEventFilterType) HistoryEventIterator
 
 		// CompleteActivity reports activity completed.

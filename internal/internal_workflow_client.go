@@ -23,6 +23,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/pborman/uuid"
@@ -48,11 +49,10 @@ const (
 type (
 	// workflowClient is the client for starting a workflow execution.
 	workflowClient struct {
-		workflowExecution WorkflowExecution
-		workflowService   workflowserviceclient.Interface
-		domain            string
-		metricsScope      tally.Scope
-		identity          string
+		workflowService workflowserviceclient.Interface
+		domain          string
+		metricsScope    tally.Scope
+		identity        string
 	}
 
 	// domainClient is the client for managing domains.
@@ -117,7 +117,7 @@ type (
 // StartWorkflow starts a workflow execution
 // The user can use this to start using a functor like.
 // Either by
-//     StartWorkflow(options, "workflowTypeName", input)
+//     StartWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
 //     or
 //     StartWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
 func (wc *workflowClient) StartWorkflow(
@@ -198,7 +198,7 @@ func (wc *workflowClient) StartWorkflow(
 // workflow finished successfully or timeout.
 // The user can use this to start using a functor like below and get the workflow execution result, as encoded.Value
 // Either by
-//     RunWorkflow(options, "workflowTypeName", input)
+//     RunWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
 //     or
 //     RunWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
 // NOTE: the context.Context should have a fairly large timeout, since workflow execution may take a while to be finished
@@ -629,13 +629,36 @@ GetHistoryLoop:
 }
 
 func (iter *historyEventIteratorImpl) HasNext() bool {
-	return iter.nextEventIndex < len(iter.events) || len(iter.nexttoken) != 0 || iter.err != nil || !iter.initialized
+	if iter.nextEventIndex < len(iter.events) || iter.err != nil {
+		return true
+	} else if !iter.initialized || len(iter.nexttoken) != 0 {
+		iter.initialized = true
+		response, err := iter.paginate(iter.nexttoken)
+		iter.nextEventIndex = 0
+		if err == nil {
+			iter.events = response.History.Events
+			iter.nexttoken = response.NextPageToken
+			iter.err = nil
+		} else {
+			iter.events = nil
+			iter.nexttoken = nil
+			iter.err = err
+		}
+
+		if iter.nextEventIndex < len(iter.events) || iter.err != nil {
+			return true
+		}
+		return false
+	}
+
+	return false
 }
 
 func (iter *historyEventIteratorImpl) Next() (*s.HistoryEvent, error) {
 	// if caller call the Next() when iteration is over, just return nil, nil
 	if !iter.HasNext() {
-		return nil, nil
+		// debug.PrintStack()
+		panic("HistoryEventIterator Next() called without checking HasNext()")
 	}
 
 	// we have cached events
@@ -650,19 +673,7 @@ func (iter *historyEventIteratorImpl) Next() (*s.HistoryEvent, error) {
 		return nil, err
 	}
 
-	iter.initialized = true
-	response, err := iter.paginate(iter.nexttoken)
-	iter.nextEventIndex = 0
-	if err == nil {
-		iter.events = response.History.Events
-		iter.nexttoken = response.NextPageToken
-		iter.err = nil
-	} else {
-		iter.events = nil
-		iter.nexttoken = nil
-		iter.err = err
-	}
-	return iter.Next()
+	panic("HistoryEventIterator Next() should return either a history event or a err")
 }
 
 func (workflowRun *workflowRunImpl) GetRunID() string {
@@ -691,6 +702,9 @@ func (workflowRun *workflowRunImpl) Get(ctx context.Context, valuePtr interface{
 			return errors.New("value parameter is not a pointer")
 		}
 		err = deSerializeFunctionResult(workflowRun.workflowFn, attributes.Result, valuePtr)
+	case s.EventTypeWorkflowExecutionFailed:
+		attributes := closeEvent.WorkflowExecutionFailedEventAttributes
+		err = constructError(attributes.GetReason(), attributes.Details)
 	case s.EventTypeWorkflowExecutionCanceled:
 		attributes := closeEvent.WorkflowExecutionCanceledEventAttributes
 		err = NewCanceledError(attributes.Details)
@@ -704,7 +718,7 @@ func (workflowRun *workflowRunImpl) Get(ctx context.Context, valuePtr interface{
 		workflowRun.currentRunID = attributes.GetNewExecutionRunId()
 		return workflowRun.Get(ctx, valuePtr)
 	default:
-		err = errors.New("Unknown error occur when fetching workflow execution result")
+		err = fmt.Errorf("Unexpected event type %s when handling workflow execution result", closeEvent.GetEventType())
 	}
 	return err
 }

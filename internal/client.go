@@ -278,14 +278,14 @@ const (
 	// WorkflowIDReusePolicyAllowDuplicateFailedOnly allow start a workflow execution
 	// when workflow not running, and the last execution close state is in
 	// [terminated, cancelled, timeouted, failed].
-	WorkflowIDReusePolicyAllowDuplicateFailedOnly WorkflowIDReusePolicy = 0
+	WorkflowIDReusePolicyAllowDuplicateFailedOnly WorkflowIDReusePolicy = iota
 
 	// WorkflowIDReusePolicyAllowDuplicate allow start a workflow execution using
 	// the same workflow ID,when workflow not running.
-	WorkflowIDReusePolicyAllowDuplicate WorkflowIDReusePolicy = 1
+	WorkflowIDReusePolicyAllowDuplicate
 
 	// WorkflowIDReusePolicyRejectDuplicate do not allow start a workflow execution using the same workflow ID at all
-	WorkflowIDReusePolicyRejectDuplicate WorkflowIDReusePolicy = 2
+	WorkflowIDReusePolicyRejectDuplicate
 )
 
 // NewClient creates an instance of a workflow client

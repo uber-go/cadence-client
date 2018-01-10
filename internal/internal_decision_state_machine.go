@@ -833,9 +833,11 @@ func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionFailed(wor
 
 func (h *decisionsHelper) signalExternalWorkflowExecution(domain, workflowID, runID, signalName string, input []byte, signalID string) decisionStateMachine {
 	attributes := &s.SignalExternalWorkflowExecutionDecisionAttributes{
-		Domain:     common.StringPtr(domain),
-		WorkflowId: common.StringPtr(workflowID),
-		RunId:      common.StringPtr(runID),
+		Domain: common.StringPtr(domain),
+		Execution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      common.StringPtr(runID),
+		},
 		SignalName: common.StringPtr(signalName),
 		Input:      input,
 		Control:    []byte(signalID),
@@ -850,7 +852,7 @@ func (h *decisionsHelper) handleSignalExternalWorkflowExecutionInitiated(signalI
 	decision.handleInitiatedEvent()
 }
 
-func (h *decisionsHelper) handleSignalExternalWorkflowExecutionRequested(signalID string) decisionStateMachine {
+func (h *decisionsHelper) handleSignalExternalWorkflowExecutionCompleted(signalID string) decisionStateMachine {
 	decision := h.getDecision(makeDecisionID(decisionTypeSignal, signalID))
 	decision.handleCompletionEvent()
 	return decision

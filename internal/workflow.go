@@ -575,10 +575,14 @@ func SignalExternalWorkflow(ctx Context, workflowID, runID, signalName string, a
 		settable.Set(nil, errors.New("domain is nil"))
 		return future
 	}
+	if workflowID == "" {
+		settable.Set(nil, errors.New("workflowId is empty"))
+		return future
+	}
 
 	input, err := getEncodedArg(arg)
 	if err != nil {
-		settable.Set(nil, fmt.Errorf("error when encode internal_workflow.goargument: %v", err))
+		settable.Set(nil, err)
 		return future
 	}
 

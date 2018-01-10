@@ -141,7 +141,7 @@ enum EventType {
   ChildWorkflowExecutionTerminated,
   SignalExternalWorkflowExecutionInitiated,
   SignalExternalWorkflowExecutionFailed,
-  ExternalWorkflowExecutionSignalRequested,
+  ExternalWorkflowExecutionSignaled,
 }
 
 enum DecisionTaskFailedCause {
@@ -154,12 +154,12 @@ enum DecisionTaskFailedCause {
   BAD_COMPLETE_WORKFLOW_EXECUTION_ATTRIBUTES,
   BAD_FAIL_WORKFLOW_EXECUTION_ATTRIBUTES,
   BAD_CANCEL_WORKFLOW_EXECUTION_ATTRIBUTES,
-  BAD_SIGNAL_WORKFLOW_EXECUTION_ATTRIBUTES,
   BAD_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_ATTRIBUTES,
   BAD_CONTINUE_AS_NEW_ATTRIBUTES,
   START_TIMER_DUPLICATE_ID,
   RESET_STICKY_TASKLIST,
-  WORKFLOW_WORKER_UNHANDLED_FAILURE
+  WORKFLOW_WORKER_UNHANDLED_FAILURE,
+  BAD_SIGNAL_WORKFLOW_EXECUTION_ATTRIBUTES,
 }
 
 enum CancelExternalWorkflowExecutionFailedCause {
@@ -294,11 +294,10 @@ struct RequestCancelExternalWorkflowExecutionDecisionAttributes {
 
 struct SignalExternalWorkflowExecutionDecisionAttributes {
   10: optional string domain
-  20: optional string workflowId
-  30: optional string runId
-  40: optional string signalName
-  50: optional binary input
-  60: optional binary control
+  20: optional WorkflowExecution execution
+  30: optional string signalName
+  40: optional binary input
+  50: optional binary control
 }
 
 struct RecordMarkerDecisionAttributes {
@@ -565,7 +564,7 @@ struct SignalExternalWorkflowExecutionFailedEventAttributes {
   60: optional binary control
 }
 
-struct ExternalWorkflowExecutionSignalRequestedEventAttributes {
+struct ExternalWorkflowExecutionSignaledEventAttributes {
   10: optional i64 (js.type = "Long") initiatedEventId
   20: optional string domain
   30: optional WorkflowExecution workflowExecution
@@ -692,7 +691,7 @@ struct HistoryEvent {
   410: optional ChildWorkflowExecutionTerminatedEventAttributes childWorkflowExecutionTerminatedEventAttributes
   420: optional SignalExternalWorkflowExecutionInitiatedEventAttributes signalExternalWorkflowExecutionInitiatedEventAttributes
   430: optional SignalExternalWorkflowExecutionFailedEventAttributes signalExternalWorkflowExecutionFailedEventAttributes
-  440: optional ExternalWorkflowExecutionSignalRequestedEventAttributes externalWorkflowExecutionSignalRequestedEventAttributes
+  440: optional ExternalWorkflowExecutionSignaledEventAttributes externalWorkflowExecutionSignaledEventAttributes
 }
 
 struct History {

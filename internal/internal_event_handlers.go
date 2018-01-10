@@ -255,15 +255,6 @@ func (wc *workflowEnvironmentImpl) RequestCancelWorkflow(domainName, workflowID,
 func (wc *workflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID, runID, signalName string,
 	input []byte, callback resultHandler) {
 
-	if domainName == "" {
-		callback(nil, errors.New("domain is empty"))
-		return
-	}
-	if workflowID == "" {
-		callback(nil, errors.New("workflow ID is empty"))
-		return
-	}
-
 	signalID := wc.GenerateSequenceID()
 	decision := wc.decisionsHelper.signalExternalWorkflowExecution(domainName, workflowID, runID, signalName, input, signalID)
 	decision.setData(&scheduledSignal{callback: callback})
@@ -632,8 +623,8 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	case m.EventTypeSignalExternalWorkflowExecutionFailed:
 		weh.handleSignalExternalWorkflowExecutionFailed(event)
 
-	case m.EventTypeExternalWorkflowExecutionSignalRequested:
-		weh.handleSignalExternalWorkflowExecutionRequested(event)
+	case m.EventTypeExternalWorkflowExecutionSignaled:
+		weh.handleSignalExternalWorkflowExecutionCompleted(event)
 
 	case m.EventTypeMarkerRecorded:
 		err = weh.handleMarkerRecorded(event.GetEventId(), event.MarkerRecordedEventAttributes)
@@ -988,10 +979,10 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTermin
 	return nil
 }
 
-func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecutionRequested(event *m.HistoryEvent) error {
-	attributes := event.ExternalWorkflowExecutionSignalRequestedEventAttributes
+func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecutionCompleted(event *m.HistoryEvent) error {
+	attributes := event.ExternalWorkflowExecutionSignaledEventAttributes
 	signalID := string(attributes.Control)
-	decision := weh.decisionsHelper.handleSignalExternalWorkflowExecutionRequested(signalID)
+	decision := weh.decisionsHelper.handleSignalExternalWorkflowExecutionCompleted(signalID)
 	signal := decision.getData().(*scheduledSignal)
 	if signal.handled {
 		return nil

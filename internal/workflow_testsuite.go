@@ -328,6 +328,27 @@ func (t *TestWorkflowEnvironment) SetOnTimerCancelledListener(listener func(time
 	return t
 }
 
+// SetOnLocalActivityStartedListener sets a listener that will be called before local activity starts execution.
+func (t *TestWorkflowEnvironment) SetOnLocalActivityStartedListener(
+	listener func(activityInfo *ActivityInfo, ctx context.Context, args []interface{})) *TestWorkflowEnvironment {
+	t.impl.onLocalActivityStartedListener = listener
+	return t
+}
+
+// SetOnLocalActivityCompletedListener sets a listener that will be called after local activity is completed.
+func (t *TestWorkflowEnvironment) SetOnLocalActivityCompletedListener(
+	listener func(activityInfo *ActivityInfo, result encoded.Value, err error)) *TestWorkflowEnvironment {
+	t.impl.onLocalActivityCompletedListener = listener
+	return t
+}
+
+// SetOnLocalActivityCanceledListener sets a listener that will be called after local activity is canceled.
+func (t *TestWorkflowEnvironment) SetOnLocalActivityCanceledListener(
+	listener func(activityInfo *ActivityInfo)) *TestWorkflowEnvironment {
+	t.impl.onLocalActivityCanceledListener = listener
+	return t
+}
+
 // IsWorkflowCompleted check if test is completed or not
 func (t *TestWorkflowEnvironment) IsWorkflowCompleted() bool {
 	return t.impl.isTestCompleted

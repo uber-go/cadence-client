@@ -39,7 +39,8 @@ import (
 type WorkflowTestSuiteUnitTest struct {
 	suite.Suite
 	WorkflowTestSuite
-	activityOptions ActivityOptions
+	activityOptions      ActivityOptions
+	localActivityOptions LocalActivityOptions
 }
 
 type testContextKey string
@@ -49,6 +50,9 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 		ScheduleToStartTimeout: time.Minute,
 		StartToCloseTimeout:    time.Minute,
 		HeartbeatTimeout:       20 * time.Second,
+	}
+	s.localActivityOptions = LocalActivityOptions{
+		ScheduleToCloseTimeout: time.Second * 3,
 	}
 	RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
 	RegisterWorkflow(testWorkflowHeartbeat)
@@ -1138,4 +1142,54 @@ func (s *WorkflowTestSuiteUnitTest) Test_QueryWorkflow() {
 	s.NoError(env.GetWorkflowError())
 	env.AssertExpectations(s.T())
 	verifyStateWithQuery(stateDone)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_LocalActivity() {
+	localActivityFn := func(ctx context.Context, name string) (string, error) {
+		return "hello " + name, nil
+	}
+
+	workflowFn := func(ctx Context) (string, error) {
+		ctx = WithLocalActivityOptions(ctx, s.localActivityOptions)
+		var result string
+		f := ExecuteLocalActivity(ctx, localActivityFn, "local_activity")
+		err := f.Get(ctx, &result)
+		return result, err
+	}
+
+	RegisterWorkflow(workflowFn)
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var result string
+	err := env.GetWorkflowResult(&result)
+	s.NoError(err)
+	s.Equal("hello local_activity", result)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityWithMock() {
+	localActivityFn := func(ctx context.Context, name string) (string, error) {
+		return "hello " + name, nil
+	}
+
+	workflowFn := func(ctx Context) (string, error) {
+		ctx = WithLocalActivityOptions(ctx, s.localActivityOptions)
+		var result string
+		f := ExecuteLocalActivity(ctx, localActivityFn, "local_activity")
+		err := f.Get(ctx, &result)
+		return result, err
+	}
+
+	RegisterWorkflow(workflowFn)
+	env := s.NewTestWorkflowEnvironment()
+	env.OnActivity(localActivityFn, mock.Anything, "local_activity").Return("hello mock", nil).Once()
+	env.ExecuteWorkflow(workflowFn)
+	env.AssertExpectations(s.T())
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var result string
+	err := env.GetWorkflowResult(&result)
+	s.NoError(err)
+	s.Equal("hello mock", result)
 }

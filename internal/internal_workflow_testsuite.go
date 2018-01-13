@@ -298,25 +298,11 @@ func (env *testWorkflowEnvironmentImpl) setActivityTaskList(tasklist string, act
 }
 
 func (env *testWorkflowEnvironmentImpl) executeWorkflow(workflowFn interface{}, args ...interface{}) {
-	var workflowType string
-	fnType := reflect.TypeOf(workflowFn)
-	switch fnType.Kind() {
-	case reflect.String:
-		workflowType = workflowFn.(string)
-	case reflect.Func:
-		workflowType = getFunctionName(workflowFn)
-		if alias, ok := getHostEnvironment().getWorkflowAlias(workflowType); ok {
-			workflowType = alias
-		}
-	default:
-		panic("unsupported workflowFn")
-	}
-
-	input, err := getHostEnvironment().encodeArgs(args)
+	workflowType, input, err := getValidatedWorkflowFunction(workflowFn, args)
 	if err != nil {
 		panic(err)
 	}
-	env.executeWorkflowInternal(workflowType, input)
+	env.executeWorkflowInternal(workflowType.Name, input)
 }
 
 func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(workflowType string, input []byte) {
@@ -353,27 +339,13 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	activityFn interface{},
 	args ...interface{},
 ) (encoded.Value, error) {
-	var activityType string
-	fnType := reflect.TypeOf(activityFn)
-	switch fnType.Kind() {
-	case reflect.String:
-		activityType = activityFn.(string)
-	case reflect.Func:
-		activityType = getFunctionName(activityFn)
-		if alias, ok := getHostEnvironment().getActivityAlias(activityType); ok {
-			activityType = alias
-		}
-	default:
-		panic("unsupported activityFn")
-	}
-
-	input, err := getHostEnvironment().encodeArgs(args)
+	activityType, input, err := getValidatedActivityFunction(activityFn, args)
 	if err != nil {
 		panic(err)
 	}
 
 	params := executeActivityParameters{
-		ActivityType: ActivityType{Name: activityType},
+		ActivityType: *activityType,
 		Input:        input,
 		ScheduleToCloseTimeoutSeconds: 600,
 		StartToCloseTimeoutSeconds:    600,

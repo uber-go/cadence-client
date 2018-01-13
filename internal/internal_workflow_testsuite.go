@@ -353,7 +353,19 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	activityFn interface{},
 	args ...interface{},
 ) (encoded.Value, error) {
-	fnName := getFunctionName(activityFn)
+	var activityType string
+	fnType := reflect.TypeOf(activityFn)
+	switch fnType.Kind() {
+	case reflect.String:
+		activityType = activityFn.(string)
+	case reflect.Func:
+		activityType = getFunctionName(activityFn)
+		if alias, ok := getHostEnvironment().getActivityAlias(activityType); ok {
+			activityType = alias
+		}
+	default:
+		panic("unsupported activityFn")
+	}
 
 	input, err := getHostEnvironment().encodeArgs(args)
 	if err != nil {
@@ -361,7 +373,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	}
 
 	params := executeActivityParameters{
-		ActivityType: ActivityType{Name: fnName},
+		ActivityType: ActivityType{Name: activityType},
 		Input:        input,
 		ScheduleToCloseTimeoutSeconds: 600,
 		StartToCloseTimeoutSeconds:    600,

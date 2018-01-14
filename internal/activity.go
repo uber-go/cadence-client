@@ -122,7 +122,8 @@ func GetActivityMetricsScope(ctx context.Context) tally.Scope {
 func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 	env := getActivityEnv(ctx)
 	if env.isLocalActivity {
-		panic("cannot heartbeat from local activity")
+		// no-op for local activity
+		return
 	}
 	var data []byte
 	var err error

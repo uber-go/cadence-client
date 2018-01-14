@@ -221,24 +221,6 @@ func newWorkflowWorkerInternal(
 	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params)
 }
 
-var localActivityChannelMap = make(map[string]*localActivityChannel)
-var localActivityChannelLock = sync.Mutex{}
-
-func registerLocalActivityChannel(taskList string, resultCh chan interface{}) {
-	localActivityChannelLock.Lock()
-	localActivityChannelMap[taskList] = &localActivityChannel{
-		taskCh:   make(chan *localActivityTask, 1000),
-		resultCh: resultCh,
-	}
-	localActivityChannelLock.Unlock()
-}
-
-func getLocalActivityChannel(taskList string) *localActivityChannel {
-	localActivityChannelLock.Lock()
-	defer localActivityChannelLock.Unlock()
-	return localActivityChannelMap[taskList]
-}
-
 func newWorkflowTaskWorkerInternal(
 	taskHandler WorkflowTaskHandler,
 	service workflowserviceclient.Interface,
@@ -262,8 +244,20 @@ func newWorkflowTaskWorkerInternal(
 		params.Logger,
 		params.MetricsScope,
 	)
-	registerLocalActivityChannel(params.TaskList, worker.taskQueueCh)
-	localActivityTaskPoller := newLocalActivityPoller(params)
+
+	// laTunnel is the glue that hookup 3 parts
+	laTunnel := &localActivityTunnel{
+		taskCh:   make(chan *localActivityTask, 1000),
+		resultCh: make(chan interface{}),
+	}
+
+	// 1) workflow handler will send local activity task to laTunnel
+	if handlerImpl, ok := taskHandler.(*workflowTaskHandlerImpl); ok {
+		handlerImpl.laTunnel = laTunnel
+	}
+
+	// 2) local activity task poller will poll from laTunnel, and result will be pushed to laTunnel
+	localActivityTaskPoller := newLocalActivityPoller(params, laTunnel)
 	localActivityWorker := newBaseWorker(baseWorkerOptions{
 		pollerCount:       1, // 1 poller (from local channel) is enough for local activity
 		maxConcurrentTask: params.ConcurrentActivityExecutionSize,
@@ -274,6 +268,9 @@ func newWorkflowTaskWorkerInternal(
 		params.Logger,
 		params.MetricsScope,
 	)
+
+	// 3) the result pushed to laTunnel will be send as task to workflow worker to process.
+	worker.taskQueueCh = laTunnel.resultCh
 
 	return &workflowWorker{
 		executionParameters: params,

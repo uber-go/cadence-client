@@ -92,6 +92,8 @@ type (
 
 		newDecisions        []*s.Decision
 		currentDecisionTask *s.PollForDecisionTaskResponse
+		laTunnel            *localActivityTunnel
+		decisionStartTime   time.Time
 	}
 
 	// workflowTaskHandlerImpl is the implementation of WorkflowTaskHandler
@@ -104,6 +106,7 @@ type (
 		enableLoggingInReplay  bool
 		disableStickyExecution bool
 		hostEnv                *hostEnvImpl
+		laTunnel               *localActivityTunnel
 	}
 
 	activityProvider func(name string) activity
@@ -411,6 +414,7 @@ func (w *workflowExecutionContext) destroyCachedState() {
 	w.previousStartedEventID = 0
 	w.newDecisions = nil
 	w.currentDecisionTask = nil
+	w.laTunnel = nil
 	if w.eventHandler != nil {
 		w.eventHandler.Close()
 		w.eventHandler = nil
@@ -473,6 +477,13 @@ func (wth *workflowTaskHandlerImpl) createWorkflowContext(task *s.PollForDecisio
 
 func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(task *s.PollForDecisionTaskResponse,
 	historyIterator HistoryIterator) (workflowContext *workflowExecutionContext, skipReplayCheck bool, err error) {
+	defer func() {
+		if err == nil && workflowContext != nil {
+			workflowContext.currentDecisionTask = task
+			workflowContext.laTunnel = wth.laTunnel
+			workflowContext.decisionStartTime = time.Now()
+		}
+	}()
 
 	skipReplayCheck = task.Query != nil
 	runID := task.WorkflowExecution.GetRunId()
@@ -587,8 +598,6 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	if err != nil {
 		return nil, "", err
 	}
-	workflowContext.currentDecisionTask = task
-
 	defer workflowContext.release()
 
 	eventHandler := workflowContext.eventHandler
@@ -675,8 +684,11 @@ func (wth *workflowTaskHandlerImpl) ProcessLocalActivityResult(lar *localActivit
 		// generate a new new decision task, which could be dispatched to this same worker. In that case, the cached
 		// workflowExecutionContext will be reset because the events mismatch and the currentDecisionTask will be updated
 		// to the new decision task while the reference in the local activity task will still be the old one.
-		wth.logger.Debug("Discard local activity result because decision task that it belongs to is no longer available. " +
-			"Possible cause is local activity took too long and decision task timedout.")
+		wth.logger.Info("Discard local activity result because decision task that it belongs to is no longer available. "+
+			"Possible cause is local activity took too long and decision task timed out.",
+			zap.String("LocalActivityID", lar.task.activityID),
+			zap.String("LocalActivityFunc", getFunctionName(lar.task.params.ActivityFn)),
+			zap.Int32("ScheduleToCloseTimeoutSeconds", lar.task.params.ScheduleToCloseTimeoutSeconds))
 		return nil, nil
 	}
 
@@ -697,14 +709,15 @@ func (wth *workflowTaskHandlerImpl) ProcessLocalActivityResult(lar *localActivit
 
 func (w *workflowExecutionContext) CompleteDecisionTask() interface{} {
 	if !w.isWorkflowCompleted && len(w.eventHandler.pendingLaTasks) > 0 {
-		lac := getLocalActivityChannel(w.workflowInfo.TaskListName)
-		for _, task := range w.eventHandler.pendingLaTasks {
-			if !task.started {
-				task.started = true
+		if len(w.eventHandler.unstartedLaTasks) > 0 {
+			// start new local activity tasks
+			for activityID := range w.eventHandler.unstartedLaTasks {
+				task := w.eventHandler.pendingLaTasks[activityID]
 				task.wc = w
 				task.decisionTask = w.currentDecisionTask
-				lac.sendTask(task)
+				w.laTunnel.sendTask(task)
 			}
+			w.eventHandler.unstartedLaTasks = make(map[string]struct{})
 		}
 		// cannot complete decision task as there are pending local activities
 		return nil

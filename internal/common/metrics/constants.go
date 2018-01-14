@@ -45,7 +45,6 @@ const (
 	DecisionExecutionLatency           = CadenceMetricsPrefix + "decision-execution-latency"
 	DecisionResponseFailedCounter      = CadenceMetricsPrefix + "decision-response-failed"
 	DecisionResponseLatency            = CadenceMetricsPrefix + "decision-response-latency"
-	DecisionEndToEndLatency            = CadenceMetricsPrefix + "decision-endtoend-latency" // measure from poll request start to response completed
 	DecisionTaskPanicCounter           = CadenceMetricsPrefix + "decision-task-panic"
 	DecisionTaskCompletedCounter       = CadenceMetricsPrefix + "decision-task-completed"
 

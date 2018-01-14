@@ -89,6 +89,7 @@ type (
 		metricsScope        tally.Scope
 		logger              *zap.Logger
 		activitiesPerSecond float64
+		laTunnel            *localActivityTunnel
 	}
 
 	historyIteratorImpl struct {
@@ -105,7 +106,7 @@ type (
 		handler      *localActivityTaskHandler
 		metricsScope tally.Scope
 		logger       *zap.Logger
-		laChannel    *localActivityChannel
+		laTunnel     *localActivityTunnel
 	}
 
 	localActivityTaskHandler struct {
@@ -120,22 +121,22 @@ type (
 		task   *localActivityTask
 	}
 
-	localActivityChannel struct {
+	localActivityTunnel struct {
 		taskCh   chan *localActivityTask
 		resultCh chan interface{}
 	}
 )
 
-func (lam *localActivityChannel) getTask() *localActivityTask {
-	return <-lam.taskCh
+func (lat *localActivityTunnel) getTask() *localActivityTask {
+	return <-lat.taskCh
 }
 
-func (lam *localActivityChannel) sendTask(task *localActivityTask) {
-	lam.taskCh <- task
+func (lat *localActivityTunnel) sendTask(task *localActivityTask) {
+	lat.taskCh <- task
 }
 
-func (lam *localActivityChannel) deliverResult(result *localActivityResult) {
-	lam.resultCh <- result
+func (lat *localActivityTunnel) deliverResult(result *localActivityResult) {
+	lat.resultCh <- result
 }
 
 func createServiceRetryPolicy() backoff.RetryPolicy {
@@ -198,21 +199,16 @@ func (wtp *workflowTaskPoller) PollTask() (interface{}, error) {
 	return workflowTask, nil
 }
 
-// ProcessTask processes a task
+// ProcessTask processes a task which could be workflow task or local activity result
 func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 	if lar, ok := task.(*localActivityResult); ok {
-		completedRequest, err := wtp.taskHandler.(*workflowTaskHandlerImpl).ProcessLocalActivityResult(lar)
-		if err != nil {
-			return err
-		}
-		if completedRequest == nil {
-			return nil
-		}
-
-		return wtp.RespondTaskCompleted(completedRequest, lar.task.wc.currentDecisionTask)
+		return wtp.processLocalActivityResult(lar)
 	}
 
-	workflowTask := task.(*workflowTask)
+	return wtp.processWorkflowTask(task.(*workflowTask))
+}
+
+func (wtp *workflowTaskPoller) processWorkflowTask(workflowTask *workflowTask) error {
 	if workflowTask.task == nil {
 		// We didn't have task, poll might have time out.
 		traceLog(func() {
@@ -238,9 +234,29 @@ func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 		return err
 	}
 	wtp.metricsScope.Timer(metrics.DecisionResponseLatency).Record(time.Now().Sub(responseStartTime))
-	wtp.metricsScope.Timer(metrics.DecisionEndToEndLatency).Record(time.Now().Sub(workflowTask.pollStartTime))
 	wtp.metricsScope.Counter(metrics.DecisionTaskCompletedCounter).Inc(1)
 
+	return nil
+}
+
+func (wtp *workflowTaskPoller) processLocalActivityResult(lar *localActivityResult) error {
+	completedRequest, err := wtp.taskHandler.(*workflowTaskHandlerImpl).ProcessLocalActivityResult(lar)
+	if err != nil {
+		return err
+	}
+	if completedRequest == nil {
+		return nil
+	}
+
+	workflowContext := lar.task.wc
+	wtp.metricsScope.Timer(metrics.DecisionExecutionLatency).Record(time.Now().Sub(workflowContext.decisionStartTime))
+
+	responseStartTime := time.Now()
+	if err = wtp.RespondTaskCompleted(completedRequest, workflowContext.currentDecisionTask); err != nil {
+		return err
+	}
+	wtp.metricsScope.Timer(metrics.DecisionResponseLatency).Record(time.Now().Sub(responseStartTime))
+	wtp.metricsScope.Counter(metrics.DecisionTaskCompletedCounter).Inc(1)
 	return nil
 }
 
@@ -300,28 +316,27 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 	return nil
 }
 
-func newLocalActivityPoller(params workerExecutionParameters) *localActivityTaskPoller {
+func newLocalActivityPoller(params workerExecutionParameters, laTunnel *localActivityTunnel) *localActivityTaskPoller {
 	handler := &localActivityTaskHandler{
 		userContext:  params.UserContext,
 		metricsScope: params.MetricsScope,
 		logger:       params.Logger,
 	}
-	lac := getLocalActivityChannel(params.TaskList)
 	return &localActivityTaskPoller{
 		handler:      handler,
 		metricsScope: params.MetricsScope,
 		logger:       params.Logger,
-		laChannel:    lac,
+		laTunnel:     laTunnel,
 	}
 }
 
 func (latp *localActivityTaskPoller) PollTask() (interface{}, error) {
-	return latp.laChannel.getTask(), nil
+	return latp.laTunnel.getTask(), nil
 }
 
 func (latp *localActivityTaskPoller) ProcessTask(task interface{}) error {
 	result := latp.handler.executeLocalActivityTask(task.(*localActivityTask))
-	latp.laChannel.deliverResult(result)
+	latp.laTunnel.deliverResult(result)
 	return nil
 }
 
@@ -385,9 +400,16 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		close(ch)
 	}(doneCh)
 
-	// block until previous poll completed or return immediately when shutdown
+Wait_Result:
 	select {
 	case <-ctx.Done():
+		select {
+		case <-doneCh:
+			// double check if result is ready.
+			break Wait_Result
+		default:
+		}
+
 		// context is done
 		if ctx.Err() == context.Canceled {
 			lath.metricsScope.Counter(metrics.LocalActivityCanceledCounter).Inc(1)

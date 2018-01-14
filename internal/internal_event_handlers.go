@@ -77,6 +77,7 @@ type (
 		sideEffectResult map[int32][]byte
 		changeVersions   map[string]Version
 		pendingLaTasks   map[string]*localActivityTask
+		unstartedLaTasks map[string]struct{}
 
 		counterID         int32     // To generate sequence IDs for activity/timer etc.
 		currentReplayTime time.Time // Indicates current replay time of the decision.
@@ -102,7 +103,6 @@ type (
 		callback     resultHandler
 		wc           *workflowExecutionContext
 		decisionTask *m.PollForDecisionTaskResponse
-		started      bool
 		canceled     bool
 		cancelFunc   func()
 	}
@@ -155,6 +155,7 @@ func newWorkflowExecutionEventHandler(
 		sideEffectResult:      make(map[int32][]byte),
 		changeVersions:        make(map[string]Version),
 		pendingLaTasks:        make(map[string]*localActivityTask),
+		unstartedLaTasks:      make(map[string]struct{}),
 		completeHandler:       completeHandler,
 		enableLoggingInReplay: enableLoggingInReplay,
 		hostEnv:               hostEnv,
@@ -350,6 +351,7 @@ func (wc *workflowEnvironmentImpl) ExecuteLocalActivity(params executeLocalActiv
 	activityID := wc.GenerateSequenceID()
 	task := &localActivityTask{activityID: activityID, params: &params, callback: callback}
 	wc.pendingLaTasks[activityID] = task
+	wc.unstartedLaTasks[activityID] = struct{}{}
 	return &localActivityInfo{activityID: activityID}
 }
 
@@ -784,7 +786,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleLocalActivityMarker(markerDa
 
 	if la, ok := weh.pendingLaTasks[lamd.ActivityID]; ok {
 		delete(weh.pendingLaTasks, lamd.ActivityID)
-
+		delete(weh.unstartedLaTasks, lamd.ActivityID)
 		if len(lamd.ErrReason) > 0 {
 			la.callback(nil, constructError(lamd.ErrReason, []byte(lamd.ErrJSON)))
 		} else {

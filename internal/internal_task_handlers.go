@@ -188,7 +188,8 @@ func isDecisionEvent(eventType s.EventType) bool {
 		s.EventTypeTimerCanceled,
 		s.EventTypeMarkerRecorded,
 		s.EventTypeStartChildWorkflowExecutionInitiated,
-		s.EventTypeRequestCancelExternalWorkflowExecutionInitiated:
+		s.EventTypeRequestCancelExternalWorkflowExecutionInitiated,
+		s.EventTypeSignalExternalWorkflowExecutionInitiated:
 		return true
 	default:
 		return false

@@ -618,8 +618,6 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 
 	case m.EventTypeSignalExternalWorkflowExecutionInitiated:
 		signalID := string(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Control)
-		fmt.Println("vancexu")
-		fmt.Println(signalID)
 		weh.decisionsHelper.handleSignalExternalWorkflowExecutionInitiated(signalID)
 
 	case m.EventTypeSignalExternalWorkflowExecutionFailed:

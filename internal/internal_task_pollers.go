@@ -380,7 +380,8 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		}
 	}()
 
-	deadline := time.Now().Add(time.Duration(task.params.ScheduleToCloseTimeoutSeconds) * time.Second)
+	timeoutDuration := time.Duration(task.params.ScheduleToCloseTimeoutSeconds) * time.Second
+	deadline := time.Now().Add(timeoutDuration)
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	task.Lock()
 	if task.canceled {
@@ -396,8 +397,18 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 	go func(ch chan struct{}) {
 		laStartTime := time.Now()
 		laResult, err = ae.ExecuteWithActualArgs(ctx, task.params.InputArgs)
-		lath.metricsScope.Timer(metrics.LocalActivityExecutionLatency).Record(time.Now().Sub(laStartTime))
+		executionLatency := time.Now().Sub(laStartTime)
 		close(ch)
+		lath.metricsScope.Timer(metrics.LocalActivityExecutionLatency).Record(executionLatency)
+		if executionLatency > timeoutDuration {
+			// If local activity takes longer than expected timeout, the context would already be DeadlineExceeded and
+			// the result would be discarded. Print a warning in this case.
+			lath.logger.Warn("LocalActivity takes too long to complete.",
+				zap.String("LocalActivityID", task.activityID),
+				zap.String("LocalActivityType", activityType),
+				zap.Int32("ScheduleToCloseTimeoutSeconds", task.params.ScheduleToCloseTimeoutSeconds),
+				zap.Duration("ActualExecutionDuration", executionLatency))
+		}
 	}(doneCh)
 
 Wait_Result:

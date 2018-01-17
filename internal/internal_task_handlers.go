@@ -155,9 +155,8 @@ func (eh *history) GetWorkflowStartedEvent() (*s.HistoryEvent, error) {
 	return events[0], nil
 }
 
-// Get last non replayed event ID.
-func (eh *history) LastNonReplayedID() int64 {
-	return eh.workflowTask.task.GetPreviousStartedEventId()
+func (eh *history) IsReplayEvent(event *s.HistoryEvent) bool {
+	return event.GetEventId() <= eh.workflowTask.task.GetPreviousStartedEventId() || isDecisionEvent(event.GetEventType())
 }
 
 func (eh *history) IsNextDecisionFailed() bool {
@@ -625,7 +624,7 @@ ProcessEvents:
 		}
 
 		for i, event := range reorderedEvents {
-			isInReplay := reorderedEvents[0].GetEventId() < reorderedHistory.LastNonReplayedID() || isLocalActivityMarkerEvent(event)
+			isInReplay := reorderedHistory.IsReplayEvent(event)
 			isLast := !isInReplay && i == len(reorderedEvents)-1
 			if !skipReplayCheck && isDecisionEvent(event.GetEventType()) {
 				respondEvents = append(respondEvents, event)
@@ -740,14 +739,6 @@ func isVersionMarkerDecision(d *s.Decision) bool {
 func isVersionMarkerEvent(e *s.HistoryEvent) bool {
 	if e.GetEventType() == s.EventTypeMarkerRecorded &&
 		e.MarkerRecordedEventAttributes.GetMarkerName() == versionMarkerName {
-		return true
-	}
-	return false
-}
-
-func isLocalActivityMarkerEvent(e *s.HistoryEvent) bool {
-	if e.GetEventType() == s.EventTypeMarkerRecorded &&
-		e.MarkerRecordedEventAttributes.GetMarkerName() == localActivityMarkerName {
 		return true
 	}
 	return false

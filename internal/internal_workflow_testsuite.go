@@ -1037,9 +1037,7 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelWorkflow(domainName, workfl
 }
 
 func (env *testWorkflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID, runID, signalName string, input []byte, callback resultHandler) {
-	// fake testing to mimic signal external workflow.
-	env.signalHandler(signalName, input)
-	callback(nil, nil)
+	// TODO: add tests for signal external workflow
 }
 
 func (env *testWorkflowEnvironmentImpl) ExecuteChildWorkflow(options workflowOptions, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error {

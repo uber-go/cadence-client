@@ -306,6 +306,7 @@ struct StartChildWorkflowExecutionDecisionAttributes {
   70: optional i32 taskStartToCloseTimeoutSeconds
   80: optional ChildPolicy childPolicy
   90: optional binary control
+  100: optional WorkflowIdReusePolicy workflowIdReusePolicy
 }
 
 struct Decision {
@@ -538,6 +539,7 @@ struct StartChildWorkflowExecutionInitiatedEventAttributes {
   80:  optional ChildPolicy childPolicy
   90:  optional binary control
   100: optional i64 (js.type = "Long") decisionTaskCompletedEventId
+  110: optional WorkflowIdReusePolicy workflowIdReusePolicy
 }
 
 struct StartChildWorkflowExecutionFailedEventAttributes {
@@ -950,4 +952,31 @@ struct DescribeWorkflowExecutionResponse {
   10: optional WorkflowExecutionConfiguration executionConfiguration
   20: optional WorkflowExecutionInfo workflowExecutionInfo
   30: optional list<PendingActivityInfo> pendingActivities
+}
+
+struct DescribeTaskListRequest {
+  10: optional string domain
+  20: optional TaskList taskList
+  30: optional TaskListType taskListType
+}
+
+struct DescribeTaskListResponse {
+  10: optional list<PollerInfo> pollers
+}
+
+enum TaskListType {
+  /*
+   * Decision type of tasklist
+   */
+  Decision,
+  /*
+   * Activity type of tasklist
+   */
+  Activity,
+}
+
+struct PollerInfo {
+  // Unix Nano
+  10: optional i64 (js.type = "Long")  lastAccessTime
+  20: optional string identity
 }

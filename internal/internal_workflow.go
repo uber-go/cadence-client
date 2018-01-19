@@ -164,6 +164,7 @@ type (
 		waitForCancellation                 bool
 		signalChannels                      map[string]Channel
 		queryHandlers                       map[string]func([]byte) ([]byte, error)
+		workflowIDReusePolicy               WorkflowIDReusePolicy
 	}
 
 	// decodeFutureImpl
@@ -941,7 +942,7 @@ func newWorkflowDefinition(workflow workflow) workflowDefinition {
 	return &syncWorkflowDefinition{workflow: workflow}
 }
 
-func getValidatedWorkerFunction(workflowFunc interface{}, args []interface{}) (*WorkflowType, []byte, error) {
+func getValidatedWorkflowFunction(workflowFunc interface{}, args []interface{}) (*WorkflowType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(workflowFunc)
 	switch fType.Kind() {

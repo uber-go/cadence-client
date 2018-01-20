@@ -203,7 +203,6 @@ func (s *scheduledChildWorkflow) handle(result []byte, err error) {
 	s.resultCallback(result, err)
 }
 
-
 func (t *localActivityTask) cancel() {
 	t.Lock()
 	t.canceled = true

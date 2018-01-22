@@ -840,7 +840,7 @@ func convertActivityResultToRespondRequest(identity string, taskToken, result []
 		Identity:  common.StringPtr(identity)}
 }
 
-func convertActivityResultToRespondRequestByID(identity, domainID, workflowID, runID, activityID string,
+func convertActivityResultToRespondRequestByID(identity, domain, workflowID, runID, activityID string,
 	result []byte, err error) interface{} {
 	if err == ErrActivityResultPending {
 		// activity result is pending and will be completed asynchronously.
@@ -850,7 +850,7 @@ func convertActivityResultToRespondRequestByID(identity, domainID, workflowID, r
 
 	if err == nil {
 		return &s.RespondActivityTaskCompletedByIDRequest{
-			DomainID:   common.StringPtr(domainID),
+			Domain:     common.StringPtr(domain),
 			WorkflowID: common.StringPtr(workflowID),
 			RunID:      common.StringPtr(runID),
 			ActivityID: common.StringPtr(activityID),
@@ -861,7 +861,7 @@ func convertActivityResultToRespondRequestByID(identity, domainID, workflowID, r
 	reason, details := getErrorDetails(err)
 	if _, ok := err.(*CanceledError); ok || err == context.Canceled {
 		return &s.RespondActivityTaskCanceledByIDRequest{
-			DomainID:   common.StringPtr(domainID),
+			Domain:     common.StringPtr(domain),
 			WorkflowID: common.StringPtr(workflowID),
 			RunID:      common.StringPtr(runID),
 			ActivityID: common.StringPtr(activityID),
@@ -870,7 +870,7 @@ func convertActivityResultToRespondRequestByID(identity, domainID, workflowID, r
 	}
 
 	return &s.RespondActivityTaskFailedByIDRequest{
-		DomainID:   common.StringPtr(domainID),
+		Domain:     common.StringPtr(domain),
 		WorkflowID: common.StringPtr(workflowID),
 		RunID:      common.StringPtr(runID),
 		ActivityID: common.StringPtr(activityID),

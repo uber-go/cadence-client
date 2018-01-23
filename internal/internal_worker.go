@@ -59,7 +59,7 @@ const (
 	defaultMaxConcurrentWorkflowExecutionSize = 50     // hardcoded max workflow execution size.
 	defaultMaxWorkflowExecutionRate           = 100000 // Large workflow execution rate (unlimited)
 
-	testTagsContextKey = "testTags"
+	testTagsContextKey = "cadence-testTags"
 )
 
 // Assert that structs do indeed implement the interfaces

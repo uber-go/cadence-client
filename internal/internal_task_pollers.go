@@ -444,7 +444,7 @@ func (wtp *workflowTaskPoller) release(kind s.TaskListKind) {
 	}
 
 	wtp.requestLock.Lock()
-	if kind.Equals(s.TaskListKindWorker) {
+	if kind == s.TaskListKindSticky {
 		wtp.pendingStickyPollCount--
 	} else {
 		wtp.pendingRegularPollCount--
@@ -453,7 +453,7 @@ func (wtp *workflowTaskPoller) release(kind s.TaskListKind) {
 }
 
 func (wtp *workflowTaskPoller) updateBacklog(taskListKind s.TaskListKind, backlogCountHint int64) {
-	if taskListKind.Equals(s.TaskListKindNormal) || wtp.disableStickyExecution {
+	if taskListKind == s.TaskListKindNormal || wtp.disableStickyExecution {
 		// we only care about sticky backlog for now.
 		return
 	}
@@ -477,7 +477,7 @@ func (wtp *workflowTaskPoller) getNextPollRequest() (request *s.PollForDecisionT
 		if wtp.stickyBacklog > 0 || wtp.pendingStickyPollCount <= wtp.pendingRegularPollCount {
 			wtp.pendingStickyPollCount++
 			taskListName = getWorkerTaskList()
-			taskListKind = s.TaskListKindWorker
+			taskListKind = s.TaskListKindSticky
 		} else {
 			wtp.pendingRegularPollCount++
 		}

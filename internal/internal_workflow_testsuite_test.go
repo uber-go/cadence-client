@@ -1144,7 +1144,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_QueryWorkflow() {
 	verifyStateWithQuery(stateDone)
 }
 
-func (s *WorkflowTestSuiteUnitTest) Test_LocalActivity() {
+func (s *WorkflowTestSuiteUnitTest) Test_WorkflowWithLocalActivity() {
 	localActivityFn := func(ctx context.Context, name string) (string, error) {
 		return "hello " + name, nil
 	}
@@ -1168,15 +1168,48 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivity() {
 	s.Equal("hello local_activity", result)
 }
 
-func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityWithMock() {
+func (s *WorkflowTestSuiteUnitTest) Test_LocalActivity() {
 	localActivityFn := func(ctx context.Context, name string) (string, error) {
 		return "hello " + name, nil
+	}
+
+	env := s.NewTestActivityEnvironment()
+	result, err := env.ExecuteLocalActivity(localActivityFn, "local_activity")
+	s.NoError(err)
+	var laResult string
+	err = result.Get(&laResult)
+	s.NoError(err)
+	s.Equal("hello local_activity", laResult)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_WorkflowLocalActivityWithMockAndListeners() {
+	localActivityFn := func(ctx context.Context, name string) (string, error) {
+		return "hello " + name, nil
+	}
+
+	cancelledLocalActivityFn := func() error {
+		time.Sleep(time.Second)
+		return nil
 	}
 
 	workflowFn := func(ctx Context) (string, error) {
 		ctx = WithLocalActivityOptions(ctx, s.localActivityOptions)
 		var result string
 		f := ExecuteLocalActivity(ctx, localActivityFn, "local_activity")
+		ctx2, cancel := WithCancel(ctx)
+		f2 := ExecuteLocalActivity(ctx2, cancelledLocalActivityFn)
+
+		NewSelector(ctx).AddFuture(f, func(f Future) {
+			cancel()
+		}).AddFuture(f2, func(f Future) {
+
+		}).Select(ctx)
+
+		err2 := f2.Get(ctx, nil)
+		if _, ok := err2.(*CanceledError); !ok {
+			return "", err2
+		}
+
 		err := f.Get(ctx, &result)
 		return result, err
 	}
@@ -1184,8 +1217,29 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityWithMock() {
 	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
 	env.OnActivity(localActivityFn, mock.Anything, "local_activity").Return("hello mock", nil).Once()
+	var startedCount, completedCount, canceledCount int
+	env.SetOnLocalActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args []interface{}) {
+		startedCount++
+	})
+
+	env.SetOnLocalActivityCompletedListener(func(activityInfo *ActivityInfo, result encoded.Value, err error) {
+		s.NoError(err)
+		var resultValue string
+		err = result.Get(&resultValue)
+		s.NoError(err)
+		s.Equal("hello mock", resultValue)
+		completedCount++
+	})
+
+	env.SetOnLocalActivityCanceledListener(func(activityInfo *ActivityInfo) {
+		canceledCount++
+	})
+
 	env.ExecuteWorkflow(workflowFn)
 	env.AssertExpectations(s.T())
+	s.Equal(2, startedCount)
+	s.Equal(1, completedCount)
+	s.Equal(1, canceledCount)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 	var result string

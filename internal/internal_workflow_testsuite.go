@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"sync"
@@ -384,6 +385,32 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 		// will never happen
 		return nil, fmt.Errorf("unsupported respond type %T", result)
 	}
+}
+
+func (env *testWorkflowEnvironmentImpl) executeLocalActivity(
+	activityFn interface{},
+	args ...interface{},
+) (encoded.Value, error) {
+	params := executeLocalActivityParams{
+		ActivityFn:                    activityFn,
+		InputArgs:                     args,
+		ScheduleToCloseTimeoutSeconds: int32(math.Ceil(env.testTimeout.Seconds())),
+		WorkflowInfo:                  env.workflowInfo,
+	}
+	task := &localActivityTask{
+		activityID: "test-local-activity",
+		params:     &params,
+		callback: func(result []byte, err error) {
+		},
+	}
+	taskHandler := localActivityTaskHandler{
+		userContext:  env.workerOptions.BackgroundActivityContext,
+		metricsScope: env.metricsScope,
+		logger:       env.logger,
+	}
+
+	result := taskHandler.executeLocalActivityTask(task)
+	return EncodedValue(result.result), result.err
 }
 
 func (env *testWorkflowEnvironmentImpl) startDecisionTask() {

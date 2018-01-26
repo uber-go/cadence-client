@@ -215,7 +215,7 @@ func validateFunctionArgs(f interface{}, args []interface{}, isWorkflow bool) er
 func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(f)
-	switch getReflectTypeKind(fType) {
+	switch getKind(fType) {
 	case reflect.String:
 		fnName = reflect.ValueOf(f).String()
 
@@ -240,7 +240,7 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityT
 	return &ActivityType{Name: fnName}, input, nil
 }
 
-func getReflectTypeKind(fType reflect.Type) reflect.Kind {
+func getKind(fType reflect.Type) reflect.Kind {
 	fTypeKind := reflect.Invalid
 	if fType != nil {
 		fTypeKind = fType.Kind()
@@ -314,7 +314,7 @@ func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interf
 func deSerializeFunctionResult(f interface{}, result []byte, to interface{}) error {
 	fType := reflect.TypeOf(f)
 
-	switch getReflectTypeKind(fType) {
+	switch getKind(fType) {
 	case reflect.Func:
 		// We already validated that it either have (result, error) (or) just error.
 		return deSerializeFnResultFromFnType(fType, result, to)

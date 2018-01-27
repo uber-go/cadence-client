@@ -536,9 +536,9 @@ func activityOptionsWorkflow(ctx Context) (result string, err error) {
 	ctx1 := WithActivityOptions(ctx, ao1)
 	ctx2 := WithActivityOptions(ctx, ao2)
 
-	ctx1_ao := getActivityOptions(ctx1)
-	ctx2_ao := getActivityOptions(ctx2)
-	return *ctx1_ao.ActivityID + " " + *ctx2_ao.ActivityID, nil
+	ctx1Ao := getActivityOptions(ctx1)
+	ctx2Ao := getActivityOptions(ctx2)
+	return *ctx1Ao.ActivityID + " " + *ctx2Ao.ActivityID, nil
 }
 
 // Test that activity options are correctly spawned with WithActivityOptions is called.

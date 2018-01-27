@@ -329,6 +329,17 @@ func (f childWorkflowFutureImpl) GetChildWorkflowExecution() Future {
 	return f.executionFuture
 }
 
+func (f childWorkflowFutureImpl) SignalChildWorkflow(ctx Context, signalName string, data interface{}) Future {
+	var childExec WorkflowExecution
+	if err := f.GetChildWorkflowExecution().Get(ctx, &childExec); err != nil {
+		future, settable := NewFuture(ctx)
+		settable.Set(nil, err)
+		return future
+	}
+
+	return SignalExternalWorkflow(ctx, childExec.ID, childExec.RunID, signalName, data)
+}
+
 func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) {
 	d.rootCtx = WithValue(background, workflowEnvironmentContextKey, env)
 	var resultPtr *workflowResult

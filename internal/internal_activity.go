@@ -241,11 +241,10 @@ func getValidatedActivityFunction(f interface{}, args []interface{}) (*ActivityT
 }
 
 func getKind(fType reflect.Type) reflect.Kind {
-	fTypeKind := reflect.Invalid
-	if fType != nil {
-		fTypeKind = fType.Kind()
+	if fType == nil {
+		return reflect.Invalid
 	}
-	return fTypeKind
+	return fType.Kind()
 }
 
 func isActivityContext(inType reflect.Type) bool {

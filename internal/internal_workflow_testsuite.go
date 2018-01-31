@@ -1222,7 +1222,6 @@ func (env *testWorkflowEnvironmentImpl) SignalExternalWorkflow(domainName, workf
 			callback(nil, err)
 		} else {
 			childEnv.signalHandler(signalName, input)
-			//childEnv.signalWorkflow(signalName, input)
 			callback(nil, nil)
 		}
 		return

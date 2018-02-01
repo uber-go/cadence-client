@@ -1191,10 +1191,11 @@ func (env *testWorkflowEnvironmentImpl) RegisterQueryHandler(handler func(string
 	env.queryHandler = handler
 }
 
-func (env *testWorkflowEnvironmentImpl) RequestCancelWorkflow(domainName, workflowID, runID string) error {
+func (env *testWorkflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName, workflowID, runID string, callback resultHandler) {
 	if env.workflowInfo.WorkflowExecution.ID == workflowID {
 		// cancel current workflow
 		env.workflowCancelHandler()
+		callback(nil, nil)
 
 		// check if current workflow is a child workflow
 		if env.isChildWorkflow() && env.onChildWorkflowCanceledListener != nil {
@@ -1206,9 +1207,10 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelWorkflow(domainName, workfl
 		// current workflow is a parent workflow, and we are canceling a child workflow
 		childHandle.handled = true
 		childEnv := childHandle.env
-		childEnv.cancelWorkflow()
+		childEnv.cancelWorkflow(callback)
 	}
-	return nil
+
+	// TODO add test for cancel external workflow
 }
 
 func (env *testWorkflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID, runID, signalName string, input []byte, arg interface{}, callback resultHandler) {
@@ -1293,12 +1295,15 @@ func (env *testWorkflowEnvironmentImpl) getActivityInfo(activityID, activityType
 	}
 }
 
-func (env *testWorkflowEnvironmentImpl) cancelWorkflow() {
+func (env *testWorkflowEnvironmentImpl) cancelWorkflow(callback resultHandler) {
 	env.postCallback(func() {
 		// RequestCancelWorkflow needs to be run in main thread
-		env.RequestCancelWorkflow(env.workflowInfo.Domain,
+		env.RequestCancelExternalWorkflow(
+			env.workflowInfo.Domain,
 			env.workflowInfo.WorkflowExecution.ID,
-			env.workflowInfo.WorkflowExecution.RunID)
+			env.workflowInfo.WorkflowExecution.RunID,
+			callback,
+		)
 	}, true)
 }
 

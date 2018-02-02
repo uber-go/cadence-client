@@ -284,7 +284,7 @@ OrderEvents:
 			concurrentToDecision = false
 
 		case s.EventTypeDecisionTaskScheduled, s.EventTypeDecisionTaskTimedOut, s.EventTypeDecisionTaskFailed:
-		// Skip
+			// Skip
 		default:
 			if concurrentToDecision {
 				decisionStartToCompletionEvents = append(decisionStartToCompletionEvents, event)
@@ -1239,17 +1239,8 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr), nil
 		}
 	}()
-
-	var deadline time.Time
-	scheduleToCloseDeadline := time.Unix(0, t.GetScheduledTimestamp()).Add(time.Duration(t.GetScheduleToCloseTimeoutSeconds()) * time.Second)
-	startToCloseDeadline := time.Unix(0, t.GetStartedTimestamp()).Add(time.Duration(t.GetStartToCloseTimeoutSeconds()) * time.Second)
-	// Minimum of the two deadlines.
-	if scheduleToCloseDeadline.Before(startToCloseDeadline) {
-		deadline = scheduleToCloseDeadline
-	} else {
-		deadline = startToCloseDeadline
-	}
-	ctx, dlCancelFunc := context.WithDeadline(ctx, deadline)
+	info := ctx.Value(activityEnvContextKey).(*activityEnvironment)
+	ctx, dlCancelFunc := context.WithDeadline(ctx, info.deadline)
 
 	output, err := activityImplementation.Execute(ctx, t.Input)
 

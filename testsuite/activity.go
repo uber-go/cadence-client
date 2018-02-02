@@ -37,9 +37,10 @@ type ServiceInvoker = internal.ServiceInvoker
 func WithActivityTask(
 	ctx context.Context,
 	task *shared.PollForActivityTaskResponse,
+	taskListName string,
 	invoker ServiceInvoker,
 	logger *zap.Logger,
 	scope tally.Scope,
 ) context.Context {
-	return internal.WithActivityTask(ctx, task, invoker, logger, scope)
+	return internal.WithActivityTask(ctx, task, taskListName, invoker, logger, scope)
 }

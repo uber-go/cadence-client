@@ -1203,7 +1203,7 @@ func newServiceInvoker(
 }
 
 // Execute executes an implementation of the activity.
-func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (result interface{}, err error) {
+func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivityTaskResponse) (result interface{}, err error) {
 	traceLog(func() {
 		ath.logger.Debug("Processing new activity task",
 			zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
@@ -1218,7 +1218,7 @@ func (ath *activityTaskHandlerImpl) Execute(t *s.PollForActivityTaskResponse) (r
 	canCtx, cancel := context.WithCancel(rootCtx)
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds())
 	defer invoker.Close()
-	ctx := WithActivityTask(canCtx, t, invoker, ath.logger, ath.metricsScope)
+	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, ath.metricsScope)
 	activityType := *t.ActivityType
 	activityImplementation := ath.getActivity(activityType.GetName())
 	if activityImplementation == nil {

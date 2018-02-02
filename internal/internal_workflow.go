@@ -332,9 +332,7 @@ func (f childWorkflowFutureImpl) GetChildWorkflowExecution() Future {
 func (f childWorkflowFutureImpl) SignalChildWorkflow(ctx Context, signalName string, data interface{}) Future {
 	var childExec WorkflowExecution
 	if err := f.GetChildWorkflowExecution().Get(ctx, &childExec); err != nil {
-		future, settable := NewFuture(ctx)
-		settable.Set(nil, err)
-		return future
+		return f.GetChildWorkflowExecution()
 	}
 
 	return SignalExternalWorkflow(ctx, childExec.ID, childExec.RunID, signalName, data)

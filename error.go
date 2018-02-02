@@ -80,9 +80,3 @@ func IsPanicError(err error) bool {
 	_, ok := err.(*workflow.PanicError)
 	return ok
 }
-
-// IsContinueAsNewError return if the err is a ContinueAsNewError
-func IsContinueAsNewError(err error) bool {
-	_, ok := err.(*workflow.ContinueAsNewError)
-	return ok
-}

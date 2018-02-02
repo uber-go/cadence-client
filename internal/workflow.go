@@ -114,6 +114,9 @@ type (
 		//      // child workflow started, you can use childWE to get the WorkflowID and RunID of child workflow
 		//  }
 		GetChildWorkflowExecution() Future
+
+		// SignalChildWorkflow sends a signal to the child workflow. This call will block until child workflow is started.
+		SignalChildWorkflow(ctx Context, signalName string, data interface{}) Future
 	}
 
 	// WorkflowType identifies a workflow type.
@@ -669,7 +672,15 @@ func GetSignalChannel(ctx Context, signalName string) Channel {
 
 // Get extract data from encoded data to desired value type. valuePtr is pointer to the actual value type.
 func (b EncodedValue) Get(valuePtr interface{}) error {
+	if b == nil {
+		return ErrNoData
+	}
 	return getHostEnvironment().decodeArg(b, valuePtr)
+}
+
+// HasValue return whether there is value encoded.
+func (b EncodedValue) HasValue() bool {
+	return b != nil
 }
 
 // SideEffect executes provided function once, records its result into the workflow history. The recorded result on

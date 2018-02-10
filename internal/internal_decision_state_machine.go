@@ -124,12 +124,12 @@ const (
 )
 
 const (
-	decisionTypeActivity         decisionType = 0
-	decisionTypeChildWorkflow    decisionType = 1
-	decisionTypeExternalWorkflow decisionType = 2
-	decisionTypeMarker           decisionType = 3
-	decisionTypeTimer            decisionType = 4
-	decisionTypeSignal           decisionType = 5
+	decisionTypeActivity      decisionType = 0
+	decisionTypeChildWorkflow decisionType = 1
+	decisionTypeCancellation  decisionType = 2
+	decisionTypeMarker        decisionType = 3
+	decisionTypeTimer         decisionType = 4
+	decisionTypeSignal        decisionType = 5
 )
 
 const (
@@ -183,12 +183,14 @@ func (d decisionType) String() string {
 		return "Activity"
 	case decisionTypeChildWorkflow:
 		return "ChildWorkflow"
-	case decisionTypeExternalWorkflow:
-		return "ExternalWorkflow"
+	case decisionTypeCancellation:
+		return "Cancellation"
 	case decisionTypeMarker:
 		return "Marker"
 	case decisionTypeTimer:
 		return "Timer"
+	case decisionTypeSignal:
+		return "Signal"
 	default:
 		return "Unknown"
 	}
@@ -250,11 +252,11 @@ func newMarkerDecisionStateMachine(id string, attributes *s.RecordMarkerDecision
 	}
 }
 
-func newCancelExternalWorkflowStateMachine(attributes *s.RequestCancelExternalWorkflowExecutionDecisionAttributes) *cancelExternalWorkflowDecisionStateMachine {
+func newCancelExternalWorkflowStateMachine(attributes *s.RequestCancelExternalWorkflowExecutionDecisionAttributes, cancellationID string) *cancelExternalWorkflowDecisionStateMachine {
 	d := createNewDecision(s.DecisionTypeRequestCancelExternalWorkflowExecution)
 	d.RequestCancelExternalWorkflowExecutionDecisionAttributes = attributes
 	return &cancelExternalWorkflowDecisionStateMachine{
-		naiveDecisionStateMachine: newNaiveDecisionStateMachine(decisionTypeExternalWorkflow, attributes.GetWorkflowId(), d),
+		naiveDecisionStateMachine: newNaiveDecisionStateMachine(decisionTypeCancellation, cancellationID, d),
 	}
 }
 
@@ -778,71 +780,49 @@ func (h *decisionsHelper) handleStartChildWorkflowExecutionFailed(workflowID str
 	return decision
 }
 
-func (h *decisionsHelper) requestCancelExternalWorkflowExecution(domain, workflowID, runID string) (bool, decisionStateMachine) {
-	decision, ok := h.decisions[makeDecisionID(decisionTypeChildWorkflow, workflowID)]
-	if ok {
-		// this is for child workflow
-		decision.(*childWorkflowDecisionStateMachine).runID = runID
-		decision.cancel()
-		return true, decision
-	}
-
-	// this is for external non-child workflow
+func (h *decisionsHelper) requestCancelExternalWorkflowExecution(domain, workflowID, runID string, cancellationID string, childWorkflowOnly bool) decisionStateMachine {
+	// this is for external workflow, can be child workflow if child workflow is continue as new (new run ID)
 	attributes := &s.RequestCancelExternalWorkflowExecutionDecisionAttributes{
-		Domain:     common.StringPtr(domain),
-		WorkflowId: common.StringPtr(workflowID),
-		RunId:      common.StringPtr(runID),
+		Domain:            common.StringPtr(domain),
+		WorkflowId:        common.StringPtr(workflowID),
+		RunId:             common.StringPtr(runID),
+		Control:           []byte(cancellationID),
+		ChildWorkflowOnly: common.BoolPtr(childWorkflowOnly),
 	}
-	decision = newCancelExternalWorkflowStateMachine(attributes)
+	decision := newCancelExternalWorkflowStateMachine(attributes, cancellationID)
 	h.addDecision(decision)
 
-	return false, decision
+	return decision
 }
 
-func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionInitiated(workflowID string) {
-	decision, ok := h.decisions[makeDecisionID(decisionTypeChildWorkflow, workflowID)]
-	if ok {
-		// for child workflow
-		decision.handleCancelInitiatedEvent()
-	} else {
-		// for non-child external workflow
-		decision = h.getDecision(makeDecisionID(decisionTypeExternalWorkflow, workflowID))
-		decision.handleInitiatedEvent()
-	}
+func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionInitiated(cancellationID string) {
+	decision := h.getDecision(makeDecisionID(decisionTypeCancellation, cancellationID))
+	decision.handleInitiatedEvent()
 }
 
-func (h *decisionsHelper) handleExternalWorkflowExecutionCancelRequested(workflowID string) {
-	decision, ok := h.decisions[makeDecisionID(decisionTypeChildWorkflow, workflowID)]
-	// no state change for child workflow, it is still in CancellationDecisionSent
-	if !ok {
-		// for non-child external workflow, this is the end of the decision state
-		decision = h.getDecision(makeDecisionID(decisionTypeExternalWorkflow, workflowID))
-		decision.handleCompletionEvent()
-	}
+func (h *decisionsHelper) handleExternalWorkflowExecutionCancelRequested(cancellationID string) decisionStateMachine {
+	decision := h.getDecision(makeDecisionID(decisionTypeCancellation, cancellationID))
+	decision.handleCompletionEvent()
+	return decision
 }
 
-func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionFailed(workflowID string) {
-	decision, ok := h.decisions[makeDecisionID(decisionTypeChildWorkflow, workflowID)]
-	if ok {
-		// for child workflow
-		decision.handleCancelFailedEvent()
-	} else {
-		// for non-child external workflow, this is the end of the decision state
-		decision = h.getDecision(makeDecisionID(decisionTypeExternalWorkflow, workflowID))
-		decision.handleCompletionEvent()
-	}
+func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionFailed(cancellationID string) decisionStateMachine {
+	decision := h.getDecision(makeDecisionID(decisionTypeCancellation, cancellationID))
+	decision.handleCompletionEvent()
+	return decision
 }
 
-func (h *decisionsHelper) signalExternalWorkflowExecution(domain, workflowID, runID, signalName string, input []byte, signalID string) decisionStateMachine {
+func (h *decisionsHelper) signalExternalWorkflowExecution(domain, workflowID, runID, signalName string, input []byte, signalID string, childWorkflowOnly bool) decisionStateMachine {
 	attributes := &s.SignalExternalWorkflowExecutionDecisionAttributes{
 		Domain: common.StringPtr(domain),
 		Execution: &s.WorkflowExecution{
 			WorkflowId: common.StringPtr(workflowID),
 			RunId:      common.StringPtr(runID),
 		},
-		SignalName: common.StringPtr(signalName),
-		Input:      input,
-		Control:    []byte(signalID),
+		SignalName:        common.StringPtr(signalName),
+		Input:             input,
+		Control:           []byte(signalID),
+		ChildWorkflowOnly: common.BoolPtr(childWorkflowOnly),
 	}
 	decision := newSignalExternalWorkflowStateMachine(attributes, signalID)
 	h.addDecision(decision)
@@ -899,8 +879,9 @@ func (h *decisionsHelper) handleCancelTimerFailed(timerID string) {
 	decision.handleCancelFailedEvent()
 }
 
-func (h *decisionsHelper) handleChildWorkflowExecutionStarted(workflowID string) decisionStateMachine {
+func (h *decisionsHelper) handleChildWorkflowExecutionStarted(workflowID, runID string) decisionStateMachine {
 	decision := h.getDecision(makeDecisionID(decisionTypeChildWorkflow, workflowID))
+	decision.(*childWorkflowDecisionStateMachine).runID = runID
 	decision.handleStartedEvent()
 	return decision
 }

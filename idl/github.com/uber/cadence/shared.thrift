@@ -296,6 +296,7 @@ struct RequestCancelExternalWorkflowExecutionDecisionAttributes {
   20: optional string workflowId
   30: optional string runId
   40: optional binary control
+  50: optional bool childWorkflowOnly
 }
 
 struct SignalExternalWorkflowExecutionDecisionAttributes {
@@ -304,6 +305,7 @@ struct SignalExternalWorkflowExecutionDecisionAttributes {
   30: optional string signalName
   40: optional binary input
   50: optional binary control
+  60: optional bool childWorkflowOnly
 }
 
 struct RecordMarkerDecisionAttributes {
@@ -535,6 +537,7 @@ struct RequestCancelExternalWorkflowExecutionInitiatedEventAttributes {
   20: optional string domain
   30: optional WorkflowExecution workflowExecution
   40: optional binary control
+  50: optional bool childWorkflowOnly
 }
 
 struct RequestCancelExternalWorkflowExecutionFailedEventAttributes {
@@ -550,6 +553,7 @@ struct ExternalWorkflowExecutionCancelRequestedEventAttributes {
   10: optional i64 (js.type = "Long") initiatedEventId
   20: optional string domain
   30: optional WorkflowExecution workflowExecution
+  40: optional binary control
 }
 
 struct SignalExternalWorkflowExecutionInitiatedEventAttributes {
@@ -559,6 +563,7 @@ struct SignalExternalWorkflowExecutionInitiatedEventAttributes {
   40: optional string signalName
   50: optional binary input
   60: optional binary control
+  70: optional bool childWorkflowOnly
 }
 
 struct SignalExternalWorkflowExecutionFailedEventAttributes {
@@ -734,12 +739,22 @@ struct UpdateDomainInfo {
   20: optional string ownerEmail
 }
 
+struct ClusterReplicationConfiguration {
+ 10: optional string clusterName
+}
+
+struct DomainReplicationConfiguration {
+ 10: optional string activeClusterName
+ 20: optional list<ClusterReplicationConfiguration> clusters
+}
+
 struct RegisterDomainRequest {
   10: optional string name
   20: optional string description
   30: optional string ownerEmail
   40: optional i32 workflowExecutionRetentionPeriodInDays
   50: optional bool emitMetric
+  60: optional list<ClusterReplicationConfiguration> clusters
 }
 
 struct DescribeDomainRequest {
@@ -749,17 +764,22 @@ struct DescribeDomainRequest {
 struct DescribeDomainResponse {
   10: optional DomainInfo domainInfo
   20: optional DomainConfiguration configuration
+  30: optional DomainReplicationConfiguration replicationConfiguration
+  40: optional i64 (js.type = "Long") failoverVersion
 }
 
 struct UpdateDomainRequest {
  10: optional string name
  20: optional UpdateDomainInfo updatedInfo
  30: optional DomainConfiguration configuration
+ 40: optional DomainReplicationConfiguration replicationConfiguration
 }
 
 struct UpdateDomainResponse {
   10: optional DomainInfo domainInfo
   20: optional DomainConfiguration configuration
+  30: optional DomainReplicationConfiguration replicationConfiguration
+  40: optional i64 (js.type = "Long") failoverVersion
 }
 
 struct DeprecateDomainRequest {
@@ -904,6 +924,7 @@ struct RequestCancelWorkflowExecutionRequest {
   20: optional WorkflowExecution workflowExecution
   30: optional string identity
   40: optional string requestId
+  50: optional binary control
 }
 
 struct GetWorkflowExecutionHistoryRequest {

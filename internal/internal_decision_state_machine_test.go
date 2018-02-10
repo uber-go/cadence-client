@@ -23,6 +23,8 @@ package internal
 import (
 	"testing"
 
+	"github.com/pborman/uuid"
+
 	"github.com/stretchr/testify/require"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
@@ -267,6 +269,7 @@ func Test_ActivityStateMachine_PanicInvalidStateTransition(t *testing.T) {
 
 func Test_ChildWorkflowStateMachine_Basic(t *testing.T) {
 	workflowID := "test-child-workflow-1"
+	runID := uuid.New()
 	attributes := &s.StartChildWorkflowExecutionDecisionAttributes{
 		WorkflowId: common.StringPtr(workflowID),
 	}
@@ -288,7 +291,7 @@ func Test_ChildWorkflowStateMachine_Basic(t *testing.T) {
 	require.Equal(t, 0, len(h.getDecisions(true)))
 
 	// child workflow started
-	h.handleChildWorkflowExecutionStarted(workflowID)
+	h.handleChildWorkflowExecutionStarted(workflowID, runID)
 	require.Equal(t, decisionStateStarted, d.getState())
 	require.Equal(t, 0, len(h.getDecisions(true)))
 
@@ -312,7 +315,7 @@ func Test_ChildWorkflowStateMachine_CancelSucced(t *testing.T) {
 	// child workflow initiated
 	h.handleStartChildWorkflowExecutionInitiated(workflowID)
 	// child workflow started
-	h.handleChildWorkflowExecutionStarted(workflowID)
+	h.handleChildWorkflowExecutionStarted(workflowID, runID)
 
 	// cancel child workflow
 	h.requestCancelExternalWorkflowExecution(domain, workflowID, runID)
@@ -369,7 +372,7 @@ func Test_ChildWorkflowStateMachine_InvalidStates(t *testing.T) {
 	h.handleStartChildWorkflowExecutionInitiated(workflowID)
 	require.Equal(t, decisionStateInitiated, d.getState())
 
-	h.handleChildWorkflowExecutionStarted(workflowID)
+	h.handleChildWorkflowExecutionStarted(workflowID, runID)
 	require.Equal(t, decisionStateStarted, d.getState())
 
 	// invalid: cancel child workflow failed before cancel request
@@ -429,7 +432,7 @@ func Test_ChildWorkflowStateMachine_CancelFailed(t *testing.T) {
 	// child workflow initiated
 	h.handleStartChildWorkflowExecutionInitiated(workflowID)
 	// child workflow started
-	h.handleChildWorkflowExecutionStarted(workflowID)
+	h.handleChildWorkflowExecutionStarted(workflowID, runID)
 	// cancel child workflow
 	h.requestCancelExternalWorkflowExecution(domain, workflowID, runID)
 	// send cancel request

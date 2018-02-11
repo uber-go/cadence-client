@@ -43,6 +43,7 @@ import (
 )
 
 const (
+	defaultTestDomain     = "default-test-domain"
 	defaultTestTaskList   = "default-test-tasklist"
 	defaultTestWorkflowID = "default-test-workflow-id"
 	defaultTestRunID      = "default-test-run-id"
@@ -184,6 +185,7 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 		},
 
 		workflowInfo: &WorkflowInfo{
+			Domain: defaultTestDomain,
 			WorkflowExecution: WorkflowExecution{
 				ID:    defaultTestWorkflowID,
 				RunID: defaultTestRunID,
@@ -1196,7 +1198,6 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName
 	if env.workflowInfo.WorkflowExecution.ID == workflowID {
 		// cancel current workflow
 		env.workflowCancelHandler()
-		callback(nil, nil)
 
 		// check if current workflow is a child workflow
 		if env.isChildWorkflow() && env.onChildWorkflowCanceledListener != nil {
@@ -1208,10 +1209,11 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName
 		// current workflow is a parent workflow, and we are canceling a child workflow
 		childHandle.handled = true
 		childEnv := childHandle.env
-		childEnv.cancelWorkflow(callback)
+		childEnv.cancelWorkflow()
+		callback(nil, nil)
 	}
 
-	// TODO add test for cancel external workflow
+	// TODO add test for cancel external workflow, #388
 }
 
 func (env *testWorkflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID, runID, signalName string, input []byte, arg interface{}, childWorkflowOnly bool, callback resultHandler) {
@@ -1296,16 +1298,9 @@ func (env *testWorkflowEnvironmentImpl) getActivityInfo(activityID, activityType
 	}
 }
 
-func (env *testWorkflowEnvironmentImpl) cancelWorkflow(callback resultHandler) {
+func (env *testWorkflowEnvironmentImpl) cancelWorkflow() {
 	env.postCallback(func() {
-		// RequestCancelWorkflow needs to be run in main thread
-		env.RequestCancelExternalWorkflow(
-			env.workflowInfo.Domain,
-			env.workflowInfo.WorkflowExecution.ID,
-			env.workflowInfo.WorkflowExecution.RunID,
-			false, // meaning we are not limited to child workflow
-			callback,
-		)
+		env.workflowCancelHandler()
 	}, true)
 }
 

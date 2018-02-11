@@ -240,7 +240,6 @@ func (wc *workflowEnvironmentImpl) Complete(result []byte, err error) {
 }
 
 func (wc *workflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName, workflowID, runID string, childWorkflowOnly bool, callback resultHandler) {
-	// TODO use workflow ID?
 	// previously we were using workflow ID as identifier for decision state machine, this will have dedup issue
 	// i.e. workflow 1 cancel workflow 2 + run 1 && workflow 2 run 2
 	cancellationID := wc.GenerateSequenceID()
@@ -1031,7 +1030,8 @@ func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecut
 }
 
 // getCancellationID, helper function determine the ID used for workflow cancellation
-// this function exists for backward compatibility
+// this function exists for backward compatibility, i.e. prev generation of client use workflow ID as identifier,
+// and there is no control (being empty / missing), so we have to use the workflow ID
 func getCancellationID(control []byte, workflowID string) string {
 	if len(control) == 0 {
 		return workflowID

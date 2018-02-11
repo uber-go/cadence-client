@@ -420,10 +420,7 @@ func (t *TestWorkflowEnvironment) CompleteActivity(taskToken []byte, result inte
 
 // CancelWorkflow requests cancellation (through workflow Context) to the currently running test workflow.
 func (t *TestWorkflowEnvironment) CancelWorkflow() {
-	// since cancel current workflow and we do not care about the result, set the callback to a dummy one
-	// Note: cancellation request will always be success for it self in local test env
-	callback := func(result []byte, err error) {}
-	t.impl.cancelWorkflow(callback)
+	t.impl.cancelWorkflow()
 }
 
 // SignalWorkflow sends signal to the currently running test workflow.

@@ -17174,6 +17174,7 @@ type RequestCancelExternalWorkflowExecutionInitiatedEventAttributes struct {
 	Domain                       *string            `json:"domain,omitempty"`
 	WorkflowExecution            *WorkflowExecution `json:"workflowExecution,omitempty"`
 	Control                      []byte             `json:"control,omitempty"`
+	ChildWorkflowOnly            *bool              `json:"childWorkflowOnly,omitempty"`
 }
 
 // ToWire translates a RequestCancelExternalWorkflowExecutionInitiatedEventAttributes struct into a Thrift-level intermediate
@@ -17193,7 +17194,7 @@ type RequestCancelExternalWorkflowExecutionInitiatedEventAttributes struct {
 //   }
 func (v *RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) ToWire() (wire.Value, error) {
 	var (
-		fields [4]wire.Field
+		fields [5]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -17229,6 +17230,14 @@ func (v *RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) ToWire(
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.ChildWorkflowOnly != nil {
+		w, err = wire.NewValueBool(*(v.ChildWorkflowOnly)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
 
@@ -17293,6 +17302,16 @@ func (v *RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) FromWir
 				}
 
 			}
+		case 50:
+			if field.Value.Type() == wire.TBool {
+				var x bool
+				x, err = field.Value.GetBool(), error(nil)
+				v.ChildWorkflowOnly = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -17306,7 +17325,7 @@ func (v *RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) String(
 		return "<nil>"
 	}
 
-	var fields [4]string
+	var fields [5]string
 	i := 0
 	if v.DecisionTaskCompletedEventId != nil {
 		fields[i] = fmt.Sprintf("DecisionTaskCompletedEventId: %v", *(v.DecisionTaskCompletedEventId))
@@ -17322,6 +17341,10 @@ func (v *RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) String(
 	}
 	if v.Control != nil {
 		fields[i] = fmt.Sprintf("Control: %v", v.Control)
+		i++
+	}
+	if v.ChildWorkflowOnly != nil {
+		fields[i] = fmt.Sprintf("ChildWorkflowOnly: %v", *(v.ChildWorkflowOnly))
 		i++
 	}
 
@@ -17345,6 +17368,9 @@ func (v *RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) Equals(
 	if !((v.Control == nil && rhs.Control == nil) || (v.Control != nil && rhs.Control != nil && bytes.Equal(v.Control, rhs.Control))) {
 		return false
 	}
+	if !_Bool_EqualsPtr(v.ChildWorkflowOnly, rhs.ChildWorkflowOnly) {
+		return false
+	}
 
 	return true
 }
@@ -17364,6 +17390,16 @@ func (v *RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) GetDeci
 func (v *RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) GetDomain() (o string) {
 	if v.Domain != nil {
 		return *v.Domain
+	}
+
+	return
+}
+
+// GetChildWorkflowOnly returns the value of ChildWorkflowOnly if it is set or its
+// zero value if it is unset.
+func (v *RequestCancelExternalWorkflowExecutionInitiatedEventAttributes) GetChildWorkflowOnly() (o bool) {
+	if v.ChildWorkflowOnly != nil {
+		return *v.ChildWorkflowOnly
 	}
 
 	return
@@ -20882,6 +20918,7 @@ type SignalExternalWorkflowExecutionInitiatedEventAttributes struct {
 	SignalName                   *string            `json:"signalName,omitempty"`
 	Input                        []byte             `json:"input,omitempty"`
 	Control                      []byte             `json:"control,omitempty"`
+	ChildWorkflowOnly            *bool              `json:"childWorkflowOnly,omitempty"`
 }
 
 // ToWire translates a SignalExternalWorkflowExecutionInitiatedEventAttributes struct into a Thrift-level intermediate
@@ -20901,7 +20938,7 @@ type SignalExternalWorkflowExecutionInitiatedEventAttributes struct {
 //   }
 func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) ToWire() (wire.Value, error) {
 	var (
-		fields [6]wire.Field
+		fields [7]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -20953,6 +20990,14 @@ func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) ToWire() (wire
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 60, Value: w}
+		i++
+	}
+	if v.ChildWorkflowOnly != nil {
+		w, err = wire.NewValueBool(*(v.ChildWorkflowOnly)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 70, Value: w}
 		i++
 	}
 
@@ -21035,6 +21080,16 @@ func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) FromWire(w wir
 				}
 
 			}
+		case 70:
+			if field.Value.Type() == wire.TBool {
+				var x bool
+				x, err = field.Value.GetBool(), error(nil)
+				v.ChildWorkflowOnly = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -21048,7 +21103,7 @@ func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) String() strin
 		return "<nil>"
 	}
 
-	var fields [6]string
+	var fields [7]string
 	i := 0
 	if v.DecisionTaskCompletedEventId != nil {
 		fields[i] = fmt.Sprintf("DecisionTaskCompletedEventId: %v", *(v.DecisionTaskCompletedEventId))
@@ -21072,6 +21127,10 @@ func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) String() strin
 	}
 	if v.Control != nil {
 		fields[i] = fmt.Sprintf("Control: %v", v.Control)
+		i++
+	}
+	if v.ChildWorkflowOnly != nil {
+		fields[i] = fmt.Sprintf("ChildWorkflowOnly: %v", *(v.ChildWorkflowOnly))
 		i++
 	}
 
@@ -21099,6 +21158,9 @@ func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) Equals(rhs *Si
 		return false
 	}
 	if !((v.Control == nil && rhs.Control == nil) || (v.Control != nil && rhs.Control != nil && bytes.Equal(v.Control, rhs.Control))) {
+		return false
+	}
+	if !_Bool_EqualsPtr(v.ChildWorkflowOnly, rhs.ChildWorkflowOnly) {
 		return false
 	}
 
@@ -21130,6 +21192,16 @@ func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) GetDomain() (o
 func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) GetSignalName() (o string) {
 	if v.SignalName != nil {
 		return *v.SignalName
+	}
+
+	return
+}
+
+// GetChildWorkflowOnly returns the value of ChildWorkflowOnly if it is set or its
+// zero value if it is unset.
+func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) GetChildWorkflowOnly() (o bool) {
+	if v.ChildWorkflowOnly != nil {
+		return *v.ChildWorkflowOnly
 	}
 
 	return

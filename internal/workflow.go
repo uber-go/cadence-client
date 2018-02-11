@@ -119,6 +119,9 @@ type (
 
 		// SignalChildWorkflow sends a signal to the child workflow. This call will block until child workflow is started.
 		SignalChildWorkflow(ctx Context, signalName string, data interface{}) Future
+
+		// RequestCancelChildWorkflow send request to cancel the child workflow. This call will block until child workflow is started.
+		RequestCancelChildWorkflow(ctx Context) Future
 	}
 
 	// WorkflowType identifies a workflow type.
@@ -431,9 +434,10 @@ func ExecuteLocalActivity(ctx Context, activity interface{}, args ...interface{}
 func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interface{}) ChildWorkflowFuture {
 	mainFuture, mainSettable := newDecodeFuture(ctx, childWorkflow)
 	executionFuture, executionSettable := NewFuture(ctx)
-	result := childWorkflowFutureImpl{
+	result := &childWorkflowFutureImpl{
 		decodeFutureImpl: mainFuture.(*decodeFutureImpl),
-		executionFuture:  executionFuture.(*futureImpl)}
+		executionFuture:  executionFuture.(*futureImpl),
+	}
 	wfType, input, err := getValidatedWorkflowFunction(childWorkflow, args)
 	if err != nil {
 		mainSettable.Set(nil, err)
@@ -461,13 +465,7 @@ func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interf
 			NewSelector(ctx).AddReceive(ctxDone, func(c Channel, more bool) {
 				if ctx.Err() == ErrCanceled && childWorkflowExecution != nil && !mainFuture.IsReady() {
 					// child workflow started, and ctx cancelled
-					getWorkflowEnvironment(ctx).RequestCancelExternalWorkflow(
-						*options.domain,
-						childWorkflowExecution.ID,
-						"",   // use empty run ID to indicate the current running one
-						true, // this means we only want to cancel the child workflow, in case of racing condition
-						func(result []byte, err error) {},
-					)
+					result.RequestCancelChildWorkflow(ctx)
 				}
 			}).AddFuture(mainFuture, func(f Future) {
 				// childWorkflow is done, no-op
@@ -565,6 +563,11 @@ func Sleep(ctx Context, d time.Duration) (err error) {
 //	ctx := WithWorkflowDomain(ctx, "domain-name")
 // RequestCancelExternalWorkflow return Future with failure or empty success result.
 func RequestCancelExternalWorkflow(ctx Context, workflowID, runID string) Future {
+	childWorkflowOnly := false // this means we are not limited to child workflow
+	return requestCancelExternalWorkflow(ctx, workflowID, runID, childWorkflowOnly)
+}
+
+func requestCancelExternalWorkflow(ctx Context, workflowID, runID string, childWorkflowOnly bool) Future {
 	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
 	options := getWorkflowEnvOptions(ctx1)
 	future, settable := NewFuture(ctx1)

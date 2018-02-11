@@ -80,7 +80,6 @@ type (
 	childWorkflowDecisionStateMachine struct {
 		*decisionStateMachineBase
 		attributes *s.StartChildWorkflowExecutionDecisionAttributes
-		runID      string
 	}
 
 	naiveDecisionStateMachine struct {
@@ -474,25 +473,8 @@ func (d *childWorkflowDecisionStateMachine) getDecision() *s.Decision {
 		decision := createNewDecision(s.DecisionTypeStartChildWorkflowExecution)
 		decision.StartChildWorkflowExecutionDecisionAttributes = d.attributes
 		return decision
-	case decisionStateCanceledAfterStarted:
-		decision := createNewDecision(s.DecisionTypeRequestCancelExternalWorkflowExecution)
-		decision.RequestCancelExternalWorkflowExecutionDecisionAttributes = &s.RequestCancelExternalWorkflowExecutionDecisionAttributes{
-			Domain:     d.attributes.Domain,
-			WorkflowId: d.attributes.WorkflowId,
-			RunId:      common.StringPtr(d.runID),
-		}
-		return decision
 	default:
 		return nil
-	}
-}
-
-func (d *childWorkflowDecisionStateMachine) handleDecisionSent() {
-	switch d.state {
-	case decisionStateCanceledAfterStarted:
-		d.moveState(decisionStateCancellationDecisionSent, eventDecisionSent)
-	default:
-		d.decisionStateMachineBase.handleDecisionSent()
 	}
 }
 
@@ -500,29 +482,15 @@ func (d *childWorkflowDecisionStateMachine) handleStartedEvent() {
 	switch d.state {
 	case decisionStateInitiated:
 		d.moveState(decisionStateStarted, eventStarted)
-	case decisionStateCanceledAfterInitiated:
-		d.moveState(decisionStateCanceledAfterStarted, eventStarted)
 	default:
 		d.decisionStateMachineBase.handleStartedEvent()
 	}
 }
 
-func (d *childWorkflowDecisionStateMachine) handleCancelFailedEvent() {
-	switch d.state {
-	case decisionStateCancellationDecisionSent:
-		d.moveState(decisionStateStarted, eventCancelFailed)
-	default:
-		d.decisionStateMachineBase.handleCancelFailedEvent()
-	}
-}
-
 func (d *childWorkflowDecisionStateMachine) cancel() {
-	switch d.state {
-	case decisionStateStarted:
-		d.moveState(decisionStateCanceledAfterStarted, eventCancel)
-	default:
-		d.decisionStateMachineBase.cancel()
-	}
+	// the child workflow state machine should be alterd when trying to
+	// cancel child workflow, should use requestCancelExternalWorkflow instead
+	panic("unsupported operation")
 }
 
 func (d *childWorkflowDecisionStateMachine) handleCanceledEvent() {
@@ -536,7 +504,7 @@ func (d *childWorkflowDecisionStateMachine) handleCanceledEvent() {
 
 func (d *childWorkflowDecisionStateMachine) handleCompletionEvent() {
 	switch d.state {
-	case decisionStateStarted, decisionStateCanceledAfterStarted:
+	case decisionStateStarted:
 		d.moveState(decisionStateCompleted, eventCompletion)
 	default:
 		d.decisionStateMachineBase.handleCompletionEvent()
@@ -879,9 +847,8 @@ func (h *decisionsHelper) handleCancelTimerFailed(timerID string) {
 	decision.handleCancelFailedEvent()
 }
 
-func (h *decisionsHelper) handleChildWorkflowExecutionStarted(workflowID, runID string) decisionStateMachine {
+func (h *decisionsHelper) handleChildWorkflowExecutionStarted(workflowID string) decisionStateMachine {
 	decision := h.getDecision(makeDecisionID(decisionTypeChildWorkflow, workflowID))
-	decision.(*childWorkflowDecisionStateMachine).runID = runID
 	decision.handleStartedEvent()
 	return decision
 }

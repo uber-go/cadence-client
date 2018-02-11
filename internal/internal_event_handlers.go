@@ -890,7 +890,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionStarte
 	attributes := event.ChildWorkflowExecutionStartedEventAttributes
 	childWorkflowID := attributes.WorkflowExecution.GetWorkflowId()
 	childRunID := attributes.WorkflowExecution.GetRunId()
-	decision := weh.decisionsHelper.handleChildWorkflowExecutionStarted(childWorkflowID, childRunID)
+	decision := weh.decisionsHelper.handleChildWorkflowExecutionStarted(childWorkflowID)
 	childWorkflow := decision.getData().(*scheduledChildWorkflow)
 	if childWorkflow.handled {
 		return nil

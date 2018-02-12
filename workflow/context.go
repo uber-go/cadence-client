@@ -62,3 +62,8 @@ func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 func WithValue(parent Context, key interface{}, val interface{}) Context {
 	return internal.WithValue(parent, key, val)
 }
+
+// NewDisconnectedContext returns a new context that won't propagate parent's cancellation to the new child context.
+func NewDisconnectedContext(parent Context) (ctx Context, cancel CancelFunc) {
+	return internal.NewDisconnectedContext(parent)
+}

@@ -185,6 +185,12 @@ func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 	return c, func() { c.cancel(true, ErrCanceled) }
 }
 
+// NewDisconnectedContext returns a new context that won't propagate parent's cancellation to the new child context.
+func NewDisconnectedContext(parent Context) (ctx Context, cancel CancelFunc) {
+	c := newCancelCtx(parent)
+	return c, func() { c.cancel(true, ErrCanceled) }
+}
+
 // newCancelCtx returns an initialized cancelCtx.
 func newCancelCtx(parent Context) *cancelCtx {
 	return &cancelCtx{

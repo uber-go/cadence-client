@@ -1198,7 +1198,6 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName
 	if env.workflowInfo.WorkflowExecution.ID == workflowID {
 		// cancel current workflow
 		env.workflowCancelHandler()
-		env.Complete(nil, ErrCanceled)
 		// check if current workflow is a child workflow
 		if env.isChildWorkflow() && env.onChildWorkflowCanceledListener != nil {
 			env.postCallback(func() {

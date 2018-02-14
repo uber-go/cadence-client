@@ -1368,13 +1368,14 @@ func (s *WorkflowTestSuiteUnitTest) Test_SignalExternalWorkflow() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_CancelChildWorkflow() {
 	childWorkflowFn := func(ctx Context) error {
+		var err error
 		selector := NewSelector(ctx)
 		timer := NewTimer(ctx, 10*time.Second)
 		selector.AddFuture(timer, func(f Future) {
-			// no op, err will be nil
+			err = f.Get(ctx, nil)
 		}).Select(ctx)
 
-		return nil
+		return err
 	}
 
 	workflowFn := func(ctx Context) error {
@@ -1392,8 +1393,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_CancelChildWorkflow() {
 			return err
 		}
 
-		if err := childFuture.Get(childCtx, nil); err != ErrCanceled {
-			return fmt.Errorf("Cancel child workflow should receive ErrCanceled, instead got: %v", err)
+		err := childFuture.Get(childCtx, nil)
+		if err, ok := err.(*CanceledError); !ok {
+			return fmt.Errorf("Cancel child workflow should receive CanceledError, instead got: %v", err)
 		}
 		return nil
 	}

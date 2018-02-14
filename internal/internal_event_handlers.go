@@ -69,6 +69,11 @@ type (
 		handled             bool
 	}
 
+	scheduledCancellation struct {
+		callback resultHandler
+		handled  bool
+	}
+
 	scheduledSignal struct {
 		callback resultHandler
 		handled  bool
@@ -211,6 +216,14 @@ func (t *localActivityTask) cancel() {
 	t.Unlock()
 }
 
+func (s *scheduledCancellation) handle(result []byte, err error) {
+	if s.handled {
+		panic(fmt.Sprintf("cancellation already handled %v", s))
+	}
+	s.handled = true
+	s.callback(result, err)
+}
+
 func (s *scheduledSignal) handle(result []byte, err error) {
 	if s.handled {
 		panic(fmt.Sprintf("signal already handled %v", s))
@@ -227,27 +240,25 @@ func (wc *workflowEnvironmentImpl) Complete(result []byte, err error) {
 	wc.completeHandler(result, err)
 }
 
-func (wc *workflowEnvironmentImpl) RequestCancelWorkflow(domainName, workflowID, runID string) error {
-	if domainName == "" {
-		return errors.New("need a valid domain, provided empty")
-	}
-	if workflowID == "" {
-		return errors.New("need a valid workflow ID, provided empty")
-	}
+func (wc *workflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName, workflowID, runID string, callback resultHandler) {
 
 	isChild, decision := wc.decisionsHelper.requestCancelExternalWorkflowExecution(domainName, workflowID, runID)
 	if isChild {
 		// this is for child workflow
 		childWorkflow := decision.getData().(*scheduledChildWorkflow)
 		if childWorkflow.handled {
-			return nil
-		}
-		if childWorkflow.workflowExecution != nil && (decision.isDone() || !childWorkflow.waitForCancellation) {
+			// already have the result of child workflow execution, so the cancellation request is a success (bypass)
+			callback(nil, nil)
+		} else if childWorkflow.workflowExecution != nil && (decision.isDone() || !childWorkflow.waitForCancellation) {
+			// child workflow execution is cancelled, so the cancellation request is a success (bypass)
 			childWorkflow.handle(nil, ErrCanceled)
+			callback(nil, nil)
 		}
+	} else {
+		decision.setData(&scheduledCancellation{callback: callback})
 	}
 
-	return nil
+	return
 }
 
 func (wc *workflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID, runID, signalName string,
@@ -601,12 +612,10 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 			event.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes.WorkflowExecution.GetWorkflowId())
 
 	case m.EventTypeRequestCancelExternalWorkflowExecutionFailed:
-		weh.decisionsHelper.handleRequestCancelExternalWorkflowExecutionFailed(
-			event.RequestCancelExternalWorkflowExecutionFailedEventAttributes.WorkflowExecution.GetWorkflowId())
+		weh.handleRequestCancelExternalWorkflowExecutionFailed(event)
 
 	case m.EventTypeExternalWorkflowExecutionCancelRequested:
-		weh.decisionsHelper.handleExternalWorkflowExecutionCancelRequested(
-			event.ExternalWorkflowExecutionCancelRequestedEventAttributes.WorkflowExecution.GetWorkflowId())
+		weh.handleExternalWorkflowExecutionCancelRequested(event)
 
 	case m.EventTypeWorkflowExecutionContinuedAsNew:
 		// No Operation.
@@ -974,6 +983,37 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTermin
 	}
 	err := newTerminatedError()
 	childWorkflow.handle(nil, err)
+
+	return nil
+}
+
+func (weh *workflowExecutionEventHandlerImpl) handleExternalWorkflowExecutionCancelRequested(event *m.HistoryEvent) error {
+	attributes := event.ExternalWorkflowExecutionCancelRequestedEventAttributes
+	workflowID := attributes.WorkflowExecution.GetWorkflowId()
+	isChild, decision := weh.decisionsHelper.handleExternalWorkflowExecutionCancelRequested(workflowID)
+	if !isChild {
+		cancellation := decision.getData().(*scheduledCancellation)
+		if cancellation.handled {
+			return nil
+		}
+		cancellation.handle(nil, nil)
+	}
+
+	return nil
+}
+
+func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflowExecutionFailed(event *m.HistoryEvent) error {
+	attributes := event.RequestCancelExternalWorkflowExecutionFailedEventAttributes
+	workflowID := attributes.WorkflowExecution.GetWorkflowId()
+	isChild, decision := weh.decisionsHelper.handleRequestCancelExternalWorkflowExecutionFailed(workflowID)
+	if !isChild {
+		cancellation := decision.getData().(*scheduledCancellation)
+		if cancellation.handled {
+			return nil
+		}
+		err := fmt.Errorf("cancel external workflow failed, %v", attributes.GetCause())
+		cancellation.handle(nil, err)
+	}
 
 	return nil
 }

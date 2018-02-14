@@ -1263,7 +1263,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_SignalChildWorkflow() {
 	}
 
 	workflowFn := func(ctx Context) error {
-		cwo := ChildWorkflowOptions{ExecutionStartToCloseTimeout: time.Minute}
+		cwo := ChildWorkflowOptions{
+			ExecutionStartToCloseTimeout: time.Minute,
+			Domain: "test-domain",
+		}
 		ctx = WithChildWorkflowOptions(ctx, cwo)
 		childFuture := ExecuteChildWorkflow(ctx, childWorkflowFn, GetWorkflowInfo(ctx).WorkflowExecution)
 

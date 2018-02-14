@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"fmt"
+
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
@@ -60,7 +61,7 @@ type (
 		WorkflowInfo() *WorkflowInfo
 		Complete(result []byte, err error)
 		RegisterCancelHandler(handler func())
-		RequestCancelWorkflow(domainName, workflowID, runID string) error
+		RequestCancelExternalWorkflow(domainName, workflowID, runID string, callback resultHandler)
 		ExecuteChildWorkflow(options workflowOptions, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error
 		GetLogger() *zap.Logger
 		GetMetricsScope() tally.Scope

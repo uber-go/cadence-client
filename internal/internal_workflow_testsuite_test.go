@@ -1365,3 +1365,86 @@ func (s *WorkflowTestSuiteUnitTest) Test_SignalExternalWorkflow() {
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 }
+
+func (s *WorkflowTestSuiteUnitTest) Test_CancelChildWorkflow() {
+	childWorkflowFn := func(ctx Context) error {
+		var err error
+		selector := NewSelector(ctx)
+		timer := NewTimer(ctx, 10*time.Second)
+		selector.AddReceive(ctx.Done(), func(c Channel, more bool) {
+			err = ctx.Err()
+		}).AddFuture(timer, func(f Future) {
+			// no op, err will be nil
+		}).Select(ctx)
+
+		return err
+	}
+
+	workflowFn := func(ctx Context) error {
+
+		cwo := ChildWorkflowOptions{
+			Domain: "test-domain",
+			ExecutionStartToCloseTimeout: time.Minute,
+		}
+
+		childCtx := WithChildWorkflowOptions(ctx, cwo)
+		childFuture := ExecuteChildWorkflow(childCtx, childWorkflowFn)
+
+		cancellationFuture := childFuture.RequestCancelChildWorkflow(childCtx)
+		if err := cancellationFuture.Get(childCtx, nil); err != nil {
+			return err
+		}
+
+		if err := childFuture.Get(childCtx, nil); err != ErrCanceled {
+			return fmt.Errorf("Cancel child workflow should receive ErrCanceled, instead got: %v", err)
+		}
+		return nil
+	}
+
+	RegisterWorkflow(childWorkflowFn)
+	RegisterWorkflow(workflowFn)
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_CancelExternalWorkflow() {
+	workflowFn := func(ctx Context) error {
+		// set domain to be more specific
+		ctx = WithWorkflowDomain(ctx, "test-domain")
+		f1 := RequestCancelExternalWorkflow(ctx, "test-workflow-id1", "test-runid1")
+		f2 := RequestCancelExternalWorkflow(ctx, "test-workflow-id2", "test-runid2")
+
+		// cancellation 1 succeed
+		err1 := f1.Get(ctx, nil)
+		if err1 != nil {
+			return err1
+		}
+
+		// cancellation 2 failed
+		err2 := f2.Get(ctx, nil)
+		if err2 == nil {
+			return errors.New("cancellation 2 should fail")
+		}
+
+		return nil
+	}
+
+	RegisterWorkflow(workflowFn)
+	env := s.NewTestWorkflowEnvironment()
+
+	// cancellation 1 should succeed
+	env.OnRequestCancelExternalWorkflow("test-domain", "test-workflow-id1", "test-runid1").Return(nil).Once()
+
+	// cancellation 2 should fail
+	env.OnRequestCancelExternalWorkflow("test-domain", "test-workflow-id2", "test-runid2").Return(
+		func(domainName, workflowID, runID string) error {
+			return errors.New("unknown external workflow")
+		}).Once()
+
+	env.ExecuteWorkflow(workflowFn)
+	env.AssertExpectations(s.T())
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+}

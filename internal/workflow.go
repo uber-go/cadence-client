@@ -590,7 +590,7 @@ func requestCancelExternalWorkflow(ctx Context, workflowID, runID string, childW
 		*options.domain,
 		workflowID,
 		runID,
-		false, // this means we are not limited to child workflow
+		childWorkflowOnly,
 		resultCallback,
 	)
 

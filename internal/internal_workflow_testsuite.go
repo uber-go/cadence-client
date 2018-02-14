@@ -1205,15 +1205,48 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName
 				env.onChildWorkflowCanceledListener(env.workflowInfo)
 			}, false)
 		}
+		return
 	} else if childHandle, ok := env.runningWorkflows[workflowID]; ok && !childHandle.handled {
 		// current workflow is a parent workflow, and we are canceling a child workflow
-		childHandle.handled = true
 		childEnv := childHandle.env
-		childEnv.cancelWorkflow()
-		callback(nil, nil)
+		env.postCallback(func() {
+			callback(nil, nil)
+		}, true)
+		childEnv.cancelWorkflow(callback)
+		return
 	}
 
-	// TODO add test for cancel external workflow, #388
+	// here we are cancelling a child workflow but we cannot find it
+	if childWorkflowOnly {
+		env.postCallback(func() {
+			// currently the only cause
+			err := fmt.Errorf("request cancel external workflow failed, %v", shared.CancelExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution)
+			callback(nil, err)
+		}, true)
+		return
+	}
+
+	// target workflow is not child workflow, we need the mock. The mock needs to be called in a separate goroutinue
+	// so it can block and wait on the requested delay time (if configured). If we run it in main thread, and the mock
+	// configured to delay, it will block the main loop which stops the world.
+	env.runningCount++
+	go func() {
+		args := []interface{}{domainName, workflowID, runID}
+		// below call will panic if mock is not properly setup.
+		mockRet := env.mock.MethodCalled(mockMethodForRequestCancelExternalWorkflow, args...)
+		m := &mockWrapper{name: mockMethodForRequestCancelExternalWorkflow, fn: mockFnRequestCancelExternalWorkflow}
+		var err error
+		if mockFn := m.getMockFn(mockRet); mockFn != nil {
+			executor := &activityExecutor{name: mockMethodForRequestCancelExternalWorkflow, fn: mockFn}
+			_, err = executor.ExecuteWithActualArgs(nil, args)
+		} else {
+			_, err = m.getMockValue(mockRet)
+		}
+		env.postCallback(func() {
+			callback(nil, err)
+			env.runningCount--
+		}, true)
+	}()
 }
 
 func (env *testWorkflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID, runID, signalName string, input []byte, arg interface{}, childWorkflowOnly bool, callback resultHandler) {
@@ -1229,6 +1262,16 @@ func (env *testWorkflowEnvironmentImpl) SignalExternalWorkflow(domainName, workf
 			childEnv.signalHandler(signalName, input)
 			callback(nil, nil)
 		}
+		return
+	}
+
+	// here we are cancelling a child workflow but we cannot find it
+	if childWorkflowOnly {
+		env.postCallback(func() {
+			// currently the only cause
+			err := fmt.Errorf("signal external workflow failed, %v", shared.SignalExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution)
+			callback(nil, err)
+		}, true)
 		return
 	}
 
@@ -1298,9 +1341,23 @@ func (env *testWorkflowEnvironmentImpl) getActivityInfo(activityID, activityType
 	}
 }
 
-func (env *testWorkflowEnvironmentImpl) cancelWorkflow() {
+func (env *testWorkflowEnvironmentImpl) cancelWorkflow(callback resultHandler) {
+	// this function will be invoked in by 2 things
+	// 1. current workflow cancel itself
+	// 2. parent workflow cancel its child
+	// case 1, childWorkflowOnly being true / false does not matter
+	// case 2, the cancellation sent by parent will check whether the target is child or not in the first place
+	// and invoke this function, so childWorkflowOnly being true / false also does not matter
+	childWorkflowOnly := false
 	env.postCallback(func() {
-		env.workflowCancelHandler()
+		// RequestCancelWorkflow needs to be run in main thread
+		env.RequestCancelExternalWorkflow(
+			env.workflowInfo.Domain,
+			env.workflowInfo.WorkflowExecution.ID,
+			env.workflowInfo.WorkflowExecution.RunID,
+			childWorkflowOnly,
+			callback,
+		)
 	}, true)
 }
 
@@ -1338,6 +1395,11 @@ func (env *testWorkflowEnvironmentImpl) getMockRunFn(callWrapper *MockCallWrappe
 
 // function signature for mock SignalExternalWorkflow
 func mockFnSignalExternalWorkflow(domainName, workflowID, runID, signalName string, arg interface{}) error {
+	return nil
+}
+
+// function signature for mock RequestCancelExternalWorkflow
+func mockFnRequestCancelExternalWorkflow(domainName, workflowID, runID string) error {
 	return nil
 }
 

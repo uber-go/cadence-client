@@ -1368,16 +1368,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_SignalExternalWorkflow() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_CancelChildWorkflow() {
 	childWorkflowFn := func(ctx Context) error {
-		var err error
 		selector := NewSelector(ctx)
 		timer := NewTimer(ctx, 10*time.Second)
-		selector.AddReceive(ctx.Done(), func(c Channel, more bool) {
-			err = ctx.Err()
-		}).AddFuture(timer, func(f Future) {
+		selector.AddFuture(timer, func(f Future) {
 			// no op, err will be nil
 		}).Select(ctx)
 
-		return err
+		return nil
 	}
 
 	workflowFn := func(ctx Context) error {

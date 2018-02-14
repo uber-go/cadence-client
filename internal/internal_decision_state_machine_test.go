@@ -419,7 +419,7 @@ func Test_CancelExternalWorkflowStateMachine_Succeed(t *testing.T) {
 	domain := "test-domain"
 	workflowID := "test-workflow-id"
 	runID := "test-run-id"
-	cancellationID := "59"
+	cancellationID := workflowID
 	childWorkflowOnly := true
 	h := newDecisionsHelper()
 
@@ -439,7 +439,6 @@ func Test_CancelExternalWorkflowStateMachine_Succeed(t *testing.T) {
 			Domain:            common.StringPtr(domain),
 			WorkflowId:        common.StringPtr(workflowID),
 			RunId:             common.StringPtr(runID),
-			Control:           []byte(cancellationID),
 			ChildWorkflowOnly: common.BoolPtr(childWorkflowOnly),
 		},
 		decisions[0].RequestCancelExternalWorkflowExecutionDecisionAttributes,
@@ -464,7 +463,7 @@ func Test_CancelExternalWorkflowStateMachine_Failed(t *testing.T) {
 	domain := "test-domain"
 	workflowID := "test-workflow-id"
 	runID := "test-run-id"
-	cancellationID := "2"
+	cancellationID := workflowID
 	childWorkflowOnly := false
 	h := newDecisionsHelper()
 
@@ -484,7 +483,6 @@ func Test_CancelExternalWorkflowStateMachine_Failed(t *testing.T) {
 			Domain:            common.StringPtr(domain),
 			WorkflowId:        common.StringPtr(workflowID),
 			RunId:             common.StringPtr(runID),
-			Control:           []byte(cancellationID),
 			ChildWorkflowOnly: common.BoolPtr(childWorkflowOnly),
 		},
 		decisions[0].RequestCancelExternalWorkflowExecutionDecisionAttributes,

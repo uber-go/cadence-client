@@ -751,10 +751,11 @@ func (h *decisionsHelper) handleStartChildWorkflowExecutionFailed(workflowID str
 func (h *decisionsHelper) requestCancelExternalWorkflowExecution(domain, workflowID, runID string, cancellationID string, childWorkflowOnly bool) decisionStateMachine {
 	// this is for external workflow, can be child workflow if child workflow is continue as new (new run ID)
 	attributes := &s.RequestCancelExternalWorkflowExecutionDecisionAttributes{
-		Domain:            common.StringPtr(domain),
-		WorkflowId:        common.StringPtr(workflowID),
-		RunId:             common.StringPtr(runID),
-		Control:           []byte(cancellationID),
+		Domain:     common.StringPtr(domain),
+		WorkflowId: common.StringPtr(workflowID),
+		RunId:      common.StringPtr(runID),
+		// TODO: we currently have an issue about using workflow ID as identifier for state machine see #405
+		// idealy, we should use Control attribute for the cancellation ID
 		ChildWorkflowOnly: common.BoolPtr(childWorkflowOnly),
 	}
 	decision := newCancelExternalWorkflowStateMachine(attributes, cancellationID)

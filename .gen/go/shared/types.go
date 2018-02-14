@@ -9547,7 +9547,6 @@ type ExternalWorkflowExecutionCancelRequestedEventAttributes struct {
 	InitiatedEventId  *int64             `json:"initiatedEventId,omitempty"`
 	Domain            *string            `json:"domain,omitempty"`
 	WorkflowExecution *WorkflowExecution `json:"workflowExecution,omitempty"`
-	Control           []byte             `json:"control,omitempty"`
 }
 
 // ToWire translates a ExternalWorkflowExecutionCancelRequestedEventAttributes struct into a Thrift-level intermediate
@@ -9567,7 +9566,7 @@ type ExternalWorkflowExecutionCancelRequestedEventAttributes struct {
 //   }
 func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) ToWire() (wire.Value, error) {
 	var (
-		fields [4]wire.Field
+		fields [3]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -9595,14 +9594,6 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) ToWire() (wire
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 30, Value: w}
-		i++
-	}
-	if v.Control != nil {
-		w, err = wire.NewValueBinary(v.Control), error(nil)
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 40, Value: w}
 		i++
 	}
 
@@ -9659,14 +9650,6 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) FromWire(w wir
 				}
 
 			}
-		case 40:
-			if field.Value.Type() == wire.TBinary {
-				v.Control, err = field.Value.GetBinary(), error(nil)
-				if err != nil {
-					return err
-				}
-
-			}
 		}
 	}
 
@@ -9680,7 +9663,7 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) String() strin
 		return "<nil>"
 	}
 
-	var fields [4]string
+	var fields [3]string
 	i := 0
 	if v.InitiatedEventId != nil {
 		fields[i] = fmt.Sprintf("InitiatedEventId: %v", *(v.InitiatedEventId))
@@ -9692,10 +9675,6 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) String() strin
 	}
 	if v.WorkflowExecution != nil {
 		fields[i] = fmt.Sprintf("WorkflowExecution: %v", v.WorkflowExecution)
-		i++
-	}
-	if v.Control != nil {
-		fields[i] = fmt.Sprintf("Control: %v", v.Control)
 		i++
 	}
 
@@ -9714,9 +9693,6 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) Equals(rhs *Ex
 		return false
 	}
 	if !((v.WorkflowExecution == nil && rhs.WorkflowExecution == nil) || (v.WorkflowExecution != nil && rhs.WorkflowExecution != nil && v.WorkflowExecution.Equals(rhs.WorkflowExecution))) {
-		return false
-	}
-	if !((v.Control == nil && rhs.Control == nil) || (v.Control != nil && rhs.Control != nil && bytes.Equal(v.Control, rhs.Control))) {
 		return false
 	}
 
@@ -17410,7 +17386,6 @@ type RequestCancelWorkflowExecutionRequest struct {
 	WorkflowExecution *WorkflowExecution `json:"workflowExecution,omitempty"`
 	Identity          *string            `json:"identity,omitempty"`
 	RequestId         *string            `json:"requestId,omitempty"`
-	Control           []byte             `json:"control,omitempty"`
 }
 
 // ToWire translates a RequestCancelWorkflowExecutionRequest struct into a Thrift-level intermediate
@@ -17430,7 +17405,7 @@ type RequestCancelWorkflowExecutionRequest struct {
 //   }
 func (v *RequestCancelWorkflowExecutionRequest) ToWire() (wire.Value, error) {
 	var (
-		fields [5]wire.Field
+		fields [4]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -17466,14 +17441,6 @@ func (v *RequestCancelWorkflowExecutionRequest) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 40, Value: w}
-		i++
-	}
-	if v.Control != nil {
-		w, err = wire.NewValueBinary(v.Control), error(nil)
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
 
@@ -17540,14 +17507,6 @@ func (v *RequestCancelWorkflowExecutionRequest) FromWire(w wire.Value) error {
 				}
 
 			}
-		case 50:
-			if field.Value.Type() == wire.TBinary {
-				v.Control, err = field.Value.GetBinary(), error(nil)
-				if err != nil {
-					return err
-				}
-
-			}
 		}
 	}
 
@@ -17561,7 +17520,7 @@ func (v *RequestCancelWorkflowExecutionRequest) String() string {
 		return "<nil>"
 	}
 
-	var fields [5]string
+	var fields [4]string
 	i := 0
 	if v.Domain != nil {
 		fields[i] = fmt.Sprintf("Domain: %v", *(v.Domain))
@@ -17577,10 +17536,6 @@ func (v *RequestCancelWorkflowExecutionRequest) String() string {
 	}
 	if v.RequestId != nil {
 		fields[i] = fmt.Sprintf("RequestId: %v", *(v.RequestId))
-		i++
-	}
-	if v.Control != nil {
-		fields[i] = fmt.Sprintf("Control: %v", v.Control)
 		i++
 	}
 
@@ -17602,9 +17557,6 @@ func (v *RequestCancelWorkflowExecutionRequest) Equals(rhs *RequestCancelWorkflo
 		return false
 	}
 	if !_String_EqualsPtr(v.RequestId, rhs.RequestId) {
-		return false
-	}
-	if !((v.Control == nil && rhs.Control == nil) || (v.Control != nil && rhs.Control != nil && bytes.Equal(v.Control, rhs.Control))) {
 		return false
 	}
 

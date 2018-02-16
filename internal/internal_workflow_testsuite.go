@@ -1264,7 +1264,7 @@ func (env *testWorkflowEnvironmentImpl) SignalExternalWorkflow(domainName, workf
 		return
 	}
 
-	// here we are cancelling a child workflow but we cannot find it
+	// here we signal a child workflow but we cannot find it
 	if childWorkflowOnly {
 		env.postCallback(func() {
 			// currently the only cause

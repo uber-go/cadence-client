@@ -21,21 +21,23 @@
 // Package encoded contains wrappers that are used for binary payloads deserialization.
 package encoded
 
+import "go.uber.org/cadence/internal"
+
 type (
 
 	// Value is used to encapsulate/extract encoded value from workflow/activity.
-	Value interface {
-		// HasValue return whether there is value encoded.
-		HasValue() bool
-		// Get extract the encoded value into strong typed value pointer.
-		Get(valuePtr interface{}) error
-	}
+	Value = internal.Value
 
 	// Values is used to encapsulate/extract encoded one or more values from workflow/activity.
-	Values interface {
-		// HasValues return whether there are values encoded.
-		HasValues() bool
-		// Get extract the encoded values into strong typed value pointers.
-		Get(valuePtr ...interface{}) error
-	}
+	Values = internal.Values
 )
+
+// NewEncodedValue return encoded data as Value so it can be used to extract strong typed value from the encoded blob.
+func NewEncodedValue(data []byte) Value {
+	return internal.EncodedValue(data)
+}
+
+// NewEncodedValues return encoded data as Values so it can be used to extract strong typed values from the encoded blob.
+func NewEncodedValues(data []byte) Values {
+	return internal.EncodedValues(data)
+}

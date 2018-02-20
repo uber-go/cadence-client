@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
 )
@@ -39,6 +38,22 @@ var (
 )
 
 type (
+
+	// Value is used to encapsulate/extract encoded value from workflow/activity.
+	Value interface {
+		// HasValue return whether there is value encoded.
+		HasValue() bool
+		// Get extract the encoded value into strong typed value pointer.
+		Get(valuePtr interface{}) error
+	}
+
+	// Values is used to encapsulate/extract encoded one or more values from workflow/activity.
+	Values interface {
+		// HasValues return whether there are values encoded.
+		HasValues() bool
+		// Get extract the encoded values into strong typed value pointers.
+		Get(valuePtr ...interface{}) error
+	}
 
 	// Channel must be used instead of native go channel by workflow code.
 	// Use workflow.NewChannel(ctx) method to create Channel instance.
@@ -727,7 +742,7 @@ func (b EncodedValue) HasValue() bool {
 //  } else {
 //         ....
 //  }
-func SideEffect(ctx Context, f func(ctx Context) interface{}) encoded.Value {
+func SideEffect(ctx Context, f func(ctx Context) interface{}) Value {
 	future, settable := NewFuture(ctx)
 	wrapperFunc := func() ([]byte, error) {
 		r := f(ctx)

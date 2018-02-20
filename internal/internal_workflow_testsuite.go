@@ -36,7 +36,6 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
@@ -129,15 +128,15 @@ type (
 
 		expectedMockCalls map[string]struct{}
 
-		onActivityStartedListener        func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values)
-		onActivityCompletedListener      func(activityInfo *ActivityInfo, result encoded.Value, err error)
+		onActivityStartedListener        func(activityInfo *ActivityInfo, ctx context.Context, args Values)
+		onActivityCompletedListener      func(activityInfo *ActivityInfo, result Value, err error)
 		onActivityCanceledListener       func(activityInfo *ActivityInfo)
 		onLocalActivityStartedListener   func(activityInfo *ActivityInfo, ctx context.Context, args []interface{})
-		onLocalActivityCompletedListener func(activityInfo *ActivityInfo, result encoded.Value, err error)
+		onLocalActivityCompletedListener func(activityInfo *ActivityInfo, result Value, err error)
 		onLocalActivityCanceledListener  func(activityInfo *ActivityInfo)
-		onActivityHeartbeatListener      func(activityInfo *ActivityInfo, details encoded.Values)
-		onChildWorkflowStartedListener   func(workflowInfo *WorkflowInfo, ctx Context, args encoded.Values)
-		onChildWorkflowCompletedListener func(workflowInfo *WorkflowInfo, result encoded.Value, err error)
+		onActivityHeartbeatListener      func(activityInfo *ActivityInfo, details Values)
+		onChildWorkflowStartedListener   func(workflowInfo *WorkflowInfo, ctx Context, args Values)
+		onChildWorkflowCompletedListener func(workflowInfo *WorkflowInfo, result Value, err error)
 		onChildWorkflowCanceledListener  func(workflowInfo *WorkflowInfo)
 		onTimerScheduledListener         func(timerID string, duration time.Duration)
 		onTimerFiredListener             func(timerID string)
@@ -371,7 +370,7 @@ func (env *testWorkflowEnvironmentImpl) getWorkflowDefinition(wt WorkflowType) (
 func (env *testWorkflowEnvironmentImpl) executeActivity(
 	activityFn interface{},
 	args ...interface{},
-) (encoded.Value, error) {
+) (Value, error) {
 	activityType, input, err := getValidatedActivityFunction(activityFn, args)
 	if err != nil {
 		panic(err)
@@ -417,7 +416,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 func (env *testWorkflowEnvironmentImpl) executeLocalActivity(
 	activityFn interface{},
 	args ...interface{},
-) (encoded.Value, error) {
+) (Value, error) {
 	params := executeLocalActivityParams{
 		ActivityFn:                    activityFn,
 		InputArgs:                     args,
@@ -1336,7 +1335,7 @@ func (env *testWorkflowEnvironmentImpl) signalWorkflow(name string, input interf
 	}, true)
 }
 
-func (env *testWorkflowEnvironmentImpl) queryWorkflow(queryType string, args ...interface{}) (encoded.Value, error) {
+func (env *testWorkflowEnvironmentImpl) queryWorkflow(queryType string, args ...interface{}) (Value, error) {
 	data, err := getHostEnvironment().encodeArg(args)
 	if err != nil {
 		return nil, err

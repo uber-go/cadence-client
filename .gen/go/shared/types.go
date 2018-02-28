@@ -5634,6 +5634,7 @@ const (
 	DecisionTaskFailedCauseResetStickyTasklist                                 DecisionTaskFailedCause = 12
 	DecisionTaskFailedCauseWorkflowWorkerUnhandledFailure                      DecisionTaskFailedCause = 13
 	DecisionTaskFailedCauseBadSignalWorkflowExecutionAttributes                DecisionTaskFailedCause = 14
+	DecisionTaskFailedCauseBadStartChildExecutionAttributes                    DecisionTaskFailedCause = 15
 )
 
 // DecisionTaskFailedCause_Values returns all recognized values of DecisionTaskFailedCause.
@@ -5654,6 +5655,7 @@ func DecisionTaskFailedCause_Values() []DecisionTaskFailedCause {
 		DecisionTaskFailedCauseResetStickyTasklist,
 		DecisionTaskFailedCauseWorkflowWorkerUnhandledFailure,
 		DecisionTaskFailedCauseBadSignalWorkflowExecutionAttributes,
+		DecisionTaskFailedCauseBadStartChildExecutionAttributes,
 	}
 }
 
@@ -5708,6 +5710,9 @@ func (v *DecisionTaskFailedCause) UnmarshalText(value []byte) error {
 		return nil
 	case "BAD_SIGNAL_WORKFLOW_EXECUTION_ATTRIBUTES":
 		*v = DecisionTaskFailedCauseBadSignalWorkflowExecutionAttributes
+		return nil
+	case "BAD_START_CHILD_EXECUTION_ATTRIBUTES":
+		*v = DecisionTaskFailedCauseBadStartChildExecutionAttributes
 		return nil
 	default:
 		return fmt.Errorf("unknown enum value %q for %q", value, "DecisionTaskFailedCause")
@@ -5780,6 +5785,8 @@ func (v DecisionTaskFailedCause) String() string {
 		return "WORKFLOW_WORKER_UNHANDLED_FAILURE"
 	case 14:
 		return "BAD_SIGNAL_WORKFLOW_EXECUTION_ATTRIBUTES"
+	case 15:
+		return "BAD_START_CHILD_EXECUTION_ATTRIBUTES"
 	}
 	return fmt.Sprintf("DecisionTaskFailedCause(%d)", w)
 }
@@ -5828,6 +5835,8 @@ func (v DecisionTaskFailedCause) MarshalJSON() ([]byte, error) {
 		return ([]byte)("\"WORKFLOW_WORKER_UNHANDLED_FAILURE\""), nil
 	case 14:
 		return ([]byte)("\"BAD_SIGNAL_WORKFLOW_EXECUTION_ATTRIBUTES\""), nil
+	case 15:
+		return ([]byte)("\"BAD_START_CHILD_EXECUTION_ATTRIBUTES\""), nil
 	}
 	return ([]byte)(strconv.FormatInt(int64(v), 10)), nil
 }
@@ -7146,6 +7155,7 @@ type DescribeDomainResponse struct {
 	Configuration            *DomainConfiguration            `json:"configuration,omitempty"`
 	ReplicationConfiguration *DomainReplicationConfiguration `json:"replicationConfiguration,omitempty"`
 	FailoverVersion          *int64                          `json:"failoverVersion,omitempty"`
+	IsGlobalDomain           *bool                           `json:"isGlobalDomain,omitempty"`
 }
 
 // ToWire translates a DescribeDomainResponse struct into a Thrift-level intermediate
@@ -7165,7 +7175,7 @@ type DescribeDomainResponse struct {
 //   }
 func (v *DescribeDomainResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [4]wire.Field
+		fields [5]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -7201,6 +7211,14 @@ func (v *DescribeDomainResponse) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.IsGlobalDomain != nil {
+		w, err = wire.NewValueBool(*(v.IsGlobalDomain)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
 
@@ -7281,6 +7299,16 @@ func (v *DescribeDomainResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 50:
+			if field.Value.Type() == wire.TBool {
+				var x bool
+				x, err = field.Value.GetBool(), error(nil)
+				v.IsGlobalDomain = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -7294,7 +7322,7 @@ func (v *DescribeDomainResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [4]string
+	var fields [5]string
 	i := 0
 	if v.DomainInfo != nil {
 		fields[i] = fmt.Sprintf("DomainInfo: %v", v.DomainInfo)
@@ -7312,8 +7340,22 @@ func (v *DescribeDomainResponse) String() string {
 		fields[i] = fmt.Sprintf("FailoverVersion: %v", *(v.FailoverVersion))
 		i++
 	}
+	if v.IsGlobalDomain != nil {
+		fields[i] = fmt.Sprintf("IsGlobalDomain: %v", *(v.IsGlobalDomain))
+		i++
+	}
 
 	return fmt.Sprintf("DescribeDomainResponse{%v}", strings.Join(fields[:i], ", "))
+}
+
+func _Bool_EqualsPtr(lhs, rhs *bool) bool {
+	if lhs != nil && rhs != nil {
+
+		x := *lhs
+		y := *rhs
+		return (x == y)
+	}
+	return lhs == nil && rhs == nil
 }
 
 // Equals returns true if all the fields of this DescribeDomainResponse match the
@@ -7333,6 +7375,9 @@ func (v *DescribeDomainResponse) Equals(rhs *DescribeDomainResponse) bool {
 	if !_I64_EqualsPtr(v.FailoverVersion, rhs.FailoverVersion) {
 		return false
 	}
+	if !_Bool_EqualsPtr(v.IsGlobalDomain, rhs.IsGlobalDomain) {
+		return false
+	}
 
 	return true
 }
@@ -7342,6 +7387,16 @@ func (v *DescribeDomainResponse) Equals(rhs *DescribeDomainResponse) bool {
 func (v *DescribeDomainResponse) GetFailoverVersion() (o int64) {
 	if v.FailoverVersion != nil {
 		return *v.FailoverVersion
+	}
+
+	return
+}
+
+// GetIsGlobalDomain returns the value of IsGlobalDomain if it is set or its
+// zero value if it is unset.
+func (v *DescribeDomainResponse) GetIsGlobalDomain() (o bool) {
+	if v.IsGlobalDomain != nil {
+		return *v.IsGlobalDomain
 	}
 
 	return
@@ -8308,16 +8363,6 @@ func (v *DomainConfiguration) String() string {
 	}
 
 	return fmt.Sprintf("DomainConfiguration{%v}", strings.Join(fields[:i], ", "))
-}
-
-func _Bool_EqualsPtr(lhs, rhs *bool) bool {
-	if lhs != nil && rhs != nil {
-
-		x := *lhs
-		y := *rhs
-		return (x == y)
-	}
-	return lhs == nil && rhs == nil
 }
 
 // Equals returns true if all the fields of this DomainConfiguration match the
@@ -9547,6 +9592,7 @@ type ExternalWorkflowExecutionCancelRequestedEventAttributes struct {
 	InitiatedEventId  *int64             `json:"initiatedEventId,omitempty"`
 	Domain            *string            `json:"domain,omitempty"`
 	WorkflowExecution *WorkflowExecution `json:"workflowExecution,omitempty"`
+	Control           []byte             `json:"control,omitempty"`
 }
 
 // ToWire translates a ExternalWorkflowExecutionCancelRequestedEventAttributes struct into a Thrift-level intermediate
@@ -9566,7 +9612,7 @@ type ExternalWorkflowExecutionCancelRequestedEventAttributes struct {
 //   }
 func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) ToWire() (wire.Value, error) {
 	var (
-		fields [3]wire.Field
+		fields [4]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -9594,6 +9640,14 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) ToWire() (wire
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+	if v.Control != nil {
+		w, err = wire.NewValueBinary(v.Control), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 40, Value: w}
 		i++
 	}
 
@@ -9650,6 +9704,14 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) FromWire(w wir
 				}
 
 			}
+		case 40:
+			if field.Value.Type() == wire.TBinary {
+				v.Control, err = field.Value.GetBinary(), error(nil)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -9663,7 +9725,7 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) String() strin
 		return "<nil>"
 	}
 
-	var fields [3]string
+	var fields [4]string
 	i := 0
 	if v.InitiatedEventId != nil {
 		fields[i] = fmt.Sprintf("InitiatedEventId: %v", *(v.InitiatedEventId))
@@ -9675,6 +9737,10 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) String() strin
 	}
 	if v.WorkflowExecution != nil {
 		fields[i] = fmt.Sprintf("WorkflowExecution: %v", v.WorkflowExecution)
+		i++
+	}
+	if v.Control != nil {
+		fields[i] = fmt.Sprintf("Control: %v", v.Control)
 		i++
 	}
 
@@ -9693,6 +9759,9 @@ func (v *ExternalWorkflowExecutionCancelRequestedEventAttributes) Equals(rhs *Ex
 		return false
 	}
 	if !((v.WorkflowExecution == nil && rhs.WorkflowExecution == nil) || (v.WorkflowExecution != nil && rhs.WorkflowExecution != nil && v.WorkflowExecution.Equals(rhs.WorkflowExecution))) {
+		return false
+	}
+	if !((v.Control == nil && rhs.Control == nil) || (v.Control != nil && rhs.Control != nil && bytes.Equal(v.Control, rhs.Control))) {
 		return false
 	}
 
@@ -16028,6 +16097,7 @@ type RegisterDomainRequest struct {
 	WorkflowExecutionRetentionPeriodInDays *int32                             `json:"workflowExecutionRetentionPeriodInDays,omitempty"`
 	EmitMetric                             *bool                              `json:"emitMetric,omitempty"`
 	Clusters                               []*ClusterReplicationConfiguration `json:"clusters,omitempty"`
+	ActiveClusterName                      *string                            `json:"activeClusterName,omitempty"`
 }
 
 // ToWire translates a RegisterDomainRequest struct into a Thrift-level intermediate
@@ -16047,7 +16117,7 @@ type RegisterDomainRequest struct {
 //   }
 func (v *RegisterDomainRequest) ToWire() (wire.Value, error) {
 	var (
-		fields [6]wire.Field
+		fields [7]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -16099,6 +16169,14 @@ func (v *RegisterDomainRequest) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 60, Value: w}
+		i++
+	}
+	if v.ActiveClusterName != nil {
+		w, err = wire.NewValueString(*(v.ActiveClusterName)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 70, Value: w}
 		i++
 	}
 
@@ -16185,6 +16263,16 @@ func (v *RegisterDomainRequest) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 70:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.ActiveClusterName = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -16198,7 +16286,7 @@ func (v *RegisterDomainRequest) String() string {
 		return "<nil>"
 	}
 
-	var fields [6]string
+	var fields [7]string
 	i := 0
 	if v.Name != nil {
 		fields[i] = fmt.Sprintf("Name: %v", *(v.Name))
@@ -16222,6 +16310,10 @@ func (v *RegisterDomainRequest) String() string {
 	}
 	if v.Clusters != nil {
 		fields[i] = fmt.Sprintf("Clusters: %v", v.Clusters)
+		i++
+	}
+	if v.ActiveClusterName != nil {
+		fields[i] = fmt.Sprintf("ActiveClusterName: %v", *(v.ActiveClusterName))
 		i++
 	}
 
@@ -16249,6 +16341,9 @@ func (v *RegisterDomainRequest) Equals(rhs *RegisterDomainRequest) bool {
 		return false
 	}
 	if !((v.Clusters == nil && rhs.Clusters == nil) || (v.Clusters != nil && rhs.Clusters != nil && _List_ClusterReplicationConfiguration_Equals(v.Clusters, rhs.Clusters))) {
+		return false
+	}
+	if !_String_EqualsPtr(v.ActiveClusterName, rhs.ActiveClusterName) {
 		return false
 	}
 
@@ -16300,6 +16395,16 @@ func (v *RegisterDomainRequest) GetWorkflowExecutionRetentionPeriodInDays() (o i
 func (v *RegisterDomainRequest) GetEmitMetric() (o bool) {
 	if v.EmitMetric != nil {
 		return *v.EmitMetric
+	}
+
+	return
+}
+
+// GetActiveClusterName returns the value of ActiveClusterName if it is set or its
+// zero value if it is unset.
+func (v *RegisterDomainRequest) GetActiveClusterName() (o string) {
+	if v.ActiveClusterName != nil {
+		return *v.ActiveClusterName
 	}
 
 	return
@@ -25591,6 +25696,7 @@ type UpdateDomainResponse struct {
 	Configuration            *DomainConfiguration            `json:"configuration,omitempty"`
 	ReplicationConfiguration *DomainReplicationConfiguration `json:"replicationConfiguration,omitempty"`
 	FailoverVersion          *int64                          `json:"failoverVersion,omitempty"`
+	IsGlobalDomain           *bool                           `json:"isGlobalDomain,omitempty"`
 }
 
 // ToWire translates a UpdateDomainResponse struct into a Thrift-level intermediate
@@ -25610,7 +25716,7 @@ type UpdateDomainResponse struct {
 //   }
 func (v *UpdateDomainResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [4]wire.Field
+		fields [5]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -25646,6 +25752,14 @@ func (v *UpdateDomainResponse) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.IsGlobalDomain != nil {
+		w, err = wire.NewValueBool(*(v.IsGlobalDomain)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
 
@@ -25708,6 +25822,16 @@ func (v *UpdateDomainResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 50:
+			if field.Value.Type() == wire.TBool {
+				var x bool
+				x, err = field.Value.GetBool(), error(nil)
+				v.IsGlobalDomain = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -25721,7 +25845,7 @@ func (v *UpdateDomainResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [4]string
+	var fields [5]string
 	i := 0
 	if v.DomainInfo != nil {
 		fields[i] = fmt.Sprintf("DomainInfo: %v", v.DomainInfo)
@@ -25737,6 +25861,10 @@ func (v *UpdateDomainResponse) String() string {
 	}
 	if v.FailoverVersion != nil {
 		fields[i] = fmt.Sprintf("FailoverVersion: %v", *(v.FailoverVersion))
+		i++
+	}
+	if v.IsGlobalDomain != nil {
+		fields[i] = fmt.Sprintf("IsGlobalDomain: %v", *(v.IsGlobalDomain))
 		i++
 	}
 
@@ -25760,6 +25888,9 @@ func (v *UpdateDomainResponse) Equals(rhs *UpdateDomainResponse) bool {
 	if !_I64_EqualsPtr(v.FailoverVersion, rhs.FailoverVersion) {
 		return false
 	}
+	if !_Bool_EqualsPtr(v.IsGlobalDomain, rhs.IsGlobalDomain) {
+		return false
+	}
 
 	return true
 }
@@ -25769,6 +25900,16 @@ func (v *UpdateDomainResponse) Equals(rhs *UpdateDomainResponse) bool {
 func (v *UpdateDomainResponse) GetFailoverVersion() (o int64) {
 	if v.FailoverVersion != nil {
 		return *v.FailoverVersion
+	}
+
+	return
+}
+
+// GetIsGlobalDomain returns the value of IsGlobalDomain if it is set or its
+// zero value if it is unset.
+func (v *UpdateDomainResponse) GetIsGlobalDomain() (o bool) {
+	if v.IsGlobalDomain != nil {
+		return *v.IsGlobalDomain
 	}
 
 	return

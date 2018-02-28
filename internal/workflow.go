@@ -119,9 +119,6 @@ type (
 
 		// SignalChildWorkflow sends a signal to the child workflow. This call will block until child workflow is started.
 		SignalChildWorkflow(ctx Context, signalName string, data interface{}) Future
-
-		// RequestCancelChildWorkflow send request to cancel the child workflow. This call will block until child workflow is started.
-		RequestCancelChildWorkflow(ctx Context) Future
 	}
 
 	// WorkflowType identifies a workflow type.
@@ -465,7 +462,7 @@ func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interf
 			NewSelector(ctx).AddReceive(ctxDone, func(c Channel, more bool) {
 				if ctx.Err() == ErrCanceled && childWorkflowExecution != nil && !mainFuture.IsReady() {
 					// child workflow started, and ctx cancelled
-					result.RequestCancelChildWorkflow(ctx)
+					getWorkflowEnvironment(ctx).RequestCancelChildWorkflow(*options.domain, childWorkflowExecution.ID)
 				}
 			}).AddFuture(mainFuture, func(f Future) {
 				// childWorkflow is done, no-op
@@ -563,11 +560,6 @@ func Sleep(ctx Context, d time.Duration) (err error) {
 //	ctx := WithWorkflowDomain(ctx, "domain-name")
 // RequestCancelExternalWorkflow return Future with failure or empty success result.
 func RequestCancelExternalWorkflow(ctx Context, workflowID, runID string) Future {
-	childWorkflowOnly := false // this means we are not limited to child workflow
-	return requestCancelExternalWorkflow(ctx, workflowID, runID, childWorkflowOnly)
-}
-
-func requestCancelExternalWorkflow(ctx Context, workflowID, runID string, childWorkflowOnly bool) Future {
 	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
 	options := getWorkflowEnvOptions(ctx1)
 	future, settable := NewFuture(ctx1)
@@ -590,7 +582,6 @@ func requestCancelExternalWorkflow(ctx Context, workflowID, runID string, childW
 		*options.domain,
 		workflowID,
 		runID,
-		childWorkflowOnly,
 		resultCallback,
 	)
 

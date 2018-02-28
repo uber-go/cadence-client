@@ -239,7 +239,7 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 	}
 
 	var callOptions []interface{}
-	for _ = range yarpcCallOptions {
+	for range yarpcCallOptions {
 		callOptions = append(callOptions, gomock.Any())
 	}
 	em := mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
@@ -1194,7 +1194,16 @@ func (env *testWorkflowEnvironmentImpl) RegisterQueryHandler(handler func(string
 	env.queryHandler = handler
 }
 
-func (env *testWorkflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName, workflowID, runID string, childWorkflowOnly bool, callback resultHandler) {
+func (env *testWorkflowEnvironmentImpl) RequestCancelChildWorkflow(domainName, workflowID string) {
+	if childHandle, ok := env.runningWorkflows[workflowID]; ok && !childHandle.handled {
+		// current workflow is a parent workflow, and we are canceling a child workflow
+		childEnv := childHandle.env
+		childEnv.cancelWorkflow(func(result []byte, err error) {})
+		return
+	}
+}
+
+func (env *testWorkflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName, workflowID, runID string, callback resultHandler) {
 	if env.workflowInfo.WorkflowExecution.ID == workflowID {
 		// cancel current workflow
 		env.workflowCancelHandler()
@@ -1212,16 +1221,6 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName
 			callback(nil, nil)
 		}, true)
 		childEnv.cancelWorkflow(callback)
-		return
-	}
-
-	// here we are cancelling a child workflow but we cannot find it
-	if childWorkflowOnly {
-		env.postCallback(func() {
-			// currently the only cause
-			err := fmt.Errorf("request cancel external workflow failed, %v", shared.CancelExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution)
-			callback(nil, err)
-		}, true)
 		return
 	}
 
@@ -1341,20 +1340,12 @@ func (env *testWorkflowEnvironmentImpl) getActivityInfo(activityID, activityType
 }
 
 func (env *testWorkflowEnvironmentImpl) cancelWorkflow(callback resultHandler) {
-	// this function will be invoked in by 2 things
-	// 1. current workflow cancel itself
-	// 2. parent workflow cancel its child
-	// case 1, childWorkflowOnly being true / false does not matter
-	// case 2, the cancellation sent by parent will check whether the target is child or not in the first place
-	// and invoke this function, so childWorkflowOnly being true / false also does not matter
-	childWorkflowOnly := false
 	env.postCallback(func() {
 		// RequestCancelWorkflow needs to be run in main thread
 		env.RequestCancelExternalWorkflow(
 			env.workflowInfo.Domain,
 			env.workflowInfo.WorkflowExecution.ID,
 			env.workflowInfo.WorkflowExecution.RunID,
-			childWorkflowOnly,
 			callback,
 		)
 	}, true)

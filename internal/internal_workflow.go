@@ -340,17 +340,6 @@ func (f *childWorkflowFutureImpl) SignalChildWorkflow(ctx Context, signalName st
 	return signalExternalWorkflow(ctx, childExec.ID, "", signalName, data, childWorkflowOnly)
 }
 
-func (f *childWorkflowFutureImpl) RequestCancelChildWorkflow(ctx Context) Future {
-	var childExec WorkflowExecution
-	if err := f.GetChildWorkflowExecution().Get(ctx, &childExec); err != nil {
-		return f.GetChildWorkflowExecution()
-	}
-
-	childWorkflowOnly := true // this means we are targeting child workflow
-	// below we use empty run ID indicating the current running one, in case child do continue-as-new
-	return requestCancelExternalWorkflow(ctx, childExec.ID, "", childWorkflowOnly)
-}
-
 func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) {
 	d.rootCtx = WithValue(background, workflowEnvironmentContextKey, env)
 	var resultPtr *workflowResult

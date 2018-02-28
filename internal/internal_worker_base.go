@@ -61,7 +61,8 @@ type (
 		WorkflowInfo() *WorkflowInfo
 		Complete(result []byte, err error)
 		RegisterCancelHandler(handler func())
-		RequestCancelExternalWorkflow(domainName, workflowID, runID string, childWorkflowOnly bool, callback resultHandler)
+		RequestCancelChildWorkflow(domainName, workflowID string)
+		RequestCancelExternalWorkflow(domainName, workflowID, runID string, callback resultHandler)
 		ExecuteChildWorkflow(options workflowOptions, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error
 		GetLogger() *zap.Logger
 		GetMetricsScope() tally.Scope

@@ -1375,6 +1375,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_CancelChildWorkflow() {
 			err = f.Get(ctx, nil)
 		}).Select(ctx)
 
+		fmt.Println("####")
+		fmt.Println(err)
+		fmt.Println("####")
 		return err
 	}
 
@@ -1386,15 +1389,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_CancelChildWorkflow() {
 		}
 
 		childCtx := WithChildWorkflowOptions(ctx, cwo)
+		childCtx, cancel := WithCancel(childCtx)
 		childFuture := ExecuteChildWorkflow(childCtx, childWorkflowFn)
-
-		cancellationFuture := childFuture.RequestCancelChildWorkflow(childCtx)
-		if err := cancellationFuture.Get(childCtx, nil); err != nil {
-			return err
-		}
+		Sleep(ctx, 2*time.Second)
+		cancel()
 
 		err := childFuture.Get(childCtx, nil)
-		if err, ok := err.(*CanceledError); !ok {
+		if _, ok := err.(*CanceledError); !ok {
 			return fmt.Errorf("Cancel child workflow should receive CanceledError, instead got: %v", err)
 		}
 		return nil

@@ -160,6 +160,7 @@ enum DecisionTaskFailedCause {
   RESET_STICKY_TASKLIST,
   WORKFLOW_WORKER_UNHANDLED_FAILURE,
   BAD_SIGNAL_WORKFLOW_EXECUTION_ATTRIBUTES,
+  BAD_START_CHILD_EXECUTION_ATTRIBUTES,
 }
 
 enum CancelExternalWorkflowExecutionFailedCause {
@@ -553,6 +554,7 @@ struct ExternalWorkflowExecutionCancelRequestedEventAttributes {
   10: optional i64 (js.type = "Long") initiatedEventId
   20: optional string domain
   30: optional WorkflowExecution workflowExecution
+  40: optional binary control
 }
 
 struct SignalExternalWorkflowExecutionInitiatedEventAttributes {
@@ -754,6 +756,7 @@ struct RegisterDomainRequest {
   40: optional i32 workflowExecutionRetentionPeriodInDays
   50: optional bool emitMetric
   60: optional list<ClusterReplicationConfiguration> clusters
+  70: optional string activeClusterName
 }
 
 struct DescribeDomainRequest {
@@ -765,6 +768,7 @@ struct DescribeDomainResponse {
   20: optional DomainConfiguration configuration
   30: optional DomainReplicationConfiguration replicationConfiguration
   40: optional i64 (js.type = "Long") failoverVersion
+  50: optional bool isGlobalDomain
 }
 
 struct UpdateDomainRequest {
@@ -779,6 +783,7 @@ struct UpdateDomainResponse {
   20: optional DomainConfiguration configuration
   30: optional DomainReplicationConfiguration replicationConfiguration
   40: optional i64 (js.type = "Long") failoverVersion
+  50: optional bool isGlobalDomain
 }
 
 struct DeprecateDomainRequest {

@@ -26,8 +26,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/cadence/workflow"
 	"go.uber.org/cadence/client"
+	"go.uber.org/cadence/workflow"
 )
 
 func Test_MockClient(t *testing.T) {

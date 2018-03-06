@@ -783,7 +783,7 @@ func (h *decisionsHelper) handleStartChildWorkflowExecutionFailed(workflowID str
 
 func (h *decisionsHelper) requestCancelExternalWorkflowExecution(domain, workflowID, runID string, cancellationID string, childWorkflowOnly bool) decisionStateMachine {
 	// For cancellation of child workflow only, we do not use cancellation ID
-	// for cancellation of all possible workflow, we have to use cancellation ID
+	// for cancellation of external workflow, we have to use cancellation ID
 	if childWorkflowOnly {
 		// sanity check that cancellation ID is not set
 		if len(cancellationID) != 0 {
@@ -800,7 +800,7 @@ func (h *decisionsHelper) requestCancelExternalWorkflowExecution(domain, workflo
 
 	// sanity check that cancellation ID is set
 	if len(cancellationID) == 0 {
-		panic("cancellation on all possible workflow should use cancellation ID")
+		panic("cancellation on external workflow should use cancellation ID")
 	}
 	// this is aimed for any external workflow (including child workflow)
 	attributes := &s.RequestCancelExternalWorkflowExecutionDecisionAttributes{
@@ -817,45 +817,45 @@ func (h *decisionsHelper) requestCancelExternalWorkflowExecution(domain, workflo
 }
 
 func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionInitiated(initiatedeventID int64, workflowID, cancellationID string) {
-	if len(cancellationID) == 0 {
+	if h.isCancelExternalWorkflowEventForChildWorkflow(cancellationID) {
 		// this is cancellation for child workflow only
 		decision := h.getDecision(makeDecisionID(decisionTypeChildWorkflow, workflowID))
 		decision.handleCancelInitiatedEvent()
 	} else {
-		// this is cancellation for all possible workflow
+		// this is cancellation for external workflow
 		h.scheduledEventIDToCancellationID[initiatedeventID] = cancellationID
 		decision := h.getDecision(makeDecisionID(decisionTypeCancellation, cancellationID))
 		decision.handleInitiatedEvent()
 	}
 }
 
-func (h *decisionsHelper) handleExternalWorkflowExecutionCancelRequested(initiatedeventID int64, workflowID string) decisionStateMachine {
+func (h *decisionsHelper) handleExternalWorkflowExecutionCancelRequested(initiatedeventID int64, workflowID string) (bool, decisionStateMachine) {
 	var decision decisionStateMachine
-	cancellationID, ok := h.scheduledEventIDToCancellationID[initiatedeventID]
-	if !ok {
+	cancellationID, isExternal := h.scheduledEventIDToCancellationID[initiatedeventID]
+	if !isExternal {
 		decision = h.getDecision(makeDecisionID(decisionTypeChildWorkflow, workflowID))
 		// no state change for child workflow, it is still in CancellationDecisionSent
 	} else {
-		// this is cancellation for all possible workflow
+		// this is cancellation for external workflow
 		decision = h.getDecision(makeDecisionID(decisionTypeCancellation, cancellationID))
 		decision.handleCompletionEvent()
 	}
-	return decision
+	return isExternal, decision
 }
 
-func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionFailed(initiatedeventID int64, workflowID string) decisionStateMachine {
+func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionFailed(initiatedeventID int64, workflowID string) (bool, decisionStateMachine) {
 	var decision decisionStateMachine
-	cancellationID, ok := h.scheduledEventIDToCancellationID[initiatedeventID]
-	if !ok {
+	cancellationID, isExternal := h.scheduledEventIDToCancellationID[initiatedeventID]
+	if !isExternal {
 		// this is cancellation for child workflow only
 		decision = h.getDecision(makeDecisionID(decisionTypeChildWorkflow, workflowID))
 		decision.handleCancelFailedEvent()
 	} else {
-		// this is cancellation for all possible workflow
+		// this is cancellation for external workflow
 		decision = h.getDecision(makeDecisionID(decisionTypeCancellation, cancellationID))
 		decision.handleCompletionEvent()
 	}
-	return decision
+	return isExternal, decision
 }
 
 func (h *decisionsHelper) signalExternalWorkflowExecution(domain, workflowID, runID, signalName string, input []byte, signalID string, childWorkflowOnly bool) decisionStateMachine {
@@ -967,4 +967,12 @@ func (h *decisionsHelper) getDecisions(markAsSent bool) []*s.Decision {
 	}
 
 	return result
+}
+
+func (h *decisionsHelper) isCancelExternalWorkflowEventForChildWorkflow(cancellationID string) bool {
+	// the cancellationID, i.e. Control in RequestCancelExternalWorkflowExecutionInitiatedEventAttributes
+	// will be empty if the event is for child workflow.
+	// for cancellation external workflow, Control in RequestCancelExternalWorkflowExecutionInitiatedEventAttributes
+	// will have a client generated sequency ID
+	return len(cancellationID) == 0
 }

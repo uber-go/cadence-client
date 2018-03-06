@@ -248,7 +248,7 @@ func (wc *workflowEnvironmentImpl) RequestCancelChildWorkflow(domainName string,
 }
 
 func (wc *workflowEnvironmentImpl) RequestCancelExternalWorkflow(domainName, workflowID, runID string, callback resultHandler) {
-	// for cancellation of all possible workflow, we have to use cancellation ID and set isChildWorkflowOnly to false
+	// for cancellation of external workflow, we have to use cancellation ID and set isChildWorkflowOnly to false
 	isChildWorkflowOnly := false
 	cancellationID := wc.GenerateSequenceID()
 	decision := wc.decisionsHelper.requestCancelExternalWorkflowExecution(domainName, workflowID, runID, cancellationID, isChildWorkflowOnly)
@@ -980,7 +980,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTermin
 
 func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflowExecutionInitiated(event *m.HistoryEvent) error {
 	// For cancellation of child workflow only, we do not use cancellation ID
-	// for cancellation of all possible workflow, we have to use cancellation ID
+	// for cancellation of external workflow, we have to use cancellation ID
 	attribute := event.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes
 	workflowID := attribute.WorkflowExecution.GetWorkflowId()
 	cancellationID := string(attribute.Control)
@@ -990,12 +990,11 @@ func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflo
 
 func (weh *workflowExecutionEventHandlerImpl) handleExternalWorkflowExecutionCancelRequested(event *m.HistoryEvent) error {
 	// For cancellation of child workflow only, we do not use cancellation ID
-	// for cancellation of all possible workflow, we have to use cancellation ID
+	// for cancellation of external workflow, we have to use cancellation ID
 	attributes := event.ExternalWorkflowExecutionCancelRequestedEventAttributes
 	workflowID := attributes.WorkflowExecution.GetWorkflowId()
-	cancellationID := string(attributes.Control)
-	decision := weh.decisionsHelper.handleExternalWorkflowExecutionCancelRequested(attributes.GetInitiatedEventId(), workflowID)
-	if len(cancellationID) != 0 {
+	isExternal, decision := weh.decisionsHelper.handleExternalWorkflowExecutionCancelRequested(attributes.GetInitiatedEventId(), workflowID)
+	if isExternal {
 		// for cancel external workflow, we need to set the future
 		cancellation := decision.getData().(*scheduledCancellation)
 		if cancellation.handled {
@@ -1009,12 +1008,11 @@ func (weh *workflowExecutionEventHandlerImpl) handleExternalWorkflowExecutionCan
 
 func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflowExecutionFailed(event *m.HistoryEvent) error {
 	// For cancellation of child workflow only, we do not use cancellation ID
-	// for cancellation of all possible workflow, we have to use cancellation ID
+	// for cancellation of external workflow, we have to use cancellation ID
 	attributes := event.RequestCancelExternalWorkflowExecutionFailedEventAttributes
 	workflowID := attributes.WorkflowExecution.GetWorkflowId()
-	cancellationID := string(attributes.Control)
-	decision := weh.decisionsHelper.handleRequestCancelExternalWorkflowExecutionFailed(attributes.GetInitiatedEventId(), workflowID)
-	if len(cancellationID) != 0 {
+	isExternal, decision := weh.decisionsHelper.handleRequestCancelExternalWorkflowExecutionFailed(attributes.GetInitiatedEventId(), workflowID)
+	if isExternal {
 		// for cancel external workflow, we need to set the future
 		cancellation := decision.getData().(*scheduledCancellation)
 		if cancellation.handled {

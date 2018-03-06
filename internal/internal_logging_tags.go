@@ -36,3 +36,7 @@ const (
 	tagSideEffectID    = "SideEffectID"
 	tagChildWorkflowID = "ChildWorkflowID"
 )
+
+func newTag(tagName, tagValue string) map[string]string {
+	return map[string]string{tagName: tagValue}
+}

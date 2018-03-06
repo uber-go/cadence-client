@@ -984,7 +984,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflo
 	attribute := event.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes
 	workflowID := attribute.WorkflowExecution.GetWorkflowId()
 	cancellationID := string(attribute.Control)
-	weh.decisionsHelper.handleRequestCancelExternalWorkflowExecutionInitiated(workflowID, cancellationID)
+	weh.decisionsHelper.handleRequestCancelExternalWorkflowExecutionInitiated(event.GetEventId(), workflowID, cancellationID)
 	return nil
 }
 
@@ -994,7 +994,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleExternalWorkflowExecutionCan
 	attributes := event.ExternalWorkflowExecutionCancelRequestedEventAttributes
 	workflowID := attributes.WorkflowExecution.GetWorkflowId()
 	cancellationID := string(attributes.Control)
-	decision := weh.decisionsHelper.handleExternalWorkflowExecutionCancelRequested(workflowID, cancellationID)
+	decision := weh.decisionsHelper.handleExternalWorkflowExecutionCancelRequested(attributes.GetInitiatedEventId(), workflowID)
 	if len(cancellationID) != 0 {
 		// for cancel external workflow, we need to set the future
 		cancellation := decision.getData().(*scheduledCancellation)
@@ -1013,7 +1013,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflo
 	attributes := event.RequestCancelExternalWorkflowExecutionFailedEventAttributes
 	workflowID := attributes.WorkflowExecution.GetWorkflowId()
 	cancellationID := string(attributes.Control)
-	decision := weh.decisionsHelper.handleRequestCancelExternalWorkflowExecutionFailed(workflowID, cancellationID)
+	decision := weh.decisionsHelper.handleRequestCancelExternalWorkflowExecutionFailed(attributes.GetInitiatedEventId(), workflowID)
 	if len(cancellationID) != 0 {
 		// for cancel external workflow, we need to set the future
 		cancellation := decision.getData().(*scheduledCancellation)

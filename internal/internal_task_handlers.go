@@ -1247,7 +1247,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			ath.logger.Error("Activity panic.",
 				zap.String("PanicError", fmt.Sprintf("%v", p)),
 				zap.String("PanicStack", st))
-			ath.metricsScope.Tagged(newTag(tagActivityType, t.ActivityType.GetName())).
+			tagScope(ath.metricsScope, tagActivityType, t.ActivityType.GetName()).
 				Counter(metrics.ActivityTaskPanicCounter).Inc(1)
 			panicErr := newPanicError(p, st)
 			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr), nil

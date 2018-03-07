@@ -190,7 +190,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	if wc.metricsScope != nil {
-		wc.metricsScope.Tagged(newTag(tagWorkflowType, workflowType.Name)).
+		tagScope(wc.metricsScope, tagWorkflowType, workflowType.Name).
 			Counter(metrics.WorkflowStartCounter).Inc(1)
 	}
 

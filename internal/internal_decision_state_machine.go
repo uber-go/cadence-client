@@ -782,13 +782,19 @@ func (h *decisionsHelper) handleStartChildWorkflowExecutionFailed(workflowID str
 }
 
 func (h *decisionsHelper) requestCancelExternalWorkflowExecution(domain, workflowID, runID string, cancellationID string, childWorkflowOnly bool) decisionStateMachine {
-	// For cancellation of child workflow only, we do not use cancellation ID
-	// for cancellation of external workflow, we have to use cancellation ID
 	if childWorkflowOnly {
+		// For cancellation of child workflow only, we do not use cancellation ID
+		// since the child workflow cancellation go through the existing child workflow
+		// state machine, and we use workflow ID as identifier
+		// we also do not use run ID, since child workflow can do continue-as-new
+		// which will have different run ID
+		// there will be server side validation that target workflow is child workflow
+
 		// sanity check that cancellation ID is not set
 		if len(cancellationID) != 0 {
 			panic("cancellation on child workflow should not use cancellation ID")
 		}
+		// sanity check that run ID is not set
 		if len(runID) != 0 {
 			panic("cancellation on child workflow should not use run ID")
 		}
@@ -798,11 +804,15 @@ func (h *decisionsHelper) requestCancelExternalWorkflowExecution(domain, workflo
 		return decision
 	}
 
+	// For cancellation of external workflow, we have to use cancellation ID
+	// to identify different cancellation request (decision) / response (history event)
+	// client can also use this code path to cancel its own child workflow, however, there will
+	// be no server side validation that target workflow is the child
+
 	// sanity check that cancellation ID is set
 	if len(cancellationID) == 0 {
 		panic("cancellation on external workflow should use cancellation ID")
 	}
-	// this is aimed for any external workflow (including child workflow)
 	attributes := &s.RequestCancelExternalWorkflowExecutionDecisionAttributes{
 		Domain:            common.StringPtr(domain),
 		WorkflowId:        common.StringPtr(workflowID),

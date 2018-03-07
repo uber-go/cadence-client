@@ -890,3 +890,14 @@ func SetQueryHandler(ctx Context, queryType string, handler interface{}) error {
 	}
 	return setQueryHandler(ctx, queryType, handler)
 }
+
+// IsReplaying returns whether the current workflow code is replaying.
+// Warning! Never make decisions, like schedule activity/childWorkflow/timer or send/wait on future/channel, based on
+// this flag as it is going to break workflow determinism requirement.
+// The only reasonable use case for this flag is to avoid some external actions during replay, like custom logging or
+// metric reporting. Please note that Cadence already provide standard logging/metric via workflow.GetLogger(ctx) and
+// workflow.GetMetricsScope(ctx), and those standard mechanism are replay-aware and it will automatically suppress during
+// replay. Only use this flag if you need custom logging/metrics reporting, for example if you want to log to kafka.
+func IsReplaying(ctx Context) bool {
+	return getWorkflowEnvironment(ctx).IsReplaying()
+}

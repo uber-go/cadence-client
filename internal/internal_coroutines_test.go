@@ -361,17 +361,17 @@ func TestBlockingSelectAsyncSend2(t *testing.T) {
 		s := NewSelector(ctx)
 		s.
 			AddReceive(c1, func(c Channel, more bool) {
-			assert.True(t, more)
-			var v string
-			c.Receive(ctx, &v)
-			history = append(history, fmt.Sprintf("c1-%v", v))
-		}).
+				assert.True(t, more)
+				var v string
+				c.Receive(ctx, &v)
+				history = append(history, fmt.Sprintf("c1-%v", v))
+			}).
 			AddReceive(c2, func(c Channel, more bool) {
-			assert.True(t, more)
-			var v string
-			c.Receive(ctx, &v)
-			history = append(history, fmt.Sprintf("c2-%v", v))
-		})
+				assert.True(t, more)
+				var v string
+				c.Receive(ctx, &v)
+				history = append(history, fmt.Sprintf("c2-%v", v))
+			})
 
 		history = append(history, "send-s2")
 		c2.SendAsync("s2")

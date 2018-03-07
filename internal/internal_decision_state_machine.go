@@ -107,6 +107,7 @@ type (
 
 		scheduledEventIDToActivityID     map[int64]string
 		scheduledEventIDToCancellationID map[int64]string
+		scheduledEventIDToSignalID       map[int64]string
 	}
 )
 
@@ -620,13 +621,15 @@ func (d *signalExternalWorkflowDecisionStateMachine) handleCompletionEvent() {
 	}
 }
 
-func (d *markerDecisionStateMachine) handleCompletionEvent() {
-	// Marker decision transit from SENT to COMPLETED on EventType_MarkerRecorded event
+func (d *markerDecisionStateMachine) handleDecisionSent() {
+	// Marker decision state machine is considered as completed once decision is sent.
+	// For SideEffect/Version markers, when the history event is applied, there is no marker decision state machine yet
+	// because we preload those marker events.
+	// For local activity, when we apply the history event, we use it to create the marker state machine, there is no
+	// other event to drive it to completed state.
 	switch d.state {
-	case decisionStateDecisionSent:
-		d.moveState(decisionStateCompleted, eventInitiated)
-	default:
-		d.failStateTransition(eventInitiated)
+	case decisionStateCreated:
+		d.moveState(decisionStateCompleted, eventDecisionSent)
 	}
 }
 
@@ -637,6 +640,7 @@ func newDecisionsHelper() *decisionsHelper {
 
 		scheduledEventIDToActivityID:     make(map[int64]string),
 		scheduledEventIDToCancellationID: make(map[int64]string),
+		scheduledEventIDToSignalID:       make(map[int64]string),
 	}
 }
 
@@ -754,13 +758,6 @@ func (h *decisionsHelper) recordLocalActivityMarker(activityID string, result []
 	}
 	decision := newMarkerDecisionStateMachine(markerID, attributes)
 	h.addDecision(decision)
-	return decision
-}
-
-func (h *decisionsHelper) handleSideEffectMarkerRecorded(sideEffectID int32) decisionStateMachine {
-	markerID := fmt.Sprintf("%v_%v", sideEffectMarkerName, sideEffectID)
-	decision := h.getDecision(makeDecisionID(decisionTypeMarker, markerID))
-	decision.handleCompletionEvent()
 	return decision
 }
 
@@ -885,21 +882,30 @@ func (h *decisionsHelper) signalExternalWorkflowExecution(domain, workflowID, ru
 	return decision
 }
 
-func (h *decisionsHelper) handleSignalExternalWorkflowExecutionInitiated(signalID string) {
+func (h *decisionsHelper) handleSignalExternalWorkflowExecutionInitiated(initiatedEventID int64, signalID string) {
+	h.scheduledEventIDToSignalID[initiatedEventID] = signalID
 	decision := h.getDecision(makeDecisionID(decisionTypeSignal, signalID))
 	decision.handleInitiatedEvent()
 }
 
-func (h *decisionsHelper) handleSignalExternalWorkflowExecutionCompleted(signalID string) decisionStateMachine {
-	decision := h.getDecision(makeDecisionID(decisionTypeSignal, signalID))
+func (h *decisionsHelper) handleSignalExternalWorkflowExecutionCompleted(initiatedEventID int64) decisionStateMachine {
+	decision := h.getDecision(makeDecisionID(decisionTypeSignal, h.getSignalID(initiatedEventID)))
 	decision.handleCompletionEvent()
 	return decision
 }
 
-func (h *decisionsHelper) handleSignalExternalWorkflowExecutionFailed(signalID string) decisionStateMachine {
-	decision := h.getDecision(makeDecisionID(decisionTypeSignal, signalID))
+func (h *decisionsHelper) handleSignalExternalWorkflowExecutionFailed(initiatedEventID int64) decisionStateMachine {
+	decision := h.getDecision(makeDecisionID(decisionTypeSignal, h.getSignalID(initiatedEventID)))
 	decision.handleCompletionEvent()
 	return decision
+}
+
+func (h *decisionsHelper) getSignalID(initiatedEventID int64) string {
+	signalID, ok := h.scheduledEventIDToSignalID[initiatedEventID]
+	if !ok {
+		panic(fmt.Sprintf("unable to find signal ID: %v", initiatedEventID))
+	}
+	return signalID
 }
 
 func (h *decisionsHelper) startTimer(attributes *s.StartTimerDecisionAttributes) decisionStateMachine {

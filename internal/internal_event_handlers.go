@@ -618,7 +618,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 
 	case m.EventTypeSignalExternalWorkflowExecutionInitiated:
 		signalID := string(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Control)
-		weh.decisionsHelper.handleSignalExternalWorkflowExecutionInitiated(signalID)
+		weh.decisionsHelper.handleSignalExternalWorkflowExecutionInitiated(event.GetEventId(), signalID)
 
 	case m.EventTypeSignalExternalWorkflowExecutionFailed:
 		weh.handleSignalExternalWorkflowExecutionFailed(event)
@@ -885,6 +885,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleStartChildWorkflowExecutionF
 	}
 
 	err := fmt.Errorf("ChildWorkflowFailed: %v", attributes.GetCause())
+	childWorkflow.startedCallback(WorkflowExecution{}, err)
 	childWorkflow.handle(nil, err)
 
 	return nil
@@ -1027,8 +1028,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflo
 
 func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecutionCompleted(event *m.HistoryEvent) error {
 	attributes := event.ExternalWorkflowExecutionSignaledEventAttributes
-	signalID := string(attributes.Control)
-	decision := weh.decisionsHelper.handleSignalExternalWorkflowExecutionCompleted(signalID)
+	decision := weh.decisionsHelper.handleSignalExternalWorkflowExecutionCompleted(attributes.GetInitiatedEventId())
 	signal := decision.getData().(*scheduledSignal)
 	if signal.handled {
 		return nil
@@ -1040,8 +1040,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecut
 
 func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecutionFailed(event *m.HistoryEvent) error {
 	attributes := event.SignalExternalWorkflowExecutionFailedEventAttributes
-	signalID := string(attributes.Control)
-	decision := weh.decisionsHelper.handleSignalExternalWorkflowExecutionFailed(signalID)
+	decision := weh.decisionsHelper.handleSignalExternalWorkflowExecutionFailed(attributes.GetInitiatedEventId())
 	signal := decision.getData().(*scheduledSignal)
 	if signal.handled {
 		return nil

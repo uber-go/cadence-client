@@ -84,6 +84,7 @@ type (
 	// baseWorkerOptions options to configure base worker.
 	baseWorkerOptions struct {
 		pollerCount       int
+		pollerRate        int
 		maxConcurrentTask int
 		maxTaskPerSecond  float64
 		taskWorker        taskPoller
@@ -108,6 +109,10 @@ type (
 		pollerRequestCh chan struct{}
 		taskQueueCh     chan interface{}
 	}
+
+	polledTask struct {
+		task interface{}
+	}
 )
 
 func createPollRetryPolicy() backoff.RetryPolicy {
@@ -124,10 +129,9 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 
 func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope) *baseWorker {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &baseWorker{
+	bw := &baseWorker{
 		options:         options,
 		shutdownCh:      make(chan struct{}),
-		pollLimiter:     rate.NewLimiter(rate.Limit(1000), 1),
 		taskLimiter:     rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
 		retrier:         backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
 		logger:          logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
@@ -138,6 +142,11 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 		limiterContext:       ctx,
 		limiterContextCancel: cancel,
 	}
+	if options.pollerRate > 0 {
+		bw.pollLimiter = rate.NewLimiter(rate.Limit(options.pollerRate), 1)
+	}
+
+	return bw
 }
 
 // Start starts a fixed set of routines to do the work.
@@ -213,8 +222,9 @@ func (bw *baseWorker) runTaskDispatcher() {
 		case <-bw.shutdownCh:
 			return
 		case task := <-bw.taskQueueCh:
-			// block until taskRateLimiter satisfied
-			if bw.taskLimiter.Wait(bw.limiterContext) != nil {
+			// for non-polled-task (local activity result as task), we don't need to rate limit
+			_, isPolledTask := task.(*polledTask)
+			if isPolledTask && bw.taskLimiter.Wait(bw.limiterContext) != nil {
 				if bw.isShutdown() {
 					return
 				}
@@ -228,7 +238,7 @@ func (bw *baseWorker) pollTask() {
 	var err error
 	var task interface{}
 	bw.retrier.Throttle()
-	if bw.pollLimiter.Wait(bw.limiterContext) == nil {
+	if bw.pollLimiter == nil || bw.pollLimiter.Wait(bw.limiterContext) == nil {
 		task, err = bw.options.taskWorker.PollTask()
 		if err != nil && enableVerboseLogging {
 			bw.logger.Debug("Failed to poll for task.", zap.Error(err))
@@ -241,13 +251,19 @@ func (bw *baseWorker) pollTask() {
 	}
 
 	if task != nil {
-		bw.taskQueueCh <- task
+		bw.taskQueueCh <- &polledTask{task}
 	} else {
 		bw.pollerRequestCh <- struct{}{} // poll failed, trigger a new pool
 	}
 }
 
 func (bw *baseWorker) processTask(task interface{}) {
+	// If the task is from poller, after processing it we would need to request a new poll. Otherwise, the task is from
+	// local activity worker, we don't need a new poll from server.
+	polledTask, isPolledTask := task.(*polledTask)
+	if isPolledTask {
+		task = polledTask.task
+	}
 	defer func() {
 		if p := recover(); p != nil {
 			bw.metricsScope.Counter(metrics.WorkerPanicCounter).Inc(1)
@@ -257,7 +273,10 @@ func (bw *baseWorker) processTask(task interface{}) {
 				zap.String("PanicError", fmt.Sprintf("%v", p)),
 				zap.String("PanicStack", st))
 		}
-		bw.pollerRequestCh <- struct{}{}
+
+		if isPolledTask {
+			bw.pollerRequestCh <- struct{}{}
+		}
 	}()
 	err := bw.options.taskWorker.ProcessTask(task)
 	if err != nil {

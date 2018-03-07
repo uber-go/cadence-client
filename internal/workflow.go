@@ -437,11 +437,13 @@ func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interf
 	}
 	wfType, input, err := getValidatedWorkflowFunction(childWorkflow, args)
 	if err != nil {
+		executionSettable.Set(nil, err)
 		mainSettable.Set(nil, err)
 		return result
 	}
 	options, err := getValidatedWorkflowOptions(ctx)
 	if err != nil {
+		executionSettable.Set(nil, err)
 		mainSettable.Set(nil, err)
 		return result
 	}
@@ -449,7 +451,7 @@ func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interf
 	options.input = input
 	options.workflowType = wfType
 	var childWorkflowExecution *WorkflowExecution
-	getWorkflowEnvironment(ctx).ExecuteChildWorkflow(*options, func(r []byte, e error) {
+	err = getWorkflowEnvironment(ctx).ExecuteChildWorkflow(*options, func(r []byte, e error) {
 		mainSettable.Set(r, e)
 	}, func(r WorkflowExecution, e error) {
 		if e == nil {
@@ -457,6 +459,12 @@ func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interf
 		}
 		executionSettable.Set(r, e)
 	})
+	if err != nil {
+		executionSettable.Set(nil, err)
+		mainSettable.Set(nil, err)
+		return result
+	}
+
 	Go(ctx, func(ctx Context) {
 		if ctxDone := ctx.Done(); ctxDone != nil {
 			NewSelector(ctx).AddReceive(ctxDone, func(c Channel, more bool) {

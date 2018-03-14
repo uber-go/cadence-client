@@ -48,10 +48,11 @@ const (
 type (
 	// workflowClient is the client for starting a workflow execution.
 	workflowClient struct {
-		workflowService workflowserviceclient.Interface
-		domain          string
-		metricsScope    tally.Scope
-		identity        string
+		workflowService   workflowserviceclient.Interface
+		domain            string
+		metricsScope      tally.Scope
+		tagToMetricsScope map[string]tally.Scope // to avoid repeated creation of subScope
+		identity          string
 	}
 
 	// domainClient is the client for managing domains.
@@ -190,8 +191,11 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	if wc.metricsScope != nil {
-		tagScope(wc.metricsScope, tagWorkflowType, workflowType.Name).
-			Counter(metrics.WorkflowStartCounter).Inc(1)
+		wfName := workflowType.Name
+		if _, ok := wc.tagToMetricsScope[wfName]; !ok {
+			wc.tagToMetricsScope[wfName] = tagScope(wc.metricsScope, tagWorkerType, wfName)
+		}
+		wc.tagToMetricsScope[wfName].Counter(metrics.WorkflowStartCounter).Inc(1)
 	}
 
 	executionInfo := &WorkflowExecution{

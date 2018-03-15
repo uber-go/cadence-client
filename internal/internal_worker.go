@@ -1089,6 +1089,22 @@ func tagScope(metricsScope tally.Scope, keyValueinPairs ...string) tally.Scope {
 	return metricsScope.Tagged(tagsMap)
 }
 
+// getOrCreateTaggedScope is used to get or create single tag for metrics.
+// Note: This assume the map has no conflicts of tagValue for different tagName,
+// otherwise retrieved subScope will be corrupted. e.g you cannot getOrCreateTaggedScope(m, scope, "domain", "A name")
+// and then getOrCreateTaggedScope(m, scope, "workflow-type", "A name")
+func getOrCreateTaggedScope(m sync.Map, scope tally.Scope, tagName, tagValue string) tally.Scope {
+	taggedScope, ok := m.Load(tagValue)
+	if !ok {
+		m.Store(tagValue, tagScope(scope, tagName, tagValue))
+		taggedScope, _ = m.Load(tagValue)
+	}
+	if taggedScope == nil {
+		panic("metric scope cannot be tagged")  // This should never happen
+	}
+	return taggedScope.(tally.Scope)
+}
+
 func processTestTags(wOptions *WorkerOptions, ep *workerExecutionParameters) {
 	testTags := getTestTags(wOptions.BackgroundActivityContext)
 	if testTags != nil {

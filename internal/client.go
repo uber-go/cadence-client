@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"sync"
 
 	"go.uber.org/cadence/encoded"
 
@@ -327,7 +328,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 		workflowService:   metrics.NewWorkflowServiceWrapper(service, metricScope),
 		domain:            domain,
 		metricsScope:      metricScope,
-		tagToMetricsScope: make(map[string]tally.Scope),
+		tagToMetricsScope: sync.Map{},
 		identity:          identity,
 	}
 }

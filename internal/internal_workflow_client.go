@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
@@ -51,7 +52,7 @@ type (
 		workflowService   workflowserviceclient.Interface
 		domain            string
 		metricsScope      tally.Scope
-		tagToMetricsScope map[string]tally.Scope // to avoid repeated creation of subScope
+		tagToMetricsScope sync.Map // to avoid repeated creation of subScopes
 		identity          string
 	}
 
@@ -191,11 +192,8 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	if wc.metricsScope != nil {
-		wfName := workflowType.Name
-		if _, ok := wc.tagToMetricsScope[wfName]; !ok {
-			wc.tagToMetricsScope[wfName] = tagScope(wc.metricsScope, tagWorkerType, wfName)
-		}
-		wc.tagToMetricsScope[wfName].Counter(metrics.WorkflowStartCounter).Inc(1)
+		scope := getOrCreateTaggedScope(wc.tagToMetricsScope, wc.metricsScope, tagWorkflowType, workflowType.Name)
+		scope.Counter(metrics.WorkflowStartCounter).Inc(1)
 	}
 
 	executionInfo := &WorkflowExecution{

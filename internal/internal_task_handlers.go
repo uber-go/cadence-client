@@ -117,7 +117,7 @@ type (
 		identity          string
 		service           workflowserviceclient.Interface
 		metricsScope      tally.Scope
-		tagToMetricsScope map[string]tally.Scope // to avoid repeated creation of subScope
+		tagToMetricsScope sync.Map // to avoid repeated creation of subScopes
 		logger            *zap.Logger
 		userContext       context.Context
 		hostEnv           *hostEnvImpl
@@ -1091,7 +1091,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		service:           service,
 		logger:            params.Logger,
 		metricsScope:      params.MetricsScope,
-		tagToMetricsScope: make(map[string]tally.Scope),
+		tagToMetricsScope: sync.Map{},
 		userContext:       params.UserContext,
 		hostEnv:           env,
 		activityProvider:  activityProvider,
@@ -1249,11 +1249,8 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			ath.logger.Error("Activity panic.",
 				zap.String("PanicError", fmt.Sprintf("%v", p)),
 				zap.String("PanicStack", st))
-			activityTypeName := t.ActivityType.GetName()
-			if _, ok := ath.tagToMetricsScope[activityTypeName]; !ok {
-				ath.tagToMetricsScope[activityTypeName] = tagScope(ath.metricsScope, tagActivityType, activityTypeName)
-			}
-			ath.tagToMetricsScope[activityTypeName].Counter(metrics.ActivityTaskPanicCounter).Inc(1)
+			scope := getOrCreateTaggedScope(ath.tagToMetricsScope, ath.metricsScope, tagActivityType, t.ActivityType.GetName())
+			scope.Counter(metrics.ActivityTaskPanicCounter).Inc(1)
 			panicErr := newPanicError(p, st)
 			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr), nil
 		}

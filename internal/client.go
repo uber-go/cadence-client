@@ -23,8 +23,8 @@ package internal
 import (
 	"context"
 	"fmt"
-	"time"
 	"sync"
+	"time"
 
 	"go.uber.org/cadence/encoded"
 

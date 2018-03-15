@@ -1100,7 +1100,7 @@ func getOrCreateTaggedScope(m sync.Map, scope tally.Scope, tagName, tagValue str
 		taggedScope, _ = m.Load(tagValue)
 	}
 	if taggedScope == nil {
-		panic("metric scope cannot be tagged")  // This should never happen
+		panic("metric scope cannot be tagged") // This should never happen
 	}
 	return taggedScope.(tally.Scope)
 }

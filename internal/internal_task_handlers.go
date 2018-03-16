@@ -113,15 +113,14 @@ type (
 	activityProvider func(name string) activity
 	// activityTaskHandlerImpl is the implementation of ActivityTaskHandler
 	activityTaskHandlerImpl struct {
-		taskListName      string
-		identity          string
-		service           workflowserviceclient.Interface
-		metricsScope      tally.Scope
-		tagToMetricsScope sync.Map // to avoid repeated creation of subScopes
-		logger            *zap.Logger
-		userContext       context.Context
-		hostEnv           *hostEnvImpl
-		activityProvider  activityProvider
+		taskListName     string
+		identity         string
+		service          workflowserviceclient.Interface
+		metricsScope     *metrics.TaggedScope
+		logger           *zap.Logger
+		userContext      context.Context
+		hostEnv          *hostEnvImpl
+		activityProvider activityProvider
 	}
 
 	// history wrapper method to help information about events.
@@ -1086,15 +1085,14 @@ func newActivityTaskHandlerWithCustomProvider(
 	activityProvider activityProvider,
 ) ActivityTaskHandler {
 	return &activityTaskHandlerImpl{
-		taskListName:      params.TaskList,
-		identity:          params.Identity,
-		service:           service,
-		logger:            params.Logger,
-		metricsScope:      params.MetricsScope,
-		tagToMetricsScope: sync.Map{},
-		userContext:       params.UserContext,
-		hostEnv:           env,
-		activityProvider:  activityProvider,
+		taskListName:     params.TaskList,
+		identity:         params.Identity,
+		service:          service,
+		logger:           params.Logger,
+		metricsScope:     &metrics.TaggedScope{Scope: params.MetricsScope, Map: &sync.Map{}},
+		userContext:      params.UserContext,
+		hostEnv:          env,
+		activityProvider: activityProvider,
 	}
 }
 
@@ -1249,7 +1247,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			ath.logger.Error("Activity panic.",
 				zap.String("PanicError", fmt.Sprintf("%v", p)),
 				zap.String("PanicStack", st))
-			scope := getOrCreateTaggedScope(ath.tagToMetricsScope, ath.metricsScope, tagActivityType, t.ActivityType.GetName())
+			scope := ath.metricsScope.GetTaggedScope(tagActivityType, t.ActivityType.GetName())
 			scope.Counter(metrics.ActivityTaskPanicCounter).Inc(1)
 			panicErr := newPanicError(p, st)
 			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr), nil

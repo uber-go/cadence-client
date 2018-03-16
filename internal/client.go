@@ -325,11 +325,10 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	}
 	metricScope = tagScope(metricScope, tagDomain, domain)
 	return &workflowClient{
-		workflowService:   metrics.NewWorkflowServiceWrapper(service, metricScope),
-		domain:            domain,
-		metricsScope:      metricScope,
-		tagToMetricsScope: sync.Map{},
-		identity:          identity,
+		workflowService: metrics.NewWorkflowServiceWrapper(service, metricScope),
+		domain:          domain,
+		metricsScope:    &metrics.TaggedScope{Scope: metricScope, Map: &sync.Map{}},
+		identity:        identity,
 	}
 }
 

@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sync"
 
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
@@ -49,11 +48,10 @@ const (
 type (
 	// workflowClient is the client for starting a workflow execution.
 	workflowClient struct {
-		workflowService   workflowserviceclient.Interface
-		domain            string
-		metricsScope      tally.Scope
-		tagToMetricsScope sync.Map // to avoid repeated creation of subScopes
-		identity          string
+		workflowService workflowserviceclient.Interface
+		domain          string
+		metricsScope    *metrics.TaggedScope
+		identity        string
 	}
 
 	// domainClient is the client for managing domains.
@@ -192,7 +190,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	if wc.metricsScope != nil {
-		scope := getOrCreateTaggedScope(wc.tagToMetricsScope, wc.metricsScope, tagWorkflowType, workflowType.Name)
+		scope := wc.metricsScope.GetTaggedScope(tagWorkflowType, workflowType.Name)
 		scope.Counter(metrics.WorkflowStartCounter).Inc(1)
 	}
 

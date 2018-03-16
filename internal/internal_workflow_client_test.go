@@ -24,7 +24,6 @@ import (
 	"errors"
 	"log"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -34,7 +33,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
-	"github.com/uber-go/tally"
 	"go.uber.org/cadence/internal/common/metrics"
 )
 
@@ -192,7 +190,7 @@ func (s *workflowRunSuite) SetupTest() {
 	mockCtrl := gomock.NewController(s.T())
 	s.workflowServiceClient = workflowservicetest.NewMockClient(mockCtrl)
 
-	metricsScope := &metrics.TaggedScope{Scope: tally.NoopScope, Map: &sync.Map{}}
+	metricsScope := metrics.NewTaggedScope(nil)
 	s.workflowClient = &workflowClient{
 		workflowService: s.workflowServiceClient,
 		domain:          domain,

@@ -200,7 +200,7 @@ func (ts *TaggedScope) GetTaggedScope(tagName, tagValue string) tally.Scope {
 		ts.Map = &sync.Map{}
 	}
 
-	key := tagName + tagValue // used to prevent collision of tagValue (map key) for different tagName
+	key := tagName + ":" + tagValue // used to prevent collision of tagValue (map key) for different tagName
 	taggedScope, ok := ts.Load(key)
 	if !ok {
 		ts.Store(key, ts.Scope.Tagged(map[string]string{tagName: tagValue}))
@@ -214,6 +214,9 @@ func (ts *TaggedScope) GetTaggedScope(tagName, tagValue string) tally.Scope {
 }
 
 // NewTaggedScope create a new TaggedScope
-func NewTaggedScope() *TaggedScope {
-	return &TaggedScope{Scope: tally.NoopScope, Map: &sync.Map{}}
+func NewTaggedScope(scope tally.Scope) *TaggedScope {
+	if scope == nil {
+		scope = tally.NoopScope
+	}
+	return &TaggedScope{Scope: scope, Map: &sync.Map{}}
 }

@@ -174,7 +174,7 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 			taskListSpecificActivities: make(map[string]*taskListSpecificActivity),
 
 			logger:           s.logger,
-			metricsScope:     metrics.NewTaggedScope(),
+			metricsScope:     metrics.NewTaggedScope(nil),
 			mockClock:        clock.NewMock(),
 			wallClock:        clock.New(),
 			timers:           make(map[string]*testTimerHandle),
@@ -213,7 +213,7 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 		env.logger = logger
 	}
 	if env.metricsScope == nil {
-		env.metricsScope = &metrics.TaggedScope{Scope: s.scope, Map: &sync.Map{}}
+		env.metricsScope = metrics.NewTaggedScope(s.scope)
 	}
 
 	// setup mock service

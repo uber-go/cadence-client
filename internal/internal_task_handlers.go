@@ -1089,7 +1089,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		identity:         params.Identity,
 		service:          service,
 		logger:           params.Logger,
-		metricsScope:     &metrics.TaggedScope{Scope: params.MetricsScope, Map: &sync.Map{}},
+		metricsScope:     metrics.NewTaggedScope(params.MetricsScope),
 		userContext:      params.UserContext,
 		hostEnv:          env,
 		activityProvider: activityProvider,

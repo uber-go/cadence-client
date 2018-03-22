@@ -964,7 +964,7 @@ struct SignalWorkflowExecutionRequest {
 
 struct SignalWithStartWorkflowExecutionRequest {
   10: optional string domain
-  20: optional WorkflowExecution workflowExecution
+  20: optional string workflowId
   30: optional WorkflowType workflowType
   40: optional TaskList taskList
   50: optional binary input

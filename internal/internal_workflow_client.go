@@ -263,9 +263,9 @@ func (wc *workflowClient) SignalWorkflow(ctx context.Context, workflowID string,
 		}, serviceOperationRetryPolicy, isServiceTransientError)
 }
 
-// SignalWithStartWorkflow sends a signals to a workflow in execution, if workflow is not running or not found,
-// it starts workflow then sends the signal in transaction
-func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowID string, runID string, signalName string, signalArg interface{},
+// SignalWithStartWorkflow sends a signal to a running workflow.
+// If the workflow is not running or not found, it starts the workflow and then sends the signal in transaction.
+func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
 	options StartWorkflowOptions, workflowFunc interface{}, workflowArgs ...interface{}) (*WorkflowExecution, error) {
 
 	signalInput, err := getEncodedArg(signalArg)
@@ -300,17 +300,13 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 		return nil, err
 	}
 
-	execution := &s.WorkflowExecution{
-		WorkflowId: common.StringPtr(workflowID),
-		RunId:      getRunID(runID),
-	}
 	signalWithStartRequest := &s.SignalWithStartWorkflowExecutionRequest{
-		Domain:            common.StringPtr(wc.domain),
-		RequestId:         common.StringPtr(uuid.New()),
-		WorkflowExecution: execution,
-		WorkflowType:      workflowTypePtr(*workflowType),
-		TaskList:          common.TaskListPtr(s.TaskList{Name: common.StringPtr(options.TaskList)}),
-		Input:             input,
+		Domain:       common.StringPtr(wc.domain),
+		RequestId:    common.StringPtr(uuid.New()),
+		WorkflowId:   common.StringPtr(workflowID),
+		WorkflowType: workflowTypePtr(*workflowType),
+		TaskList:     common.TaskListPtr(s.TaskList{Name: common.StringPtr(options.TaskList)}),
+		Input:        input,
 		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionTimeout),
 		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(decisionTaskTimeout),
 		SignalName:                          common.StringPtr(signalName),

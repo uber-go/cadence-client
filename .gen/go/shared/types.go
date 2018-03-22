@@ -21526,7 +21526,7 @@ func (v *SignalExternalWorkflowExecutionInitiatedEventAttributes) GetChildWorkfl
 
 type SignalWithStartWorkflowExecutionRequest struct {
 	Domain                              *string                `json:"domain,omitempty"`
-	WorkflowExecution                   *WorkflowExecution     `json:"workflowExecution,omitempty"`
+	WorkflowId                          *string                `json:"workflowId,omitempty"`
 	WorkflowType                        *WorkflowType          `json:"workflowType,omitempty"`
 	TaskList                            *TaskList              `json:"taskList,omitempty"`
 	Input                               []byte                 `json:"input,omitempty"`
@@ -21571,8 +21571,8 @@ func (v *SignalWithStartWorkflowExecutionRequest) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 10, Value: w}
 		i++
 	}
-	if v.WorkflowExecution != nil {
-		w, err = v.WorkflowExecution.ToWire()
+	if v.WorkflowId != nil {
+		w, err = wire.NewValueString(*(v.WorkflowId)), error(nil)
 		if err != nil {
 			return w, err
 		}
@@ -21710,8 +21710,10 @@ func (v *SignalWithStartWorkflowExecutionRequest) FromWire(w wire.Value) error {
 
 			}
 		case 20:
-			if field.Value.Type() == wire.TStruct {
-				v.WorkflowExecution, err = _WorkflowExecution_Read(field.Value)
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.WorkflowId = &x
 				if err != nil {
 					return err
 				}
@@ -21836,8 +21838,8 @@ func (v *SignalWithStartWorkflowExecutionRequest) String() string {
 		fields[i] = fmt.Sprintf("Domain: %v", *(v.Domain))
 		i++
 	}
-	if v.WorkflowExecution != nil {
-		fields[i] = fmt.Sprintf("WorkflowExecution: %v", v.WorkflowExecution)
+	if v.WorkflowId != nil {
+		fields[i] = fmt.Sprintf("WorkflowId: %v", *(v.WorkflowId))
 		i++
 	}
 	if v.WorkflowType != nil {
@@ -21906,7 +21908,7 @@ func (v *SignalWithStartWorkflowExecutionRequest) Equals(rhs *SignalWithStartWor
 	if !_String_EqualsPtr(v.Domain, rhs.Domain) {
 		return false
 	}
-	if !((v.WorkflowExecution == nil && rhs.WorkflowExecution == nil) || (v.WorkflowExecution != nil && rhs.WorkflowExecution != nil && v.WorkflowExecution.Equals(rhs.WorkflowExecution))) {
+	if !_String_EqualsPtr(v.WorkflowId, rhs.WorkflowId) {
 		return false
 	}
 	if !((v.WorkflowType == nil && rhs.WorkflowType == nil) || (v.WorkflowType != nil && rhs.WorkflowType != nil && v.WorkflowType.Equals(rhs.WorkflowType))) {
@@ -21951,6 +21953,16 @@ func (v *SignalWithStartWorkflowExecutionRequest) Equals(rhs *SignalWithStartWor
 func (v *SignalWithStartWorkflowExecutionRequest) GetDomain() (o string) {
 	if v.Domain != nil {
 		return *v.Domain
+	}
+
+	return
+}
+
+// GetWorkflowId returns the value of WorkflowId if it is set or its
+// zero value if it is unset.
+func (v *SignalWithStartWorkflowExecutionRequest) GetWorkflowId() (o string) {
+	if v.WorkflowId != nil {
+		return *v.WorkflowId
 	}
 
 	return

@@ -299,11 +299,11 @@ service WorkflowService {
     )
 
   /**
-  * SignalWithStartWorkflowExecution is used to ensure sending a signal event to a workflow execution.
-  * If workflow is running, this results in WorkflowExecutionSignaled event recorded in the history
+  * SignalWithStartWorkflowExecution is used to ensure sending signal to a workflow.
+  * If the workflow is running, this results in WorkflowExecutionSignaled event being recorded in the history
   * and a decision task being created for the execution.
-  * If workflow is not running or not found, this results in WorkflowExecutionStarted and WorkflowExecutionSignaled
-  * event recorded in history, and a decision task being created for the execution
+  * If the workflow is not running or not found, this results in WorkflowExecutionStarted and WorkflowExecutionSignaled
+  * events being recorded in history, and a decision task being created for the execution
   **/
   shared.StartWorkflowExecutionResponse SignalWithStartWorkflowExecution(1: shared.SignalWithStartWorkflowExecutionRequest signalWithStartRequest)
     throws (

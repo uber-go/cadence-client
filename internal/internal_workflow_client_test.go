@@ -544,12 +544,12 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflow() {
 	}
 	s.service.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(2)
 
-	resp, err := s.client.SignalWithStartWorkflow(context.Background(), workflowID, runID, signalName, signalInput,
+	resp, err := s.client.SignalWithStartWorkflow(context.Background(), workflowID, signalName, signalInput,
 		options, workflowType)
 	s.Nil(err)
 	s.Equal(createResponse.GetRunId(), resp.RunID)
 
-	resp, err = s.client.SignalWithStartWorkflow(context.Background(), "", runID, signalName, signalInput,
+	resp, err = s.client.SignalWithStartWorkflow(context.Background(), "", signalName, signalInput,
 		options, workflowType)
 	s.Nil(err)
 	s.Equal(createResponse.GetRunId(), resp.RunID)
@@ -560,13 +560,13 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_Error() {
 	signalInput := []byte("my signal input")
 	options := StartWorkflowOptions{}
 
-	resp, err := s.client.SignalWithStartWorkflow(context.Background(), workflowID, runID, signalName, signalInput,
+	resp, err := s.client.SignalWithStartWorkflow(context.Background(), workflowID, signalName, signalInput,
 		options, workflowType)
 	s.NotNil(err)
 	s.Nil(resp)
 
 	options.TaskList = tasklist
-	resp, err = s.client.SignalWithStartWorkflow(context.Background(), workflowID, runID, signalName, signalInput,
+	resp, err = s.client.SignalWithStartWorkflow(context.Background(), workflowID, signalName, signalInput,
 		options, workflowType)
 	s.NotNil(err)
 	s.Nil(resp)
@@ -576,7 +576,7 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_Error() {
 		RunId: common.StringPtr(runID),
 	}
 	s.service.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(2)
-	resp, err = s.client.SignalWithStartWorkflow(context.Background(), workflowID, runID, signalName, signalInput,
+	resp, err = s.client.SignalWithStartWorkflow(context.Background(), workflowID, signalName, signalInput,
 		options, workflowType)
 	s.Nil(err)
 	s.Equal(createResponse.GetRunId(), resp.RunID)

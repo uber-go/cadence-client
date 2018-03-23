@@ -114,6 +114,18 @@ func Now(ctx Context) time.Time {
 // is canceled, the returned Future become ready, and Future.Get() will return *CanceledError.
 // The current timer resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
 // subjected to change in the future.
+//
+// NOTE: the return error from Future should alreays be checked before moving forward.
+// Example:
+// var err error
+// selector := NewSelector(ctx)
+// timer := NewTimer(ctx, 1*time.Hour)
+// selctor.AddFuture(timer, func(f Future) {
+//   err  = f.Get(ctx, nil)
+// })
+// {OTHER WORKFLOW CODE}
+// the timer will be interrupted if workflow is cancelled, meaning the selector
+// will not pause for 1 hour and {OTHER WORKFLOW CODE} will be executed.
 func NewTimer(ctx Context, d time.Duration) Future {
 	return internal.NewTimer(ctx, d)
 }

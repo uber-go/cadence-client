@@ -30,6 +30,7 @@ import (
 
 	"github.com/uber-go/tally"
 	m "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
@@ -86,6 +87,7 @@ type (
 		sideEffectResult map[int32][]byte
 		changeVersions   map[string]Version
 		pendingLaTasks   map[string]*localActivityTask
+		idedSideEffect   map[string][]byte
 		unstartedLaTasks map[string]struct{}
 
 		counterID         int32     // To generate sequence IDs for activity/timer etc.
@@ -162,6 +164,7 @@ func newWorkflowExecutionEventHandler(
 		workflowInfo:          workflowInfo,
 		decisionsHelper:       newDecisionsHelper(),
 		sideEffectResult:      make(map[int32][]byte),
+		idedSideEffect:        make(map[string][]byte),
 		changeVersions:        make(map[string]Version),
 		pendingLaTasks:        make(map[string]*localActivityTask),
 		unstartedLaTasks:      make(map[string]struct{}),
@@ -512,6 +515,46 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 	wc.logger.Debug("SideEffect Marker added", zap.Int32(tagSideEffectID, sideEffectID))
 }
 
+func (wc *workflowEnvironmentImpl) UpdateSideEffect(id string, f func() ([]byte, error), equals func(a, b encoded.Value) bool) encoded.Value {
+	if result, ok := wc.idedSideEffect[id]; ok {
+		encodedResult := EncodedValue(result)
+		if wc.isReplay {
+			return encodedResult
+		}
+
+		newValue, err := f()
+		if err != nil {
+			panic(err)
+		}
+		if equals(EncodedValue(newValue), encodedResult) {
+			return encodedResult
+		}
+
+		return wc.recordUpdatedSideEffect(id, newValue)
+	}
+
+	if wc.isReplay {
+		// this should not happen
+		panic("SideEffect result with given ID not found during replay")
+	}
+
+	result, err := f()
+	if err != nil {
+		panic(err)
+	}
+	return wc.recordUpdatedSideEffect(id, result)
+}
+
+func (wc *workflowEnvironmentImpl) recordUpdatedSideEffect(id string, data []byte) encoded.Value {
+	details, err := wc.hostEnv.encodeArgs([]interface{}{id, string(data)})
+	if err != nil {
+		panic(err)
+	}
+	wc.decisionsHelper.recordUpdatedSideEffectMarker(id, details)
+	wc.idedSideEffect[id] = data
+	return EncodedValue(data)
+}
+
 func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	event *m.HistoryEvent,
 	isReplay bool,
@@ -809,6 +852,12 @@ func (weh *workflowExecutionEventHandlerImpl) handleMarkerRecorded(
 		return nil
 	case localActivityMarkerName:
 		return weh.handleLocalActivityMarker(attributes.Details)
+	case idedSideEffectMarkerName:
+		var fixedID string
+		var result string
+		encodedValues.Get(&fixedID, &result)
+		weh.idedSideEffect[fixedID] = []byte(result)
+		return nil
 	default:
 		return fmt.Errorf("unknown marker name \"%v\" for eventID \"%v\"",
 			attributes.GetMarkerName(), eventID)

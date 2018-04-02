@@ -23,12 +23,13 @@ package internal
 // All code in this file is private to the package.
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
-	"bytes"
 	"github.com/uber-go/tally"
 	m "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/encoded"
@@ -36,7 +37,6 @@ import (
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"reflect"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -533,7 +533,7 @@ func (wc *workflowEnvironmentImpl) MutableSideEffect(id string, f func() interfa
 	}
 
 	if wc.isReplay {
-		// this should not happen
+		// This should not happen
 		panic("MutableSideEffect with given ID not found during replay")
 	}
 

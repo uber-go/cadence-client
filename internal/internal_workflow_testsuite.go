@@ -1361,7 +1361,7 @@ func (env *testWorkflowEnvironmentImpl) GetVersion(changeID string, minSupported
 	return maxSupported
 }
 
-func (env *testWorkflowEnvironmentImpl) UpdateSideEffect(id string, f func() ([]byte, error), equals func(a, b encoded.Value) bool) encoded.Value {
+func (env *testWorkflowEnvironmentImpl) MutableSideEffect(id string, f func() ([]byte, error), equals func(a, b encoded.Value) bool) encoded.Value {
 	blob, err := f()
 	if err != nil {
 		panic(err)

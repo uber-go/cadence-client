@@ -262,21 +262,22 @@ func SideEffect(ctx Context, f func(ctx Context) interface{}) encoded.Value {
 	return internal.SideEffect(ctx, f)
 }
 
-// UpdateSideEffect executes provided function once, then it look up history for value with the given id,
+// MutableSideEffect executes provided function once, then it look up history for value with the given id,
 // if there is no existing value, then it record the function result as value with the given id on history;
 // otherwise, it compare if the existing value from history has changed from the new function result by calling the
 // provided equals function,
 //   if they are equal, it returns the value without recording a new one in history;
-//   otherwise, it record the new value with the same id on history.
+//   otherwise, it records the new value with the same id on history.
 //
-// Caution: do not use UpdateSideEffect to modify closures, always retrieve result from UpdateSideEffect's encoded return value.
+// Caution: do not use MutableSideEffect to modify closures, always retrieve result from MutableSideEffect's encoded
+// return value.
 //
-// The difference between UpdateSideEffect() and SideEffect() is that every new SideEffect() call in non-replay will result
-// in a new marker been recorded on history. However, UpdateSideEffect() only record a new marker if the value changed.
-// During replay, UpdateSideEffect() will not execute the function again, but it will return the exact same value as it
-// was returning during the non-replay run.
-func UpdateSideEffect(ctx Context, id string, f func(ctx Context) interface{}, equals func(a, b encoded.Value) bool) encoded.Value {
-	return internal.UpdateSideEffect(ctx, id, f, equals)
+// The difference between MutableSideEffect() and SideEffect() is that every new SideEffect() call in non-replay will
+// result in a new marker been recorded on history. However, MutableSideEffect() only record a new marker if the value
+// changed. During replay, MutableSideEffect() will not execute the function again, but it will return the exact same
+// value as it was returning during the non-replay run.
+func MutableSideEffect(ctx Context, id string, f func(ctx Context) interface{}, equals func(a, b encoded.Value) bool) encoded.Value {
+	return internal.MutableSideEffect(ctx, id, f, equals)
 }
 
 // DefaultVersion is a version returned by GetVersion for code that wasn't versioned before

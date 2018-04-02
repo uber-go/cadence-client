@@ -71,7 +71,7 @@ type (
 		SignalExternalWorkflow(domainName, workflowID, runID, signalName string, input []byte, arg interface{}, childWorkflowOnly bool, callback resultHandler)
 		RegisterQueryHandler(handler func(queryType string, queryArgs []byte) ([]byte, error))
 		IsReplaying() bool
-		UpdateSideEffect(id string, f func() ([]byte, error), equals func(a, b encoded.Value) bool) encoded.Value
+		MutableSideEffect(id string, f func() ([]byte, error), equals func(a, b encoded.Value) bool) encoded.Value
 	}
 
 	// WorkflowDefinition wraps the code that can execute a workflow.

@@ -729,7 +729,7 @@ func (w *workflowExecutionContext) CompleteDecisionTask() interface{} {
 func skipDeterministicCheckForDecision(d *s.Decision) bool {
 	if d.GetDecisionType() == s.DecisionTypeRecordMarker {
 		markerName := d.RecordMarkerDecisionAttributes.GetMarkerName()
-		if markerName == versionMarkerName || markerName == idedSideEffectMarkerName {
+		if markerName == versionMarkerName || markerName == mutableSideEffectMarkerName {
 			return true
 		}
 	}
@@ -739,7 +739,7 @@ func skipDeterministicCheckForDecision(d *s.Decision) bool {
 func skipDeterministicCheckForEvent(e *s.HistoryEvent) bool {
 	if e.GetEventType() == s.EventTypeMarkerRecorded {
 		markerName := e.MarkerRecordedEventAttributes.GetMarkerName()
-		if markerName == versionMarkerName || markerName == idedSideEffectMarkerName {
+		if markerName == versionMarkerName || markerName == mutableSideEffectMarkerName {
 			return true
 		}
 	}

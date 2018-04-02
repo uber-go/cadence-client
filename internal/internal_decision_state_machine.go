@@ -146,10 +146,10 @@ const (
 )
 
 const (
-	sideEffectMarkerName     = "SideEffect"
-	versionMarkerName        = "Version"
-	localActivityMarkerName  = "LocalActivity"
-	idedSideEffectMarkerName = "IdedSideEffect"
+	sideEffectMarkerName        = "SideEffect"
+	versionMarkerName           = "Version"
+	localActivityMarkerName     = "LocalActivity"
+	mutableSideEffectMarkerName = "MutableSideEffect"
 )
 
 func (d decisionState) String() string {
@@ -762,10 +762,10 @@ func (h *decisionsHelper) recordLocalActivityMarker(activityID string, result []
 	return decision
 }
 
-func (h *decisionsHelper) recordUpdatedSideEffectMarker(sideEffectID string, data []byte) decisionStateMachine {
-	markerID := fmt.Sprintf("%v_%v", idedSideEffectMarkerName, sideEffectID)
+func (h *decisionsHelper) recordMutableSideEffectMarker(mutableSideEffectID string, data []byte) decisionStateMachine {
+	markerID := fmt.Sprintf("%v_%v", mutableSideEffectMarkerName, mutableSideEffectID)
 	attributes := &s.RecordMarkerDecisionAttributes{
-		MarkerName: common.StringPtr(idedSideEffectMarkerName),
+		MarkerName: common.StringPtr(mutableSideEffectMarkerName),
 		Details:    data,
 	}
 	decision := newMarkerDecisionStateMachine(markerID, attributes)

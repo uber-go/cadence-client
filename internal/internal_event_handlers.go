@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"bytes"
 	"github.com/uber-go/tally"
 	m "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/encoded"
@@ -35,6 +36,7 @@ import (
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"reflect"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -515,22 +517,19 @@ func (wc *workflowEnvironmentImpl) SideEffect(f func() ([]byte, error), callback
 	wc.logger.Debug("SideEffect Marker added", zap.Int32(tagSideEffectID, sideEffectID))
 }
 
-func (wc *workflowEnvironmentImpl) MutableSideEffect(id string, f func() ([]byte, error), equals func(a, b encoded.Value) bool) encoded.Value {
+func (wc *workflowEnvironmentImpl) MutableSideEffect(id string, f func() interface{}, equals func(a, b interface{}) bool) encoded.Value {
 	if result, ok := wc.mutableSideEffect[id]; ok {
 		encodedResult := EncodedValue(result)
 		if wc.isReplay {
 			return encodedResult
 		}
 
-		newValue, err := f()
-		if err != nil {
-			panic(err)
-		}
-		if equals(EncodedValue(newValue), encodedResult) {
+		newValue := f()
+		if isEqualValue(newValue, result, equals) {
 			return encodedResult
 		}
 
-		return wc.recordMutableSideEffect(id, newValue)
+		return wc.recordMutableSideEffect(id, encodeValue(newValue))
 	}
 
 	if wc.isReplay {
@@ -538,11 +537,36 @@ func (wc *workflowEnvironmentImpl) MutableSideEffect(id string, f func() ([]byte
 		panic("MutableSideEffect with given ID not found during replay")
 	}
 
-	result, err := f()
+	return wc.recordMutableSideEffect(id, encodeValue(f()))
+}
+
+func isEqualValue(newValue interface{}, encodedOldValue []byte, equals func(a, b interface{}) bool) bool {
+	if newValue == nil {
+		// new value is nil
+		newEncodedValue := encodeValue(nil)
+		return bytes.Equal(newEncodedValue, encodedOldValue)
+	}
+
+	oldValue := decodeValue(encodedOldValue, newValue)
+	return equals(newValue, oldValue)
+}
+
+func decodeValue(encodedValue EncodedValue, value interface{}) interface{} {
+	// We need to decode oldValue out of encodedValue, first we need to prepare valuePtr as the same type as value
+	valuePtr := reflect.New(reflect.TypeOf(value)).Interface()
+	if err := encodedValue.Get(valuePtr); err != nil {
+		panic(err)
+	}
+	decodedValue := reflect.ValueOf(valuePtr).Elem().Interface()
+	return decodedValue
+}
+
+func encodeValue(value interface{}) []byte {
+	blob, err := getHostEnvironment().encodeArg(value)
 	if err != nil {
 		panic(err)
 	}
-	return wc.recordMutableSideEffect(id, result)
+	return blob
 }
 
 func (wc *workflowEnvironmentImpl) recordMutableSideEffect(id string, data []byte) encoded.Value {

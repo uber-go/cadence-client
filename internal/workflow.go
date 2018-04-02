@@ -818,10 +818,9 @@ func SideEffect(ctx Context, f func(ctx Context) interface{}) encoded.Value {
 // result in a new marker been recorded on history. However, MutableSideEffect() only record a new marker if the value
 // changed. During replay, MutableSideEffect() will not execute the function again, but it will return the exact same
 // value as it was returning during the non-replay run.
-func MutableSideEffect(ctx Context, id string, f func(ctx Context) interface{}, equals func(a, b encoded.Value) bool) encoded.Value {
-	wrapperFunc := func() ([]byte, error) {
-		r := f(ctx)
-		return getHostEnvironment().encodeArg(r)
+func MutableSideEffect(ctx Context, id string, f func(ctx Context) interface{}, equals func(a, b interface{}) bool) encoded.Value {
+	wrapperFunc := func() interface{} {
+		return f(ctx)
 	}
 	return getWorkflowEnvironment(ctx).MutableSideEffect(id, wrapperFunc, equals)
 }

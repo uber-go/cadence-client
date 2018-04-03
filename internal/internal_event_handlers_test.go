@@ -103,7 +103,7 @@ func Test_DecodedValueNil(t *testing.T) {
 		return a == nil && b == nil
 	}
 	// newValue is nil, old value is nil
-	var value interface{} = nil
+	var value interface{}
 	blob := encodeValue(value)
 	isEqual := isEqualValue(value, blob, equals)
 	require.True(t, isEqual)

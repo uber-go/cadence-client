@@ -276,7 +276,7 @@ func SideEffect(ctx Context, f func(ctx Context) interface{}) encoded.Value {
 // changed. During replay, MutableSideEffect() will not execute the function again, but it will return the exact same
 // value as it was returning during the non-replay run.
 //
-// One good use case of MutableSideEffect() is to dynamic change config without breaking determinism.
+// One good use case of MutableSideEffect() is to access dynamically changing config without breaking determinism.
 func MutableSideEffect(ctx Context, id string, f func(ctx Context) interface{}, equals func(a, b interface{}) bool) encoded.Value {
 	return internal.MutableSideEffect(ctx, id, f, equals)
 }

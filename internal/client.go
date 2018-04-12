@@ -378,7 +378,14 @@ func (p WorkflowIDReusePolicy) toThriftPtr() *s.WorkflowIdReusePolicy {
 	return &policy
 }
 
-// NewDecoder creates an decoder
-func NewDecoder() encoded.Decoder {
-	return &DecoderImpl{}
+// NewValue creates a new encoded.Value
+func NewValue(data []byte) encoded.Value {
+	result := EncodedValue(data)
+	return &result
+}
+
+// NewValues creates a new encoded.Values
+func NewValues(data []byte) encoded.Values {
+	result := EncodedValues(data)
+	return &result
 }

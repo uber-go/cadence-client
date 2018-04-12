@@ -34,3 +34,30 @@ func TestChannelBuilderOptions(t *testing.T) {
 
 	require.Equal(t, time.Minute, builder.Timeout)
 }
+
+type testDecodeStruct struct {
+	Name string
+	Age  int
+}
+
+func TestDecoder(t *testing.T) {
+	var details []interface{}
+	heartbeatDetail := "status-report-to-workflow"
+	heartbeatDetail2 := 1
+	heartbeatDetail3 := testDecodeStruct{
+		Name: heartbeatDetail,
+		Age:  heartbeatDetail2,
+	}
+	details = append(details, heartbeatDetail, heartbeatDetail2, heartbeatDetail3)
+	data, err := getHostEnvironment().encodeArgs(details)
+	if err != nil {
+		panic(err)
+	}
+	var res string
+	var res2 int
+	var res3 testDecodeStruct
+	NewDecoder().Decode(data, &res, &res2, &res3)
+	require.Equal(t, heartbeatDetail, res)
+	require.Equal(t, heartbeatDetail2, res2)
+	require.Equal(t, heartbeatDetail3, res3)
+}

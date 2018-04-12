@@ -38,4 +38,10 @@ type (
 		// Get extract the encoded values into strong typed value pointers.
 		Get(valuePtr ...interface{}) error
 	}
+
+	// Decoder is used to decode data
+	Decoder interface {
+		// Decode is used to decode binary from Cadence
+		Decode(data []byte, valuePtr ...interface{}) error
+	}
 )

@@ -308,3 +308,8 @@ var _ Client = internal.Client(nil)
 var _ internal.Client = Client(nil)
 var _ DomainClient = internal.DomainClient(nil)
 var _ internal.DomainClient = DomainClient(nil)
+
+// NewDecoder creates an decoder
+func NewDecoder() encoded.Decoder {
+	return internal.NewDecoder()
+}

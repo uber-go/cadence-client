@@ -377,3 +377,8 @@ func (p WorkflowIDReusePolicy) toThriftPtr() *s.WorkflowIdReusePolicy {
 	}
 	return &policy
 }
+
+// NewDecoder creates an decoder
+func NewDecoder() encoded.Decoder {
+	return &DecoderImpl{}
+}

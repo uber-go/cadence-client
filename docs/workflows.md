@@ -2,17 +2,17 @@
 
 A workflow is the implementation of coordination logic. Its sole purpose is to orchestrate activity executions.
 
-Workflows are implemented as functions. Startup data can be passed to a workflow via function parameters. The parameters can be either basic types or structs, with the only requirement being that the parameters need to be serializable. The first parameter of a workflow function is of type `workflow.Context`. The function must return an **error** value, and can optional return a result value. The result value can be either a basic type or a struct with the only requirement being that the it is serializable.
+Workflows are implemented as functions. Startup data can be passed to a workflow via function parameters. The parameters can be either basic types or structs, with the only requirement being that the parameters need to be serializable. The first parameter of a workflow function is of type `workflow.Context`. The function must return an **error** value, and can optionally return a result value. The result value can be either a basic type or a struct with the only requirement being that it is serializable.
 
-Workflow functions need to execute deterministically. Therefore, here is a list of rules that workflow code should obey to be a good Cadence citizen:
+Workflow functions need to execute deterministically. Therefore, here is a list of rules that workflow code should obey:
 * Use `workflow.Context` everywhere.
 * Don’t use range over `map`.
 * Use `workflow.SideEffect` to call rand and similar nondeterministic functions like UUID generator.
-* Use `workflow.Now` to get current time. Use `workflow.NewTimer` or `workflow.Sleep` instead of standard Go functions.
+* Use `workflow.Now` to get the current time. Use `workflow.NewTimer` or `workflow.Sleep` instead of standard Go functions.
 * Don’t use native channel and select. Use `workflow.Channel` and `workflow.Selector`.
 * Don’t use go func(...). Use `workflow.Go(func(...))`.
-* Don’t use non constant global variables as multiple instances of a workflow function can be executing in parallel.
-* Don’t use any blocking functions besides belonging to `Channel`, `Selector` or `Future`
+* Don’t use non-constant global variables as multiple instances of a workflow function can be executing in parallel.
+* Don’t use any blocking functions besides belonging to `Channel`, `Selector` or `Future`.
 * Don’t use any synchronization primitives as they can cause blockage and there is no possibility of races when running under dispatcher.
 * Don't just change workflow code when there are open workflows. Always update code using `workflow.GetVersion`.
 * Don’t perform any IO or service calls as they are not usually deterministic. Use activities for that.

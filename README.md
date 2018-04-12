@@ -3,6 +3,8 @@
 
 `cadence-client` is the framework for authoring workflows and activities in Go.
 
+If you are authoring in Java, see [Java Cadence Client](https://github.com/uber-java/cadence-client).
+
 ## Samples
 
 For samples, see [Cadence Samples](https://github.com/samarabbas/cadence-samples).

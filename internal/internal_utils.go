@@ -215,11 +215,3 @@ func getKillSignal() <-chan os.Signal {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	return c
 }
-
-// DecoderImpl implements encoded.Decoder Decode function
-type DecoderImpl struct{}
-
-// Decode is used to decode byte array received from Cadence
-func (dc *DecoderImpl) Decode(data []byte, valuePtr ...interface{}) error {
-	return getHostEnvironment().decode(data, valuePtr)
-}

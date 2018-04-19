@@ -21,7 +21,9 @@
 package internal
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"os"
@@ -77,7 +79,7 @@ type internalWorkerTestSuite struct {
 	service  *workflowservicetest.MockClient
 }
 
-func TestinternalWorkferTestSuite(t *testing.T) {
+func TestInternalWorkferTestSuite(t *testing.T) {
 	s := new(internalWorkerTestSuite)
 	suite.Run(t, s)
 }
@@ -350,9 +352,9 @@ func (s *internalWorkerTestSuite) TestCompleteActivity() {
 	require.NotNil(t, failedRequest)
 }
 
-func (s *internalWorkerTestSuite) TestCompleteActivityById(t *testing.T) {
+func (s *internalWorkerTestSuite) TestCompleteActivityById() {
+	t := s.T()
 	mockService := s.service
-
 	domain := "testDomain"
 	wfClient := NewClient(mockService, domain, nil)
 	var completedRequest, canceledRequest, failedRequest interface{}
@@ -417,7 +419,7 @@ func (s *internalWorkerTestSuite) TestRecordActivityHeartbeatByID() {
 }
 
 func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string {
-	input, err := getHostEnvironment().Encoder().Marshal(args)
+	input, err := getHostEnvironment().GetDataConverter().ToData(args...)
 	require.NoError(t, err, err)
 
 	var result []interface{}
@@ -425,7 +427,7 @@ func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string
 		arg := reflect.New(reflect.TypeOf(v)).Interface()
 		result = append(result, arg)
 	}
-	err = getHostEnvironment().Encoder().Unmarshal(input, result)
+	err = getHostEnvironment().GetDataConverter().FromData(input, result...)
 	require.NoError(t, err, err)
 
 	targetArgs := []reflect.Value{}
@@ -439,7 +441,6 @@ func testEncodeFunction(t *testing.T, f interface{}, args ...interface{}) string
 
 func (s *internalWorkerTestSuite) TestEncoder() {
 	t := s.T()
-	getHostEnvironment().Encoder().Register(new(emptyCtx))
 	// Two param functor.
 	f1 := func(ctx Context, r []byte) string {
 		return "result"
@@ -841,16 +842,6 @@ type encodingTest struct {
 	input    []interface{}
 }
 
-// duplicate of GetHostEnvironment().registerType()
-func testRegisterType(enc encoding, v interface{}) error {
-	t := reflect.Indirect(reflect.ValueOf(v)).Type()
-	if t.Kind() == reflect.Interface || t.Kind() == reflect.Ptr {
-		return nil
-	}
-	arg := reflect.Zero(t).Interface()
-	return enc.Register(arg)
-}
-
 func Test_ActivityNilArgs(t *testing.T) {
 	nilErr := errors.New("nils")
 	activityFn := func(name string, idx int, strptr *string) error {
@@ -922,15 +913,82 @@ func _TestThriftEncoding(t *testing.T) {
 
 // Encode function args
 func testEncodeFunctionArgs(workflowFunc interface{}, args ...interface{}) []byte {
-	err := getHostEnvironment().RegisterFnType(reflect.TypeOf(workflowFunc))
-	if err != nil {
-		fmt.Println(err)
-		panic("Failed to register function types")
-	}
 	input, err := getHostEnvironment().encodeArgs(args)
 	if err != nil {
 		fmt.Println(err)
 		panic("Failed to encode arguments")
 	}
 	return input
+}
+
+// testDataConverter implements encoded.DataConverter using gob
+type testDataConverter struct{}
+
+func (tdc *testDataConverter) ToData(value ...interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	for i, obj := range value {
+		if err := enc.Encode(obj); err != nil {
+			return nil, fmt.Errorf(
+				"unable to encode argument: %d, %v, with gob error: %v", i, reflect.TypeOf(obj), err)
+		}
+	}
+	return buf.Bytes(), nil
+}
+
+func (tdc *testDataConverter) FromData(input []byte, valuePtr ...interface{}) error {
+	dec := gob.NewDecoder(bytes.NewBuffer(input))
+	for i, obj := range valuePtr {
+		if err := dec.Decode(obj); err != nil {
+			return fmt.Errorf(
+				"unable to decode argument: %d, %v, with gob error: %v", i, reflect.TypeOf(obj), err)
+		}
+	}
+	return nil
+}
+
+// create worker with test DataConverter for test
+func createWorkerWithDataConverter(service *workflowservicetest.MockClient) Worker {
+	// Configure worker options.
+	workerOptions := WorkerOptions{}
+	workerOptions.DataConverter = &testDataConverter{}
+
+	// Start Worker.
+	worker := NewWorker(
+		service,
+		domain,
+		"testGroupForDataConverter",
+		workerOptions)
+	return worker
+}
+
+func TestDataConverter(t *testing.T) {
+	// Create service endpoint
+	mockCtrl := gomock.NewController(t)
+	service := workflowservicetest.NewMockClient(mockCtrl)
+
+	w := createWorkerWithDataConverter(service)
+	aw := w.(*aggregatedWorker)
+	require.Equal(t, aw.hostEnv.dataConverter, &testDataConverter{})
+
+	f1 := func(ctx Context, r []byte) string {
+		return "result"
+	}
+	r1 := testEncodeFunction(t, f1, new(emptyCtx), []byte("test"))
+	require.Equal(t, r1, "result")
+	// No parameters.
+	f2 := func() string {
+		return "empty-result"
+	}
+	r2 := testEncodeFunction(t, f2)
+	require.Equal(t, r2, "empty-result")
+	// Nil parameter.
+	f3 := func(r []byte) string {
+		return "nil-result"
+	}
+	r3 := testEncodeFunction(t, f3, []byte(""))
+	require.Equal(t, r3, "nil-result")
+
+	// set hostEnv.DataConverter back to default
+	aw.hostEnv.SetDataConverter(&defaultDataConverter{})
 }

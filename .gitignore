@@ -14,3 +14,4 @@ bins
 test
 test.log
 /dummy
+.DS_Store

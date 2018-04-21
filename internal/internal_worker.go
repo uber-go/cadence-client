@@ -477,9 +477,13 @@ func (th *hostEnvImpl) GetDataConverter() encoded.DataConverter {
 	return th.dataConverter
 }
 
+func newDefaultDataConverter() encoded.DataConverter {
+	return &defaultDataConverter{}
+}
+
 func (th *hostEnvImpl) SetDataConverter(dc encoded.DataConverter) {
 	if dc == nil {
-		th.dataConverter = &defaultDataConverter{}
+		th.dataConverter = newDefaultDataConverter()
 	} else {
 		th.dataConverter = dc
 	}
@@ -732,7 +736,7 @@ func newHostEnvironment() *hostEnvImpl {
 		workflowAliasMap: make(map[string]string),
 		activityFuncMap:  make(map[string]activity),
 		activityAliasMap: make(map[string]string),
-		dataConverter:    &defaultDataConverter{},
+		dataConverter:    newDefaultDataConverter(),
 	}
 }
 
@@ -1177,7 +1181,7 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 		options.StickyScheduleToStartTimeout = stickyDecisionScheduleToStartTimeoutSeconds * time.Second
 	}
 	if options.DataConverter == nil {
-		options.DataConverter = &defaultDataConverter{}
+		options.DataConverter = newDefaultDataConverter()
 	}
 	return options
 }

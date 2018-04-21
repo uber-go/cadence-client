@@ -582,3 +582,102 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_Error() {
 	s.Nil(err)
 	s.Equal(createResponse.GetRunId(), resp.RunID)
 }
+
+func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_WithDataConverter() {
+	signalName := "my signal"
+	signalInput := "my signal input"
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        tasklist,
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+		DataConverter:                   newTestDataConverter(),
+	}
+	f1 := func(ctx Context, r []byte) string {
+		return "result"
+	}
+	input := []byte("test")
+
+	createResponse := &shared.StartWorkflowExecutionResponse{
+		RunId: common.StringPtr(runID),
+	}
+
+	s.service.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).
+		Do(func(_ interface{}, req *shared.SignalWithStartWorkflowExecutionRequest, _ ...interface{}) {
+			currentDataConverter := getHostEnvironment().GetDataConverter()
+			s.Equal(newTestDataConverter(), currentDataConverter)
+			encodedSignal, _ := currentDataConverter.ToData(signalInput)
+			encodedArg, _ := currentDataConverter.ToData(input)
+			s.Equal(req.SignalInput, encodedSignal)
+			s.Equal(req.Input, encodedArg)
+			var decodedSignal string
+			var decodedArg []byte
+			currentDataConverter.FromData(req.SignalInput, &decodedSignal)
+			currentDataConverter.FromData(req.Input, &decodedArg)
+			s.Equal(signalInput, decodedSignal)
+			s.Equal(input, decodedArg)
+		}).Return(createResponse, nil)
+
+	resp, err := s.client.SignalWithStartWorkflow(context.Background(), workflowID, signalName, signalInput,
+		options, f1, input)
+	// test data converter is restored to previous one after call
+	s.Equal(newDefaultDataConverter(), getHostEnvironment().GetDataConverter())
+	s.Nil(err)
+	s.Equal(createResponse.GetRunId(), resp.RunID)
+}
+
+func (s *workflowClientTestSuite) TestStartWorkflow() {
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        tasklist,
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+	}
+	f1 := func(ctx Context, r []byte) string {
+		return "result"
+	}
+
+	createResponse := &shared.StartWorkflowExecutionResponse{
+		RunId: common.StringPtr(runID),
+	}
+	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil)
+
+	resp, err := s.client.StartWorkflow(context.Background(), options, f1, []byte("test"))
+	s.Equal(getHostEnvironment().GetDataConverter(), newDefaultDataConverter())
+	s.Nil(err)
+	s.Equal(createResponse.GetRunId(), resp.RunID)
+}
+
+func (s *workflowClientTestSuite) TestStartWorkflow_WithDataConverter() {
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        tasklist,
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+		DataConverter:                   newTestDataConverter(),
+	}
+	f1 := func(ctx Context, r []byte) string {
+		return "result"
+	}
+	input := []byte("test")
+
+	createResponse := &shared.StartWorkflowExecutionResponse{
+		RunId: common.StringPtr(runID),
+	}
+	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).
+		Do(func(_ interface{}, req *shared.StartWorkflowExecutionRequest, _ ...interface{}) {
+			currentDataConverter := getHostEnvironment().GetDataConverter()
+			s.Equal(newTestDataConverter(), currentDataConverter)
+			encodedArg, _ := currentDataConverter.ToData(input)
+			s.Equal(req.Input, encodedArg)
+			var decodedArg []byte
+			currentDataConverter.FromData(req.Input, &decodedArg)
+			s.Equal(input, decodedArg)
+		}).Return(createResponse, nil)
+
+	resp, err := s.client.StartWorkflow(context.Background(), options, f1, input)
+	// test data converter is restored to previous one after call
+	s.Equal(newDefaultDataConverter(), getHostEnvironment().GetDataConverter())
+	s.Nil(err)
+	s.Equal(createResponse.GetRunId(), resp.RunID)
+}

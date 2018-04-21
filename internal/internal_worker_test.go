@@ -38,6 +38,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
@@ -924,6 +925,10 @@ func testEncodeFunctionArgs(workflowFunc interface{}, args ...interface{}) []byt
 // testDataConverter implements encoded.DataConverter using gob
 type testDataConverter struct{}
 
+func newTestDataConverter() encoded.DataConverter {
+	return &testDataConverter{}
+}
+
 func (tdc *testDataConverter) ToData(value ...interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
@@ -951,7 +956,7 @@ func (tdc *testDataConverter) FromData(input []byte, valuePtr ...interface{}) er
 func createWorkerWithDataConverter(service *workflowservicetest.MockClient) Worker {
 	// Configure worker options.
 	workerOptions := WorkerOptions{}
-	workerOptions.DataConverter = &testDataConverter{}
+	workerOptions.DataConverter = newTestDataConverter()
 
 	// Start Worker.
 	worker := NewWorker(
@@ -969,7 +974,7 @@ func TestDataConverter(t *testing.T) {
 
 	w := createWorkerWithDataConverter(service)
 	aw := w.(*aggregatedWorker)
-	require.Equal(t, aw.hostEnv.dataConverter, &testDataConverter{})
+	require.Equal(t, aw.hostEnv.dataConverter, newTestDataConverter())
 
 	f1 := func(ctx Context, r []byte) string {
 		return "result"
@@ -990,5 +995,5 @@ func TestDataConverter(t *testing.T) {
 	require.Equal(t, r3, "nil-result")
 
 	// set hostEnv.DataConverter back to default
-	aw.hostEnv.SetDataConverter(&defaultDataConverter{})
+	aw.hostEnv.SetDataConverter(newDefaultDataConverter())
 }

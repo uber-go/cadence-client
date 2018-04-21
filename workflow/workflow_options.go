@@ -23,6 +23,7 @@ package workflow
 import (
 	"time"
 
+	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal"
 )
 
@@ -59,4 +60,9 @@ func WithExecutionStartToCloseTimeout(ctx Context, d time.Duration) Context {
 // WithWorkflowTaskStartToCloseTimeout adds a decision timeout to the context.
 func WithWorkflowTaskStartToCloseTimeout(ctx Context, d time.Duration) Context {
 	return internal.WithWorkflowTaskStartToCloseTimeout(ctx, d)
+}
+
+// WithWorkflowDataConverter adds DataConverter to the context.
+func WithWorkflowDataConverter(ctx Context, dc encoded.DataConverter) Context {
+	return internal.WithWorkflowDataConverter(ctx, dc)
 }

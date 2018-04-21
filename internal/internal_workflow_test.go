@@ -361,7 +361,7 @@ func TestWorkflowWithDataConverter(t *testing.T) {
 	ts := &WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 	w := &testWorkflowWithDataConverter{t: t}
-	RegisterActivity(testAct)
+	//RegisterActivity(testAct)
 	RegisterWorkflow(w.Execute)
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
 	require.True(t, env.IsWorkflowCompleted())

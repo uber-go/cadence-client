@@ -329,6 +329,45 @@ func TestActivityCancellation(t *testing.T) {
 	require.NoError(t, env.GetWorkflowError())
 }
 
+type testWorkflowWithDataConverter struct {
+	t *testing.T
+}
+
+func (w *testWorkflowWithDataConverter) Execute(ctx Context, input []byte) (result []byte, err error) {
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
+	}
+	ctx = WithActivityOptions(ctx, ao)
+
+	dc := newTestDataConverter()
+	ctx = WithWorkflowDataConverter(ctx, dc)
+	require.Equal(w.t, newTestDataConverter(), getWorkflowEnvOptions(ctx).dataConverter)
+
+	f := ExecuteActivity(ctx, testAct)
+	// test data converter was restored to previous one
+	require.Equal(w.t, newTestDataConverter(), getWorkflowEnvOptions(ctx).dataConverter)
+	require.Equal(w.t, newDefaultDataConverter(), getHostEnvironment().dataConverter)
+
+	var res1 string
+	err1 := f.Get(ctx, &res1)
+	require.NoError(w.t, err1, err1)
+	require.Equal(w.t, res1, "test")
+
+	return []byte("workflow-completed"), nil
+}
+
+func TestWorkflowWithDataConverter(t *testing.T) {
+	ts := &WorkflowTestSuite{}
+	env := ts.NewTestWorkflowEnvironment()
+	w := &testWorkflowWithDataConverter{t: t}
+	//RegisterActivity(testAct)
+	RegisterWorkflow(w.Execute)
+	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
+	require.True(t, env.IsWorkflowCompleted())
+	require.NoError(t, env.GetWorkflowError())
+}
+
 type sayGreetingActivityRequest struct {
 	Name     string
 	Greeting string

@@ -273,6 +273,10 @@ type (
 		// WorkflowIDReusePolicy - Whether server allow reuse of workflow ID, can be useful
 		// for dedup logic if set to WorkflowIdReusePolicyRejectDuplicate
 		WorkflowIDReusePolicy WorkflowIDReusePolicy
+
+		// DataConverter - Used by Cadence to serialize/deserialize workflow arguments
+		// Optional: default use Cadence defaultDataConverter
+		DataConverter encoded.DataConverter
 	}
 
 	// DomainClient is the client for managing operations on the domain.

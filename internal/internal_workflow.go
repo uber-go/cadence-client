@@ -164,6 +164,7 @@ type (
 		signalChannels                      map[string]SignalChannel
 		queryHandlers                       map[string]func([]byte) ([]byte, error)
 		workflowIDReusePolicy               WorkflowIDReusePolicy
+		dataConverter                       encoded.DataConverter
 	}
 
 	// decodeFutureImpl
@@ -1045,6 +1046,9 @@ func getValidatedWorkflowOptions(ctx Context) (*workflowOptions, error) {
 	}
 	if p.executionStartToCloseTimeoutSeconds == nil || *p.executionStartToCloseTimeoutSeconds <= 0 {
 		return nil, errors.New("missing or invalid ExecutionStartToCloseTimeout")
+	}
+	if p.dataConverter == nil {
+		p.dataConverter = newDefaultDataConverter()
 	}
 
 	return p, nil

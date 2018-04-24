@@ -39,6 +39,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/zap"
@@ -142,6 +143,9 @@ type (
 
 		StickyScheduleToStartTimeout time.Duration
 	}
+
+	// defaultDataConverter uses thrift encoder/decoder when possible, for everything use json.
+	defaultDataConverter struct{}
 )
 
 // newWorkflowWorker returns an instance of the workflow worker.
@@ -406,8 +410,7 @@ type hostEnvImpl struct {
 	workflowAliasMap map[string]string
 	activityFuncMap  map[string]activity
 	activityAliasMap map[string]string
-	encoding         encoding
-	tEncoding        encoding
+	dataConverter    encoded.DataConverter
 }
 
 func (th *hostEnvImpl) RegisterWorkflow(af interface{}) error {
@@ -432,10 +435,6 @@ func (th *hostEnvImpl) RegisterWorkflowWithOptions(
 	// Check if already registered
 	if _, ok := th.getWorkflowFn(registerName); ok {
 		return fmt.Errorf("workflow name \"%v\" is already registered", registerName)
-	}
-	// Register args with encoding.
-	if err := th.registerEncodingTypes(fnType); err != nil {
-		return err
 	}
 	th.addWorkflowFn(registerName, af)
 	if len(alias) > 0 {
@@ -467,10 +466,6 @@ func (th *hostEnvImpl) RegisterActivityWithOptions(
 	if _, ok := th.getActivityFn(registerName); ok {
 		return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 	}
-	// Register args with encoding.
-	if err := th.registerEncodingTypes(fnType); err != nil {
-		return err
-	}
 	th.addActivityFn(registerName, af)
 	if len(alias) > 0 {
 		th.addActivityAlias(fnName, alias)
@@ -478,19 +473,20 @@ func (th *hostEnvImpl) RegisterActivityWithOptions(
 	return nil
 }
 
-// Get the encoder.
-func (th *hostEnvImpl) Encoder() encoding {
-	return th.encoding
+func (th *hostEnvImpl) GetDataConverter() encoded.DataConverter {
+	return th.dataConverter
 }
 
-// Get thrift encoder.
-func (th *hostEnvImpl) ThriftEncoder() encoding {
-	return th.tEncoding
+func newDefaultDataConverter() encoded.DataConverter {
+	return &defaultDataConverter{}
 }
 
-// Register all function args and return types with encoder.
-func (th *hostEnvImpl) RegisterFnType(fnType reflect.Type) error {
-	return th.registerEncodingTypes(fnType)
+func (th *hostEnvImpl) SetDataConverter(dc encoded.DataConverter) {
+	if dc == nil {
+		th.dataConverter = newDefaultDataConverter()
+	} else {
+		th.dataConverter = dc
+	}
 }
 
 func (th *hostEnvImpl) addWorkflowAlias(fnName string, alias string) {
@@ -574,56 +570,9 @@ func (th *hostEnvImpl) getRegisteredActivities() []activity {
 	return activities
 }
 
-// register all the types with encoder.
-func (th *hostEnvImpl) registerEncodingTypes(fnType reflect.Type) error {
-	th.Lock()
-	defer th.Unlock()
-
-	// Register arguments.
-	for i := 0; i < fnType.NumIn(); i++ {
-		err := th.registerType(fnType.In(i), th.Encoder())
-		if err != nil {
-			return err
-		}
-	}
-	// Register return types.
-	// TODO: We need register all concrete implementations of error, Either
-	// through pre-registry (or) at the time conversion.
-	for i := 0; i < fnType.NumOut(); i++ {
-		err := th.registerType(fnType.Out(i), th.Encoder())
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (th *hostEnvImpl) registerValue(v interface{}, encoder encoding) error {
-	if val := reflect.ValueOf(v); val.IsValid() {
-		if val.Kind() == reflect.Ptr && val.IsNil() {
-			return nil
-		}
-		rType := reflect.Indirect(val).Type()
-		return th.registerType(rType, encoder)
-	}
-	return nil
-}
-
-// register type with our encoder.
-func (th *hostEnvImpl) registerType(t reflect.Type, encoder encoding) error {
-	// Interfaces cannot be registered, their implementations should be
-	// https://golang.org/pkg/encoding/gob/#Register
-	if t.Kind() == reflect.Interface || t.Kind() == reflect.Ptr {
-		return nil
-	}
-	arg := reflect.Zero(t).Interface()
-	return encoder.Register(arg)
-}
-
-func (th *hostEnvImpl) isUseThriftEncoding(objs []interface{}) bool {
+func isUseThriftEncoding(objs []interface{}) bool {
 	// NOTE: our criteria to use which encoder is simple if all the types are serializable using thrift then we use
-	// thrift encoder. For everything else we default to gob.
+	// thrift encoder. For everything else we default to json.
 
 	if len(objs) == 0 {
 		return false
@@ -637,9 +586,9 @@ func (th *hostEnvImpl) isUseThriftEncoding(objs []interface{}) bool {
 	return true
 }
 
-func (th *hostEnvImpl) isUseThriftDecoding(objs []interface{}) bool {
+func isUseThriftDecoding(objs []interface{}) bool {
 	// NOTE: our criteria to use which encoder is simple if all the types are de-serializable using thrift then we use
-	// thrift decoder. For everything else we default to gob.
+	// thrift decoder. For everything else we default to json.
 
 	if len(objs) == 0 {
 		return false
@@ -709,53 +658,12 @@ func validateFnFormat(fnType reflect.Type, isWorkflow bool) error {
 
 // encode set of values.
 func (th *hostEnvImpl) encode(r []interface{}) ([]byte, error) {
-	if len(r) == 1 && isTypeByteSlice(reflect.TypeOf(r[0])) {
-		return r[0].([]byte), nil
-	}
-
-	var encoder encoding
-	if th.isUseThriftEncoding(r) {
-		encoder = th.ThriftEncoder()
-	} else {
-		encoder = th.Encoder()
-	}
-
-	for _, v := range r {
-		err := th.registerValue(v, encoder)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	data, err := encoder.Marshal(r)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+	return th.dataConverter.ToData(r...)
 }
 
 // decode a set of values.
 func (th *hostEnvImpl) decode(data []byte, to []interface{}) error {
-	if len(to) == 1 && isTypeByteSlice(reflect.TypeOf(to[0])) {
-		reflect.ValueOf(to[0]).Elem().SetBytes(data)
-		return nil
-	}
-
-	var encoder encoding
-	if th.isUseThriftDecoding(to) {
-		encoder = th.ThriftEncoder()
-	} else {
-		encoder = th.Encoder()
-	}
-
-	for _, v := range to {
-		err := th.registerValue(v, encoder)
-		if err != nil {
-			return err
-		}
-	}
-
-	return encoder.Unmarshal(data, to)
+	return th.dataConverter.FromData(data, to...)
 }
 
 // encode multiple arguments(arguments to a function).
@@ -828,8 +736,7 @@ func newHostEnvironment() *hostEnvImpl {
 		workflowAliasMap: make(map[string]string),
 		activityFuncMap:  make(map[string]activity),
 		activityAliasMap: make(map[string]string),
-		encoding:         jsonEncoding{},
-		tEncoding:        thriftEncoding{},
+		dataConverter:    newDefaultDataConverter(),
 	}
 }
 
@@ -1029,6 +936,8 @@ func newAggregatedWorker(
 	processTestTags(&wOptions, &workerParams)
 
 	hostEnv := getHostEnvironment()
+	hostEnv.SetDataConverter(wOptions.DataConverter)
+
 	// workflow factory.
 	var workflowWorker Worker
 	if !wOptions.DisableWorkflowWorker {
@@ -1134,18 +1043,12 @@ func isInterfaceNil(i interface{}) bool {
 
 // encoding is capable of encoding and decoding objects
 type encoding interface {
-	Register(obj interface{}) error
 	Marshal([]interface{}) ([]byte, error)
 	Unmarshal([]byte, []interface{}) error
 }
 
 // jsonEncoding encapsulates json encoding and decoding
 type jsonEncoding struct {
-}
-
-// Register implements the encoding interface
-func (g jsonEncoding) Register(obj interface{}) error {
-	return nil
 }
 
 // Marshal encodes an array of object into bytes
@@ -1187,11 +1090,6 @@ func isThriftType(v interface{}) bool {
 // thriftEncoding encapsulates thrift serializer/de-serializer.
 type thriftEncoding struct{}
 
-// Register implements the encoding interface
-func (g thriftEncoding) Register(obj interface{}) error {
-	return nil
-}
-
 // Marshal encodes an array of thrift into bytes
 func (g thriftEncoding) Marshal(objs []interface{}) ([]byte, error) {
 	tlist := []thrift.TStruct{}
@@ -1228,6 +1126,41 @@ func (g thriftEncoding) Unmarshal(data []byte, objs []interface{}) error {
 	return nil
 }
 
+func (dc *defaultDataConverter) ToData(r ...interface{}) ([]byte, error) {
+	if len(r) == 1 && isTypeByteSlice(reflect.TypeOf(r[0])) {
+		return r[0].([]byte), nil
+	}
+
+	var encoder encoding
+	if isUseThriftEncoding(r) {
+		encoder = &thriftEncoding{}
+	} else {
+		encoder = &jsonEncoding{}
+	}
+
+	data, err := encoder.Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (dc *defaultDataConverter) FromData(data []byte, to ...interface{}) error {
+	if len(to) == 1 && isTypeByteSlice(reflect.TypeOf(to[0])) {
+		reflect.ValueOf(to[0]).Elem().SetBytes(data)
+		return nil
+	}
+
+	var encoder encoding
+	if isUseThriftDecoding(to) {
+		encoder = &thriftEncoding{}
+	} else {
+		encoder = &jsonEncoding{}
+	}
+
+	return encoder.Unmarshal(data, to)
+}
+
 func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 	if options.MaxConcurrentActivityExecutionSize == 0 {
 		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
@@ -1246,6 +1179,9 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 	}
 	if options.StickyScheduleToStartTimeout.Seconds() == 0 {
 		options.StickyScheduleToStartTimeout = stickyDecisionScheduleToStartTimeoutSeconds * time.Second
+	}
+	if options.DataConverter == nil {
+		options.DataConverter = newDefaultDataConverter()
 	}
 	return options
 }

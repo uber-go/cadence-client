@@ -333,6 +333,16 @@ func NewFuture(ctx Context) (Future, Settable) {
 //
 // ExecuteActivity returns Future with activity result or failure.
 func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Future {
+	// Check whether to use custom DataConverter
+	// TODO: Add this data converter logic to other APIs (and tests)
+	workflowEnvOptions := getWorkflowEnvOptions(ctx)
+	if workflowEnvOptions != nil && workflowEnvOptions.dataConverter != nil {
+		previousDataConverter := getHostEnvironment().GetDataConverter()
+		if previousDataConverter != workflowEnvOptions.dataConverter {
+			getHostEnvironment().SetDataConverter(workflowEnvOptions.dataConverter)
+			defer getHostEnvironment().SetDataConverter(previousDataConverter)
+		}
+	}
 	// Validate type and its arguments.
 	future, settable := newDecodeFuture(ctx, activity)
 	activityType, input, err := getValidatedActivityFunction(activity, args)
@@ -730,6 +740,16 @@ func WithExecutionStartToCloseTimeout(ctx Context, d time.Duration) Context {
 func WithWorkflowTaskStartToCloseTimeout(ctx Context, d time.Duration) Context {
 	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
 	getWorkflowEnvOptions(ctx1).taskStartToCloseTimeoutSeconds = common.Int32Ptr(common.Int32Ceil(d.Seconds()))
+	return ctx1
+}
+
+// WithWorkflowDataConverter adds DataConverter to the context.
+func WithWorkflowDataConverter(ctx Context, dc encoded.DataConverter) Context {
+	if dc == nil {
+		return ctx
+	}
+	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
+	getWorkflowEnvOptions(ctx1).dataConverter = dc
 	return ctx1
 }
 

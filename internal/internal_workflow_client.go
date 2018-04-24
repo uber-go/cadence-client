@@ -153,6 +153,14 @@ func (wc *workflowClient) StartWorkflow(
 		decisionTaskTimeout = defaultDecisionTaskTimeoutInSecs
 	}
 
+	if options.DataConverter != nil { // use custom DataConverter only for this workflow
+		previousDataConverter := getHostEnvironment().GetDataConverter()
+		if previousDataConverter != options.DataConverter {
+			getHostEnvironment().SetDataConverter(options.DataConverter)
+			defer getHostEnvironment().SetDataConverter(previousDataConverter)
+		}
+	}
+
 	// Validate type and its arguments.
 	workflowType, input, err := getValidatedWorkflowFunction(workflowFunc, args)
 	if err != nil {
@@ -267,6 +275,14 @@ func (wc *workflowClient) SignalWorkflow(ctx context.Context, workflowID string,
 // If the workflow is not running or not found, it starts the workflow and then sends the signal in transaction.
 func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
 	options StartWorkflowOptions, workflowFunc interface{}, workflowArgs ...interface{}) (*WorkflowExecution, error) {
+
+	if options.DataConverter != nil { // use custom DataConverter only for this workflow
+		previousDataConverter := getHostEnvironment().GetDataConverter()
+		if previousDataConverter != options.DataConverter {
+			getHostEnvironment().SetDataConverter(options.DataConverter)
+			defer getHostEnvironment().SetDataConverter(previousDataConverter)
+		}
+	}
 
 	signalInput, err := getEncodedArg(signalArg)
 	if err != nil {

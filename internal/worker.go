@@ -27,6 +27,7 @@ import (
 	"github.com/uber-go/tally"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	"go.uber.org/cadence/encoded"
 	"go.uber.org/zap"
 )
 
@@ -131,6 +132,10 @@ type (
 		// Optional: sets context for activity. The context can be used to pass any configuration to activity
 		// like common logger for all activities.
 		BackgroundActivityContext context.Context
+
+		// Optional: sets DataConverter to customize serialization/deserialization of arguments in Cadence
+		// default: defaultDataConverter, an combination of thriftEncoder and jsonEncoder
+		DataConverter encoded.DataConverter
 	}
 )
 

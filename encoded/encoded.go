@@ -38,4 +38,13 @@ type (
 		// Get extract the encoded values into strong typed value pointers.
 		Get(valuePtr ...interface{}) error
 	}
+
+	// DataConverter is used by the framework to serialize/deserialize method parameters that need to be sent over the wire.
+	DataConverter interface {
+		// ToData implements conversion of a list of values.
+		ToData(value ...interface{}) ([]byte, error)
+		// FromData implements conversion of an array of values of different types.
+		// Useful for deserializing arguments of function invocations.
+		FromData(input []byte, valuePtr ...interface{}) error
+	}
 )

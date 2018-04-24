@@ -157,7 +157,8 @@ func NewWorker(
 
 // ReplayWorkflowExecution loads a workflow execution history from the Cadence service and executes a single decision task for it.
 // Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
-func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.Interface, domain string, execution WorkflowExecution) error {
+// The logger is the only optional parameter. Defaults to the noop logger.
+func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.Interface, logger *zap.Logger, domain string, execution WorkflowExecution) error {
 	sharedExecution := &shared.WorkflowExecution{
 		RunId:      common.StringPtr(execution.RunID),
 		WorkflowId: common.StringPtr(execution.ID),
@@ -187,7 +188,7 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 	}
 	workflowType := attr.WorkflowType
 	task := &shared.PollForDecisionTaskResponse{
-		Attempt:           common.Int64Ptr(1),
+		Attempt:           common.Int64Ptr(0),
 		TaskToken:         []byte("ReplayTaskToken"),
 		NextPageToken:     hResponse.NextPageToken,
 		WorkflowType:      workflowType,
@@ -203,7 +204,9 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 		maxEventID:    task.GetStartedEventId(),
 	}
 	taskList := "ReplayTaskList"
-	logger := zap.NewNop()
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		Identity: "replayID",
@@ -216,7 +219,8 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 
 // ReplayWorkflowHistory executes a single decision task for the given history.
 // Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
-func ReplayWorkflowHistory(history *shared.History) error {
+// The logger is an optional parameter. Defaults to the noop logger.
+func ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
 	domain := "ReplayDomain"
 	taskList := "ReplayTaskList"
 	events := history.Events
@@ -240,14 +244,16 @@ func ReplayWorkflowHistory(history *shared.History) error {
 		WorkflowId: common.StringPtr("ReplayId"),
 	}
 	task := &shared.PollForDecisionTaskResponse{
-		Attempt:                common.Int64Ptr(1),
+		Attempt:                common.Int64Ptr(0),
 		TaskToken:              []byte("ReplayTaskToken"),
 		WorkflowType:           workflowType,
 		WorkflowExecution:      execution,
 		History:                history,
 		PreviousStartedEventId: common.Int64Ptr(math.MaxInt64),
 	}
-	logger := zap.NewNop()
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	testReporter := logger.Sugar()
 	controller := gomock.NewController(testReporter)
 	service := workflowservicetest.NewMockClient(controller)

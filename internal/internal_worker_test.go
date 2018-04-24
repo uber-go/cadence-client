@@ -132,7 +132,8 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory() {
 	}
 
 	history := &shared.History{Events: testEvents}
-	err := ReplayWorkflowHistory(history)
+	logger := getLogger()
+	err := ReplayWorkflowHistory(logger, history)
 	require.NoError(s.T(), err)
 }
 

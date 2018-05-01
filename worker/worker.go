@@ -78,3 +78,9 @@ func ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
 func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.Interface, logger *zap.Logger, domain string, execution workflow.Execution) error {
 	return internal.ReplayWorkflowExecution(ctx, service, logger, domain, execution)
 }
+
+// SetStickyWorkflowCacheSize sets the cache size for sticky workflow cache. The default cache size is 100K which might
+// not be suitable for every use case. This must be done before any worker is started.
+func SetStickyWorkflowCacheSize(cacheSize int) {
+	internal.SetStickyWorkflowCacheSize(cacheSize)
+}

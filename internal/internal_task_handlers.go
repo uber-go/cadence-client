@@ -318,15 +318,33 @@ func newWorkflowTaskHandler(
 }
 
 // TODO: need a better eviction policy based on memory usage
-var workflowCache = cache.New(defaultStickyCacheSize, &cache.Options{
-	RemovedFunc: func(cachedEntity interface{}) {
-		wc := cachedEntity.(*workflowExecutionContext)
-		wc.onEviction()
-	},
-})
+var workflowCache cache.Cache
+var stickyCacheSize = defaultStickyCacheSize
+var initCacheOnce sync.Once
+
+// SetStickyWorkflowCacheSize sets the cache size for sticky workflow cache. The default cache size is 100K which might
+// not be suitable for every use case. This must be done before any worker is started.
+func SetStickyWorkflowCacheSize(cacheSize int) {
+	if workflowCache != nil {
+		panic("cache already created, please set cache size before worker starts.")
+	}
+	stickyCacheSize = cacheSize
+}
+
+func getWorkflowCache() cache.Cache {
+	initCacheOnce.Do(func() {
+		workflowCache = cache.New(stickyCacheSize, &cache.Options{
+			RemovedFunc: func(cachedEntity interface{}) {
+				wc := cachedEntity.(*workflowExecutionContext)
+				wc.onEviction()
+			},
+		})
+	})
+	return workflowCache
+}
 
 func getWorkflowContext(runID string) *workflowExecutionContext {
-	o := workflowCache.Get(runID)
+	o := getWorkflowCache().Get(runID)
 	if o == nil {
 		return nil
 	}
@@ -335,7 +353,7 @@ func getWorkflowContext(runID string) *workflowExecutionContext {
 }
 
 func putWorkflowContext(runID string, wc *workflowExecutionContext) (*workflowExecutionContext, error) {
-	existing, err := workflowCache.PutIfNotExist(runID, wc)
+	existing, err := getWorkflowCache().PutIfNotExist(runID, wc)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +361,7 @@ func putWorkflowContext(runID string, wc *workflowExecutionContext) (*workflowEx
 }
 
 func removeWorkflowContext(runID string) {
-	workflowCache.Delete(runID)
+	getWorkflowCache().Delete(runID)
 }
 
 func (w *workflowExecutionContext) release() {

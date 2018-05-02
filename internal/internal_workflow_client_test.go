@@ -32,6 +32,7 @@ import (
 	"go.uber.org/cadence/internal/common"
 
 	"github.com/golang/mock/gomock"
+	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/internal/common/metrics"
 )
@@ -224,6 +225,57 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Success() {
 		NextPageToken: nil,
 	}
 	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+
+	workflowRun, err := s.workflowClient.ExecuteWorkflow(
+		context.Background(),
+		StartWorkflowOptions{
+			ID:                              workflowID,
+			TaskList:                        tasklist,
+			ExecutionStartToCloseTimeout:    timeoutInSeconds * time.Second,
+			DecisionTaskStartToCloseTimeout: timeoutInSeconds * time.Second,
+			WorkflowIDReusePolicy:           workflowIDReusePolicy,
+		}, workflowType,
+	)
+	s.Nil(err)
+	s.Equal(workflowRun.GetRunID(), runID)
+	decodedResult := time.Minute
+	err = workflowRun.Get(context.Background(), &decodedResult)
+	s.Nil(err)
+	s.Equal(workflowResult, decodedResult)
+}
+
+func (s *workflowRunSuite) TestExecuteWorkflowWorkflowExecutionAlreadyStartedError() {
+	alreadyStartedErr := &shared.WorkflowExecutionAlreadyStartedError{
+		RunId:          common.StringPtr(runID),
+		Message:        common.StringPtr("Already Started"),
+		StartRequestId: common.StringPtr(uuid.NewUUID().String()),
+	}
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, alreadyStartedErr).Times(1)
+
+	eventType := shared.EventTypeWorkflowExecutionCompleted
+	workflowResult := time.Hour * 59
+	encodedResult, _ := getHostEnvironment().encodeArg(workflowResult)
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				{
+					EventType: &eventType,
+					WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
+						Result: encodedResult,
+					},
+				},
+			},
+		},
+		NextPageToken: nil,
+	}
+	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(getResponse, nil).Times(1)
+	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
+		workflowID := getRequest.Execution.WorkflowId
+		s.NotNil(workflowID)
+		s.NotEmpty(*workflowID)
+	})
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),

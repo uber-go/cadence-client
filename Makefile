@@ -8,7 +8,7 @@ THRIFT_GENDIR := .gen/go
 THRIFTRW_SRC := idl/github.com/uber/cadence/cadence.thrift
 # one or more thriftrw-generated file(s), to create / depend on generated code
 THRIFTRW_OUT := $(THRIFT_GENDIR)/cadence/idl.go
-TEST_ARG ?= -coverprofile=$(BUILD)/cover.out -race -v
+TEST_ARG ?= -coverprofile=$(BUILD)/cover.out -race
 
 # general build-product folder, cleaned as part of `make clean`
 BUILD := .build

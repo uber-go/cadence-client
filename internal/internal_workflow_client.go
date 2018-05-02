@@ -132,7 +132,7 @@ func (wc *workflowClient) StartWorkflow(
 	args ...interface{},
 ) (*WorkflowExecution, error) {
 	workflowID := options.ID
-	if workflowID == "" {
+	if len(workflowID) == 0 {
 		workflowID = uuid.NewRandom().String()
 	}
 
@@ -195,7 +195,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	executionInfo := &WorkflowExecution{
-		ID:    options.ID,
+		ID:    workflowID,
 		RunID: response.GetRunId()}
 	return executionInfo, nil
 }
@@ -226,7 +226,7 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 	}
 
 	iterFn := func(fnCtx context.Context, fnRunID string) HistoryEventIterator {
-		return wc.GetWorkflowHistory(fnCtx, options.ID, fnRunID, true, s.HistoryEventFilterTypeCloseEvent)
+		return wc.GetWorkflowHistory(fnCtx, executionInfo.ID, fnRunID, true, s.HistoryEventFilterTypeCloseEvent)
 	}
 
 	return &workflowRunImpl{

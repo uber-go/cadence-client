@@ -243,6 +243,55 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Success() {
 	s.Equal(workflowResult, decodedResult)
 }
 
+// Test for the bug in ExecuteWorkflow.
+// When Options.ID was empty then GetWorkflowExecutionHistory was called with an empty WorkflowID.
+func (s *workflowRunSuite) TestExecuteWorkflow_NoIdInOptions() {
+	createResponse := &shared.StartWorkflowExecutionResponse{
+		RunId: common.StringPtr(runID),
+	}
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+
+	eventType := shared.EventTypeWorkflowExecutionCompleted
+	workflowResult := time.Hour * 59
+	encodedResult, _ := getHostEnvironment().encodeArg(workflowResult)
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				{
+					EventType: &eventType,
+					WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
+						Result: encodedResult,
+					},
+				},
+			},
+		},
+		NextPageToken: nil,
+	}
+	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	getHistory.Do(func(ctx interface{}, getRequest interface{}, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
+		get := getRequest.(*shared.GetWorkflowExecutionHistoryRequest)
+		workflowID := get.Execution.WorkflowId
+		s.NotNil(workflowID)
+		s.NotEmpty(*workflowID)
+	})
+
+	workflowRun, err := s.workflowClient.ExecuteWorkflow(
+		context.Background(),
+		StartWorkflowOptions{
+			TaskList:                        tasklist,
+			ExecutionStartToCloseTimeout:    timeoutInSeconds * time.Second,
+			DecisionTaskStartToCloseTimeout: timeoutInSeconds * time.Second,
+			WorkflowIDReusePolicy:           workflowIDReusePolicy,
+		}, workflowType,
+	)
+	s.Nil(err)
+	s.Equal(workflowRun.GetRunID(), runID)
+	decodedResult := time.Minute
+	err = workflowRun.Get(context.Background(), &decodedResult)
+	s.Nil(err)
+	s.Equal(workflowResult, decodedResult)
+}
+
 func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Cancelled() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),

@@ -63,8 +63,8 @@ git checkout --quiet "$VERSION"
 
 if [ -z "$(echo "$VERSION" | grep -E '^v{0,1}\d+(\.\d+){0,3}$')" ]; then
     # not versioned, check for newer commits
-    BEHIND=$(git rev-list ..HEAD | wc -l)
-    [ "$BEHIND" -eq 0 ] || (>&2 echo "$GO_GETTABLE_REPO is $BEHIND commits behind the current HEAD")
+    BEHIND=$(git rev-list "..$HEAD" | wc -l | tr -dc '0-9')
+    [ "$BEHIND" -eq 0 ] || (>&2 echo "$GO_GETTABLE_REPO is $BEHIND commits behind the current HEAD: $HEAD")
 else
     # versioned, check for newer tags.
     # using xargs because it's safer (for big lists) + it doesn't result in

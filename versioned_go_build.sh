@@ -54,14 +54,43 @@ fi
 
 
 go get -d "$GO_GETTABLE_BIN"
-pushd "$GOPATH/src/$GO_GETTABLE_REPO"
-git checkout "$VERSION"
+pushd "$GOPATH/src/$GO_GETTABLE_REPO" >/dev/null
+
+HEAD=$(git rev-parse HEAD)
+
+# silently check out, reduces a lot of default spam
+git checkout --quiet "$VERSION"
+
+if [ -z "$(echo "$VERSION" | grep -E '^v{0,1}\d+(\.\d+){0,3}$')" ]; then
+    # not versioned, check for newer commits
+    BEHIND=$(git rev-list ..HEAD | wc -l)
+    [ "$BEHIND" -eq 0 ] || (>&2 echo "$GO_GETTABLE_REPO is $BEHIND commits behind the current HEAD")
+else
+    # versioned, check for newer tags.
+    # using xargs because it's safer (for big lists) + it doesn't result in
+    # a ton of SHAs in debug output like `git describe --tags $(...)` causes.
+    #
+    # in brief:
+    # - get all tagged shas
+    # - get their tags
+    # - grep for `v1.2.3.4` since there are a ton of non-release-y ones out there
+    # - sort by version, and grab the "biggest"
+    LATEST=$(
+        git rev-list --tags \
+        | xargs git describe --tags 2>/dev/null \
+        | grep -E '^v{0,1}\d+(\.\d+){0,3}$' \
+        | sort -Vr \
+        | head -n 1
+    )
+    # use sort to check if VERSION >= LATEST
+    echo -e "$VERSION\n$LATEST" | sort -Vrc 2>/dev/null || (>&2 echo "$GO_GETTABLE_REPO has a newer tag: $LATEST")
+fi
 
 # only glide install when there is a glide file, or it tries to install
 # to the current repo (not in our current folder)
 if [ -f glide.lock ]; then
-    glide install
+    glide --quiet install
 fi
 
-popd
+popd >/dev/null
 go build -o "$INSTALL_LOCATION" "$GO_GETTABLE_BIN"

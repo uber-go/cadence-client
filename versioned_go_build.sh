@@ -2,6 +2,20 @@
 
 set -e
 
+# In a nutshell, this script:
+# - makes a tempdir and moves to it
+# - go gets the requested bin (but does not install it)
+# - cds to the repo
+# - checks out the requested version
+# - maybe runs `glide install`
+# - builds the bin and puts it where you told it to.
+#
+# Since doing that verbatim is a bit noisy, and pinning tools tends to
+# cause them to slowly get out of date, it does two additional things:
+# - suppresses output unless `--debug` is passed
+# - checks for newer commits / tags than the one you passed
+# - print the newer sha/version (if any) to stderr so it's always visible
+
 usage () {
     echo 'Installs a specific version of a go-gettable bin to the specified location.'
     echo ''
@@ -27,6 +41,11 @@ usage () {
 if [ "$1" == "--debug" ]; then
     shift  # consume it
     DEBUG=1
+else
+    # otherwise, redirect to /dev/null (requires eval)
+    TO_DEV_NULL='>/dev/null'
+    # pass quiet flags where needed (do not quote)
+    QUIET='--quiet'
 fi
 
 [ $# -ge 3 ] || usage
@@ -54,12 +73,13 @@ fi
 
 
 go get -d "$GO_GETTABLE_BIN"
-pushd "$GOPATH/src/$GO_GETTABLE_REPO" >/dev/null
+# eval so redirection works when quiet
+eval "pushd $GOPATH/src/$GO_GETTABLE_REPO $TO_DEV_NULL"
 
 HEAD=$(git rev-parse HEAD)
 
 # silently check out, reduces a lot of default spam
-git checkout --quiet "$VERSION"
+git checkout $QUIET "$VERSION"
 
 if [ -z "$(echo "$VERSION" | grep -E '^v{0,1}\d+(\.\d+){0,3}$')" ]; then
     # not versioned, check for newer commits
@@ -89,8 +109,10 @@ fi
 # only glide install when there is a glide file, or it tries to install
 # to the current repo (not in our current folder)
 if [ -f glide.lock ]; then
-    glide --quiet install
+    glide $QUIET install
 fi
 
-popd >/dev/null
+# eval so redirection works when quiet
+eval "popd $TO_DEV_NULL"
+
 go build -o "$INSTALL_LOCATION" "$GO_GETTABLE_BIN"

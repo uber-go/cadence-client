@@ -46,7 +46,7 @@ $(BUILD)/thriftrw:
 	./versioned_go_build.sh go.uber.org/thriftrw v1.11.0 $@
 
 $(BUILD)/thriftrw-plugin-yarpc:
-	./versioned_go_build.sh go.uber.org/yarpc v1.29.0 encoding/thrift/thriftrw-plugin-yarpc $@
+	./versioned_go_build.sh go.uber.org/yarpc v1.29.1 encoding/thrift/thriftrw-plugin-yarpc $@
 
 $(BUILD)/golint:
 	./versioned_go_build.sh golang.org/x/lint 470b6b0bb3005eda157f0275e2e4895055396a81 golint $@

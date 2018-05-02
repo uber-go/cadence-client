@@ -49,7 +49,7 @@ elif [ $# -eq 3 ]; then
     INSTALL_LOCATION="$3"
 else
     # should be unreachable
-    help
+    usage
 fi
 
 

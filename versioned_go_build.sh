@@ -36,6 +36,37 @@ usage () {
     exit 1
 }
 
+is_versioned () {
+    str=$1
+    if [ -z "$(echo "$str" | grep -E "$VERSION_TAG_REGEX")" ]; then
+        return 1
+    fi
+    return 0
+}
+
+num_commits_behind () {
+    head=$1
+    git rev-list "..$head" | wc -l | tr -dc '0-9'
+}
+
+most_recent_version_tag () {
+    # using xargs because it's safer (for big lists) + it doesn't result in
+    # a ton of SHAs in debug output like `git describe --tags $(...)` causes.
+    #
+    # in brief:
+    # - get all tagged shas
+    # - get their tags
+    # - grep for `v1[.2[.3[.4]]]` since there are a ton of non-release-y ones out there
+    # - sort by version
+    # - return the "biggest"
+
+    git rev-list --tags \
+    | xargs git describe --tags 2>/dev/null \
+    | grep -E "$VERSION_TAG_REGEX" \
+    | sort -Vr \
+    | head -n 1
+}
+
 # needs 3 or 4 args, plus optional --debug
 
 if [ "$1" == "--debug" ]; then
@@ -47,6 +78,8 @@ else
     # pass quiet flags where needed (do not quote)
     QUIET='--quiet'
 fi
+
+VERSION_TAG_REGEX='^v{0,1}\d+(\.\d+){0,3}$'
 
 [ $# -ge 3 ] || usage
 [ $# -le 4 ] || usage
@@ -76,33 +109,20 @@ go get -d "$GO_GETTABLE_BIN"
 # eval so redirection works when quiet
 eval "pushd $GOPATH/src/$GO_GETTABLE_REPO $TO_DEV_NULL"
 
-HEAD=$(git rev-parse HEAD)
+HEAD="$(git rev-parse HEAD)"
 
 # silently check out, reduces a lot of default spam
 git checkout $QUIET "$VERSION"
 
-if [ -z "$(echo "$VERSION" | grep -E '^v{0,1}\d+(\.\d+){0,3}$')" ]; then
+if is_versioned $VERSION; then
     # not versioned, check for newer commits
-    BEHIND=$(git rev-list "..$HEAD" | wc -l | tr -dc '0-9')
+    BEHIND=$(num_commits_behind "$HEAD")
+    # should be zero, or warn about the newer version
     [ "$BEHIND" -eq 0 ] || (>&2 echo "$GO_GETTABLE_REPO is $BEHIND commits behind the current HEAD: $HEAD")
 else
     # versioned, check for newer tags.
-    # using xargs because it's safer (for big lists) + it doesn't result in
-    # a ton of SHAs in debug output like `git describe --tags $(...)` causes.
-    #
-    # in brief:
-    # - get all tagged shas
-    # - get their tags
-    # - grep for `v1.2.3.4` since there are a ton of non-release-y ones out there
-    # - sort by version, and grab the "biggest"
-    LATEST=$(
-        git rev-list --tags \
-        | xargs git describe --tags 2>/dev/null \
-        | grep -E '^v{0,1}\d+(\.\d+){0,3}$' \
-        | sort -Vr \
-        | head -n 1
-    )
-    # use sort to check if VERSION >= LATEST
+    LATEST=$(most_recent_version_tag)
+    # use sort to check if VERSION >= LATEST, or warn about the newer version
     echo -e "$VERSION\n$LATEST" | sort -Vrc 2>/dev/null || (>&2 echo "$GO_GETTABLE_REPO has a newer tag: $LATEST")
 fi
 

@@ -240,7 +240,7 @@ func (eh *history) getMoreEvents() (*s.History, error) {
 	return eh.workflowTask.historyIterator.GetNextPage()
 }
 
-func (eh *history) nextDecisionEvents() (reorderedEvents []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
+func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
 	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMoreEvents() {
 		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, nil
 	}
@@ -267,7 +267,7 @@ OrderEvents:
 		case s.EventTypeDecisionTaskStarted:
 			if !eh.IsNextDecisionFailed() {
 				eh.currentIndex++
-				reorderedEvents = append(reorderedEvents, event)
+				nextEvents = append(nextEvents, event)
 				break OrderEvents
 			}
 
@@ -280,7 +280,7 @@ OrderEvents:
 			if isPreloadMarkerEvent(event) {
 				markers = append(markers, event)
 			}
-			reorderedEvents = append(reorderedEvents, event)
+			nextEvents = append(nextEvents, event)
 		}
 		eh.currentIndex++
 	}
@@ -289,7 +289,7 @@ OrderEvents:
 	eh.loadedEvents = eh.loadedEvents[eh.currentIndex:]
 	eh.currentIndex = 0
 
-	return reorderedEvents, markers, nil
+	return nextEvents, markers, nil
 }
 
 func isPreloadMarkerEvent(event *s.HistoryEvent) bool {

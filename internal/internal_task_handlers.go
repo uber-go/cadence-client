@@ -266,7 +266,7 @@ OrderEvents:
 		switch event.GetEventType() {
 		case s.EventTypeDecisionTaskStarted:
 			if !eh.IsNextDecisionFailed() {
-				eh.moveToNextEvent()
+				eh.currentIndex++
 				reorderedEvents = append(reorderedEvents, event)
 				break OrderEvents
 			}
@@ -282,7 +282,7 @@ OrderEvents:
 			}
 			reorderedEvents = append(reorderedEvents, event)
 		}
-		eh.moveToNextEvent()
+		eh.currentIndex++
 	}
 
 	// shrink loaded events so it can be GCed
@@ -290,13 +290,6 @@ OrderEvents:
 	eh.currentIndex = 0
 
 	return reorderedEvents, markers, nil
-}
-
-func (eh *history) moveToNextEvent() {
-	if eh.currentIndex > 0 { // event 0 is accessed in many places
-		eh.loadedEvents[eh.currentIndex] = nil // do not keep reference so GC could reclaim earlier
-	}
-	eh.currentIndex++
 }
 
 func isPreloadMarkerEvent(event *s.HistoryEvent) bool {

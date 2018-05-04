@@ -124,22 +124,20 @@ type (
 
 	// history wrapper method to help information about events.
 	history struct {
-		workflowTask      *workflowTask
-		eventsHandler     *workflowExecutionEventHandlerImpl
-		loadedEvents      []*s.HistoryEvent
-		currentIndex      int
-		historyEventsSize int
-		next              []*s.HistoryEvent
+		workflowTask  *workflowTask
+		eventsHandler *workflowExecutionEventHandlerImpl
+		loadedEvents  []*s.HistoryEvent
+		currentIndex  int
+		next          []*s.HistoryEvent
 	}
 )
 
 func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandlerImpl) *history {
 	result := &history{
-		workflowTask:      task,
-		eventsHandler:     eventsHandler,
-		loadedEvents:      task.task.History.Events,
-		currentIndex:      0,
-		historyEventsSize: len(task.task.History.Events),
+		workflowTask:  task,
+		eventsHandler: eventsHandler,
+		loadedEvents:  task.task.History.Events,
+		currentIndex:  0,
 	}
 
 	return result
@@ -159,7 +157,7 @@ func (eh *history) IsReplayEvent(event *s.HistoryEvent) bool {
 }
 
 func (eh *history) IsNextDecisionFailed() bool {
-	events := eh.workflowTask.task.History.Events
+	events := eh.loadedEvents
 	eventsSize := len(events)
 	for i := eh.currentIndex; i < eventsSize; i++ {
 		switch events[i].GetEventType() {
@@ -249,12 +247,6 @@ func (eh *history) nextDecisionEvents() (reorderedEvents []*s.HistoryEvent, mark
 
 	// Process events
 
-	decisionStartToCompletionEvents := []*s.HistoryEvent{}
-	decisionCompletionToStartEvents := []*s.HistoryEvent{}
-	var decisionStartedEvent *s.HistoryEvent
-	concurrentToDecision := true
-	lastDecisionIndex := -1
-
 OrderEvents:
 	for {
 		// load more history events if needed
@@ -275,50 +267,28 @@ OrderEvents:
 		case s.EventTypeDecisionTaskStarted:
 			if !eh.IsNextDecisionFailed() {
 				eh.moveToNextEvent()
-				decisionStartedEvent = event
+				reorderedEvents = append(reorderedEvents, event)
 				break OrderEvents
 			}
 
-		case s.EventTypeDecisionTaskCompleted:
-			concurrentToDecision = false
-
-		case s.EventTypeDecisionTaskScheduled, s.EventTypeDecisionTaskTimedOut, s.EventTypeDecisionTaskFailed:
+		case s.EventTypeDecisionTaskCompleted,
+			s.EventTypeDecisionTaskScheduled,
+			s.EventTypeDecisionTaskTimedOut,
+			s.EventTypeDecisionTaskFailed:
 			// Skip
 		default:
-			if concurrentToDecision {
-				decisionStartToCompletionEvents = append(decisionStartToCompletionEvents, event)
-			} else {
-				if isDecisionEvent(event.GetEventType()) {
-					lastDecisionIndex = len(decisionCompletionToStartEvents)
-				}
-				if isPreloadMarkerEvent(event) {
-					markers = append(markers, event)
-				}
-				decisionCompletionToStartEvents = append(decisionCompletionToStartEvents, event)
+			if isPreloadMarkerEvent(event) {
+				markers = append(markers, event)
 			}
+			reorderedEvents = append(reorderedEvents, event)
 		}
 		eh.moveToNextEvent()
 	}
 
-	// Reorder events to correspond to the order that decider sees them.
-	// The main difference is that events that were added during decision task execution
-	// should be processed after events that correspond to the decisions.
-	// Otherwise the replay is going to break.
+	// shrink loaded events so it can be GCed
+	eh.loadedEvents = eh.loadedEvents[eh.currentIndex:]
+	eh.currentIndex = 0
 
-	// First are events that correspond to the previous task decisions
-	if lastDecisionIndex >= 0 {
-		// Make a copy of the slice.
-		reorderedEvents = append(reorderedEvents, decisionCompletionToStartEvents[:lastDecisionIndex+1]...)
-	}
-	// Second are events that were added during previous task execution
-	reorderedEvents = append(reorderedEvents, decisionStartToCompletionEvents...)
-	// The last are events that were added after previous task completion
-	if lastDecisionIndex+1 < len(decisionCompletionToStartEvents) {
-		reorderedEvents = append(reorderedEvents, decisionCompletionToStartEvents[lastDecisionIndex+1:]...)
-	}
-	if decisionStartedEvent != nil {
-		reorderedEvents = append(reorderedEvents, decisionStartedEvent)
-	}
 	return reorderedEvents, markers, nil
 }
 

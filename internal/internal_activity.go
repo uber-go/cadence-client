@@ -140,46 +140,46 @@ func getLocalActivityOptions(ctx Context) *executeLocalActivityParams {
 	return opts.(*executeLocalActivityParams)
 }
 
-func getValidatedActivityOptions(ctx Context) (*executeActivityParameters, error) {
+func getValidatedActivityOptions(ctx Context) (executeActivityParameters, error) {
 	p := getActivityOptions(ctx)
 	if p == nil {
 		// We need task list as a compulsory parameter. This can be removed after registration
-		return nil, errActivityParamsBadRequest
+		return executeActivityParameters{}, errActivityParamsBadRequest
 	}
 	if p.TaskListName == "" {
 		// We default to origin task list name.
 		p.TaskListName = p.OriginalTaskListName
 	}
 	if p.ScheduleToStartTimeoutSeconds <= 0 {
-		return nil, errors.New("missing or negative ScheduleToStartTimeoutSeconds")
+		return executeActivityParameters{}, errors.New("missing or negative ScheduleToStartTimeoutSeconds")
 	}
 	if p.StartToCloseTimeoutSeconds <= 0 {
-		return nil, errors.New("missing or negative StartToCloseTimeoutSeconds")
+		return executeActivityParameters{}, errors.New("missing or negative StartToCloseTimeoutSeconds")
 	}
 	if p.ScheduleToCloseTimeoutSeconds < 0 {
-		return nil, errors.New("missing or negative ScheduleToCloseTimeoutSeconds")
+		return executeActivityParameters{}, errors.New("missing or negative ScheduleToCloseTimeoutSeconds")
 	}
 	if p.ScheduleToCloseTimeoutSeconds == 0 {
 		// This is a optional parameter, we default to sum of the other two timeouts.
 		p.ScheduleToCloseTimeoutSeconds = p.ScheduleToStartTimeoutSeconds + p.StartToCloseTimeoutSeconds
 	}
 	if p.HeartbeatTimeoutSeconds < 0 {
-		return nil, errors.New("invalid negative HeartbeatTimeoutSeconds")
+		return executeActivityParameters{}, errors.New("invalid negative HeartbeatTimeoutSeconds")
 	}
 
-	return p, nil
+	return *p, nil
 }
 
-func getValidatedLocalActivityOptions(ctx Context) (*executeLocalActivityParams, error) {
+func getValidatedLocalActivityOptions(ctx Context) (executeLocalActivityParams, error) {
 	p := getLocalActivityOptions(ctx)
 	if p == nil {
-		return nil, errLocalActivityParamsBadRequest
+		return executeLocalActivityParams{}, errLocalActivityParamsBadRequest
 	}
 	if p.ScheduleToCloseTimeoutSeconds <= 0 {
-		return nil, errors.New("missing or negative ScheduleToCloseTimeoutSeconds")
+		return executeLocalActivityParams{}, errors.New("missing or negative ScheduleToCloseTimeoutSeconds")
 	}
 
-	return p, nil
+	return *p, nil
 }
 
 func validateFunctionArgs(f interface{}, args []interface{}, isWorkflow bool) error {

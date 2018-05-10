@@ -1079,11 +1079,11 @@ func getValidatedWorkflowFunction(workflowFunc interface{}, args []interface{}) 
 	return &WorkflowType{Name: fnName}, input, nil
 }
 
-func getValidatedWorkflowOptions(ctx Context) (*workflowOptions, error) {
+func getValidatedWorkflowOptions(ctx Context) (workflowOptions, error) {
 	p := getWorkflowEnvOptions(ctx)
 	if p == nil {
 		// We need task list as a compulsory parameter. This can be removed after registration
-		return nil, errWorkflowOptionBadRequest
+		return workflowOptions{}, errWorkflowOptionBadRequest
 	}
 	info := GetWorkflowInfo(ctx)
 	if p.domain == nil || *p.domain == "" {
@@ -1095,16 +1095,16 @@ func getValidatedWorkflowOptions(ctx Context) (*workflowOptions, error) {
 		p.taskListName = common.StringPtr(info.TaskListName)
 	}
 	if p.taskStartToCloseTimeoutSeconds == nil || *p.taskStartToCloseTimeoutSeconds < 0 {
-		return nil, errors.New("missing or negative DecisionTaskStartToCloseTimeout")
+		return workflowOptions{}, errors.New("missing or negative DecisionTaskStartToCloseTimeout")
 	}
 	if *p.taskStartToCloseTimeoutSeconds == 0 {
 		p.taskStartToCloseTimeoutSeconds = common.Int32Ptr(defaultDecisionTaskTimeoutInSecs)
 	}
 	if p.executionStartToCloseTimeoutSeconds == nil || *p.executionStartToCloseTimeoutSeconds <= 0 {
-		return nil, errors.New("missing or invalid ExecutionStartToCloseTimeout")
+		return workflowOptions{}, errors.New("missing or invalid ExecutionStartToCloseTimeout")
 	}
 
-	return p, nil
+	return *p, nil
 }
 
 func getWorkflowEnvOptions(ctx Context) *workflowOptions {

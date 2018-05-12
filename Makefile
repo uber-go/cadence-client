@@ -1,94 +1,77 @@
 .PHONY: test bins clean cover cover_ci
-PROJECT_ROOT = go.uber.org/cadence
-
-export PATH := $(GOPATH)/bin:$(PATH)
-
-THRIFT_GENDIR=.gen
 
 # default target
 default: test
 
-# define the list of thrift files the service depends on
-# (if you have some)
-THRIFTRW_SRCS = \
-  idl/github.com/uber/cadence/cadence.thrift \
-  idl/github.com/uber/cadence/shared.thrift \
+IMPORT_ROOT := go.uber.org/cadence
+THRIFT_GENDIR := .gen/go
+THRIFTRW_SRC := idl/github.com/uber/cadence/cadence.thrift
+# one or more thriftrw-generated file(s), to create / depend on generated code
+THRIFTRW_OUT := $(THRIFT_GENDIR)/cadence/idl.go
+TEST_ARG ?= -coverprofile=$(BUILD)/cover.out -race
 
-PROGS = cadence-client
-TEST_ARG ?= -race -v -timeout 5m
-BUILD := ./build
+# general build-product folder, cleaned as part of `make clean`
+BUILD := .build
 
-THRIFT_GEN=$(GOPATH)/bin/thrift-gen
+$(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BUILD)/thriftrw $(BUILD)/thriftrw-plugin-yarpc
+	@echo 'thriftrw: $(THRIFTRW_SRC)'
+	@mkdir -p $(dir $@)
+	@# needs to be able to find the thriftrw-plugin-yarpc bin in PATH
+	@PATH="$(BUILD)" \
+		$(BUILD)/thriftrw \
+		--plugin=yarpc \
+		--pkg-prefix=$(IMPORT_ROOT)/$(THRIFT_GENDIR) \
+		--out=$(THRIFT_GENDIR) \
+		$(THRIFTRW_SRC)
 
-define thriftrwrule
-THRIFTRW_GEN_SRC += $(THRIFT_GENDIR)/go/$1/$1.go
-
-$(THRIFT_GENDIR)/go/$1/$1.go:: $2
-	@mkdir -p $(THRIFT_GENDIR)/go
-	$(ECHO_V)thriftrw --plugin=yarpc --pkg-prefix=$(PROJECT_ROOT)/$(THRIFT_GENDIR)/go/ --out=$(THRIFT_GENDIR)/go $2
-endef
-
-$(foreach tsrc,$(THRIFTRW_SRCS),$(eval $(call \
-	thriftrwrule,$(basename $(notdir \
-	$(shell echo $(tsrc) | tr A-Z a-z))),$(tsrc))))
-
-# Automatically gather all srcs
-ALL_SRC := $(shell find . -name "*.go" | grep -v -e Godeps -e vendor \
-	-e ".*/\..*" \
-	-e ".*/_.*")
+# Automatically gather all srcs + a "sentinel" thriftrw output file (which forces generation).
+ALL_SRC := $(THRIFTRW_OUT) $(shell \
+	find . -name "*.go" | \
+	grep -v \
+	-e vendor/ \
+	-e .gen/ \
+	-e .build/ \
+)
 
 # Files that needs to run lint, exclude testify mock from lint
 LINT_SRC := $(filter-out ./mock%,$(ALL_SRC))
 
-# all directories with *_test.go files in them
-TEST_DIRS := $(sort $(dir $(filter %_test.go,$(ALL_SRC))))
+vendor: vendor/glide.updated
 
-vendor:
+vendor/glide.updated: glide.lock
 	glide install
+	touch vendor/glide.updated
 
-yarpc-install: vendor
-	go get './vendor/go.uber.org/thriftrw'
-	go get './vendor/go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc'
+$(BUILD)/thriftrw:
+	./versioned_go_build.sh go.uber.org/thriftrw v1.11.0 $@
+
+$(BUILD)/thriftrw-plugin-yarpc:
+	./versioned_go_build.sh go.uber.org/yarpc v1.29.1 encoding/thrift/thriftrw-plugin-yarpc $@
+
+$(BUILD)/golint:
+	./versioned_go_build.sh golang.org/x/lint 470b6b0bb3005eda157f0275e2e4895055396a81 golint $@
 
 clean_thrift:
 	rm -rf .gen
 
-thriftc: clean_thrift yarpc-install $(THRIFTRW_GEN_SRC)
-
-copyright: ./internal/cmd/tools/copyright/licensegen.go
+# `make copyright` or depend on "copyright" to force-run licensegen,
+# or depend on $(BUILD)/copyright to let it run as needed.
+copyright $(BUILD)/copyright: $(ALL_SRC)
 	go run ./internal/cmd/tools/copyright/licensegen.go --verifyOnly
+	touch $(BUILD)/copyright
 
-vendor/glide.updated: glide.lock glide.yaml
-	glide install
-	touch vendor/glide.updated
+$(BUILD)/dummy: vendor/glide.updated $(ALL_SRC)
+	go build -i -o $@ internal/cmd/dummy/dummy.go
 
-dummy: vendor/glide.updated $(ALL_SRC)
-	go build -i -o dummy internal/cmd/dummy/dummy.go
+test $(BUILD)/cover.out: $(BUILD)/copyright $(BUILD)/dummy $(ALL_SRC)
+	go test ./... $(TEST_ARG)
 
-test: bins
-	@rm -f test
-	@rm -f test.log
-	@for dir in $(TEST_DIRS); do \
-		go test -race -coverprofile=$@ "$$dir" | tee -a test.log; \
-	done;
+bins: $(ALL_SRC) $(BUILD)/copyright lint $(BUILD)/dummy
 
-bins: thriftc copyright lint dummy
-
-cover_profile: clean copyright lint vendor/glide.updated
-	@mkdir -p $(BUILD)
-	@echo "mode: atomic" > $(BUILD)/cover.out
-
-	@echo Testing packages:
-	@for dir in $(TEST_DIRS); do \
-		mkdir -p $(BUILD)/"$$dir"; \
-		go test "$$dir" $(TEST_ARG) -coverprofile=$(BUILD)/"$$dir"/coverage.out || exit 1; \
-		cat $(BUILD)/"$$dir"/coverage.out | grep -v "mode: atomic" >> $(BUILD)/cover.out; \
-	done;
-
-cover: cover_profile
+cover: $(BUILD)/cover.out
 	go tool cover -html=$(BUILD)/cover.out;
 
-cover_ci: cover_profile
+cover_ci: $(BUILD)/cover.out
 	goveralls -coverprofile=$(BUILD)/cover.out -service=travis-ci || echo -e "\x1b[31mCoveralls failed\x1b[m";
 
 # golint fails to report many lint failures if it is only given a single file
@@ -102,10 +85,10 @@ cover_ci: cover_profile
 # - filter to only files in LINT_SRC
 # - if it's not empty, run golint against the list
 define lint_if_present
-test -n "$1" && golint -set_exit_status $1
+test -n "$1" && $(BUILD)/golint -set_exit_status $1
 endef
 
-lint:
+lint: $(BUILD)/golint $(ALL_SRC)
 	@$(foreach pkg,\
 		$(sort $(dir $(LINT_SRC))), \
 		$(call lint_if_present,$(filter $(wildcard $(pkg)*.go),$(LINT_SRC))) || ERR=1; \
@@ -121,6 +104,5 @@ fmt:
 	@gofmt -w $(ALL_SRC)
 
 clean:
-	rm -rf cadence-client
 	rm -Rf $(BUILD)
-	rm -f dummy
+	rm -Rf .gen

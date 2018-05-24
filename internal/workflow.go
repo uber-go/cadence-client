@@ -350,12 +350,12 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 		settable.Set(nil, err)
 		return future
 	}
-	options.DataConverter = dataConverter
 
 	params := executeActivityParams{
 		activityOptions: *options,
 		ActivityType:    *activityType,
 		Input:           input,
+		DataConverter:   dataConverter,
 	}
 
 	ctxDone, cancellable := ctx.Done().(*channelImpl)
@@ -432,6 +432,7 @@ func ExecuteLocalActivity(ctx Context, activity interface{}, args ...interface{}
 		ActivityFn:           activity,
 		InputArgs:            args,
 		WorkflowInfo:         GetWorkflowInfo(ctx),
+		DataConverter:        getDataConverterFromWorkflowContext(ctx),
 	}
 
 	ctxDone, cancellable := ctx.Done().(*channelImpl)

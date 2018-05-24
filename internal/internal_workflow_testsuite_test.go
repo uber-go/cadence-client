@@ -55,7 +55,6 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 		ScheduleToCloseTimeout: time.Second * 3,
 	}
 	RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
-	RegisterWorkflowWithOptions(testWorkflowHelloWithDataConverter, RegisterWorkflowOptions{Name: "testWorkflowHelloWithDC"})
 	RegisterWorkflow(testWorkflowHeartbeat)
 	RegisterActivityWithOptions(testActivityHello, RegisterActivityOptions{Name: "testActivityHello"})
 	RegisterActivity(testActivityHeartbeat)
@@ -88,12 +87,37 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockFunction_WithDataConverter(
 		return "mock_" + msg, nil
 	}
 
+	workflowFn := func(ctx Context) (string, error) {
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    time.Minute,
+			HeartbeatTimeout:       20 * time.Second,
+		}
+		ctx = WithActivityOptions(ctx, ao)
+
+		var result string
+		ctx = WithDataConverter(ctx, newTestDataConverter())
+		err := ExecuteActivity(ctx, testActivityHello, "world").Get(ctx, &result)
+		if err != nil {
+			return "", err
+		}
+
+		var result1 string
+		ctx1 := WithDataConverter(ctx, newDefaultDataConverter()) // use another converter to run activity
+		err1 := ExecuteActivity(ctx1, testActivityHello, "world1").Get(ctx1, &result1)
+		if err1 != nil {
+			return "", err1
+		}
+		return result + "," + result1, nil
+	}
+
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
 
 	env.SetWorkerOptions(WorkerOptions{DataConverter: newTestDataConverter()})
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return(mockActivity).Twice()
 
-	env.ExecuteWorkflow(testWorkflowHelloWithDataConverter)
+	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -411,30 +435,6 @@ func testWorkflowHello(ctx Context) (string, error) {
 		return "", err
 	}
 	return result, nil
-}
-
-func testWorkflowHelloWithDataConverter(ctx Context) (string, error) {
-	ao := ActivityOptions{
-		ScheduleToStartTimeout: time.Minute,
-		StartToCloseTimeout:    time.Minute,
-		HeartbeatTimeout:       20 * time.Second,
-	}
-	ctx = WithActivityOptions(ctx, ao)
-
-	var result string
-	ctx = WithDataConverter(ctx, newTestDataConverter())
-	err := ExecuteActivity(ctx, testActivityHello, "world").Get(ctx, &result)
-	if err != nil {
-		return "", err
-	}
-
-	var result1 string
-	ctx1 := WithDataConverter(ctx, newDefaultDataConverter()) // use another converter to run activity
-	err1 := ExecuteActivity(ctx1, testActivityHello, "world1").Get(ctx1, &result1)
-	if err1 != nil {
-		return "", err1
-	}
-	return result + "," + result1, nil
 }
 
 func testActivityHello(ctx context.Context, msg string) (string, error) {

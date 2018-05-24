@@ -478,7 +478,7 @@ func (wc *workflowEnvironmentImpl) GetVersion(changeID string, minSupported, max
 	} else {
 		// GetVersion for changeID is called first time (non-replay mode), we need to generate a marker decision for it.
 		version = maxSupported
-		wc.decisionsHelper.recordVersionMarker(changeID, version, wc.dataConverter)
+		wc.decisionsHelper.recordVersionMarker(changeID, version, wc.GetDataConverter())
 	}
 
 	validateVersion(changeID, version, minSupported, maxSupported)
@@ -577,7 +577,7 @@ func (wc *workflowEnvironmentImpl) encodeValue(value interface{}) []byte {
 }
 
 func (wc *workflowEnvironmentImpl) encodeArg(arg interface{}) ([]byte, error) {
-	return wc.dataConverter.ToData(arg)
+	return wc.GetDataConverter().ToData(arg)
 }
 
 func (wc *workflowEnvironmentImpl) recordMutableSideEffect(id string, data []byte) encoded.Value {

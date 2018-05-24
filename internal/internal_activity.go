@@ -60,18 +60,17 @@ type (
 		HeartbeatTimeoutSeconds       int32
 		WaitForCancellation           bool
 		OriginalTaskListName          string
-		DataConverter                 encoded.DataConverter // used in testsuite
 	}
 
 	localActivityOptions struct {
 		ScheduleToCloseTimeoutSeconds int32
-		DataConverter                 encoded.DataConverter // used in testsuite
 	}
 
 	executeActivityParams struct {
 		activityOptions
-		ActivityType ActivityType
-		Input        []byte
+		ActivityType  ActivityType
+		Input         []byte
+		DataConverter encoded.DataConverter
 	}
 
 	executeLocalActivityParams struct {
@@ -190,9 +189,6 @@ func getValidatedLocalActivityOptions(ctx Context) (*localActivityOptions, error
 	}
 	if p.ScheduleToCloseTimeoutSeconds <= 0 {
 		return nil, errors.New("missing or negative ScheduleToCloseTimeoutSeconds")
-	}
-	if p.DataConverter == nil {
-		p.DataConverter = newDefaultDataConverter()
 	}
 
 	return p, nil

@@ -286,7 +286,8 @@ func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(param
 	childEnv.parentEnv = env
 	childEnv.startedHandler = startedHandler
 	childEnv.testWorkflowEnvironmentShared = env.testWorkflowEnvironmentShared
-	childEnv.workerOptions = WorkerOptions{DataConverter: params.dataConverter}
+	childEnv.workerOptions = env.workerOptions
+	childEnv.workerOptions.DataConverter = params.dataConverter
 
 	if params.workflowID == "" {
 		params.workflowID = env.workflowInfo.WorkflowExecution.RunID + "_" + getStringID(env.nextID())

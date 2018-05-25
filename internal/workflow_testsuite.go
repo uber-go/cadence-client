@@ -159,8 +159,7 @@ func (t *TestActivityEnvironment) SetWorkerOptions(options WorkerOptions) *TestA
 }
 
 // SetTestTimeout sets the wall clock timeout for this activity test run. When test timeout happen, it means activity is
-// taking too longer. This could happen if workflow is waiting for activity result for too long.
-// This is real wall clock time, not the workflow time (a.k.a workflow.Now() time).
+// taking too long.
 func (t *TestActivityEnvironment) SetTestTimeout(idleTimeout time.Duration) *TestActivityEnvironment {
 	t.impl.testTimeout = idleTimeout
 	return t

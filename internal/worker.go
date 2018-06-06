@@ -202,7 +202,7 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 	if err != nil {
 		return err
 	}
-	
+
 	return replayWorkflowHistory(logger, service, domain, hResponse.History)
 }
 
@@ -210,6 +210,10 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 // Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.
 func ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
+
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 
 	testReporter := logger.Sugar()
 	controller := gomock.NewController(testReporter)
@@ -229,6 +233,10 @@ func ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string) 
 
 	if err != nil {
 		return err
+	}
+
+	if logger == nil {
+		logger = zap.NewNop()
 	}
 
 	testReporter := logger.Sugar()
@@ -300,16 +308,10 @@ func extractHistoryFromFile(jsonfileName string) (*shared.History, error) {
 		return nil, err
 	}
 
-	var deserializedEvents []shared.HistoryEvent
+	var deserializedEvents []*shared.HistoryEvent
 	json.Unmarshal(raw, &deserializedEvents)
 
-	eventCount := len(deserializedEvents)
-	historyEvents := make([]*shared.HistoryEvent, eventCount, eventCount)
-
-	for i := range deserializedEvents {
-		historyEvents[i] = &deserializedEvents[i]
-	}
-	history := &shared.History{Events: historyEvents[:]}
+	history := &shared.History{Events: deserializedEvents}
 
 	return history, nil
 }

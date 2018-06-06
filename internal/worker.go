@@ -242,7 +242,7 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 		Logger:   logger,
 	}
 	taskHandler := newWorkflowTaskHandler(domain, params, nil, getHostEnvironment())
-	_, _, err = taskHandler.ProcessWorkflowTask(task, iterator, false)
+	_, _, err = taskHandler.ProcessWorkflowTask(task, iterator)
 	return err
 }
 
@@ -301,6 +301,6 @@ func ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
 		Logger:   logger,
 	}
 	taskHandler := newWorkflowTaskHandler(domain, params, nil, getHostEnvironment())
-	_, _, err := taskHandler.ProcessWorkflowTask(task, iterator, false)
+	_, _, err := taskHandler.ProcessWorkflowTask(task, iterator)
 	return err
 }

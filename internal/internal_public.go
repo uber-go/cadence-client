@@ -28,6 +28,9 @@ package internal
 // point of view only to access them from other packages.
 
 import (
+	"sync"
+	"time"
+
 	s "go.uber.org/cadence/.gen/go/shared"
 )
 
@@ -42,6 +45,18 @@ type (
 		HasNextPage() bool
 	}
 
+	// WorkflowExecutionContext represents one instance of workflow execution state in memory. Lock must be obtained before
+	// calling into any methods.
+	WorkflowExecutionContext interface {
+		sync.Locker
+		ProcessWorkflowTask(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (completeRequest interface{}, err error)
+		ProcessLocalActivityResult(lar *localActivityResult) (interface{}, error)
+		CompleteDecisionTask(waitLocalActivity bool) interface{}
+		GetDelayReportDuration(startTime time.Time) time.Duration
+		GetCurrentDecisionTask() *s.PollForDecisionTaskResponse
+		StackTrace() string
+	}
+
 	// WorkflowTaskHandler represents decision task handlers.
 	WorkflowTaskHandler interface {
 		// Processes the workflow task
@@ -51,7 +66,7 @@ type (
 		// - RespondQueryTaskCompletedRequest
 		ProcessWorkflowTask(
 			task *s.PollForDecisionTaskResponse,
-			historyIterator HistoryIterator) (response interface{}, context *WorkflowExecutionContext, err error)
+			historyIterator HistoryIterator) (response interface{}, w WorkflowExecutionContext, err error)
 	}
 
 	// ActivityTaskHandler represents activity task handlers.

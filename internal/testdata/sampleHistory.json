@@ -1,0 +1,46 @@
+[
+  {
+    "eventId": 1,
+    "eventType": "WorkflowExecutionStarted",
+    "workflowExecutionStartedEventAttributes": {
+      "workflowType": {
+        "name": "go.uber.org/cadence/internal.testReplayWorkflow"
+      },
+      "taskList": {
+        "name": "taskList1"
+      }
+    }
+  },
+  {
+    "eventId": 2,
+    "eventType": "DecisionTaskScheduled",
+    "decisionTaskScheduledEventAttributes": {}
+  },
+  {
+    "eventId": 3,
+    "eventType": "DecisionTaskStarted"
+  },
+  {
+    "eventId": 4,
+    "eventType": "DecisionTaskCompleted",
+    "decisionTaskCompletedEventAttributes": {}
+  },
+  {
+    "eventId": 5,
+    "eventType": "ActivityTaskScheduled",
+    "activityTaskScheduledEventAttributes": {
+      "activityId": "0",
+      "activityType": {
+        "name": "testActivity"
+      },
+      "taskList": {
+        "name": "taskList1"
+      }
+    }
+  },
+  {
+    "eventId": 6,
+    "eventType": "ActivityTaskStarted",
+    "activityTaskStartedEventAttributes": {}
+  }
+]

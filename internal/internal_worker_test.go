@@ -141,6 +141,12 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory() {
 	require.NoError(s.T(), err)
 }
 
+func (s *internalWorkerTestSuite) TestReplayWorkflowHistoryFromFile() {
+	logger := getLogger()
+	err := ReplayWorkflowHistoryFromJSONFile(logger, "testdata/sampleHistory.json")
+	require.NoError(s.T(), err)
+}
+
 func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExecutionParameters) {
 	taskList := "taskList1"
 	testEvents := []*shared.HistoryEvent{

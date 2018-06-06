@@ -91,6 +91,17 @@ func ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
 	return internal.ReplayWorkflowHistory(logger, history)
 }
 
+// ReplayWorkflowHistoryFromJSONFile executes a single decision task for the given history.
+// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+//
+// The logger is an optional parameter. Defaults to the noop logger.
+// The response contains the decisions produced processing the decision task. It is either
+// RespondDecisionTaskCompletedRequest or RespondDecisionTaskFailedRequest.
+// The returned stackTrace contains the stack trace of the workflow at the end of the decision.
+func ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string) error {
+	return internal.ReplayWorkflowHistoryFromJSONFile(logger, jsonfileName)
+}
+
 // ReplayWorkflowExecution loads a workflow execution history from the Cadence service and executes a single decision task for it.
 // Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is the only optional parameter. Defaults to the noop logger.

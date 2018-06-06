@@ -87,7 +87,9 @@ func ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
 	return internal.ReplayWorkflowHistory(logger, history)
 }
 
-// ReplayWorkflowHistoryFromJSONFile executes a single decision task for the given json history file.
+// ReplayWorkflowHistoryFromJSONFile executes a single decision task for the json history file downloaded from the cli.
+//// To download the history file: cadence workflow showid <workflow_id> -of <output_filename>
+//// See https://github.com/uber/cadence/blob/master/tools/cli/README.md for full documentation
 //// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
 //// The logger is an optional parameter. Defaults to the noop logger.
 func ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string) error {

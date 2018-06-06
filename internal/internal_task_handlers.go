@@ -629,11 +629,11 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 
 	workflowTask := &workflowTask{task: task, historyIterator: historyIterator}
 
-	response, err := workflowContext.processWorkflowTaskWithLock(workflowTask, skipReplayCheck)
+	response, err := workflowContext.processWorkflowTaskLocked(workflowTask, skipReplayCheck)
 	return response, workflowContext, err
 }
 
-func (w *WorkflowExecutionContext) processWorkflowTaskWithLock(task *workflowTask, skipReplayCheck bool) (completeRequest interface{}, err error) {
+func (w *WorkflowExecutionContext) processWorkflowTaskLocked(task *workflowTask, skipReplayCheck bool) (completeRequest interface{}, err error) {
 	eventHandler := w.eventHandler
 	reorderedHistory := newHistory(task, eventHandler)
 	var replayDecisions []*s.Decision
@@ -719,19 +719,19 @@ ProcessEvents:
 		}
 	}
 
-	return w.CompleteDecisionTaskWithLock(false), nil
+	return w.CompleteDecisionTaskLocked(false), nil
 }
 
 func (wth *workflowTaskHandlerImpl) ProcessLocalActivityResult(lar *localActivityResult) (interface{}, error) {
 	workflowContext := lar.task.wc
 	workflowContext.Lock()
 	defer workflowContext.release()
-	workflowContext.processLocalActivityResultWithLock(lar)
+	workflowContext.processLocalActivityResultLocked(lar)
 
-	return workflowContext.CompleteDecisionTaskWithLock(false), nil
+	return workflowContext.CompleteDecisionTaskLocked(false), nil
 }
 
-func (w *WorkflowExecutionContext) processLocalActivityResultWithLock(lar *localActivityResult) error {
+func (w *WorkflowExecutionContext) processLocalActivityResultLocked(lar *localActivityResult) error {
 	eventDecisions, err := w.eventHandler.ProcessLocalActivityResult(lar)
 	if err != nil {
 		return err
@@ -744,7 +744,7 @@ func (w *WorkflowExecutionContext) processLocalActivityResultWithLock(lar *local
 	return nil
 }
 
-func (w *WorkflowExecutionContext) CompleteDecisionTaskWithLock(force bool) interface{} {
+func (w *WorkflowExecutionContext) CompleteDecisionTaskLocked(force bool) interface{} {
 	if w.hasPendingLocalActivityWork() {
 		if len(w.eventHandler.unstartedLaTasks) > 0 {
 			// start new local activity tasks

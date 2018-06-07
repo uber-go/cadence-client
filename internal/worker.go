@@ -309,8 +309,11 @@ func extractHistoryFromFile(jsonfileName string) (*shared.History, error) {
 	}
 
 	var deserializedEvents []*shared.HistoryEvent
-	json.Unmarshal(raw, &deserializedEvents)
+	err = json.Unmarshal(raw, &deserializedEvents)
 
+	if err != nil {
+		return nil, err
+	}
 	history := &shared.History{Events: deserializedEvents}
 
 	return history, nil

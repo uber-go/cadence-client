@@ -50,6 +50,7 @@ func init() {
 		RegisterWorkflowOptions{Name: "sampleWorkflowExecute"},
 	)
 	RegisterWorkflow(testReplayWorkflow)
+	RegisterWorkflow(testReplayWorkflowFromFile)
 	RegisterActivityWithOptions(
 		testActivity,
 		RegisterActivityOptions{Name: "testActivity"},
@@ -112,6 +113,22 @@ func testReplayWorkflow(ctx Context) error {
 	return err
 }
 
+func testReplayWorkflowFromFile(ctx Context) error {
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+		HeartbeatTimeout:       20 * time.Second,
+		WaitForCancellation:    true,
+	}
+	ctx = WithActivityOptions(ctx, ao)
+	err := ExecuteActivity(ctx, "testActivityMultipleArgs", 2, "test", true).Get(ctx, nil)
+	if err != nil {
+		getLogger().Error("activity failed with error.", zap.Error(err))
+		panic("Failed workflow")
+	}
+	return err
+}
+
 func testActivity(ctx context.Context) error {
 	return nil
 }
@@ -122,7 +139,7 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory() {
 		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
 			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
-			Input:        testEncodeFunctionArgs(nil, testReplayWorkflow),
+			Input:    testEncodeFunctionArgs(nil, testReplayWorkflow),
 		}),
 		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
@@ -152,7 +169,7 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 	testEvents := []*shared.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 			TaskList: &shared.TaskList{Name: common.StringPtr(taskList)},
-			Input:    testEncodeFunctionArgs(params.DataConverter, testReplayWorkflow),
+			Input:    testEncodeFunctionArgs(params.DataConverter, testReplayWorkflow, "2"),
 		}),
 		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),

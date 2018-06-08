@@ -302,7 +302,6 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 }
 
 func extractHistoryFromFile(jsonfileName string) (*shared.History, error) {
-
 	raw, err := ioutil.ReadFile(jsonfileName)
 	if err != nil {
 		return nil, err

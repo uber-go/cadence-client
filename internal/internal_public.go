@@ -51,8 +51,17 @@ type (
 		sync.Locker
 		ProcessWorkflowTask(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (completeRequest interface{}, err error)
 		ProcessLocalActivityResult(lar *localActivityResult) (interface{}, error)
+		// CompleteDecisionTask try to complete current decision task and get response that needs to be sent back to server.
+		// The waitLocalActivity is used to control if we should wait for outstanding local activities.
+		// If there is no outstanding local activities or if waitLocalActivity is false, the complete will return response
+		// which will be one of following:
+		// - RespondDecisionTaskCompletedRequest
+		// - RespondDecisionTaskFailedRequest
+		// - RespondQueryTaskCompletedRequest
+		// If waitLocalActivity is true, and there is outstanding local activities, this call will return nil.
 		CompleteDecisionTask(waitLocalActivity bool) interface{}
-		GetDelayReportDuration(startTime time.Time) time.Duration
+		// GetDecisionTimeout returns the TaskStartToCloseTimeout
+		GetDecisionTimeout() time.Duration
 		GetCurrentDecisionTask() *s.PollForDecisionTaskResponse
 		StackTrace() string
 	}

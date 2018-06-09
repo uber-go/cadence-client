@@ -799,10 +799,8 @@ func (w *workflowExecutionContextImpl) ResetIfStale(task *s.PollForDecisionTaskR
 	return nil
 }
 
-func (w *workflowExecutionContextImpl) GetDelayReportDuration(startTime time.Time) time.Duration {
-	deadlineToTrigger := time.Duration(float32(0.8) * float32(w.workflowInfo.TaskStartToCloseTimeoutSeconds) * float32(time.Second))
-	delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
-	return delayDuration
+func (w *workflowExecutionContextImpl) GetDecisionTimeout() time.Duration {
+	return time.Second * time.Duration(w.workflowInfo.TaskStartToCloseTimeoutSeconds)
 }
 
 func (w *workflowExecutionContextImpl) StackTrace() string {

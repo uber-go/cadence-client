@@ -261,7 +261,9 @@ func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTa
 }
 
 func (wtp *workflowTaskPoller) scheduleRespondDecisionTaskCompleted(wc WorkflowExecutionContext, workflowTask *workflowTask, startTime time.Time) {
-	delayDuration := wc.GetDelayReportDuration(startTime)
+	timeoutDuration := wc.GetDecisionTimeout()
+	deadlineToTrigger := time.Duration(float32(0.8) * float32(timeoutDuration))
+	delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
 	time.AfterFunc(delayDuration, func() {
 		defer func() {
 			if p := recover(); p != nil {

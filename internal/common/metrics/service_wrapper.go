@@ -71,6 +71,7 @@ const (
 	scopeNameTerminateWorkflowExecution       = CadenceMetricsPrefix + "TerminateWorkflowExecution"
 	scopeNameUpdateDomain                     = CadenceMetricsPrefix + "UpdateDomain"
 	scopeNameQueryWorkflow                    = CadenceMetricsPrefix + "QueryWorkflow"
+	scopeNameQueryTaskList                    = CadenceMetricsPrefix + "QueryTaskList"
 	scopeNameDescribeTaskList                 = CadenceMetricsPrefix + "DescribeTaskList"
 	scopeNameRespondQueryTaskCompleted        = CadenceMetricsPrefix + "RespondQueryTaskCompleted"
 	scopeNameDescribeWorkflowExecution        = CadenceMetricsPrefix + "DescribeWorkflowExecution"
@@ -296,6 +297,13 @@ func (w *workflowServiceMetricsWrapper) UpdateDomain(ctx context.Context, reques
 func (w *workflowServiceMetricsWrapper) QueryWorkflow(ctx context.Context, request *shared.QueryWorkflowRequest, opts ...yarpc.CallOption) (*shared.QueryWorkflowResponse, error) {
 	scope := w.getOperationScope(scopeNameQueryWorkflow)
 	result, err := w.service.QueryWorkflow(ctx, request, opts...)
+	scope.handleError(err)
+	return result, err
+}
+
+func (w *workflowServiceMetricsWrapper) QueryTaskList(ctx context.Context, request *shared.QueryTaskListRequest, opts ...yarpc.CallOption) (*shared.QueryTaskListResponse, error) {
+	scope := w.getOperationScope(scopeNameQueryWorkflow)
+	result, err := w.service.QueryTaskList(ctx, request, opts...)
 	scope.handleError(err)
 	return result, err
 }

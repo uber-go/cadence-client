@@ -41,6 +41,9 @@ type (
 	// NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 	// mismatched history events (presumably arising from non-deterministic workflow definitions).
 	NonDeterministicWorkflowPolicy = internal.NonDeterministicWorkflowPolicy
+
+	// TaskListQueryHandlers contain query handlers for task lists.
+	TaskListQueryHandlers = internal.TaskListQueryHandlers
 )
 
 const (

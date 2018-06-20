@@ -882,6 +882,11 @@ func reportActivityComplete(ctx context.Context, service workflowserviceclient.I
 			func() error {
 				return service.RespondActivityTaskCompleted(tchCtx, request, opt...)
 			}, serviceOperationRetryPolicy, isServiceTransientError)
+	case *s.RespondQueryTaskCompletedRequest:
+		reportErr = backoff.Retry(ctx,
+			func() error {
+				return service.RespondQueryTaskCompleted(tchCtx, request, opt...)
+			}, serviceOperationRetryPolicy, isServiceTransientError)
 	}
 	if reportErr == nil {
 		switch request.(type) {

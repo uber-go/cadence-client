@@ -114,20 +114,22 @@ type (
 		laTunnel                       *localActivityTunnel
 		nonDeterministicWorkflowPolicy NonDeterministicWorkflowPolicy
 		dataConverter                  encoded.DataConverter
+		taskListQueryHandlers          map[string]queryFunc
 	}
 
 	activityProvider func(name string) activity
 	// activityTaskHandlerImpl is the implementation of ActivityTaskHandler
 	activityTaskHandlerImpl struct {
-		taskListName     string
-		identity         string
-		service          workflowserviceclient.Interface
-		metricsScope     *metrics.TaggedScope
-		logger           *zap.Logger
-		userContext      context.Context
-		hostEnv          *hostEnvImpl
-		activityProvider activityProvider
-		dataConverter    encoded.DataConverter
+		taskListName          string
+		identity              string
+		service               workflowserviceclient.Interface
+		metricsScope          *metrics.TaggedScope
+		logger                *zap.Logger
+		userContext           context.Context
+		hostEnv               *hostEnvImpl
+		activityProvider      activityProvider
+		dataConverter         encoded.DataConverter
+		taskListQueryHandlers map[string]queryFunc
 	}
 
 	// history wrapper method to help information about events.
@@ -317,6 +319,7 @@ func newWorkflowTaskHandler(
 		hostEnv:                hostEnv,
 		nonDeterministicWorkflowPolicy: params.NonDeterministicWorkflowPolicy,
 		dataConverter:                  params.DataConverter,
+		taskListQueryHandlers:          params.DecisionTaskListQueryHandlers,
 	}
 }
 
@@ -604,6 +607,15 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		return nil, nil, errors.New("nil or empty history")
 	}
 
+	if task.Query != nil && task.WorkflowExecution == nil {
+		// task list query
+		query := &s.Query{
+			QueryType: task.Query.QueryType,
+			QueryArgs: task.Query.QueryArgs,
+		}
+		return processQuery(task.TaskToken, query, wth.taskListQueryHandlers), nil, nil
+	}
+
 	runID := task.WorkflowExecution.GetRunId()
 	workflowID := task.WorkflowExecution.GetWorkflowId()
 	traceLog(func() {
@@ -622,6 +634,46 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 
 	response, err := workflowContext.ProcessWorkflowTask(task, historyIterator)
 	return response, workflowContext, err
+}
+
+func processQuery(taskToken []byte, query *s.Query, queryHandlers map[string]queryFunc) *s.RespondQueryTaskCompletedRequest {
+	queryCompletedRequest := &s.RespondQueryTaskCompletedRequest{TaskToken: taskToken}
+
+	result, err := processTaskListQuery(query, queryHandlers)
+	if err != nil {
+		if panicErr, ok := err.(*PanicError); ok {
+			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
+			queryCompletedRequest.ErrorMessage = common.StringPtr("Task list query handler panic: " + panicErr.Error())
+		} else {
+			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
+			queryCompletedRequest.ErrorMessage = common.StringPtr(err.Error())
+		}
+	} else {
+		queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeCompleted)
+		queryCompletedRequest.QueryResult = result
+
+	}
+	return queryCompletedRequest
+}
+
+func processTaskListQuery(query *s.Query, queryHandlers map[string]queryFunc) (result []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			topLine := fmt.Sprintf("panic in task list query [%v]:", *query.QueryType)
+			st := getStackTraceRaw(topLine, 7, 0)
+			err = newPanicError(r, st)
+		}
+	}()
+
+	handler, ok := queryHandlers[*query.QueryType]
+	if !ok {
+		var keys []string
+		for k := range queryHandlers {
+			keys = append(keys, k)
+		}
+		return nil, fmt.Errorf("unknown query type %v. Known query types=%v", *query.QueryType, keys)
+	}
+	return handler(query.QueryArgs)
 }
 
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (completeRequest interface{}, err error) {
@@ -1178,15 +1230,16 @@ func newActivityTaskHandlerWithCustomProvider(
 	activityProvider activityProvider,
 ) ActivityTaskHandler {
 	return &activityTaskHandlerImpl{
-		taskListName:     params.TaskList,
-		identity:         params.Identity,
-		service:          service,
-		logger:           params.Logger,
-		metricsScope:     metrics.NewTaggedScope(params.MetricsScope),
-		userContext:      params.UserContext,
-		hostEnv:          env,
-		activityProvider: activityProvider,
-		dataConverter:    params.DataConverter,
+		taskListName:          params.TaskList,
+		identity:              params.Identity,
+		service:               service,
+		logger:                params.Logger,
+		metricsScope:          metrics.NewTaggedScope(params.MetricsScope),
+		userContext:           params.UserContext,
+		hostEnv:               env,
+		activityProvider:      activityProvider,
+		dataConverter:         params.DataConverter,
+		taskListQueryHandlers: params.ActivityTaskListQueryHandlers,
 	}
 }
 
@@ -1312,11 +1365,22 @@ func newServiceInvoker(
 // Execute executes an implementation of the activity.
 func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivityTaskResponse) (result interface{}, err error) {
 	traceLog(func() {
-		ath.logger.Debug("Processing new activity task",
-			zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
-			zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
-			zap.String(tagActivityType, t.ActivityType.GetName()))
+		if t.WorkflowExecution != nil {
+			ath.logger.Debug("Processing new activity task",
+				zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
+				zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
+				zap.String(tagActivityType, t.ActivityType.GetName()))
+		} else if t.Query != nil {
+			ath.logger.Debug("Processing activity task list query task",
+				zap.String(tagTaskList, taskList),
+				zap.String(tagQueryType, *t.Query.QueryType))
+		}
 	})
+
+	if t.WorkflowExecution == nil && t.ActivityType == nil && t.Query != nil {
+		// task list query
+		return processQuery(t.TaskToken, t.Query, ath.taskListQueryHandlers), nil
+	}
 
 	rootCtx := ath.userContext
 	if rootCtx == nil {

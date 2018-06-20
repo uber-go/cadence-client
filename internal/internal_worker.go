@@ -148,10 +148,16 @@ type (
 		NonDeterministicWorkflowPolicy NonDeterministicWorkflowPolicy
 
 		DataConverter encoded.DataConverter
+
+		DecisionTaskListQueryHandlers map[string]queryFunc
+
+		ActivityTaskListQueryHandlers map[string]queryFunc
 	}
 
 	// defaultDataConverter uses thrift encoder/decoder when possible, for everything else use json.
 	defaultDataConverter struct{}
+
+	queryFunc func([]byte) ([]byte, error)
 )
 
 // newWorkflowWorker returns an instance of the workflow worker.
@@ -934,6 +940,26 @@ func newAggregatedWorker(
 		TaskListActivitiesPerSecond:          wOptions.TaskListActivitiesPerSecond,
 		NonDeterministicWorkflowPolicy:       wOptions.NonDeterministicWorkflowPolicy,
 		DataConverter:                        wOptions.DataConverter,
+		DecisionTaskListQueryHandlers:        make(map[string]queryFunc),
+		ActivityTaskListQueryHandlers:        make(map[string]queryFunc),
+	}
+
+	for queryType, handler := range wOptions.TaskListQueryHandlers.DecisionTaskListQueryHandlers {
+		qh := &queryHandler{fn: handler, queryType: queryType, dataConverter: wOptions.DataConverter}
+		if err := qh.validateHandlerFn(); err != nil {
+			panic("invalid task list query handler func")
+		}
+
+		workerParams.DecisionTaskListQueryHandlers[queryType] = qh.execute
+	}
+
+	for queryType, handler := range wOptions.TaskListQueryHandlers.ActivityTaskListQueryHandlers {
+		qh := &queryHandler{fn: handler, queryType: queryType, dataConverter: wOptions.DataConverter}
+		if err := qh.validateHandlerFn(); err != nil {
+			panic("invalid task list query handler func")
+		}
+
+		workerParams.ActivityTaskListQueryHandlers[queryType] = qh.execute
 	}
 
 	ensureRequiredParams(&workerParams)

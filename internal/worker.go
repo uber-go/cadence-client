@@ -149,6 +149,16 @@ type (
 		// Optional: Sets DataConverter to customize serialization/deserialization of arguments in Cadence
 		// default: defaultDataConverter, an combination of thriftEncoder and jsonEncoder
 		DataConverter encoded.DataConverter
+
+		// Optional: TaskListQueryHandlers handle queries for task list.
+		// default: default handlers map contains handlers for workflow and activity type query.
+		TaskListQueryHandlers TaskListQueryHandlers
+	}
+
+	// TaskListQueryHandlers contain query handlers for task lists.
+	TaskListQueryHandlers struct {
+		DecisionTaskListQueryHandlers map[string]interface{}
+		ActivityTaskListQueryHandlers map[string]interface{}
 	}
 )
 

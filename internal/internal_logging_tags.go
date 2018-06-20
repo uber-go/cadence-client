@@ -35,4 +35,5 @@ const (
 	tagWorkerType      = "WorkerType"
 	tagSideEffectID    = "SideEffectID"
 	tagChildWorkflowID = "ChildWorkflowID"
+	tagQueryType       = "QueryType"
 )

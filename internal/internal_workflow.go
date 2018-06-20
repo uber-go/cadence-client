@@ -510,18 +510,29 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 			return true
 		},
 	}
-	v, ok, more := c.receiveAsyncImpl(callback)
-	if ok || !more {
-		c.assignValue(v, valuePtr)
-		return more
-	}
+
 	for {
-		if hasResult {
-			state.unblocked()
-			c.assignValue(result, valuePtr)
-			return more
+		hasResult = false
+		v, ok, more := c.receiveAsyncImpl(callback)
+
+		if ok || !more {
+			err:= c.assignValue(v, valuePtr)
+			if err == nil {
+				return more
+			}
+			continue //Corrupt signal. Drop and reset process.
 		}
-		state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
+		for {
+			if hasResult {
+				err:= c.assignValue(result, valuePtr)
+				if err == nil {
+					state.unblocked()
+					return more
+				}
+				break //Corrupt signal. Drop and reset process.
+			}
+			state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
+		}
 	}
 }
 
@@ -532,7 +543,11 @@ func (c *channelImpl) ReceiveAsync(valuePtr interface{}) (ok bool) {
 
 func (c *channelImpl) ReceiveAsyncWithMoreFlag(valuePtr interface{}) (ok bool, more bool) {
 	v, ok, more := c.receiveAsyncImpl(nil)
-	c.assignValue(v, valuePtr)
+	err:=c.assignValue(v, valuePtr)
+	if err != nil {
+		// failed so serialize corrupt signal. Dropping signal
+		return false, more
+	}
 	return ok, more
 }
 
@@ -652,11 +667,10 @@ func (c *channelImpl) Close() {
 }
 
 // Takes a value and assigns that 'to' value.
-func (c *channelImpl) assignValue(from interface{}, to interface{}) {
+func (c *channelImpl) assignValue(from interface{}, to interface{}) (error) {
 	err := decodeAndAssignValue(c.dataConverter, from, to)
-	if err != nil {
-		panic(err)
-	}
+	//add to metrics
+	return err
 }
 
 // initialYield called at the beginning of the coroutine execution

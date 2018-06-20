@@ -40,7 +40,13 @@ type WorkflowUnitTest struct {
 	activityOptions ActivityOptions
 }
 
-func (s *WorkflowUnitTest) SetupSuite() {
+type WorkflowUnitTest2 struct {
+	suite.Suite
+	WorkflowTestSuite
+	activityOptions ActivityOptions
+}
+
+func (s *WorkflowUnitTest2) SetupSuite() {
 	RegisterWorkflow(worldWorkflow)
 	RegisterWorkflow(helloWorldActivityWorkflow)
 	RegisterWorkflow(testClockWorkflow)
@@ -49,6 +55,7 @@ func (s *WorkflowUnitTest) SetupSuite() {
 	RegisterWorkflow(cancelWorkflowTest)
 	RegisterWorkflow(cancelWorkflowAfterActivityTest)
 	RegisterWorkflow(signalWorkflowTest)
+	RegisterWorkflow(corruptSignalWorkflowTest)
 	RegisterWorkflow(splitJoinActivityWorkflow)
 	RegisterWorkflow(activityOptionsWorkflow)
 
@@ -65,7 +72,7 @@ func (s *WorkflowUnitTest) SetupSuite() {
 }
 
 func TestWorkflowUnitTest(t *testing.T) {
-	suite.Run(t, new(WorkflowUnitTest))
+	suite.Run(t, new(WorkflowUnitTest2))
 }
 
 func worldWorkflow(ctx Context, input string) (result string, err error) {
@@ -541,6 +548,64 @@ func (s *WorkflowUnitTest) Test_SignalWorkflow() {
 	var result []byte
 	env.GetWorkflowResult(&result)
 	s.EqualValues(strings.Join(expected, ""), string(result))
+}
+
+type message struct{
+	Value string
+}
+
+func corruptSignalWorkflowTest(ctx Context) ([]message, error) {
+	ch := GetSignalChannel(ctx, "channelExpectingTypeMessage")
+	var result []message
+	var m message
+	ch.Receive(ctx, &m)
+	result = append(result, m)
+
+	// Read on a selector
+	ch = GetSignalChannel(ctx, "channelExpectingTypeMessage")
+	s := NewSelector(ctx)
+	s.AddReceive(ch, func(c Channel, more bool) {
+		var m message
+		ch.Receive(ctx, &m)
+		result = append(result, m)
+	})
+	s.Select(ctx)
+	return result,nil
+}
+func (s *WorkflowUnitTest2) Test_CorruptedSignalWorkflow_ShouldNotThrowException() {
+	env := s.NewTestWorkflowEnvironment()
+
+	// Setup signals.
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow("channelExpectingTypeMessage", "wrong")
+	}, time.Millisecond)
+
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow("channelExpectingTypeMessage", message {
+			Value:"the right interface 1",
+		})
+	}, time.Second)
+
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow("channelExpectingTypeMessage", "wrong again")
+	}, 2 * time.Second)
+
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow("channelExpectingTypeMessage", message {
+			Value:"the right interface 2",
+		})
+	}, 3 * time.Second)
+
+	env.ExecuteWorkflow(corruptSignalWorkflowTest)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+
+	var result []message
+	env.GetWorkflowResult(&result)
+
+	s.EqualValues(2,len(result))
+	s.EqualValues("the right interface 1",result[0].Value)
+	s.EqualValues("the right interface 2",result[1].Value)
 }
 
 func activityOptionsWorkflow(ctx Context) (result string, err error) {

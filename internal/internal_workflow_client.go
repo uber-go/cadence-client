@@ -196,7 +196,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	if wc.metricsScope != nil {
-		scope := tagScope(wc.metricsScope, tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
+		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
 		scope.Counter(metrics.WorkflowStartCounter).Inc(1)
 	}
 
@@ -345,7 +345,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 	}
 
 	if wc.metricsScope != nil {
-		scope := tagScope(wc.metricsScope, tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
+		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
 		scope.Counter(metrics.WorkflowSignalWithStartCounter).Inc(1)
 	}
 

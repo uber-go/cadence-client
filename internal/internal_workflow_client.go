@@ -196,7 +196,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	if wc.metricsScope != nil {
-		scope := wc.metricsScope.GetTaggedScope(tagWorkflowType, workflowType.Name)
+		scope := tagScope(wc.metricsScope, tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
 		scope.Counter(metrics.WorkflowStartCounter).Inc(1)
 	}
 
@@ -345,8 +345,8 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 	}
 
 	if wc.metricsScope != nil {
-		scope := wc.metricsScope.GetTaggedScope(tagWorkflowType, workflowType.Name)
-		scope.Counter(metrics.WorkflowSingalWithStartCounter).Inc(1)
+		scope := tagScope(wc.metricsScope, tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
+		scope.Counter(metrics.WorkflowSignalWithStartCounter).Inc(1)
 	}
 
 	executionInfo := &WorkflowExecution{
@@ -437,7 +437,7 @@ func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID str
 	}
 }
 
-// CompleteActivity reports activity completed. activity Execute method can return acitivity.activity.ErrResultPending to
+// CompleteActivity reports activity completed. activity Execute method can return activity.ErrResultPending to
 // indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivity() method
 // should be called when that activity is completed with the actual result and error. If err is nil, activity task
 // completed event will be reported; if err is CanceledError, activity task cancelled event will be reported; otherwise,

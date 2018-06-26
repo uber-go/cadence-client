@@ -38,6 +38,7 @@ import (
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
+	"github.com/uber-go/tally"
 )
 
 const (
@@ -106,6 +107,7 @@ type (
 		closed          bool                  // true if channel is closed.
 		recValue        *interface{}          // Used only while receiving value, this is used as pre-fetch buffer value from the channel.
 		dataConverter   encoded.DataConverter // for decode data
+		scope			tally.Scope
 	}
 
 	// Single case statement of the Select
@@ -666,10 +668,13 @@ func (c *channelImpl) Close() {
 	}
 }
 
-// Takes a value and assigns that 'to' value.
+// Takes a value and assigns that 'to' value. logs a metric if it is unable to deserialize
 func (c *channelImpl) assignValue(from interface{}, to interface{}) (error) {
 	err := decodeAndAssignValue(c.dataConverter, from, to)
 	//add to metrics
+	if err != nil {
+		c.scope.Counter(metrics.CorruptedSignalsCounter).Inc(1)
+	}
 	return err
 }
 

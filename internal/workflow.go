@@ -242,18 +242,21 @@ func NewChannel(ctx Context) Channel {
 // NewNamedChannel create new Channel instance with a given human readable name.
 // Name appears in stack traces that are blocked on this channel.
 func NewNamedChannel(ctx Context, name string) Channel {
-	return &channelImpl{name: name, dataConverter: getDataConverterFromWorkflowContext(ctx)}
+	env:=getWorkflowEnvironment(ctx)
+	return &channelImpl{name: name, dataConverter: getDataConverterFromWorkflowContext(ctx), scope:env.GetMetricsScope()}
 }
 
 // NewBufferedChannel create new buffered Channel instance
 func NewBufferedChannel(ctx Context, size int) Channel {
-	return &channelImpl{size: size, dataConverter: getDataConverterFromWorkflowContext(ctx)}
+	env:=getWorkflowEnvironment(ctx)
+	return &channelImpl{size: size, dataConverter: getDataConverterFromWorkflowContext(ctx), scope:env.GetMetricsScope()}
 }
 
 // NewNamedBufferedChannel create new BufferedChannel instance with a given human readable name.
 // Name appears in stack traces that are blocked on this Channel.
 func NewNamedBufferedChannel(ctx Context, name string, size int) Channel {
-	return &channelImpl{name: name, size: size, dataConverter: getDataConverterFromWorkflowContext(ctx)}
+	env:=getWorkflowEnvironment(ctx)
+	return &channelImpl{name: name, size: size, dataConverter: getDataConverterFromWorkflowContext(ctx), scope:env.GetMetricsScope()}
 }
 
 // NewSelector creates a new Selector instance.

@@ -50,6 +50,7 @@ func init() {
 		RegisterWorkflowOptions{Name: "sampleWorkflowExecute"},
 	)
 	RegisterWorkflow(testReplayWorkflow)
+	RegisterWorkflow(testReplayWorkflowFromFile)
 	RegisterActivityWithOptions(
 		testActivity,
 		RegisterActivityOptions{Name: "testActivity"},
@@ -112,6 +113,22 @@ func testReplayWorkflow(ctx Context) error {
 	return err
 }
 
+func testReplayWorkflowFromFile(ctx Context) error {
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+		HeartbeatTimeout:       20 * time.Second,
+		WaitForCancellation:    true,
+	}
+	ctx = WithActivityOptions(ctx, ao)
+	err := ExecuteActivity(ctx, "testActivityMultipleArgs", 2, "test", true).Get(ctx, nil)
+	if err != nil {
+		getLogger().Error("activity failed with error.", zap.Error(err))
+		panic("Failed workflow")
+	}
+	return err
+}
+
 func testActivity(ctx context.Context) error {
 	return nil
 }
@@ -141,6 +158,12 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory() {
 	require.NoError(s.T(), err)
 }
 
+func (s *internalWorkerTestSuite) TestReplayWorkflowHistoryFromFile() {
+	logger := getLogger()
+	err := ReplayWorkflowHistoryFromJSONFile(logger, "testdata/sampleHistory.json")
+	require.NoError(s.T(), err)
+}
+
 func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExecutionParameters) {
 	taskList := "taskList1"
 	testEvents := []*shared.HistoryEvent{
@@ -150,13 +173,6 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 		}),
 		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
-		createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-		createTestEventActivityTaskScheduled(5, &shared.ActivityTaskScheduledEventAttributes{
-			ActivityId:   common.StringPtr("0"),
-			ActivityType: &shared.ActivityType{Name: common.StringPtr("testActivity")},
-			TaskList:     &shared.TaskList{Name: &taskList},
-		}),
-		createTestEventActivityTaskStarted(6, &shared.ActivityTaskStartedEventAttributes{}),
 	}
 
 	workflowType := "go.uber.org/cadence/internal.testReplayWorkflow"
@@ -167,14 +183,14 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 		WorkflowExecution:      &shared.WorkflowExecution{WorkflowId: &workflowID, RunId: &runID},
 		WorkflowType:           &shared.WorkflowType{Name: &workflowType},
 		History:                &shared.History{Events: testEvents},
-		PreviousStartedEventId: common.Int64Ptr(5),
+		PreviousStartedEventId: common.Int64Ptr(0),
 	}
 
 	r := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	_, wc, err := r.ProcessWorkflowTask(task, nil)
 	s.NoError(err)
 	s.NotNil(wc)
-	stackTrace := wc.eventHandler.StackTrace()
+	stackTrace := wc.StackTrace()
 	require.NotEmpty(s.T(), stackTrace, stackTrace)
 	require.Contains(s.T(), stackTrace, "cadence/internal.(*decodeFutureImpl).Get")
 }

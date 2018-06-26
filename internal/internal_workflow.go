@@ -515,14 +515,15 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 
 	for {
 		hasResult = false
-		v, ok, more := c.receiveAsyncImpl(callback)
+		v, ok, m := c.receiveAsyncImpl(callback)
 
-		if ok || !more {
+		if ok || !m {
 			err:= c.assignValue(v, valuePtr)
 			if err == nil {
-				return more
+				state.unblocked()
+				return m
 			}
-			continue //Corrupt signal. Drop and reset process.
+			continue //corrupt signal. Drop and reset process
 		}
 		for {
 			if hasResult {
@@ -536,6 +537,7 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 			state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
 		}
 	}
+
 }
 
 func (c *channelImpl) ReceiveAsync(valuePtr interface{}) (ok bool) {

@@ -352,8 +352,8 @@ func sayGreetingActivity(input *sayGreetingActivityRequest) (string, error) {
 func greetingsWorkflow(ctx Context) (result string, err error) {
 	// Get Greeting.
 	ao := ActivityOptions{
-		ScheduleToStartTimeout: 10000 * time.Second,
-		StartToCloseTimeout:    5000 * time.Second,
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
 	}
 	ctx1 := WithActivityOptions(ctx, ao)
 

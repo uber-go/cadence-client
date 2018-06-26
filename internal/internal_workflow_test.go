@@ -41,12 +41,6 @@ type WorkflowUnitTest struct {
 	activityOptions ActivityOptions
 }
 
-type WorkflowUnitTest2 struct {
-	suite.Suite
-	WorkflowTestSuite
-	activityOptions ActivityOptions
-}
-
 func (s *WorkflowUnitTest) SetupSuite() {
 	RegisterWorkflow(worldWorkflow)
 	RegisterWorkflow(helloWorldActivityWorkflow)
@@ -75,7 +69,7 @@ func (s *WorkflowUnitTest) SetupSuite() {
 }
 
 func TestWorkflowUnitTest(t *testing.T) {
-	suite.Run(t, new(WorkflowUnitTest2))
+	suite.Run(t, new(WorkflowUnitTest))
 }
 
 func worldWorkflow(ctx Context, input string) (result string, err error) {

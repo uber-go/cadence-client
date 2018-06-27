@@ -308,4 +308,3 @@ func (r *capturingStatsReporter) Tagging() bool {
 func (r *capturingStatsReporter) Flush() {
 	r.flush++
 }
->>>>>>> master

@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
 	"sync"
+	"io"
 )
 
 func Test_Counter(t *testing.T) {
@@ -149,3 +150,162 @@ func Test_TaggedScope(t *testing.T) {
 	require.Equal(t, 1, len(reporter.Counts()))
 	require.Equal(t, int64(3), reporter.Counts()[0].Value())
 }
+
+func Test_TaggedScope_WithMultiTags(t *testing.T) {
+	taggedScope, closer, reporter := newTaggedMetricsScope()
+	scope := taggedScope.GetTaggedScope("tag1", "val1", "tag2", "val2")
+	scope.Counter("test-name").Inc(3)
+	closer.Close()
+	require.Equal(t, 1, len(reporter.counts))
+	require.Equal(t, int64(3), reporter.counts[0].value)
+
+	m := &sync.Map{}
+	taggedScope, closer, reporter = newTaggedMetricsScope()
+	taggedScope.Map = m
+	scope = taggedScope.GetTaggedScope("tag2", "val1", "tag3", "val3")
+	scope.Counter("test-name").Inc(2)
+	taggedScope, closer2, reporter2 := newTaggedMetricsScope()
+	taggedScope.Map = m
+	scope = taggedScope.GetTaggedScope("tag2", "val1", "tag3", "val3")
+	scope.Counter("test-name").Inc(1)
+	closer2.Close()
+	require.Equal(t, 0, len(reporter2.counts))
+	closer.Close()
+	require.Equal(t, 1, len(reporter.counts))
+	require.Equal(t, int64(3), reporter.counts[0].value)
+
+	require.Panics(t, func() { taggedScope.GetTaggedScope("tag") })
+}
+
+func newMetricsScope(isReplay *bool) (tally.Scope, io.Closer, *capturingStatsReporter) {
+	reporter := &capturingStatsReporter{}
+	opts := tally.ScopeOptions{Reporter: reporter}
+	scope, closer := tally.NewRootScope(opts, time.Second)
+	return WrapScope(isReplay, scope, &realClock{}), closer, reporter
+}
+
+func newTaggedMetricsScope() (*TaggedScope, io.Closer, *capturingStatsReporter) {
+	isReplay := false
+	scope, closer, reporter := newMetricsScope(&isReplay)
+	return &TaggedScope{Scope: scope}, closer, reporter
+}
+
+type realClock struct {
+}
+
+func (c *realClock) Now() time.Time {
+	return time.Now()
+}
+
+// capturingStatsReporter is a reporter used by tests to capture the metric so we can verify our tests.
+type capturingStatsReporter struct {
+	counts                   []capturedCount
+	gauges                   []capturedGauge
+	timers                   []capturedTimer
+	histogramValueSamples    []capturedHistogramValueSamples
+	histogramDurationSamples []capturedHistogramDurationSamples
+	capabilities             int
+	flush                    int
+}
+
+type capturedCount struct {
+	name  string
+	tags  map[string]string
+	value int64
+}
+
+type capturedGauge struct {
+	name  string
+	tags  map[string]string
+	value float64
+}
+
+type capturedTimer struct {
+	name  string
+	tags  map[string]string
+	value time.Duration
+}
+
+type capturedHistogramValueSamples struct {
+	name             string
+	tags             map[string]string
+	bucketLowerBound float64
+	bucketUpperBound float64
+	samples          int64
+}
+
+type capturedHistogramDurationSamples struct {
+	name             string
+	tags             map[string]string
+	bucketLowerBound time.Duration
+	bucketUpperBound time.Duration
+	samples          int64
+}
+
+func (r *capturingStatsReporter) ReportCounter(
+	name string,
+	tags map[string]string,
+	value int64,
+) {
+	r.counts = append(r.counts, capturedCount{name, tags, value})
+}
+
+func (r *capturingStatsReporter) ReportGauge(
+	name string,
+	tags map[string]string,
+	value float64,
+) {
+	r.gauges = append(r.gauges, capturedGauge{name, tags, value})
+}
+
+func (r *capturingStatsReporter) ReportTimer(
+	name string,
+	tags map[string]string,
+	value time.Duration,
+) {
+	r.timers = append(r.timers, capturedTimer{name, tags, value})
+}
+
+func (r *capturingStatsReporter) ReportHistogramValueSamples(
+	name string,
+	tags map[string]string,
+	buckets tally.Buckets,
+	bucketLowerBound,
+	bucketUpperBound float64,
+	samples int64,
+) {
+	elem := capturedHistogramValueSamples{name, tags,
+		bucketLowerBound, bucketUpperBound, samples}
+	r.histogramValueSamples = append(r.histogramValueSamples, elem)
+}
+
+func (r *capturingStatsReporter) ReportHistogramDurationSamples(
+	name string,
+	tags map[string]string,
+	buckets tally.Buckets,
+	bucketLowerBound,
+	bucketUpperBound time.Duration,
+	samples int64,
+) {
+	elem := capturedHistogramDurationSamples{name, tags,
+		bucketLowerBound, bucketUpperBound, samples}
+	r.histogramDurationSamples = append(r.histogramDurationSamples, elem)
+}
+
+func (r *capturingStatsReporter) Capabilities() tally.Capabilities {
+	r.capabilities++
+	return r
+}
+
+func (r *capturingStatsReporter) Reporting() bool {
+	return true
+}
+
+func (r *capturingStatsReporter) Tagging() bool {
+	return true
+}
+
+func (r *capturingStatsReporter) Flush() {
+	r.flush++
+}
+>>>>>>> master

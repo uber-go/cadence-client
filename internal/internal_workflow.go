@@ -518,6 +518,10 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 		hasResult = false
 		v, ok, m := c.receiveAsyncImpl(callback)
 
+		if !ok && !m { //channel closed and empty
+			return m
+		}
+
 		if ok || !m {
 			err:= c.assignValue(v, valuePtr)
 			if err == nil {
@@ -549,6 +553,10 @@ func (c *channelImpl) ReceiveAsync(valuePtr interface{}) (ok bool) {
 func (c *channelImpl) ReceiveAsyncWithMoreFlag(valuePtr interface{}) (ok bool, more bool) {
 	for{
 		v, ok, more := c.receiveAsyncImpl(nil)
+		/*if !ok && !more { //channel closed and empty
+			return ok,more
+		}*/
+
 		err:=c.assignValue(v, valuePtr)
 		if err != nil {
 			continue

@@ -55,6 +55,8 @@ func (s *WorkflowUnitTest) SetupSuite() {
 	RegisterWorkflow(receiveWithSelector_CorruptSignalWorkflowTest)
 	RegisterWorkflow(splitJoinActivityWorkflow)
 	RegisterWorkflow(activityOptionsWorkflow)
+	RegisterWorkflow(receiveAsync_CorruptSignalOnClosedChannelWorkflowTest)
+	RegisterWorkflow(receive_CorruptSignalOnClosedChannelWorkflowTest)
 
 	s.activityOptions = ActivityOptions{
 		ScheduleToStartTimeout: time.Minute,
@@ -560,6 +562,16 @@ func receive_CorruptSignalWorkflowTest(ctx Context) ([]message, error) {
 	return result,nil
 }
 
+func receive_CorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]message, error) {
+	ch := GetSignalChannel(ctx, "channelExpectingTypeMessage")
+	var result []message
+	var m message
+	ch.Close()
+	ch.Receive(ctx, &m)
+	result = append(result, m)
+	return result,nil
+}
+
 func receiveWithSelector_CorruptSignalWorkflowTest(ctx Context) ([]message, error) {
 	var result []message
 
@@ -572,6 +584,21 @@ func receiveWithSelector_CorruptSignalWorkflowTest(ctx Context) ([]message, erro
 		result = append(result, m)
 	})
 	s.Select(ctx)
+	return result,nil
+}
+
+func receiveAsync_CorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]int, error) {
+	ch := GetSignalChannel(ctx, "channelExpectingInt")
+	var result []int
+	var m int
+
+	ch.SendAsync("wrong")
+	ch.Close()
+	ok := ch.ReceiveAsync(&m)
+	if ok == true {
+		result = append(result, m)
+	}
+
 	return result,nil
 }
 
@@ -682,6 +709,35 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_ReceiveAsync_ShouldLogMe
 	s.EqualValues(1, len(counts))
 	s.EqualValues(metrics.CorruptedSignalsCounter, counts[0].Name())
 	s.EqualValues(2, counts[0].Value())
+}
+
+func (s *WorkflowUnitTest) Test_CorruptedSignalOnClosedChannelWorkflow_ReceiveAsync_ShouldComplete() {
+	env := s.NewTestWorkflowEnvironment()
+
+	env.ExecuteWorkflow(receiveAsync_CorruptSignalOnClosedChannelWorkflowTest)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+
+	var result []message
+	env.GetWorkflowResult(&result)
+	s.EqualValues(0,len(result))
+}
+
+func (s *WorkflowUnitTest) Test_CorruptedSignalOnClosedChannelWorkflow_Receive_ShouldComplete() {
+	env := s.NewTestWorkflowEnvironment()
+
+	// Setup signals.
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow("channelExpectingTypeMessage", "wrong")
+	}, time.Second)
+	
+	env.ExecuteWorkflow(receiveAsync_CorruptSignalOnClosedChannelWorkflowTest)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+
+	var result []message
+	env.GetWorkflowResult(&result)
+	s.EqualValues(0,len(result))
 }
 
 func activityOptionsWorkflow(ctx Context) (result string, err error) {

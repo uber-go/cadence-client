@@ -586,6 +586,7 @@ func receiveAysnc_CorruptSignalWorkflowTest(ctx Context) ([]message, error) {
 		result = append(result, m)
 	}
 
+	ch.SendAsync("wrong again")
 	ch.SendAsync(message {
 		Value:"the right interface",
 	})
@@ -680,7 +681,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_ReceiveAsync_ShouldLogMe
 	counts := reporter.Counts()
 	s.EqualValues(1, len(counts))
 	s.EqualValues(metrics.CorruptedSignalsCounter, counts[0].Name())
-	s.EqualValues(1, counts[0].Value())
+	s.EqualValues(2, counts[0].Value())
 }
 
 func activityOptionsWorkflow(ctx Context) (result string, err error) {

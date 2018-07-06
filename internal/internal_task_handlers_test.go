@@ -45,6 +45,7 @@ type (
 	TaskHandlersTestSuite struct {
 		suite.Suite
 		logger *zap.Logger
+		service  *workflowservicetest.MockClient
 	}
 )
 
@@ -389,6 +390,8 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	newWorkflowTaskWorkerInternal(taskHandler, t.service,testDomain, params)
+
 	request, _, err := taskHandler.ProcessWorkflowTask(task, nil)
 	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	// there should be no error as the history events matched the decisions.

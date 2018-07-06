@@ -624,12 +624,11 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		workflowContext.Unlock(err)
 	}()
 
-
 	response, err := workflowContext.ProcessWorkflowTask(task, historyIterator)
 	return response, workflowContext, err
 }
 
-func (w *workflowExecutionContextImpl)  ProcessWorkflowTask(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (completeRequest interface{}, err error) {
+func (w *workflowExecutionContextImpl) ProcessWorkflowTask(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (completeRequest interface{}, err error) {
 	if err = w.ResetIfStale(task, historyIterator); err != nil {
 		return
 	}

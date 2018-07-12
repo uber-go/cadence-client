@@ -267,7 +267,7 @@ type (
 		ExecutionStartToCloseTimeout time.Duration
 
 		// DecisionTaskStartToCloseTimeout - The time out for processing decision task from the time the worker
-		// pulled this task.
+		// pulled this task. If a decision task is lost, it is retried after this timeout.
 		// The resolution is seconds.
 		// Optional: defaulted to 10 secs.
 		DecisionTaskStartToCloseTimeout time.Duration

@@ -269,7 +269,7 @@ type (
 		// DecisionTaskStartToCloseTimeout - The time out for processing decision task from the time the worker
 		// pulled this task.
 		// The resolution is seconds.
-		// Optional: defaulted to 20 secs.
+		// Optional: defaulted to 10 secs.
 		DecisionTaskStartToCloseTimeout time.Duration
 
 		// WorkflowIDReusePolicy - Whether server allow reuse of workflow ID, can be useful

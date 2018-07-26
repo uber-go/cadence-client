@@ -653,7 +653,7 @@ func (h *decisionsHelper) getDecision(id decisionID) decisionStateMachine {
 			" or incompatible change in the workflow definition", id)
 		panic(panicMsg)
 	}
-	h.orderedDecisions.MoveToFront(decision)
+	h.orderedDecisions.MoveToBack(decision)
 	return decision.Value.(decisionStateMachine)
 }
 

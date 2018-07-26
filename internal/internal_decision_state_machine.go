@@ -653,6 +653,8 @@ func (h *decisionsHelper) getDecision(id decisionID) decisionStateMachine {
 			" or incompatible change in the workflow definition", id)
 		panic(panicMsg)
 	}
+	// Move the last update decision state machine to the back of the list.
+	// Otherwise decisions (like timer cancellations) can end up out of order.
 	h.orderedDecisions.MoveToBack(decision)
 	return decision.Value.(decisionStateMachine)
 }

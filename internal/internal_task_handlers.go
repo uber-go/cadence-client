@@ -628,20 +628,6 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 }
 
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (completeRequest interface{}, err error) {
-	defer func() {
-		if err != nil {
-			// unexpected error happened, decision task will timeout if we don't handle this err here.
-			// convert error to DecisionTaskFailed.
-			w.wth.logger.Info("Failed to process decision task.",
-				zap.String(tagWorkflowType, task.WorkflowType.GetName()),
-				zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
-				zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
-				zap.Error(err))
-			completeRequest = errorToFailDecisionTask(task.TaskToken, w.wth.dataConverter, err, w.wth.identity)
-			err = nil
-		}
-	}()
-
 	if err = w.ResetIfStale(task, historyIterator); err != nil {
 		return
 	}
@@ -653,7 +639,6 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(task *s.PollForDecisi
 	var respondEvents []*s.HistoryEvent
 
 	skipReplayCheck := w.skipReplayCheck()
-
 	// Process events
 ProcessEvents:
 	for {
@@ -1137,7 +1122,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		wth.logger.Error("Workflow panic.",
 			zap.String("PanicError", panicErr.Error()),
 			zap.String("PanicStack", panicErr.StackTrace()))
-		return errorToFailDecisionTask(task.TaskToken, wth.dataConverter, panicErr, wth.identity)
+		return errorToFailDecisionTask(task.TaskToken, panicErr, wth.identity)
 	}
 
 	// complete decision task
@@ -1195,9 +1180,9 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	}
 }
 
-func errorToFailDecisionTask(taskToken []byte, dataConverter encoded.DataConverter, err error, identity string) *s.RespondDecisionTaskFailedRequest {
+func errorToFailDecisionTask(taskToken []byte, err error, identity string) *s.RespondDecisionTaskFailedRequest {
 	failedCause := s.DecisionTaskFailedCauseWorkflowWorkerUnhandledFailure
-	_, details := getErrorDetails(err, dataConverter)
+	_, details := getErrorDetails(err, nil)
 	return &s.RespondDecisionTaskFailedRequest{
 		TaskToken: taskToken,
 		Cause:     &failedCause,

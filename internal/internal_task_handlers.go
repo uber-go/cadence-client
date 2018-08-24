@@ -707,7 +707,7 @@ ProcessEvents:
 	if !skipReplayCheck {
 		// check if decisions from reply matches to the history events
 		if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
-			w.wth.metricsScope.Counter(metrics.NonDeterministicError).Inc(1)
+			w.wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName()).Counter(metrics.NonDeterministicError).Inc(1)
 			w.wth.logger.Error("Replay and history mismatch.",
 				zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 				zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),

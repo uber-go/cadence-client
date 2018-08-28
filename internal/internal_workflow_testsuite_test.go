@@ -1792,3 +1792,137 @@ func (s *WorkflowTestSuiteUnitTest) Test_ContextMisuse() {
 	s.Error(env.GetWorkflowError())
 	s.Contains(env.GetWorkflowError().Error(), "block on coroutine which is already blocked")
 }
+
+func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetry() {
+
+	activityFn := func(ctx context.Context) (string, error) {
+		info := GetActivityInfo(ctx)
+		if info.Attempt < 2 {
+			return "", NewCustomError("bad-luck")
+		}
+		return "retry-done", nil
+	}
+
+	workflowFn := func(ctx Context) (string, error) {
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    time.Minute,
+			RetryPolicy: &RetryPolicy{
+				MaximumAttempts:          3,
+				InitialInterval:          time.Second,
+				MaximumInterval:          time.Second * 10,
+				BackoffCoefficient:       2,
+				NonRetriableErrorReasons: []string{"bad-error"},
+				ExpirationInterval:       time.Minute,
+			},
+		}
+		ctx = WithActivityOptions(ctx, ao)
+
+		var result string
+		err := ExecuteActivity(ctx, activityFn).Get(ctx, &result)
+		if err != nil {
+			return "", err
+		}
+		return result, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	RegisterWorkflow(workflowFn)
+	RegisterActivity(activityFn)
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var result string
+	s.NoError(env.GetWorkflowResult(&result))
+	s.Equal("retry-done", result)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
+
+	localActivityFn := func(ctx context.Context) (string, error) {
+		info := GetActivityInfo(ctx)
+		if info.Attempt < 2 {
+			return "", NewCustomError("bad-luck")
+		}
+		return "retry-done", nil
+	}
+
+	workflowFn := func(ctx Context) (string, error) {
+		lao := LocalActivityOptions{
+			ScheduleToCloseTimeout: time.Minute,
+			RetryPolicy: &RetryPolicy{
+				MaximumAttempts:          3,
+				InitialInterval:          time.Second,
+				MaximumInterval:          time.Second * 10,
+				BackoffCoefficient:       2,
+				NonRetriableErrorReasons: []string{"bad-error"},
+				ExpirationInterval:       time.Minute,
+			},
+		}
+		ctx = WithLocalActivityOptions(ctx, lao)
+
+		var result string
+		err := ExecuteLocalActivity(ctx, localActivityFn).Get(ctx, &result)
+		if err != nil {
+			return "", err
+		}
+		return result, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.SetTestTimeout(time.Hour)
+	RegisterWorkflow(workflowFn)
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var result string
+	s.NoError(env.GetWorkflowResult(&result))
+	s.Equal("retry-done", result)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowRetry() {
+
+	childWorkflowFn := func(ctx Context) (string, error) {
+		info := GetWorkflowInfo(ctx)
+		if info.Attempt < 2 {
+			return "", NewCustomError("bad-luck")
+		}
+		return "retry-done", nil
+	}
+
+	workflowFn := func(ctx Context) (string, error) {
+		cwo := ChildWorkflowOptions{
+			ExecutionStartToCloseTimeout: time.Minute,
+			RetryPolicy: &RetryPolicy{
+				MaximumAttempts:          3,
+				InitialInterval:          time.Second,
+				MaximumInterval:          time.Second * 10,
+				BackoffCoefficient:       2,
+				NonRetriableErrorReasons: []string{"bad-error"},
+				ExpirationInterval:       time.Minute,
+			},
+		}
+		ctx = WithChildWorkflowOptions(ctx, cwo)
+		var childResult string
+		err := ExecuteChildWorkflow(ctx, childWorkflowFn).Get(ctx, &childResult)
+		if err != nil {
+			return "", err
+		}
+
+		return childResult, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.SetTestTimeout(time.Hour)
+	RegisterWorkflow(childWorkflowFn)
+	RegisterWorkflow(workflowFn)
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var result string
+	s.NoError(env.GetWorkflowResult(&result))
+	s.Equal("retry-done", result)
+}

@@ -1122,6 +1122,8 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		// Workflow panic
 		metricsScope.Counter(metrics.DecisionTaskPanicCounter).Inc(1)
 		wth.logger.Error("Workflow panic.",
+			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
+			zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
 			zap.String("PanicError", panicErr.Error()),
 			zap.String("PanicStack", panicErr.StackTrace()))
 		return errorToFailDecisionTask(task.TaskToken, panicErr, wth.identity)

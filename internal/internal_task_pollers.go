@@ -275,6 +275,8 @@ func (wtp *workflowTaskPoller) scheduleRespondDecisionTaskCompleted(wc WorkflowE
 				wtp.metricsScope.Counter(metrics.DecisionTaskPanicCounter).Inc(1)
 				st := getStackTraceRaw("forceRespondDecisionTaskCompleted [panic]:", 7, 0)
 				wtp.logger.Error("Unhandled panic.",
+					zap.String(tagWorkflowID, workflowTask.task.WorkflowExecution.GetWorkflowId()),
+					zap.String(tagRunID, workflowTask.task.WorkflowExecution.GetRunId()),
 					zap.String("PanicError", fmt.Sprintf("%v", p)),
 					zap.String("PanicStack", st))
 			}

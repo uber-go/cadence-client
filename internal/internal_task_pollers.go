@@ -490,6 +490,9 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 			topLine := fmt.Sprintf("local activity for %s [panic]:", activityType)
 			st := getStackTraceRaw(topLine, 7, 0)
 			lath.logger.Error("LocalActivity panic.",
+				zap.String(tagWorkflowID, task.params.WorkflowInfo.WorkflowExecution.ID),
+				zap.String(tagRunID, task.params.WorkflowInfo.WorkflowExecution.RunID),
+				zap.String(tagActivityType, activityType),
 				zap.String("PanicError", fmt.Sprintf("%v", p)),
 				zap.String("PanicStack", st))
 			lath.metricsScope.Counter(metrics.LocalActivityPanicCounter).Inc(1)

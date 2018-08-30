@@ -117,9 +117,10 @@ type (
 	}
 
 	localActivityResult struct {
-		result []byte
-		err    error
-		task   *localActivityTask
+		result  []byte
+		err     error
+		task    *localActivityTask
+		backoff time.Duration
 	}
 
 	localActivityTunnel struct {
@@ -487,6 +488,7 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		metricsScope:      lath.metricsScope,
 		isLocalActivity:   true,
 		dataConverter:     lath.dataConverter,
+		attempt:           task.attempt,
 	})
 
 	// panic handler
@@ -515,6 +517,10 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 
 	timeoutDuration := time.Duration(task.params.ScheduleToCloseTimeoutSeconds) * time.Second
 	deadline := time.Now().Add(timeoutDuration)
+	if task.attempt > 0 && !task.expireTime.IsZero() && task.expireTime.Before(deadline) {
+		// this is attempt and expire time is before SCHEDULE_TO_CLOSE timeout
+		deadline = task.expireTime
+	}
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	task.Lock()
 	if task.canceled {

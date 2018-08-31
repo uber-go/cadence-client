@@ -587,7 +587,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveErro
 	heartbeatErr := cadenceInvoker.Heartbeat(nil)
 	t.NotNil(heartbeatErr)
 	_, ok := (heartbeatErr).(*s.DomainNotActiveError)
-	t.True(ok, "heartbeatErr must be EntityNotExistsError.")
+	t.True(ok, "heartbeatErr must be DomainNotActiveError.")
 }
 
 type testActivityDeadline struct {

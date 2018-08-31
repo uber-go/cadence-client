@@ -570,6 +570,26 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 	t.True(ok, "heartbeatErr must be EntityNotExistsError.")
 }
 
+func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveError() {
+	mockCtrl := gomock.NewController(t.T())
+	mockService := workflowservicetest.NewMockClient(mockCtrl)
+
+	domainNotActiveError := &s.DomainNotActiveError{}
+	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).Return(nil, domainNotActiveError)
+
+	cadenceInvoker := newServiceInvoker(
+		nil,
+		"Test_Cadence_Invoker",
+		mockService,
+		func() {},
+		0)
+
+	heartbeatErr := cadenceInvoker.Heartbeat(nil)
+	t.NotNil(heartbeatErr)
+	_, ok := (heartbeatErr).(*s.DomainNotActiveError)
+	t.True(ok, "heartbeatErr must be EntityNotExistsError.")
+}
+
 type testActivityDeadline struct {
 	logger *zap.Logger
 	d      time.Duration

@@ -1584,18 +1584,18 @@ func (env *testWorkflowEnvironmentImpl) signalWorkflow(name string, input interf
 	}, true)
 }
 
-func (env *testWorkflowEnvironmentImpl) signalChildWorkflow(workflowID, signalName string, input interface{}) error {
+func (env *testWorkflowEnvironmentImpl) signalWorkflowByID(workflowID, signalName string, input interface{}) error {
 	data, err := encodeArg(env.GetDataConverter(), input)
 	if err != nil {
 		panic(err)
 	}
 
-	if childWorkflowHandle, ok := env.runningWorkflows[workflowID]; ok {
-		if childWorkflowHandle.handled {
+	if workflowHandle, ok := env.runningWorkflows[workflowID]; ok {
+		if workflowHandle.handled {
 			return &shared.EntityNotExistsError{Message: fmt.Sprintf("Workflow %v already completed", workflowID)}
 		}
-		childWorkflowHandle.env.postCallback(func() {
-			childWorkflowHandle.env.signalHandler(signalName, data)
+		workflowHandle.env.postCallback(func() {
+			workflowHandle.env.signalHandler(signalName, data)
 		}, true)
 		return nil
 	}

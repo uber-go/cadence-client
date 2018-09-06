@@ -1988,7 +1988,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_SignalChildWorkflowRetry() {
 	RegisterWorkflow(workflowFn)
 
 	env.RegisterDelayedCallback(func() {
-		env.SignalChildWorkflow("test-retry-signal-child-workflow", "test-signal-name", "test-signal-data")
+		env.SignalWorkflowByID("test-retry-signal-child-workflow", "test-signal-name", "test-signal-data")
 	}, time.Second*7 /* after 2nd attempt failed, but before 3rd attempt starts */)
 
 	env.ExecuteWorkflow(workflowFn)

@@ -1792,3 +1792,40 @@ func (s *WorkflowTestSuiteUnitTest) Test_ContextMisuse() {
 	s.Error(env.GetWorkflowError())
 	s.Contains(env.GetWorkflowError().Error(), "block on coroutine which is already blocked")
 }
+
+func (s *WorkflowTestSuiteUnitTest) Test_AmbiguousRegistration() {
+	workflowFn := func(ctx Context) error {
+		ctx = WithActivityOptions(ctx, ActivityOptions{
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    time.Minute,
+		})
+		return ExecuteActivity(ctx, f1).Get(ctx, nil)
+	}
+	env := s.NewTestWorkflowEnvironment()
+	RegisterWorkflow(workflowFn)
+
+	env.OnActivity("f1").Return(errors.New("f1 called"))
+	env.OnActivity("f2").Return(errors.New("incorrect behavior, f2 called"))
+
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
+
+	// note that this will fail - f2 was called.
+	// if you swap f1 and f2 registers in the init below, it'll pass, because the second write wins.
+	s.Contains(env.GetWorkflowError().Error(), "f1 called")
+}
+
+func init() {
+	f1 = reg("f1")
+	f2 = reg("f2")
+}
+
+var f1, f2 func() error
+
+func reg(name string) func() error {
+	f := func() error { return nil }
+	RegisterActivityWithOptions(f, RegisterActivityOptions{name})
+	return f
+}

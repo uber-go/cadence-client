@@ -1827,9 +1827,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetry() {
 		ctx = WithActivityOptions(ctx, ao)
 
 		err := ExecuteActivity(ctx, activityFailedFn).Get(ctx, nil)
-		if err == nil {
-			panic("should see error")
-		}
+		badBug, ok := err.(*CustomError)
+		s.True(ok)
+		s.Equal("bad-bug", badBug.Reason())
 
 		var result string
 		err = ExecuteActivity(ctx, activityFn).Get(ctx, &result)

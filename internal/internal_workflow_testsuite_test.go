@@ -1795,7 +1795,15 @@ func (s *WorkflowTestSuiteUnitTest) Test_ContextMisuse() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetry() {
 
+	attempt1Count := 0
+	activityFailedFn := func(ctx context.Context) (string, error) {
+		attempt1Count++
+		return "", NewCustomError("bad-bug")
+	}
+
+	attempt2Count := 0
 	activityFn := func(ctx context.Context) (string, error) {
+		attempt2Count++
 		info := GetActivityInfo(ctx)
 		if info.Attempt < 2 {
 			return "", NewCustomError("bad-luck")
@@ -1808,18 +1816,23 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetry() {
 			ScheduleToStartTimeout: time.Minute,
 			StartToCloseTimeout:    time.Minute,
 			RetryPolicy: &RetryPolicy{
-				MaximumAttempts:          3,
+				MaximumAttempts:          5,
 				InitialInterval:          time.Second,
 				MaximumInterval:          time.Second * 10,
 				BackoffCoefficient:       2,
-				NonRetriableErrorReasons: []string{"bad-error"},
+				NonRetriableErrorReasons: []string{"bad-bug"},
 				ExpirationInterval:       time.Minute,
 			},
 		}
 		ctx = WithActivityOptions(ctx, ao)
 
+		err := ExecuteActivity(ctx, activityFailedFn).Get(ctx, nil)
+		if err == nil {
+			panic("should see error")
+		}
+
 		var result string
-		err := ExecuteActivity(ctx, activityFn).Get(ctx, &result)
+		err = ExecuteActivity(ctx, activityFn).Get(ctx, &result)
 		if err != nil {
 			return "", err
 		}
@@ -1828,6 +1841,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetry() {
 
 	env := s.NewTestWorkflowEnvironment()
 	RegisterWorkflow(workflowFn)
+	RegisterActivity(activityFailedFn)
 	RegisterActivity(activityFn)
 	env.ExecuteWorkflow(workflowFn)
 
@@ -1836,6 +1850,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetry() {
 	var result string
 	s.NoError(env.GetWorkflowResult(&result))
 	s.Equal("retry-done", result)
+	s.Equal(1, attempt1Count)
+	s.Equal(3, attempt2Count)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
@@ -1856,7 +1872,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
 				InitialInterval:          time.Second,
 				MaximumInterval:          time.Second * 10,
 				BackoffCoefficient:       2,
-				NonRetriableErrorReasons: []string{"bad-error"},
+				NonRetriableErrorReasons: []string{"bad-bug"},
 				ExpirationInterval:       time.Minute,
 			},
 		}
@@ -1900,7 +1916,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowRetry() {
 				InitialInterval:          time.Second,
 				MaximumInterval:          time.Second * 10,
 				BackoffCoefficient:       2,
-				NonRetriableErrorReasons: []string{"bad-error"},
+				NonRetriableErrorReasons: []string{"bad-bug"},
 				ExpirationInterval:       time.Minute,
 			},
 		}

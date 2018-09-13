@@ -46,6 +46,8 @@ const (
 	retryServiceOperationExpirationInterval = 60 * time.Second
 
 	stickyDecisionScheduleToStartTimeoutSeconds = 5
+
+	ratioToForceCompleteDecisionTaskComplete = 0.8
 )
 
 var (
@@ -233,10 +235,11 @@ process_WorkflowTask_Loop:
 		workflowTask.laResultCh = laResultCh
 		completedRequest, wc, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
 		if err == nil && completedRequest == nil {
-			// decision task cannot complete, we need a timer to force complete it
+			// decision task cannot complete because it is waiting for local activity to finish
+			// we need a timer to force complete it to avoid the decision task timeout on server.
 		wait_LocalActivity_Loop:
 			for {
-				deadlineToTrigger := time.Duration(float32(0.8) * float32(wc.GetDecisionTimeout()))
+				deadlineToTrigger := time.Duration(float32(ratioToForceCompleteDecisionTaskComplete) * float32(wc.GetDecisionTimeout()))
 				delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
 				select {
 				case <-time.After(delayDuration):
@@ -464,10 +467,15 @@ func (latp *localActivityTaskPoller) PollTask() (interface{}, error) {
 
 func (latp *localActivityTaskPoller) ProcessTask(task interface{}) error {
 	result := latp.handler.executeLocalActivityTask(task.(*localActivityTask))
+	// We need to send back the local activity result to unblock workflowTaskPoller.processWorkflowTask() which is
+	// synchronously listening on the laResultCh. We also want to make sure we don't block here forever in case
+	// processWorkflowTask() already returns and nobody is receiving from laResultCh. We guarantee that doneCh is closed
+	// before returning from workflowTaskPoller.processWorkflowTask().
 	select {
-	case <-result.task.workflowTask.doneCh:
-		return nil
 	case result.task.workflowTask.laResultCh <- result:
+		return nil
+	case <-result.task.workflowTask.doneCh:
+		// processWorkflowTask() already returns, just drop this local activity result.
 		return nil
 	}
 	return nil

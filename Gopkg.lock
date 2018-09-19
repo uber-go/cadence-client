@@ -145,6 +145,38 @@
   version = "v1.3.2"
 
 [[projects]]
+  name = "go.uber.org/config"
+  packages = [
+    ".",
+    "internal/merge",
+    "internal/unreachable"
+  ]
+  revision = "c37f2f871fe0747f4e165d2851d1ef958ce87cde"
+  version = "v1.3.0"
+
+[[projects]]
+  name = "go.uber.org/dig"
+  packages = [
+    ".",
+    "internal/digreflect",
+    "internal/dot"
+  ]
+  revision = "d6ba99365e475c24e8ac02392eb3f78ccab2a6f3"
+  version = "v1.4.0"
+
+[[projects]]
+  name = "go.uber.org/fx"
+  packages = [
+    ".",
+    "fxtest",
+    "internal/fxlog",
+    "internal/fxreflect",
+    "internal/lifecycle"
+  ]
+  revision = "b156a883a62423b7d9ab651d1689c42c4d788787"
+  version = "v1.7.0"
+
+[[projects]]
   name = "go.uber.org/multierr"
   packages = ["."]
   revision = "3c4937480c32f4c13a875a1829af76c98ca3d40a"
@@ -230,13 +262,25 @@
   source = "golang.org/x/sys"
 
 [[projects]]
+  name = "golang.org/x/text"
+  packages = ["transform"]
+  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
+  version = "v0.3.0"
+
+[[projects]]
   name = "golang.org/x/time"
   packages = ["rate"]
   revision = "6dc17368e09b0e8634d71cac8168d853e869a0c7"
 
+[[projects]]
+  name = "gopkg.in/yaml.v2"
+  packages = ["."]
+  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
+  version = "v2.2.1"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d5ef62239aecf1834c42523f157cab0ff642baae6298e7d199449548d0f2245a"
+  inputs-digest = "dd7de1d4c04f717564c0a61e09cca3c47702f67d4cc2f31adcab90ddc4e64f5b"
   solver-name = "gps-cdcl"
   solver-version = 1

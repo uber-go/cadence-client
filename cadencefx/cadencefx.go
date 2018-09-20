@@ -34,7 +34,7 @@ import (
 // Use Module if the FX app is a cadence worker.
 //
 // Sample yaml for configuring a worker:
-// cadencde:
+// cadence:
 //   workers:
 //	 - domain: domain1
 //	   task_list: tasklist1

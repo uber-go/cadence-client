@@ -114,23 +114,26 @@ func SimpleWorkflow(ctx workflow.Context, value string) error {
 
 A worker or “worker service” is a services hosting the workflow and activity implementations. The worker polls the “Cadence service” for tasks, performs those tasks and communicates task execution results back to the “Cadence service”. Worker services are developed, deployed and operated by Cadence customers.
 
-You can run a Cadence worker in a new or an exiting service. Use the framework APIs to start the Cadence worker and link in all activity and workflow implementations that you require this service to execute.
+You can run a Cadence worker in a new or an exiting service. Use the framework APIs to start the Cadence worker and link in all activity and workflow implementations that you require this service to execute. We recommend using [Fx](go.uber.org/fx), but it's equally possible to manually invoke the functions as well
 
 ```go
 package main
 
 import (
+    "context"
+	"fmt"
 
 	t "go.uber.org/cadence/.gen/go/cadence"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/worker"
 
 	"github.com/uber-go/tally"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"go.uber.org/fx"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/api/transport"
 	"go.uber.org/yarpc/transport/tchannel"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var HostPort = "127.0.0.1:7933"
@@ -140,41 +143,58 @@ var ClientName = "SimpleWorker"
 var CadenceService = "CadenceServiceFrontend"
 
 func main() {
-	startWorker(buildLogger(), buildCadenceClient())
+    // This builds a new Fx Application and causes it to run until killed by user action
+    // (e.g., ^C)
+	fx.New(
+		fx.Provide(
+			provideLogger,
+			provideDispatcher,
+			provideCadenceClient,
+			provideWorker,
+		),
+		fx.Invoke(workerLifecycle),
+	).Run()
+
 }
 
-func buildLogger() *zap.Logger {
+func provideLogger() (*zap.Logger, error) {
 	config := zap.NewDevelopmentConfig()
 	config.Level.SetLevel(zapcore.InfoLevel)
 
-	var err error
-	logger, err := config.Build()
-	if err != nil {
-		panic("Failed to setup logger")
-	}
-
-	return logger
+    return config.Build()
 }
 
-func buildCadenceClient() workflowserviceclient.Interface {
+func provideDispatcher(lc fx.Lifecycle) *yarpc.Dispatcher {
+	dispatcher := yarpc.NewDispatcher(yarpc.Config{
+		Name: ClientName,
+		Outbounds: yarpc.Outbounds{
+			CadenceService: {Unary: ch.NewSingleOutbound(HostPort)},
+		},
+	})
+
+	lc.Append(fx.Hook{
+		OnStart: func(_ context.Context) error {
+			return dispatcher.Start()
+		},
+	})
+
+	return dispatcher
+}
+
+func provideCadenceClient(dispatcher *yarpc.Dispatcher) (workflowserviceclient.Interface, error) {
 	ch, err := tchannel.NewChannelTransport(tchannel.ServiceName(ClientName), tchannel.ListenAddr("127.0.0.1:0"))
 	if err != nil {
-		panic("Failed to setup tchannel")
-	}
-	dispatcher := yarpc.NewDispatcher(yarpc.Config{
-			Name: ClientName,
-			Outbounds: yarpc.Outbounds{
-				CadenceService: {Unary: ch.NewSingleOutbound(HostPort)},
-			},
-		})
-	if err := dispatcher.Start(); err != nil {
-		panic("Failed to start dispatcher")
+		return nil, fmt.Errorf("failed to set up tchannel: %v", err)
 	}
 
 	return workflowserviceclient.New(dispatcher.ClientConfig(CadenceService))
 }
 
-func startWorker(logger *zap.Logger, service workflowserviceclient.Interface) {
+func provideWorker(
+	lc fx.Lifecycle,
+	logger *zap.Logger,
+	service workflowserviceclient.Interface,
+) worker.Worker {
 	// TaskListName - identifies set of client workflows, activities and workers.
 	// it could be your group or client or application name.
 	workerOptions := worker.Options{
@@ -182,17 +202,23 @@ func startWorker(logger *zap.Logger, service workflowserviceclient.Interface) {
 		MetricsScope: tally.NewTestScope(TaskListName, map[string]string{}),
 	}
 
-	worker := worker.New(
+	return worker.New(
 		service,
 		Domain,
 		TaskListName,
-		workerOptions)
-	err := worker.Start()
-	if err != nil {
-		panic("Failed to start worker")
-	}
+		workerOptions,
+	)
+}
 
-	logger.Info("Started Worker.", zap.String("worker", TaskListName))
+func workerLifecycle(lc fx.Lifecycle, w worker.Worker) {
+	lc.Append(fx.Hook{
+		OnStart: func(_ context.Context) error {
+			return worker.Start()
+		},
+		OnStop: func(_ context.Context) error {
+			return worker.Stop()
+		},
+	})
 }
 ```
 

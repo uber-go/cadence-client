@@ -43,11 +43,13 @@ import (
 //
 // A Provider function using this struct could look like:
 //
-// func newHostSpecificTaskList() *HostSpecificTaskListConfig {
-//	 return &HostSpecificTaskListConfig{Domain:"TestDomain",
-//                                      TaskList: "TestTaskList",
-//                                      Options:worker.Options{DisableWorkflowWorker:false}}}
-//
+//	func newHostSpecificTaskList() *HostSpecificTaskListConfig {
+//		return &HostSpecificTaskListConfig{
+//			Domain:"TestDomain",
+//			TaskList: "TestTaskList",
+//			Options: worker.Options{DisableWorkflowWorker:false},
+//		}}
+//	}
 type HostSpecificWorkerConfig struct {
 	Domain   string
 	TaskList string

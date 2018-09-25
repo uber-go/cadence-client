@@ -50,9 +50,9 @@ var Module = fx.Options(
 )
 
 // ClientModule provides constructors for:
-// 1. Cadence thrift client
-// 2. Cadence client.Client
-// 3. Cadence domain client
+//	1. Cadence thrift client
+//	2. Cadence client.Client
+//	3. Cadence domain client
 //
 // It invokes the version reporter but does not start any workers.
 //

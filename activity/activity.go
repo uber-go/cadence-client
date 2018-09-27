@@ -91,6 +91,7 @@ func GetMetricsScope(ctx context.Context) tally.Scope {
 // RecordHeartbeat sends heartbeat for the currently executing activity
 // If the activity is either cancelled (or) workflow/activity doesn't exist then we would cancel
 // the context with error context.Canceled.
+//
 // details - the details that you provided here can be seen in the workflow when it receives TimeoutError, you
 // can check error TimeOutType()/Details().
 func RecordHeartbeat(ctx context.Context, details ...interface{}) {

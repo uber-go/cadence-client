@@ -65,7 +65,7 @@ func Register(activityFunc interface{}) {
 //	func sampleActivity() (result string, err error)
 //	func sampleActivity(arg1 bool) (result int, err error)
 //	func sampleActivity(arg1 bool) (err error)
-// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
+// Serialization of all primitive types, structures is supported ... except channels, functions, unsafe pointer.
 // If function implementation returns activity.ErrResultPending then activity is not completed from the
 // calling workflow point of view. See documentation of activity.ErrResultPending for more info.
 // This method calls panic if activityFunc doesn't comply with the expected format.

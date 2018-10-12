@@ -49,6 +49,7 @@ type (
 		StartedTimestamp   time.Time     // Time of activity start
 		Deadline           time.Time     // Time of activity timeout
 		Attempt            int32         // Attempt starts from 0, and increased by 1 for every retry if retry policy is specified.
+		WorkflowType       *WorkflowType
 	}
 
 	// RegisterActivityOptions consists of options for registering an activity
@@ -161,6 +162,7 @@ func GetActivityInfo(ctx context.Context) ActivityInfo {
 		StartedTimestamp:   env.startedTimestamp,
 		TaskList:           env.taskList,
 		Attempt:            env.attempt,
+		WorkflowType:       env.workflowType,
 	}
 }
 
@@ -277,6 +279,9 @@ func WithActivityTask(
 		dataConverter:      dataConverter,
 		attempt:            task.GetAttempt(),
 		heartbeatDetails:   task.HeartbeatDetails,
+		workflowType: &WorkflowType{
+			Name: *task.WorkflowType.Name,
+		},
 	})
 }
 

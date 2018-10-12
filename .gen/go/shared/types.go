@@ -15972,6 +15972,7 @@ type PollForActivityTaskResponse struct {
 	Attempt                         *int32             `json:"attempt,omitempty"`
 	ScheduledTimestampOfThisAttempt *int64             `json:"scheduledTimestampOfThisAttempt,omitempty"`
 	HeartbeatDetails                []byte             `json:"heartbeatDetails,omitempty"`
+	WorkflowType                    *WorkflowType      `json:"workflowType,omitempty"`
 }
 
 // ToWire translates a PollForActivityTaskResponse struct into a Thrift-level intermediate
@@ -15991,7 +15992,7 @@ type PollForActivityTaskResponse struct {
 //   }
 func (v *PollForActivityTaskResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [13]wire.Field
+		fields [14]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -16099,6 +16100,14 @@ func (v *PollForActivityTaskResponse) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 140, Value: w}
+		i++
+	}
+	if v.WorkflowType != nil {
+		w, err = v.WorkflowType.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 150, Value: w}
 		i++
 	}
 
@@ -16247,6 +16256,14 @@ func (v *PollForActivityTaskResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 150:
+			if field.Value.Type() == wire.TStruct {
+				v.WorkflowType, err = _WorkflowType_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -16260,7 +16277,7 @@ func (v *PollForActivityTaskResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [13]string
+	var fields [14]string
 	i := 0
 	if v.TaskToken != nil {
 		fields[i] = fmt.Sprintf("TaskToken: %v", v.TaskToken)
@@ -16314,6 +16331,10 @@ func (v *PollForActivityTaskResponse) String() string {
 		fields[i] = fmt.Sprintf("HeartbeatDetails: %v", v.HeartbeatDetails)
 		i++
 	}
+	if v.WorkflowType != nil {
+		fields[i] = fmt.Sprintf("WorkflowType: %v", v.WorkflowType)
+		i++
+	}
 
 	return fmt.Sprintf("PollForActivityTaskResponse{%v}", strings.Join(fields[:i], ", "))
 }
@@ -16360,6 +16381,9 @@ func (v *PollForActivityTaskResponse) Equals(rhs *PollForActivityTaskResponse) b
 		return false
 	}
 	if !((v.HeartbeatDetails == nil && rhs.HeartbeatDetails == nil) || (v.HeartbeatDetails != nil && rhs.HeartbeatDetails != nil && bytes.Equal(v.HeartbeatDetails, rhs.HeartbeatDetails))) {
+		return false
+	}
+	if !((v.WorkflowType == nil && rhs.WorkflowType == nil) || (v.WorkflowType != nil && rhs.WorkflowType != nil && v.WorkflowType.Equals(rhs.WorkflowType))) {
 		return false
 	}
 

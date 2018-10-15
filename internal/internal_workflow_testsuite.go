@@ -1389,7 +1389,7 @@ func newTestActivityTask(workflowID, runID, activityID, workflowTypeName, domain
 		WorkflowType: &shared.WorkflowType{
 			Name: common.StringPtr(workflowTypeName),
 		},
-		DomainID: common.StringPtr(domainID),
+		WorkflowDomain: common.StringPtr(domainID),
 	}
 	return task
 }

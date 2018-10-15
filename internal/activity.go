@@ -50,6 +50,7 @@ type (
 		Deadline           time.Time     // Time of activity timeout
 		Attempt            int32         // Attempt starts from 0, and increased by 1 for every retry if retry policy is specified.
 		WorkflowType       *WorkflowType
+		DomainID           string
 	}
 
 	// RegisterActivityOptions consists of options for registering an activity
@@ -163,6 +164,7 @@ func GetActivityInfo(ctx context.Context) ActivityInfo {
 		TaskList:           env.taskList,
 		Attempt:            env.attempt,
 		WorkflowType:       env.workflowType,
+		DomainID:           env.domainID,
 	}
 }
 
@@ -282,6 +284,7 @@ func WithActivityTask(
 		workflowType: &WorkflowType{
 			Name: *task.WorkflowType.Name,
 		},
+		domainID: *task.DomainID,
 	})
 }
 

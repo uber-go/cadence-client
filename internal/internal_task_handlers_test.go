@@ -669,7 +669,7 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
 			WorkflowType: &s.WorkflowType{
 				Name: common.StringPtr("wType"),
 			},
-			WorkflowDomain: common.StringPtr("dID"),
+			WorkflowDomain: common.StringPtr("domain"),
 		}
 		td := fmt.Sprintf("testIndex: %v, testDetails: %v", i, d)
 		r, err := activityHandler.Execute(tasklist, pats)

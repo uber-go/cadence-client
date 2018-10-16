@@ -49,7 +49,7 @@ const (
 	defaultTestWorkflowID       = "default-test-workflow-id"
 	defaultTestRunID            = "default-test-run-id"
 	defaultTestWorkflowTypeName = "default-test-workflow-type-name"
-	defaultTestDomainID         = "default-test-domain-id"
+	defaultTestDomainName       = "default-test-domain-name"
 )
 
 type (
@@ -442,7 +442,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 		defaultTestRunID,
 		"0",
 		defaultTestWorkflowTypeName,
-		defaultTestDomainID,
+		defaultTestDomainName,
 		params,
 	)
 
@@ -808,7 +808,7 @@ func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivi
 		defaultTestRunID,
 		activityInfo.activityID,
 		defaultTestWorkflowTypeName,
-		defaultTestDomainID,
+		defaultTestDomainName,
 		parameters,
 	)
 
@@ -1371,7 +1371,7 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 	return taskHandler
 }
 
-func newTestActivityTask(workflowID, runID, activityID, workflowTypeName, domainID string, params executeActivityParams) *shared.PollForActivityTaskResponse {
+func newTestActivityTask(workflowID, runID, activityID, workflowTypeName, domainName string, params executeActivityParams) *shared.PollForActivityTaskResponse {
 	task := &shared.PollForActivityTaskResponse{
 		WorkflowExecution: &shared.WorkflowExecution{
 			WorkflowId: common.StringPtr(workflowID),
@@ -1389,7 +1389,7 @@ func newTestActivityTask(workflowID, runID, activityID, workflowTypeName, domain
 		WorkflowType: &shared.WorkflowType{
 			Name: common.StringPtr(workflowTypeName),
 		},
-		WorkflowDomain: common.StringPtr(domainID),
+		WorkflowDomain: common.StringPtr(domainName),
 	}
 	return task
 }

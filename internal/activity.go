@@ -40,6 +40,8 @@ type (
 	// ActivityInfo contains information about currently executing activity.
 	ActivityInfo struct {
 		TaskToken          []byte
+		WorkflowType       *WorkflowType
+		WorkflowDomain     string
 		WorkflowExecution  WorkflowExecution
 		ActivityID         string
 		ActivityType       ActivityType
@@ -49,8 +51,6 @@ type (
 		StartedTimestamp   time.Time     // Time of activity start
 		Deadline           time.Time     // Time of activity timeout
 		Attempt            int32         // Attempt starts from 0, and increased by 1 for every retry if retry policy is specified.
-		WorkflowType       *WorkflowType
-		WorkflowDomain     string
 	}
 
 	// RegisterActivityOptions consists of options for registering an activity

@@ -363,14 +363,15 @@ func (wc *workflowEnvironmentImpl) CreateNewDecision(decisionType m.DecisionType
 	}
 }
 
-func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParams, callback resultHandler) (*activityInfo, error) {
+func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParams, callback resultHandler) *activityInfo {
 	scheduleTaskAttr := &m.ScheduleActivityTaskDecisionAttributes{}
 	if parameters.ActivityID == nil || *parameters.ActivityID == "" {
 		scheduleTaskAttr.ActivityId = common.StringPtr(wc.GenerateSequenceID())
 	} else {
 		activityID := *parameters.ActivityID
 		if wc.decisionsHelper.isExistingActivityID(activityID) {
-			return nil, fmt.Errorf("activity ID %v is already scheduled and not completed yet", activityID)
+			callback(nil, fmt.Errorf("activity ID %v is already scheduled and not completed yet", activityID))
+			return &activityInfo{activityID: activityID}
 		}
 		scheduleTaskAttr.ActivityId = parameters.ActivityID
 	}
@@ -394,7 +395,7 @@ func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityPar
 		zap.String(tagActivityID, activityID),
 		zap.String(tagActivityType, scheduleTaskAttr.ActivityType.GetName()))
 
-	return &activityInfo{activityID: activityID}, nil
+	return &activityInfo{activityID: activityID}
 }
 
 func (wc *workflowEnvironmentImpl) RequestCancelActivity(activityID string) {

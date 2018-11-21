@@ -345,18 +345,14 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 
 	ctxDone, cancellable := ctx.Done().(*channelImpl)
 	cancellationCallback := &receiveCallback{}
-	a, err := getWorkflowEnvironment(ctx).ExecuteActivity(params, func(r []byte, e error) {
+	a := getWorkflowEnvironment(ctx).ExecuteActivity(params, func(r []byte, e error) {
 		settable.Set(r, e)
 		if cancellable {
 			// future is done, we don't need the cancellation callback anymore.
 			ctxDone.removeReceiveCallback(cancellationCallback)
+			cancellable = false // callback could be called synchronously in case of duplicate activity ID
 		}
 	})
-
-	if err != nil {
-		settable.Set(nil, err)
-		return future
-	}
 
 	if cancellable {
 		cancellationCallback.fn = func(v interface{}, more bool) bool {

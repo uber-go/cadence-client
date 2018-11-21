@@ -696,6 +696,18 @@ func (h *decisionsHelper) scheduleActivityTask(attributes *s.ScheduleActivityTas
 	return decision
 }
 
+func (h *decisionsHelper) isExistingActivityID(activityID string) bool {
+	id := makeDecisionID(decisionTypeActivity, activityID)
+	_, ok := h.decisions[id]
+	return ok
+}
+
+func (h *decisionsHelper) isExistingChildWorkflowID(childWorkflowID string) bool {
+	id := makeDecisionID(decisionTypeChildWorkflow, childWorkflowID)
+	_, ok := h.decisions[id]
+	return ok
+}
+
 func (h *decisionsHelper) requestCancelActivityTask(activityID string) decisionStateMachine {
 	id := makeDecisionID(decisionTypeActivity, activityID)
 	decision := h.getDecision(id)

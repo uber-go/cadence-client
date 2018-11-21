@@ -795,12 +795,15 @@ func (env *testWorkflowEnvironmentImpl) GetDataConverter() encoded.DataConverter
 	return env.workerOptions.DataConverter
 }
 
-func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParams, callback resultHandler) *activityInfo {
+func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParams, callback resultHandler) (*activityInfo, error) {
 	var activityID string
 	if parameters.ActivityID == nil || *parameters.ActivityID == "" {
 		activityID = getStringID(env.nextID())
 	} else {
 		activityID = *parameters.ActivityID
+		if _, ok := env.activities[activityID]; ok {
+			return nil, fmt.Errorf("activity ID %v is already scheduled and not completed yet", activityID)
+		}
 	}
 	activityInfo := &activityInfo{activityID: activityID}
 	task := newTestActivityTask(
@@ -828,7 +831,7 @@ func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivi
 		}, false /* do not auto schedule decision task, because activity might be still pending */)
 	}()
 
-	return activityInfo
+	return activityInfo, nil
 }
 
 func (env *testWorkflowEnvironmentImpl) getActivityHandle(activityID string) (*testActivityHandle, bool) {

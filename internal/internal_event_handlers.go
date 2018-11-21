@@ -286,6 +286,14 @@ func (wc *workflowEnvironmentImpl) ExecuteChildWorkflow(
 	params executeWorkflowParams, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error {
 	if params.workflowID == "" {
 		params.workflowID = wc.workflowInfo.WorkflowExecution.RunID + "_" + wc.GenerateSequenceID()
+	} else {
+		if wc.decisionsHelper.isExistingChildWorkflowID(params.workflowID) {
+			err := &m.WorkflowExecutionAlreadyStartedError{
+				Message: common.StringPtr(
+					fmt.Sprintf("child workflow ID %v is already scheduled and not completed yet", params.workflowID)),
+			}
+			return err
+		}
 	}
 
 	attributes := &m.StartChildWorkflowExecutionDecisionAttributes{}
@@ -355,11 +363,15 @@ func (wc *workflowEnvironmentImpl) CreateNewDecision(decisionType m.DecisionType
 	}
 }
 
-func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParams, callback resultHandler) *activityInfo {
+func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParams, callback resultHandler) (*activityInfo, error) {
 	scheduleTaskAttr := &m.ScheduleActivityTaskDecisionAttributes{}
 	if parameters.ActivityID == nil || *parameters.ActivityID == "" {
 		scheduleTaskAttr.ActivityId = common.StringPtr(wc.GenerateSequenceID())
 	} else {
+		activityID := *parameters.ActivityID
+		if wc.decisionsHelper.isExistingActivityID(activityID) {
+			return nil, fmt.Errorf("activity ID %v is already scheduled and not completed yet", activityID)
+		}
 		scheduleTaskAttr.ActivityId = parameters.ActivityID
 	}
 	activityID := scheduleTaskAttr.GetActivityId()
@@ -382,7 +394,7 @@ func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityPar
 		zap.String(tagActivityID, activityID),
 		zap.String(tagActivityType, scheduleTaskAttr.ActivityType.GetName()))
 
-	return &activityInfo{activityID: activityID}
+	return &activityInfo{activityID: activityID}, nil
 }
 
 func (wc *workflowEnvironmentImpl) RequestCancelActivity(activityID string) {

@@ -93,7 +93,7 @@ type (
 		// The ExecuteActivity schedules an activity with a callback handler.
 		// If the activity failed to complete the callback error would indicate the failure
 		// and it can be one of ActivityTaskFailedError, ActivityTaskTimeoutError, ActivityTaskCanceledError
-		ExecuteActivity(parameters executeActivityParams, callback resultHandler) *activityInfo
+		ExecuteActivity(parameters executeActivityParams, callback resultHandler) (*activityInfo, error)
 
 		// This only initiates cancel request for activity. if the activity is configured to not waitForCancellation then
 		// it would invoke the callback handler immediately with error code ActivityTaskCanceledError.

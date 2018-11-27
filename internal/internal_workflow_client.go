@@ -430,7 +430,12 @@ func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID str
 					var err1 error
 					tchCtx, cancel, opt := newChannelContext(ctx, func(builder *contextBuilder) {
 						if isLongPoll {
-							builder.Timeout = defaultGetHistoryTimeoutInSecs * time.Second
+							longPollTimeout := defaultGetHistoryTimeoutInSecs * time.Second
+							deadline, ok := ctx.Deadline()
+							if ok && deadline.After(time.Now().Add(longPollTimeout)) {
+								longPollTimeout = deadline.Sub(time.Now())
+							}
+							builder.Timeout = longPollTimeout
 						}
 					})
 					defer cancel()

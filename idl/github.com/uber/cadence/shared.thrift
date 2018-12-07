@@ -781,9 +781,17 @@ struct DomainInfo {
   50: optional map<string,string> data
 }
 
+const i32 ARCHIVAL_RETENTION_DAYS_INFINITE = -1
+
+struct ArchivalConfiguration {
+  10: optional string bucketName
+  20: optional i32 retentionDays
+}
+
 struct DomainConfiguration {
   10: optional i32 workflowExecutionRetentionPeriodInDays
   20: optional bool emitMetric
+  30: optional ArchivalConfiguration archivalConfig
 }
 
 struct UpdateDomainInfo {
@@ -813,6 +821,7 @@ struct RegisterDomainRequest {
   // A key-value map for any customized purpose
   80: optional map<string,string> data
   90: optional string securityToken
+  100: optional ArchivalConfiguration archivalConfiguration
 }
 
 struct ListDomainsRequest {
@@ -835,6 +844,7 @@ struct DescribeDomainResponse {
   30: optional DomainReplicationConfiguration replicationConfiguration
   40: optional i64 (js.type = "Long") failoverVersion
   50: optional bool isGlobalDomain
+  60: optional ArchivalConfiguration archivalConfiguration
 }
 
 struct UpdateDomainRequest {
@@ -843,6 +853,7 @@ struct UpdateDomainRequest {
  30: optional DomainConfiguration configuration
  40: optional DomainReplicationConfiguration replicationConfiguration
  50: optional string securityToken
+ 60: optional ArchivalConfiguration archivalConfiguration
 }
 
 struct UpdateDomainResponse {
@@ -851,6 +862,7 @@ struct UpdateDomainResponse {
   30: optional DomainReplicationConfiguration replicationConfiguration
   40: optional i64 (js.type = "Long") failoverVersion
   50: optional bool isGlobalDomain
+  60: optional ArchivalConfiguration archivalConfiguration
 }
 
 struct DeprecateDomainRequest {
@@ -1143,6 +1155,8 @@ struct PendingActivityInfo {
   30: optional PendingActivityState state
   40: optional binary heartbeatDetails
   50: optional i64 (js.type = "Long") lastHeartbeatTimestamp
+  60: optional i64 (js.type = "Long") lastStartedTimestamp
+  70: optional i32 attempt
 }
 
 struct DescribeWorkflowExecutionResponse {
@@ -1220,4 +1234,21 @@ struct RetryPolicy {
 
   // Expiration time for the whole retry process.
   60: optional i32 expirationIntervalInSeconds
+}
+
+// HistoryBranchRange represents a piece of range for a branch.
+struct HistoryBranchRange{
+  // branchID of original branch forked from
+  10: optional string branchID
+  // beinning node for the range, inclusive
+  20: optional i64 beginNodeID
+  // ending node for the range, exclusive
+  30: optional i64 endNodeID
+}
+
+// For history persistence to serialize/deserialize branch details
+struct HistoryBranch{
+  10: optional string treeID
+  20: optional string branchID
+  30: optional list<HistoryBranchRange>  ancestors
 }

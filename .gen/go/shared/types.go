@@ -2048,6 +2048,158 @@ func (v *ActivityType) GetName() (o string) {
 	return
 }
 
+type ArchivalConfiguration struct {
+	BucketName    *string `json:"bucketName,omitempty"`
+	RetentionDays *int32  `json:"retentionDays,omitempty"`
+}
+
+// ToWire translates a ArchivalConfiguration struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *ArchivalConfiguration) ToWire() (wire.Value, error) {
+	var (
+		fields [2]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.BucketName != nil {
+		w, err = wire.NewValueString(*(v.BucketName)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+	if v.RetentionDays != nil {
+		w, err = wire.NewValueI32(*(v.RetentionDays)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+// FromWire deserializes a ArchivalConfiguration struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a ArchivalConfiguration struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v ArchivalConfiguration
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *ArchivalConfiguration) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.BucketName = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 20:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.RetentionDays = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a ArchivalConfiguration
+// struct.
+func (v *ArchivalConfiguration) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [2]string
+	i := 0
+	if v.BucketName != nil {
+		fields[i] = fmt.Sprintf("BucketName: %v", *(v.BucketName))
+		i++
+	}
+	if v.RetentionDays != nil {
+		fields[i] = fmt.Sprintf("RetentionDays: %v", *(v.RetentionDays))
+		i++
+	}
+
+	return fmt.Sprintf("ArchivalConfiguration{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this ArchivalConfiguration match the
+// provided ArchivalConfiguration.
+//
+// This function performs a deep comparison.
+func (v *ArchivalConfiguration) Equals(rhs *ArchivalConfiguration) bool {
+	if !_String_EqualsPtr(v.BucketName, rhs.BucketName) {
+		return false
+	}
+	if !_I32_EqualsPtr(v.RetentionDays, rhs.RetentionDays) {
+		return false
+	}
+
+	return true
+}
+
+// GetBucketName returns the value of BucketName if it is set or its
+// zero value if it is unset.
+func (v *ArchivalConfiguration) GetBucketName() (o string) {
+	if v.BucketName != nil {
+		return *v.BucketName
+	}
+
+	return
+}
+
+// GetRetentionDays returns the value of RetentionDays if it is set or its
+// zero value if it is unset.
+func (v *ArchivalConfiguration) GetRetentionDays() (o int32) {
+	if v.RetentionDays != nil {
+		return *v.RetentionDays
+	}
+
+	return
+}
+
 type BadRequestError struct {
 	Message string `json:"message,required"`
 }
@@ -7491,6 +7643,7 @@ type DescribeDomainResponse struct {
 	ReplicationConfiguration *DomainReplicationConfiguration `json:"replicationConfiguration,omitempty"`
 	FailoverVersion          *int64                          `json:"failoverVersion,omitempty"`
 	IsGlobalDomain           *bool                           `json:"isGlobalDomain,omitempty"`
+	ArchivalConfiguration    *ArchivalConfiguration          `json:"archivalConfiguration,omitempty"`
 }
 
 // ToWire translates a DescribeDomainResponse struct into a Thrift-level intermediate
@@ -7510,7 +7663,7 @@ type DescribeDomainResponse struct {
 //   }
 func (v *DescribeDomainResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [5]wire.Field
+		fields [6]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -7556,6 +7709,14 @@ func (v *DescribeDomainResponse) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
+	if v.ArchivalConfiguration != nil {
+		w, err = v.ArchivalConfiguration.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 60, Value: w}
+		i++
+	}
 
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
 }
@@ -7574,6 +7735,12 @@ func _DomainConfiguration_Read(w wire.Value) (*DomainConfiguration, error) {
 
 func _DomainReplicationConfiguration_Read(w wire.Value) (*DomainReplicationConfiguration, error) {
 	var v DomainReplicationConfiguration
+	err := v.FromWire(w)
+	return &v, err
+}
+
+func _ArchivalConfiguration_Read(w wire.Value) (*ArchivalConfiguration, error) {
+	var v ArchivalConfiguration
 	err := v.FromWire(w)
 	return &v, err
 }
@@ -7644,6 +7811,14 @@ func (v *DescribeDomainResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 60:
+			if field.Value.Type() == wire.TStruct {
+				v.ArchivalConfiguration, err = _ArchivalConfiguration_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -7657,7 +7832,7 @@ func (v *DescribeDomainResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [5]string
+	var fields [6]string
 	i := 0
 	if v.DomainInfo != nil {
 		fields[i] = fmt.Sprintf("DomainInfo: %v", v.DomainInfo)
@@ -7677,6 +7852,10 @@ func (v *DescribeDomainResponse) String() string {
 	}
 	if v.IsGlobalDomain != nil {
 		fields[i] = fmt.Sprintf("IsGlobalDomain: %v", *(v.IsGlobalDomain))
+		i++
+	}
+	if v.ArchivalConfiguration != nil {
+		fields[i] = fmt.Sprintf("ArchivalConfiguration: %v", v.ArchivalConfiguration)
 		i++
 	}
 
@@ -7711,6 +7890,9 @@ func (v *DescribeDomainResponse) Equals(rhs *DescribeDomainResponse) bool {
 		return false
 	}
 	if !_Bool_EqualsPtr(v.IsGlobalDomain, rhs.IsGlobalDomain) {
+		return false
+	}
+	if !((v.ArchivalConfiguration == nil && rhs.ArchivalConfiguration == nil) || (v.ArchivalConfiguration != nil && rhs.ArchivalConfiguration != nil && v.ArchivalConfiguration.Equals(rhs.ArchivalConfiguration))) {
 		return false
 	}
 
@@ -9213,8 +9395,9 @@ func (v *DomainCacheInfo) GetNumOfItemsInCacheByName() (o int64) {
 }
 
 type DomainConfiguration struct {
-	WorkflowExecutionRetentionPeriodInDays *int32 `json:"workflowExecutionRetentionPeriodInDays,omitempty"`
-	EmitMetric                             *bool  `json:"emitMetric,omitempty"`
+	WorkflowExecutionRetentionPeriodInDays *int32                 `json:"workflowExecutionRetentionPeriodInDays,omitempty"`
+	EmitMetric                             *bool                  `json:"emitMetric,omitempty"`
+	ArchivalConfig                         *ArchivalConfiguration `json:"archivalConfig,omitempty"`
 }
 
 // ToWire translates a DomainConfiguration struct into a Thrift-level intermediate
@@ -9234,7 +9417,7 @@ type DomainConfiguration struct {
 //   }
 func (v *DomainConfiguration) ToWire() (wire.Value, error) {
 	var (
-		fields [2]wire.Field
+		fields [3]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -9254,6 +9437,14 @@ func (v *DomainConfiguration) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
+	if v.ArchivalConfig != nil {
+		w, err = v.ArchivalConfig.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 30, Value: w}
 		i++
 	}
 
@@ -9302,6 +9493,14 @@ func (v *DomainConfiguration) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 30:
+			if field.Value.Type() == wire.TStruct {
+				v.ArchivalConfig, err = _ArchivalConfiguration_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -9315,7 +9514,7 @@ func (v *DomainConfiguration) String() string {
 		return "<nil>"
 	}
 
-	var fields [2]string
+	var fields [3]string
 	i := 0
 	if v.WorkflowExecutionRetentionPeriodInDays != nil {
 		fields[i] = fmt.Sprintf("WorkflowExecutionRetentionPeriodInDays: %v", *(v.WorkflowExecutionRetentionPeriodInDays))
@@ -9323,6 +9522,10 @@ func (v *DomainConfiguration) String() string {
 	}
 	if v.EmitMetric != nil {
 		fields[i] = fmt.Sprintf("EmitMetric: %v", *(v.EmitMetric))
+		i++
+	}
+	if v.ArchivalConfig != nil {
+		fields[i] = fmt.Sprintf("ArchivalConfig: %v", v.ArchivalConfig)
 		i++
 	}
 
@@ -9338,6 +9541,9 @@ func (v *DomainConfiguration) Equals(rhs *DomainConfiguration) bool {
 		return false
 	}
 	if !_Bool_EqualsPtr(v.EmitMetric, rhs.EmitMetric) {
+		return false
+	}
+	if !((v.ArchivalConfig == nil && rhs.ArchivalConfig == nil) || (v.ArchivalConfig != nil && rhs.ArchivalConfig != nil && v.ArchivalConfig.Equals(rhs.ArchivalConfig))) {
 		return false
 	}
 
@@ -12139,6 +12345,438 @@ func (v *History) Equals(rhs *History) bool {
 	}
 
 	return true
+}
+
+type HistoryBranch struct {
+	TreeID    *string               `json:"treeID,omitempty"`
+	BranchID  *string               `json:"branchID,omitempty"`
+	Ancestors []*HistoryBranchRange `json:"ancestors,omitempty"`
+}
+
+type _List_HistoryBranchRange_ValueList []*HistoryBranchRange
+
+func (v _List_HistoryBranchRange_ValueList) ForEach(f func(wire.Value) error) error {
+	for i, x := range v {
+		if x == nil {
+			return fmt.Errorf("invalid [%v]: value is nil", i)
+		}
+		w, err := x.ToWire()
+		if err != nil {
+			return err
+		}
+		err = f(w)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v _List_HistoryBranchRange_ValueList) Size() int {
+	return len(v)
+}
+
+func (_List_HistoryBranchRange_ValueList) ValueType() wire.Type {
+	return wire.TStruct
+}
+
+func (_List_HistoryBranchRange_ValueList) Close() {}
+
+// ToWire translates a HistoryBranch struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *HistoryBranch) ToWire() (wire.Value, error) {
+	var (
+		fields [3]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.TreeID != nil {
+		w, err = wire.NewValueString(*(v.TreeID)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+	if v.BranchID != nil {
+		w, err = wire.NewValueString(*(v.BranchID)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
+	if v.Ancestors != nil {
+		w, err = wire.NewValueList(_List_HistoryBranchRange_ValueList(v.Ancestors)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _HistoryBranchRange_Read(w wire.Value) (*HistoryBranchRange, error) {
+	var v HistoryBranchRange
+	err := v.FromWire(w)
+	return &v, err
+}
+
+func _List_HistoryBranchRange_Read(l wire.ValueList) ([]*HistoryBranchRange, error) {
+	if l.ValueType() != wire.TStruct {
+		return nil, nil
+	}
+
+	o := make([]*HistoryBranchRange, 0, l.Size())
+	err := l.ForEach(func(x wire.Value) error {
+		i, err := _HistoryBranchRange_Read(x)
+		if err != nil {
+			return err
+		}
+		o = append(o, i)
+		return nil
+	})
+	l.Close()
+	return o, err
+}
+
+// FromWire deserializes a HistoryBranch struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a HistoryBranch struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v HistoryBranch
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *HistoryBranch) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.TreeID = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 20:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.BranchID = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 30:
+			if field.Value.Type() == wire.TList {
+				v.Ancestors, err = _List_HistoryBranchRange_Read(field.Value.GetList())
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a HistoryBranch
+// struct.
+func (v *HistoryBranch) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [3]string
+	i := 0
+	if v.TreeID != nil {
+		fields[i] = fmt.Sprintf("TreeID: %v", *(v.TreeID))
+		i++
+	}
+	if v.BranchID != nil {
+		fields[i] = fmt.Sprintf("BranchID: %v", *(v.BranchID))
+		i++
+	}
+	if v.Ancestors != nil {
+		fields[i] = fmt.Sprintf("Ancestors: %v", v.Ancestors)
+		i++
+	}
+
+	return fmt.Sprintf("HistoryBranch{%v}", strings.Join(fields[:i], ", "))
+}
+
+func _List_HistoryBranchRange_Equals(lhs, rhs []*HistoryBranchRange) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+
+	for i, lv := range lhs {
+		rv := rhs[i]
+		if !lv.Equals(rv) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Equals returns true if all the fields of this HistoryBranch match the
+// provided HistoryBranch.
+//
+// This function performs a deep comparison.
+func (v *HistoryBranch) Equals(rhs *HistoryBranch) bool {
+	if !_String_EqualsPtr(v.TreeID, rhs.TreeID) {
+		return false
+	}
+	if !_String_EqualsPtr(v.BranchID, rhs.BranchID) {
+		return false
+	}
+	if !((v.Ancestors == nil && rhs.Ancestors == nil) || (v.Ancestors != nil && rhs.Ancestors != nil && _List_HistoryBranchRange_Equals(v.Ancestors, rhs.Ancestors))) {
+		return false
+	}
+
+	return true
+}
+
+// GetTreeID returns the value of TreeID if it is set or its
+// zero value if it is unset.
+func (v *HistoryBranch) GetTreeID() (o string) {
+	if v.TreeID != nil {
+		return *v.TreeID
+	}
+
+	return
+}
+
+// GetBranchID returns the value of BranchID if it is set or its
+// zero value if it is unset.
+func (v *HistoryBranch) GetBranchID() (o string) {
+	if v.BranchID != nil {
+		return *v.BranchID
+	}
+
+	return
+}
+
+type HistoryBranchRange struct {
+	BranchID    *string `json:"branchID,omitempty"`
+	BeginNodeID *int64  `json:"beginNodeID,omitempty"`
+	EndNodeID   *int64  `json:"endNodeID,omitempty"`
+}
+
+// ToWire translates a HistoryBranchRange struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *HistoryBranchRange) ToWire() (wire.Value, error) {
+	var (
+		fields [3]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.BranchID != nil {
+		w, err = wire.NewValueString(*(v.BranchID)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+	if v.BeginNodeID != nil {
+		w, err = wire.NewValueI64(*(v.BeginNodeID)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
+	if v.EndNodeID != nil {
+		w, err = wire.NewValueI64(*(v.EndNodeID)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+// FromWire deserializes a HistoryBranchRange struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a HistoryBranchRange struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v HistoryBranchRange
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *HistoryBranchRange) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.BranchID = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 20:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.BeginNodeID = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 30:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.EndNodeID = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a HistoryBranchRange
+// struct.
+func (v *HistoryBranchRange) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [3]string
+	i := 0
+	if v.BranchID != nil {
+		fields[i] = fmt.Sprintf("BranchID: %v", *(v.BranchID))
+		i++
+	}
+	if v.BeginNodeID != nil {
+		fields[i] = fmt.Sprintf("BeginNodeID: %v", *(v.BeginNodeID))
+		i++
+	}
+	if v.EndNodeID != nil {
+		fields[i] = fmt.Sprintf("EndNodeID: %v", *(v.EndNodeID))
+		i++
+	}
+
+	return fmt.Sprintf("HistoryBranchRange{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this HistoryBranchRange match the
+// provided HistoryBranchRange.
+//
+// This function performs a deep comparison.
+func (v *HistoryBranchRange) Equals(rhs *HistoryBranchRange) bool {
+	if !_String_EqualsPtr(v.BranchID, rhs.BranchID) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.BeginNodeID, rhs.BeginNodeID) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.EndNodeID, rhs.EndNodeID) {
+		return false
+	}
+
+	return true
+}
+
+// GetBranchID returns the value of BranchID if it is set or its
+// zero value if it is unset.
+func (v *HistoryBranchRange) GetBranchID() (o string) {
+	if v.BranchID != nil {
+		return *v.BranchID
+	}
+
+	return
+}
+
+// GetBeginNodeID returns the value of BeginNodeID if it is set or its
+// zero value if it is unset.
+func (v *HistoryBranchRange) GetBeginNodeID() (o int64) {
+	if v.BeginNodeID != nil {
+		return *v.BeginNodeID
+	}
+
+	return
+}
+
+// GetEndNodeID returns the value of EndNodeID if it is set or its
+// zero value if it is unset.
+func (v *HistoryBranchRange) GetEndNodeID() (o int64) {
+	if v.EndNodeID != nil {
+		return *v.EndNodeID
+	}
+
+	return
 }
 
 type HistoryEvent struct {
@@ -15398,6 +16036,8 @@ type PendingActivityInfo struct {
 	State                  *PendingActivityState `json:"state,omitempty"`
 	HeartbeatDetails       []byte                `json:"heartbeatDetails,omitempty"`
 	LastHeartbeatTimestamp *int64                `json:"lastHeartbeatTimestamp,omitempty"`
+	LastStartedTimestamp   *int64                `json:"lastStartedTimestamp,omitempty"`
+	Attempt                *int32                `json:"attempt,omitempty"`
 }
 
 // ToWire translates a PendingActivityInfo struct into a Thrift-level intermediate
@@ -15417,7 +16057,7 @@ type PendingActivityInfo struct {
 //   }
 func (v *PendingActivityInfo) ToWire() (wire.Value, error) {
 	var (
-		fields [5]wire.Field
+		fields [7]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -15461,6 +16101,22 @@ func (v *PendingActivityInfo) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 50, Value: w}
+		i++
+	}
+	if v.LastStartedTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.LastStartedTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 60, Value: w}
+		i++
+	}
+	if v.Attempt != nil {
+		w, err = wire.NewValueI32(*(v.Attempt)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 70, Value: w}
 		i++
 	}
 
@@ -15541,6 +16197,26 @@ func (v *PendingActivityInfo) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 60:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.LastStartedTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 70:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.Attempt = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -15554,7 +16230,7 @@ func (v *PendingActivityInfo) String() string {
 		return "<nil>"
 	}
 
-	var fields [5]string
+	var fields [7]string
 	i := 0
 	if v.ActivityID != nil {
 		fields[i] = fmt.Sprintf("ActivityID: %v", *(v.ActivityID))
@@ -15574,6 +16250,14 @@ func (v *PendingActivityInfo) String() string {
 	}
 	if v.LastHeartbeatTimestamp != nil {
 		fields[i] = fmt.Sprintf("LastHeartbeatTimestamp: %v", *(v.LastHeartbeatTimestamp))
+		i++
+	}
+	if v.LastStartedTimestamp != nil {
+		fields[i] = fmt.Sprintf("LastStartedTimestamp: %v", *(v.LastStartedTimestamp))
+		i++
+	}
+	if v.Attempt != nil {
+		fields[i] = fmt.Sprintf("Attempt: %v", *(v.Attempt))
 		i++
 	}
 
@@ -15610,6 +16294,12 @@ func (v *PendingActivityInfo) Equals(rhs *PendingActivityInfo) bool {
 	if !_I64_EqualsPtr(v.LastHeartbeatTimestamp, rhs.LastHeartbeatTimestamp) {
 		return false
 	}
+	if !_I64_EqualsPtr(v.LastStartedTimestamp, rhs.LastStartedTimestamp) {
+		return false
+	}
+	if !_I32_EqualsPtr(v.Attempt, rhs.Attempt) {
+		return false
+	}
 
 	return true
 }
@@ -15639,6 +16329,26 @@ func (v *PendingActivityInfo) GetState() (o PendingActivityState) {
 func (v *PendingActivityInfo) GetLastHeartbeatTimestamp() (o int64) {
 	if v.LastHeartbeatTimestamp != nil {
 		return *v.LastHeartbeatTimestamp
+	}
+
+	return
+}
+
+// GetLastStartedTimestamp returns the value of LastStartedTimestamp if it is set or its
+// zero value if it is unset.
+func (v *PendingActivityInfo) GetLastStartedTimestamp() (o int64) {
+	if v.LastStartedTimestamp != nil {
+		return *v.LastStartedTimestamp
+	}
+
+	return
+}
+
+// GetAttempt returns the value of Attempt if it is set or its
+// zero value if it is unset.
+func (v *PendingActivityInfo) GetAttempt() (o int32) {
+	if v.Attempt != nil {
+		return *v.Attempt
 	}
 
 	return
@@ -18519,6 +19229,7 @@ type RegisterDomainRequest struct {
 	ActiveClusterName                      *string                            `json:"activeClusterName,omitempty"`
 	Data                                   map[string]string                  `json:"data,omitempty"`
 	SecurityToken                          *string                            `json:"securityToken,omitempty"`
+	ArchivalConfiguration                  *ArchivalConfiguration             `json:"archivalConfiguration,omitempty"`
 }
 
 // ToWire translates a RegisterDomainRequest struct into a Thrift-level intermediate
@@ -18538,7 +19249,7 @@ type RegisterDomainRequest struct {
 //   }
 func (v *RegisterDomainRequest) ToWire() (wire.Value, error) {
 	var (
-		fields [9]wire.Field
+		fields [10]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -18614,6 +19325,14 @@ func (v *RegisterDomainRequest) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 90, Value: w}
+		i++
+	}
+	if v.ArchivalConfiguration != nil {
+		w, err = v.ArchivalConfiguration.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 100, Value: w}
 		i++
 	}
 
@@ -18728,6 +19447,14 @@ func (v *RegisterDomainRequest) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 100:
+			if field.Value.Type() == wire.TStruct {
+				v.ArchivalConfiguration, err = _ArchivalConfiguration_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -18741,7 +19468,7 @@ func (v *RegisterDomainRequest) String() string {
 		return "<nil>"
 	}
 
-	var fields [9]string
+	var fields [10]string
 	i := 0
 	if v.Name != nil {
 		fields[i] = fmt.Sprintf("Name: %v", *(v.Name))
@@ -18779,6 +19506,10 @@ func (v *RegisterDomainRequest) String() string {
 		fields[i] = fmt.Sprintf("SecurityToken: %v", *(v.SecurityToken))
 		i++
 	}
+	if v.ArchivalConfiguration != nil {
+		fields[i] = fmt.Sprintf("ArchivalConfiguration: %v", v.ArchivalConfiguration)
+		i++
+	}
 
 	return fmt.Sprintf("RegisterDomainRequest{%v}", strings.Join(fields[:i], ", "))
 }
@@ -18813,6 +19544,9 @@ func (v *RegisterDomainRequest) Equals(rhs *RegisterDomainRequest) bool {
 		return false
 	}
 	if !_String_EqualsPtr(v.SecurityToken, rhs.SecurityToken) {
+		return false
+	}
+	if !((v.ArchivalConfiguration == nil && rhs.ArchivalConfiguration == nil) || (v.ArchivalConfiguration != nil && rhs.ArchivalConfiguration != nil && v.ArchivalConfiguration.Equals(rhs.ArchivalConfiguration))) {
 		return false
 	}
 
@@ -29537,6 +30271,7 @@ type UpdateDomainRequest struct {
 	Configuration            *DomainConfiguration            `json:"configuration,omitempty"`
 	ReplicationConfiguration *DomainReplicationConfiguration `json:"replicationConfiguration,omitempty"`
 	SecurityToken            *string                         `json:"securityToken,omitempty"`
+	ArchivalConfiguration    *ArchivalConfiguration          `json:"archivalConfiguration,omitempty"`
 }
 
 // ToWire translates a UpdateDomainRequest struct into a Thrift-level intermediate
@@ -29556,7 +30291,7 @@ type UpdateDomainRequest struct {
 //   }
 func (v *UpdateDomainRequest) ToWire() (wire.Value, error) {
 	var (
-		fields [5]wire.Field
+		fields [6]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -29600,6 +30335,14 @@ func (v *UpdateDomainRequest) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 50, Value: w}
+		i++
+	}
+	if v.ArchivalConfiguration != nil {
+		w, err = v.ArchivalConfiguration.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 60, Value: w}
 		i++
 	}
 
@@ -29678,6 +30421,14 @@ func (v *UpdateDomainRequest) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 60:
+			if field.Value.Type() == wire.TStruct {
+				v.ArchivalConfiguration, err = _ArchivalConfiguration_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -29691,7 +30442,7 @@ func (v *UpdateDomainRequest) String() string {
 		return "<nil>"
 	}
 
-	var fields [5]string
+	var fields [6]string
 	i := 0
 	if v.Name != nil {
 		fields[i] = fmt.Sprintf("Name: %v", *(v.Name))
@@ -29711,6 +30462,10 @@ func (v *UpdateDomainRequest) String() string {
 	}
 	if v.SecurityToken != nil {
 		fields[i] = fmt.Sprintf("SecurityToken: %v", *(v.SecurityToken))
+		i++
+	}
+	if v.ArchivalConfiguration != nil {
+		fields[i] = fmt.Sprintf("ArchivalConfiguration: %v", v.ArchivalConfiguration)
 		i++
 	}
 
@@ -29735,6 +30490,9 @@ func (v *UpdateDomainRequest) Equals(rhs *UpdateDomainRequest) bool {
 		return false
 	}
 	if !_String_EqualsPtr(v.SecurityToken, rhs.SecurityToken) {
+		return false
+	}
+	if !((v.ArchivalConfiguration == nil && rhs.ArchivalConfiguration == nil) || (v.ArchivalConfiguration != nil && rhs.ArchivalConfiguration != nil && v.ArchivalConfiguration.Equals(rhs.ArchivalConfiguration))) {
 		return false
 	}
 
@@ -29767,6 +30525,7 @@ type UpdateDomainResponse struct {
 	ReplicationConfiguration *DomainReplicationConfiguration `json:"replicationConfiguration,omitempty"`
 	FailoverVersion          *int64                          `json:"failoverVersion,omitempty"`
 	IsGlobalDomain           *bool                           `json:"isGlobalDomain,omitempty"`
+	ArchivalConfiguration    *ArchivalConfiguration          `json:"archivalConfiguration,omitempty"`
 }
 
 // ToWire translates a UpdateDomainResponse struct into a Thrift-level intermediate
@@ -29786,7 +30545,7 @@ type UpdateDomainResponse struct {
 //   }
 func (v *UpdateDomainResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [5]wire.Field
+		fields [6]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -29830,6 +30589,14 @@ func (v *UpdateDomainResponse) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 50, Value: w}
+		i++
+	}
+	if v.ArchivalConfiguration != nil {
+		w, err = v.ArchivalConfiguration.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 60, Value: w}
 		i++
 	}
 
@@ -29902,6 +30669,14 @@ func (v *UpdateDomainResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 60:
+			if field.Value.Type() == wire.TStruct {
+				v.ArchivalConfiguration, err = _ArchivalConfiguration_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -29915,7 +30690,7 @@ func (v *UpdateDomainResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [5]string
+	var fields [6]string
 	i := 0
 	if v.DomainInfo != nil {
 		fields[i] = fmt.Sprintf("DomainInfo: %v", v.DomainInfo)
@@ -29935,6 +30710,10 @@ func (v *UpdateDomainResponse) String() string {
 	}
 	if v.IsGlobalDomain != nil {
 		fields[i] = fmt.Sprintf("IsGlobalDomain: %v", *(v.IsGlobalDomain))
+		i++
+	}
+	if v.ArchivalConfiguration != nil {
+		fields[i] = fmt.Sprintf("ArchivalConfiguration: %v", v.ArchivalConfiguration)
 		i++
 	}
 
@@ -29959,6 +30738,9 @@ func (v *UpdateDomainResponse) Equals(rhs *UpdateDomainResponse) bool {
 		return false
 	}
 	if !_Bool_EqualsPtr(v.IsGlobalDomain, rhs.IsGlobalDomain) {
+		return false
+	}
+	if !((v.ArchivalConfiguration == nil && rhs.ArchivalConfiguration == nil) || (v.ArchivalConfiguration != nil && rhs.ArchivalConfiguration != nil && v.ArchivalConfiguration.Equals(rhs.ArchivalConfiguration))) {
 		return false
 	}
 

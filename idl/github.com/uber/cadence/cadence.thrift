@@ -381,7 +381,7 @@ service WorkflowService {
     * ResetWorkflowExecution reset an existing workflow execution to DecisionTaskCompleted event(exclusive).
     * And it will immediately terminating the current execution instance.
     **/
-  void ResetWorkflowExecution(1: shared.ResetWorkflowExecutionRequest resetRequest)
+  shared.ResetWorkflowExecutionResponse ResetWorkflowExecution(1: shared.ResetWorkflowExecutionRequest resetRequest)
     throws (
       1: shared.BadRequestError badRequestError,
       2: shared.InternalServiceError internalServiceError,

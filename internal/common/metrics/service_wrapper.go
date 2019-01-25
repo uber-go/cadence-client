@@ -75,6 +75,7 @@ const (
 	scopeNameDescribeTaskList                 = CadenceMetricsPrefix + "DescribeTaskList"
 	scopeNameRespondQueryTaskCompleted        = CadenceMetricsPrefix + "RespondQueryTaskCompleted"
 	scopeNameDescribeWorkflowExecution        = CadenceMetricsPrefix + "DescribeWorkflowExecution"
+	scopeNameResetWorkflowExecution           = CadenceMetricsPrefix + "ResetWorkflowExecution"
 	scopeNameResetStickyTaskList              = CadenceMetricsPrefix + "ResetStickyTaskList"
 )
 
@@ -327,4 +328,11 @@ func (w *workflowServiceMetricsWrapper) RespondQueryTaskCompleted(ctx context.Co
 	err := w.service.RespondQueryTaskCompleted(ctx, request, opts...)
 	scope.handleError(err)
 	return err
+}
+
+func (w *workflowServiceMetricsWrapper) ResetWorkflowExecution(ctx context.Context, request *shared.ResetWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.ResetWorkflowExecutionResponse, error) {
+	scope := w.getOperationScope(scopeNameResetWorkflowExecution)
+	result, err := w.service.ResetWorkflowExecution(ctx, request, opts...)
+	scope.handleError(err)
+	return result, err
 }

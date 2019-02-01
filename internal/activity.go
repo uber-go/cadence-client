@@ -21,6 +21,7 @@
 package internal
 
 // to trigger test
+// one more line
 import (
 	"context"
 	"time"

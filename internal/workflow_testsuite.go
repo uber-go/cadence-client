@@ -312,7 +312,7 @@ func (t *TestWorkflowEnvironment) OnRequestCancelExternalWorkflow(domainName, wo
 // mock support, it is possible to test code branch for different versions.
 //
 // Note: mock can be setup for a specific changeID. Or if mock.Anything is used as changeID then all calls to GetVersion
-// will be mocked.
+// will be mocked. Mock for a specific changeID has higher priority over mock.Anything.
 func (t *TestWorkflowEnvironment) OnGetVersion(changeID string, minSupported, maxSupported Version) *MockCallWrapper {
 	call := t.Mock.On(getMockMethodForGetVersion(changeID), changeID, minSupported, maxSupported)
 	return t.wrapCall(call)

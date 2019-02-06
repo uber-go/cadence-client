@@ -257,6 +257,7 @@ func (t *TestWorkflowEnvironment) OnWorkflow(workflow interface{}, args ...inter
 
 const mockMethodForSignalExternalWorkflow = "workflow.SignalExternalWorkflow"
 const mockMethodForRequestCancelExternalWorkflow = "workflow.RequestCancelExternalWorkflow"
+const mockMethodForGetVersion = "workflow.GetVersion"
 
 // OnSignalExternalWorkflow setup a mock for sending signal to external workflow.
 // This TestWorkflowEnvironment handles sending signals between the workflows that are started from the root workflow.
@@ -303,6 +304,17 @@ func (t *TestWorkflowEnvironment) OnSignalExternalWorkflow(domainName, workflowI
 //     })
 func (t *TestWorkflowEnvironment) OnRequestCancelExternalWorkflow(domainName, workflowID, runID string) *MockCallWrapper {
 	call := t.Mock.On(mockMethodForRequestCancelExternalWorkflow, domainName, workflowID, runID)
+	return t.wrapCall(call)
+}
+
+// OnGetVersion setup a mock for workflow.GetVersion() call. By default, if mock is not setup, the GetVersion call from
+// workflow code will always return the maxSupported version. Make it not possible to test old version branch. With this
+// mock support, it is possible to test code branch for different versions.
+// Note: if mock for GetVersion is setup, the test framework expect all calls to GetVersion from the tested workflow are
+// all mocked. It is not supported to have one GetVersion call mocked and the second GetVersion call not mocked. You need
+// to either not mock any GetVersion call, or mock all GetVersion calls.
+func (t *TestWorkflowEnvironment) OnGetVersion(changeID string, minSupported, maxSupported Version) *MockCallWrapper {
+	call := t.Mock.On(mockMethodForGetVersion, changeID, minSupported, maxSupported)
 	return t.wrapCall(call)
 }
 

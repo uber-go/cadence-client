@@ -310,11 +310,11 @@ func (t *TestWorkflowEnvironment) OnRequestCancelExternalWorkflow(domainName, wo
 // OnGetVersion setup a mock for workflow.GetVersion() call. By default, if mock is not setup, the GetVersion call from
 // workflow code will always return the maxSupported version. Make it not possible to test old version branch. With this
 // mock support, it is possible to test code branch for different versions.
-// Note: if mock for GetVersion is setup, the test framework expect all calls to GetVersion from the tested workflow are
-// all mocked. It is not supported to have one GetVersion call mocked and the second GetVersion call not mocked. You need
-// to either not mock any GetVersion call, or mock all GetVersion calls.
+//
+// Note: mock can be setup for a specific changeID. Or if mock.Anything is used as changeID then all calls to GetVersion
+// will be mocked.
 func (t *TestWorkflowEnvironment) OnGetVersion(changeID string, minSupported, maxSupported Version) *MockCallWrapper {
-	call := t.Mock.On(mockMethodForGetVersion, changeID, minSupported, maxSupported)
+	call := t.Mock.On(getMockMethodForGetVersion(changeID), changeID, minSupported, maxSupported)
 	return t.wrapCall(call)
 }
 

@@ -289,7 +289,7 @@ type (
 const (
 	// WorkflowIDReusePolicyAllowDuplicateFailedOnly allow start a workflow execution
 	// when workflow not running, and the last execution close state is in
-	// [terminated, cancelled, timeouted, failed].
+	// [terminated, cancelled, timeout, failed].
 	WorkflowIDReusePolicyAllowDuplicateFailedOnly WorkflowIDReusePolicy = internal.WorkflowIDReusePolicyAllowDuplicateFailedOnly
 
 	// WorkflowIDReusePolicyAllowDuplicate allow start a workflow execution using

@@ -201,6 +201,9 @@ type (
 
 		// ListClosedWorkflow gets closed workflow executions based on request filters.
 		// Retrieved workflow executions are sorted by start time in descending order.
+		// (Retrieved workflow executions could also be sorted by closed time in descending order,
+		// if cadence server side config EnableReadFromClosedExecutionV2 is set to true.)
+		// Note: heavy usage of this API may cause huge persistence pressure.
 		// The errors it can return:
 		//  - BadRequestError
 		//  - InternalServiceError
@@ -209,6 +212,7 @@ type (
 
 		// ListOpenWorkflow gets open workflow executions based on request filters.
 		// Retrieved workflow executions are sorted by start time in descending order.
+		// Note: heavy usage of this API may cause huge persistence pressure.
 		// The errors it can return:
 		//  - BadRequestError
 		//  - InternalServiceError

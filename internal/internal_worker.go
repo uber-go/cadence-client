@@ -462,6 +462,33 @@ func (th *hostEnvImpl) RegisterWorkflowWithOptions(
 	return nil
 }
 
+func (th *hostEnvImpl) UnRegisterWorkflow(wf interface{}) error {
+	fnType := reflect.TypeOf(wf)
+
+	var registrationName string
+	var functioName string
+	if wfName, ok := wf.(string); ok {
+		// we suppose the workflow name is the alias here
+		registrationName = wfName
+	} else {
+		if err := validateFnFormat(fnType, true); err != nil {
+			return err
+		}
+		functioName = getFunctionName(wf)
+		if alias, ok := th.getWorkflowAlias(functioName); ok {
+			registrationName = alias
+		} else {
+			registrationName = functioName
+		}
+	}
+
+	th.delWorkflowFn(registrationName)
+	th.delWorkflowAliasByAlias(registrationName)
+
+	return nil
+}
+
+
 func (th *hostEnvImpl) RegisterActivity(af interface{}) error {
 	return th.RegisterActivityWithOptions(af, RegisterActivityOptions{})
 }
@@ -498,6 +525,16 @@ func (th *hostEnvImpl) addWorkflowAlias(fnName string, alias string) {
 	th.workflowAliasMap[fnName] = alias
 }
 
+func (th *hostEnvImpl) delWorkflowAliasByAlias(alias string) {
+	th.Lock()
+	defer th.Unlock()
+	for k, v := range th.workflowAliasMap {
+		if v == alias {
+			delete(th.workflowAliasMap, k)
+		}
+	}
+}
+
 func (th *hostEnvImpl) getWorkflowAlias(fnName string) (string, bool) {
 	th.Lock()
 	defer th.Unlock()
@@ -510,6 +547,13 @@ func (th *hostEnvImpl) addWorkflowFn(fnName string, wf interface{}) {
 	defer th.Unlock()
 	th.workflowFuncMap[fnName] = wf
 }
+
+func (th *hostEnvImpl) delWorkflowFn(fnName string) {
+	th.Lock()
+	defer th.Unlock()
+	delete(th.workflowFuncMap, fnName)
+}
+
 
 func (th *hostEnvImpl) getWorkflowFn(fnName string) (interface{}, bool) {
 	th.Lock()

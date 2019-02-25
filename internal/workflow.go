@@ -232,6 +232,19 @@ func RegisterWorkflow(workflowFunc interface{}) {
 	RegisterWorkflowWithOptions(workflowFunc, RegisterWorkflowOptions{})
 }
 
+// UnRegisterWorkflow - un-registers a workflow from the framework.
+// The supplied workflow can be a workflow function or a string.
+// In case a string is passed, that should be the alias of the workflow.
+// In case a function is passed, all the aliases referring to the workflow (if any) will be unregistered as well.
+// This method calls panic if workflowFunc doesn't comply with the expected format.
+func UnRegisterWorkflow(wf interface{}) {
+	thImpl := getHostEnvironment()
+	err := thImpl.UnRegisterWorkflow(wf)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // RegisterWorkflowWithOptions registers the workflow function with options
 // The user can use options to provide an external name for the workflow or leave it empty if no
 // external name is required. This can be used as

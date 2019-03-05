@@ -23,6 +23,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -519,6 +520,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowReturnsPanicError() {
 	r, ok := request.(*s.RespondDecisionTaskCompletedRequest)
 	t.True(ok)
 	t.EqualValues(s.DecisionTypeFailWorkflowExecution, r.Decisions[0].GetDecisionType())
+	attr := r.Decisions[0].FailWorkflowExecutionDecisionAttributes
+	t.EqualValues("cadenceInternal:Panic", attr.GetReason())
+	details := string(attr.Details)
+	t.True(strings.HasPrefix(details, "\"panicError"), details)
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowPanics() {

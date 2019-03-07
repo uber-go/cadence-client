@@ -21,8 +21,8 @@
 package internal
 
 import (
-	"code.uber.internal/rds/bliss-resolver/go-build/.go/src/gb2/src/github.com/pkg/errors"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"

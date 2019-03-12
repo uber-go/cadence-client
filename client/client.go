@@ -302,15 +302,15 @@ type (
 		//	- InternalServiceError
 		Update(ctx context.Context, request *s.UpdateDomainRequest) error
 
-		NewConditionalUpdates(workflowID, runID string) ConditionalUpdates
+		NewConditional(workflowID, runID string) Conditional
 	}
 
-	// ConditionalUpdates guarantees that a signal or update operation fails if a workflow state changed since
-	// the last query or update.
+	// Conditional guarantees that a signal or update operation fails if a workflow state changed since
+	// the last query or update. It also blocks the query request until the query result changes since the last query.
 	// In the following example UpdateWorkflow is going to fail if the workflow state has changed since
 	// the last query call:
 	//
-	// u := client.NewConditionalUpdates(wID, rID);
+	// u := client.NewConditional(wID, rID);
 	// v1, err := u.QueryWorkflow(ctx, "getCounter")
 	// ... error handling
 	// var counter int
@@ -319,7 +319,7 @@ type (
 	// v2, err := u.UpdateWorkflow(ctx, "setCounter", counter + 1)
 	// .. error handling
 	// v3, err := u.UpdateWorkflow(ctx, "setCounter", counter + 2)
-	ConditionalUpdates interface {
+	Conditional interface {
 		// SignalWorkflow sends a signals to a workflow in execution
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
@@ -329,8 +329,10 @@ type (
 		//	- InternalServiceError
 		SignalWorkflow(ctx context.Context, signalName string, arg interface{}) error
 
-		// QueryWorkflow queries a given workflow's last execution and returns the query result synchronously. Parameter workflowID
-		// and queryType are required, other parameters are optional. The workflowID and runID (optional) identify the
+		// QueryWorkflow queries a given workflow's last execution and returns the query result synchronously.
+		// If this query was already called with the same arguments using the same Conditional instance then
+		// this call is going to block until the workflow state changes.
+		// Parameter workflowID and queryType are required, other parameters are optional. The workflowID and runID (optional) identify the
 		// target workflow execution that this query will be send to. If runID is not specified (empty string), server will
 		// use the currently running execution of that workflowID. The queryType specifies the type of query you want to
 		// run. By default, cadence supports "__stack_trace" as a standard query type, which will return string value

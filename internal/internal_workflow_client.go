@@ -184,18 +184,23 @@ func (wc *workflowClient) StartWorkflow(
 
 	var response *s.StartWorkflowExecutionResponse
 
+	startTime := time.Now()
+	attempt := 0
 	// Start creating workflow request.
 	err = backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx)
 			defer cancel()
 
+			attempt++
 			var err1 error
 			response, err1 = wc.workflowService.StartWorkflowExecution(tchCtx, startRequest, opt...)
 			return err1
 		}, serviceOperationRetryPolicy, isServiceTransientError)
 
 	if err != nil {
+		elapsed := time.Since(startTime)
+		fmt.Printf("StartWorkflow failed.  ID: %v, Attempt: %v, Latency: %v", workflowID, attempt, elapsed)
 		return nil, err
 	}
 

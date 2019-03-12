@@ -344,10 +344,36 @@ func GetVersion(ctx Context, changeID string, minSupported, maxSupported Version
 	return internal.GetVersion(ctx, changeID, minSupported, maxSupported)
 }
 
+// SetUpdateHandler sets the update handler to handle synchronous workflow updates. The updateType specify which update type this handler
+// should handle. The handler must be a function that returns 3 values. The first return value must be a serializable
+// result. The second return value must be of bool type. Its true value indicates that update did't modify any workflow data and shouldn't be recorded into the history.
+// The third return value must be an error. The handler function could receive any number of input parameters.
+// All the input parameters must be serializable. You should call workflow.SetUpdateHandler() at the beginning of the workflow
+// code. When client calls Client.UpdateWorkflow() to cadence server, a task will be generated on server that will be dispatched
+// to a workflow worker, which will replay the history events and then execute a update handler based on the update type.
+// The update handler can only block on results of local activities. Any attempt to block waiting for some long running operation would lead to forced update operation failure.
+// Example of workflow code that support update type "update_owner":
+//  func MyWorkflow(ctx workflow.Context, input string) error {
+//    owner := "unassigned" // this could be any serializable struct
+//    err := workflow.SetUpdateHandler(ctx, "update_owner", func(newOwner string) (result string, readOnly bool, err error) {
+//      previous := owner
+//      owner = newOwner
+//      return previous, false, nil
+//    })
+//    if err != nil {
+//      return err
+//    }
+//    // ... rest of the workflow
+//    return nil
+//  }
+func SetUpdateHandler(ctx Context, updateType string, handler interface{}) error {
+	return internal.SetUpdateHandler(ctx, updateType, handler)
+}
+
 // SetQueryHandler sets the query handler to handle workflow query. The queryType specify which query type this handler
 // should handle. The handler must be a function that returns 2 values. The first return value must be a serializable
 // result. The second return value must be an error. The handler function could receive any number of input parameters.
-// All the input parameter must be serializable. You should call workflow.SetQueryHandler() at the beginning of the workflow
+// All the input parameters must be serializable. You should call workflow.SetQueryHandler() at the beginning of the workflow
 // code. When client calls Client.QueryWorkflow() to cadence server, a task will be generated on server that will be dispatched
 // to a workflow worker, which will replay the history events and then execute a query handler based on the query type.
 // The query handler will be invoked out of the context of the workflow, meaning that the handler code must not use workflow

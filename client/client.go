@@ -239,6 +239,24 @@ type (
 		//  - QueryFailError
 		QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (encoded.Value, error)
 
+		// UpdateWorkflow updates a given workflow's last execution and returns the update result synchronously. Parameter workflowID
+		// and updateType are required, other parameters are optional. The workflowID and runID (optional) identify the
+		// target workflow execution that this update will be send to. If runID is not specified (empty string), server will
+		// use the currently running execution of that workflowID. The updateType specifies the type of update you want to
+		// run.
+		// See comments at workflow.SetUpdateHandler(ctx Context, updateType string, handler interface{}) for more details
+		// on how to setup update handler within the target workflow.
+		// - workflowID is required.
+		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
+		// - updateType is the type of the update.
+		// - args... are the optional update parameters.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		//  - EntityNotExistError
+		//  - UpdateFailError
+		UpdateWorkflow(ctx context.Context, workflowID string, runID string, updateType string, args ...interface{}) (encoded.Value, error)
+
 		// DescribeWorkflowExecution returns information about the specified workflow execution.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
 		//
@@ -283,6 +301,71 @@ type (
 		//	- BadRequestError
 		//	- InternalServiceError
 		Update(ctx context.Context, request *s.UpdateDomainRequest) error
+
+		NewConditionalUpdates(workflowID, runID string) ConditionalUpdates
+	}
+
+	// ConditionalUpdates guarantees that a signal or update operation fails if a workflow state changed since
+	// the last query or update.
+	// In the following example UpdateWorkflow is going to fail if the workflow state has changed since
+	// the last query call:
+	//
+	// u := client.NewConditionalUpdates(wID, rID);
+	// v1, err := u.QueryWorkflow(ctx, "getCounter")
+	// ... error handling
+	// var counter int
+	// err = v1.Get(&counter)
+	// .. error handling
+	// v2, err := u.UpdateWorkflow(ctx, "setCounter", counter + 1)
+	// .. error handling
+	// v3, err := u.UpdateWorkflow(ctx, "setCounter", counter + 2)
+	ConditionalUpdates interface {
+		// SignalWorkflow sends a signals to a workflow in execution
+		// - workflow ID of the workflow.
+		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
+		// - signalName name to identify the signal.
+		// The errors it can return:
+		//	- EntityNotExistsError
+		//	- InternalServiceError
+		SignalWorkflow(ctx context.Context, signalName string, arg interface{}) error
+
+		// QueryWorkflow queries a given workflow's last execution and returns the query result synchronously. Parameter workflowID
+		// and queryType are required, other parameters are optional. The workflowID and runID (optional) identify the
+		// target workflow execution that this query will be send to. If runID is not specified (empty string), server will
+		// use the currently running execution of that workflowID. The queryType specifies the type of query you want to
+		// run. By default, cadence supports "__stack_trace" as a standard query type, which will return string value
+		// representing the call stack of the target workflow. The target workflow could also setup different query handler
+		// to handle custom query types.
+		// See comments at workflow.SetQueryHandler(ctx Context, queryType string, handler interface{}) for more details
+		// on how to setup query handler within the target workflow.
+		// - workflowID is required.
+		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
+		// - queryType is the type of the query.
+		// - args... are the optional query parameters.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		//  - EntityNotExistError
+		//  - QueryFailError
+		QueryWorkflow(ctx context.Context, queryType string, args ...interface{}) (encoded.Value, error)
+
+		// UpdateWorkflow updates a given workflow's last execution and returns the update result synchronously. Parameter workflowID
+		// and updateType are required, other parameters are optional. The workflowID and runID (optional) identify the
+		// target workflow execution that this update will be send to. If runID is not specified (empty string), server will
+		// use the currently running execution of that workflowID. The updateType specifies the type of update you want to
+		// run.
+		// See comments at workflow.SetUpdateHandler(ctx Context, updateType string, handler interface{}) for more details
+		// on how to setup update handler within the target workflow.
+		// - workflowID is required.
+		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
+		// - updateType is the type of the update.
+		// - args... are the optional update parameters.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		//  - EntityNotExistError
+		//  - UpdateFailError
+		UpdateWorkflow(ctx context.Context, updateType string, args ...interface{}) (encoded.Value, error)
 	}
 )
 

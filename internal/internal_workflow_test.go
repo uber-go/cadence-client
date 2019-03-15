@@ -58,6 +58,7 @@ func (s *WorkflowUnitTest) SetupSuite() {
 	RegisterWorkflow(activityOptionsWorkflow)
 	RegisterWorkflow(receiveAsync_CorruptSignalOnClosedChannelWorkflowTest)
 	RegisterWorkflow(receive_CorruptSignalOnClosedChannelWorkflowTest)
+	RegisterWorkflow(bufferedChanWorkflowTest)
 
 	s.activityOptions = ActivityOptions{
 		ScheduleToStartTimeout: time.Minute,
@@ -755,6 +756,32 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalOnClosedChannelWorkflow_Receive_S
 	var result []message
 	env.GetWorkflowResult(&result)
 	s.EqualValues(0, len(result))
+}
+
+func bufferedChanWorkflowTest(ctx Context) error {
+	bufferSize := 1
+	ch := NewBufferedChannel(ctx, bufferSize)
+	for i := 0; i < bufferSize+1; i++ {
+		ch.Send(ctx, i)
+		Go(ctx, func(ctx Context) {
+			var dummy int
+			ch.Receive(ctx, &dummy)
+		})
+	}
+
+	// Refill the buffer
+	for i := 0; i < bufferSize; i++ {
+		ch.Send(ctx, i)
+	}
+	return nil
+}
+
+func (s *WorkflowUnitTest) Test_BufferedChanWorkflow() {
+	env := s.NewTestWorkflowEnvironment()
+
+	env.ExecuteWorkflow(bufferedChanWorkflowTest)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 }
 
 func activityOptionsWorkflow(ctx Context) (result string, err error) {

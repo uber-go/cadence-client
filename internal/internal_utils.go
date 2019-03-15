@@ -57,7 +57,7 @@ const (
 	clientImplHeaderValue = "uber-go"
 
 	// defaultRPCTimeout is the default tchannel rpc call timeout
-	defaultRPCTimeout = 10 * time.Second
+	defaultRPCTimeout = 1 * time.Second
 )
 
 var (

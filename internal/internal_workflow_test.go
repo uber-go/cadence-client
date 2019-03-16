@@ -776,8 +776,8 @@ func bufferedChanWorkflowTest(ctx Context, bufferSize int) error {
 }
 
 func (s *WorkflowUnitTest) Test_BufferedChanWorkflow() {
-	maxBufferSize := 3
-	for bufferSize := 1; bufferSize <= maxBufferSize; bufferSize++ {
+	bufferSizeList := []int{1, 5}
+	for _, bufferSize := range bufferSizeList {
 		env := s.NewTestWorkflowEnvironment()
 		env.ExecuteWorkflow(bufferedChanWorkflowTest, bufferSize)
 		s.True(env.IsWorkflowCompleted())
@@ -827,8 +827,8 @@ func bufferedChanWithSelectorWorkflowTest(ctx Context, bufferSize int) error {
 }
 
 func (s *WorkflowUnitTest) Test_BufferedChanWithSelectorWorkflow() {
-	maxBufferSize := 3
-	for bufferSize := 1; bufferSize <= maxBufferSize; bufferSize++ {
+	bufferSizeList := []int{1, 5}
+	for _, bufferSize := range bufferSizeList {
 		env := s.NewTestWorkflowEnvironment()
 		env.ExecuteWorkflow(bufferedChanWithSelectorWorkflowTest, bufferSize)
 		s.True(env.IsWorkflowCompleted())

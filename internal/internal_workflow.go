@@ -587,12 +587,13 @@ func (c *channelImpl) receiveAsyncImpl(callback *receiveCallback) (v interface{}
 		c.buffer = c.buffer[1:]
 
 		// Move blocked sends into buffer
-		if len(c.blockedSends) > 0 {
+		for len(c.blockedSends) > 0 {
 			b := c.blockedSends[0]
 			c.blockedSends[0] = nil
 			c.blockedSends = c.blockedSends[1:]
 			if b.fn() {
 				c.buffer = append(c.buffer, b.value)
+				break
 			}
 		}
 

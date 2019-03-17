@@ -41,7 +41,7 @@ import (
 const (
 	pollTaskServiceTimeOut = 3 * time.Minute // Server long poll is 1 * Minutes + delta
 
-	retryServiceOperationInitialInterval    = 200 * time.Millisecond
+	retryServiceOperationInitialInterval    = 20 * time.Millisecond
 	retryServiceOperationMaxInterval        = 4 * time.Second
 	retryServiceOperationExpirationInterval = 60 * time.Second
 
@@ -141,9 +141,26 @@ func (lat *localActivityTunnel) sendTask(task *localActivityTask) {
 
 func createServiceRetryPolicy() backoff.RetryPolicy {
 	policy := backoff.NewExponentialRetryPolicy(20 * time.Millisecond)
-	policy.SetBackoffCoefficient(1.1)
+	policy.SetBackoffCoefficient(1.2)
 	policy.SetMaximumInterval(50 * time.Millisecond)
 	policy.SetExpirationInterval(3 * time.Second)
+	return policy
+}
+
+func createDynamicServiceRetryPolicy(timeout time.Duration) backoff.RetryPolicy {
+	if timeout < time.Second {
+		timeout = retryServiceOperationExpirationInterval
+	}
+	initialInterval := retryServiceOperationInitialInterval
+	maximumInterval := timeout / 10
+	if maximumInterval < retryServiceOperationInitialInterval {
+		maximumInterval = retryServiceOperationInitialInterval
+	}
+
+	policy := backoff.NewExponentialRetryPolicy(initialInterval)
+	policy.SetBackoffCoefficient(1.2)
+	policy.SetMaximumInterval(maximumInterval)
+	policy.SetExpirationInterval(timeout)
 	return policy
 }
 

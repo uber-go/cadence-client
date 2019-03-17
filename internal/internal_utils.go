@@ -106,7 +106,7 @@ func newChannelContext(ctx context.Context, options ...func(builder *contextBuil
 		if expiration, ok := ctx.Deadline(); ok && expiration.After(now) {
 			timeout := expiration.Sub(now) / 2
 			if timeout < minRPCTimeout {
-				timeout = minRPCTimeout
+				rpcTimeout = minRPCTimeout
 			}
 		}
 	}

@@ -57,7 +57,9 @@ const (
 	clientImplHeaderValue = "uber-go"
 
 	// defaultRPCTimeout is the default tchannel rpc call timeout
-	defaultRPCTimeout = 1 * time.Second
+	defaultRPCTimeout = 10 * time.Second
+	//minRPCTimeout is minimum rpc call timeout allowed
+	minRPCTimeout = 1 * time.Second
 )
 
 var (
@@ -98,7 +100,17 @@ func chanTimeout(timeout time.Duration) func(builder *contextBuilder) {
 
 // newChannelContext - Get a rpc channel context
 func newChannelContext(ctx context.Context, options ...func(builder *contextBuilder)) (context.Context, context.CancelFunc, []yarpc.CallOption) {
-	builder := &contextBuilder{Timeout: defaultRPCTimeout}
+	rpcTimeout := defaultRPCTimeout
+	if ctx != nil {
+		now := time.Now()
+		if expiration, ok := ctx.Deadline(); ok && expiration.After(now) {
+			timeout := expiration.Sub(now) / 2
+			if timeout < minRPCTimeout {
+				timeout = minRPCTimeout
+			}
+		}
+	}
+	builder := &contextBuilder{Timeout: rpcTimeout}
 	if ctx != nil {
 		builder.ParentContext = ctx
 	}

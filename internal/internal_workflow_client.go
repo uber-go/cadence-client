@@ -196,7 +196,7 @@ func (wc *workflowClient) StartWorkflow(
 			var err1 error
 			response, err1 = wc.workflowService.StartWorkflowExecution(tchCtx, startRequest, opt...)
 			return err1
-		}, serviceOperationRetryPolicy, isServiceTransientError)
+		}, createDynamicServiceRetryPolicy(3 * time.Second), isServiceTransientError)
 
 	if err != nil {
 		elapsed := time.Since(startTime)

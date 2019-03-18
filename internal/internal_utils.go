@@ -105,13 +105,13 @@ func newChannelContext(ctx context.Context, options ...func(builder *contextBuil
 		now := time.Now()
 		if expiration, ok := ctx.Deadline(); ok && expiration.After(now) {
 			timeout := expiration.Sub(now) / 2
-			fmt.Printf("Context Timeout: %v, rpc timeout: %v", timeout, rpcTimeout)
+			fmt.Printf("Context Timeout: %v, rpc timeout: %v\n", timeout, rpcTimeout)
 			if timeout < minRPCTimeout {
 				rpcTimeout = minRPCTimeout
 			}
 		}
 	}
-	fmt.Printf("rpc timeout: %v", rpcTimeout)
+	fmt.Printf("rpc timeout: %v\n", rpcTimeout)
 	builder := &contextBuilder{Timeout: rpcTimeout}
 	if ctx != nil {
 		builder.ParentContext = ctx

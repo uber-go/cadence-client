@@ -102,9 +102,11 @@ func chanTimeout(timeout time.Duration) func(builder *contextBuilder) {
 func newChannelContext(ctx context.Context, options ...func(builder *contextBuilder)) (context.Context, context.CancelFunc, []yarpc.CallOption) {
 	rpcTimeout := defaultRPCTimeout
 	if ctx != nil {
+		// Set rpc timeout less than context timeout to allow for retries when call gets lost
 		now := time.Now()
 		if expiration, ok := ctx.Deadline(); ok && expiration.After(now) {
 			rpcTimeout = expiration.Sub(now) / 2
+			// Make sure to not set rpc timeout lower than minRPCTimeout
 			if rpcTimeout < minRPCTimeout {
 				rpcTimeout = minRPCTimeout
 			}

@@ -333,6 +333,16 @@ type (
 		NonRetriableErrorReasons []string
 	}
 
+	UpdateWorkflowResult struct {
+		Value encoded.Value
+		VersionToken []byte
+	}
+
+	WatchQueryWorkflowResult struct {
+		Value encoded.Value
+		VersionToken []byte
+	}
+
 	// DomainClient is the client for managing operations on the domain.
 	// CLI, tools, ... can use this layer to manager operations on domain.
 	DomainClient interface {

@@ -42,16 +42,12 @@ const (
 	pollTaskServiceTimeOut = 3 * time.Minute // Server long poll is 1 * Minutes + delta
 
 	retryServiceOperationInitialInterval    = 20 * time.Millisecond
-	retryServiceOperationMaxInterval        = 4 * time.Second
 	retryServiceOperationExpirationInterval = 60 * time.Second
+	retryServiceOperationBackoff            = 1.2
 
 	stickyDecisionScheduleToStartTimeoutSeconds = 5
 
 	ratioToForceCompleteDecisionTaskComplete = 0.8
-)
-
-var (
-	serviceOperationRetryPolicy = createServiceRetryPolicy()
 )
 
 type (
@@ -147,9 +143,13 @@ func createServiceRetryPolicy() backoff.RetryPolicy {
 	return policy
 }
 
-func createDynamicServiceRetryPolicy(timeout time.Duration) backoff.RetryPolicy {
-	if timeout < time.Second {
-		timeout = retryServiceOperationExpirationInterval
+func createDynamicServiceRetryPolicy(ctx context.Context) backoff.RetryPolicy {
+	timeout := retryServiceOperationExpirationInterval
+	if ctx != nil {
+		now := time.Now()
+		if expiration, ok := ctx.Deadline(); ok && expiration.After(now) {
+			timeout = expiration.Sub(now)
+		}
 	}
 	initialInterval := retryServiceOperationInitialInterval
 	maximumInterval := timeout / 10
@@ -158,7 +158,7 @@ func createDynamicServiceRetryPolicy(timeout time.Duration) backoff.RetryPolicy 
 	}
 
 	policy := backoff.NewExponentialRetryPolicy(initialInterval)
-	policy.SetBackoffCoefficient(1.2)
+	policy.SetBackoffCoefficient(retryServiceOperationBackoff)
 	policy.SetMaximumInterval(maximumInterval)
 	policy.SetExpirationInterval(timeout)
 	return policy
@@ -459,7 +459,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 			}
 
 			return err1
-		}, serviceOperationRetryPolicy, isServiceTransientError)
+		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 
 	return
 }
@@ -787,7 +787,7 @@ func newGetHistoryPageFunc(
 					NextPageToken: nextPageToken,
 				}, opt...)
 				return err1
-			}, serviceOperationRetryPolicy, isServiceTransientError)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 		if err != nil {
 			metricsScope.Counter(metrics.WorkflowGetHistoryFailedCounter).Inc(1)
 			return nil, nil, err
@@ -926,25 +926,32 @@ func reportActivityComplete(ctx context.Context, service workflowserviceclient.I
 		return nil
 	}
 
-	tchCtx, cancel, opt := newChannelContext(ctx)
-	defer cancel()
 	var reportErr error
 	switch request := request.(type) {
 	case *s.RespondActivityTaskCanceledRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
+				tchCtx, cancel, opt := newChannelContext(ctx)
+				defer cancel()
+
 				return service.RespondActivityTaskCanceled(tchCtx, request, opt...)
-			}, serviceOperationRetryPolicy, isServiceTransientError)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	case *s.RespondActivityTaskFailedRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
+				tchCtx, cancel, opt := newChannelContext(ctx)
+				defer cancel()
+
 				return service.RespondActivityTaskFailed(tchCtx, request, opt...)
-			}, serviceOperationRetryPolicy, isServiceTransientError)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	case *s.RespondActivityTaskCompletedRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
+				tchCtx, cancel, opt := newChannelContext(ctx)
+				defer cancel()
+
 				return service.RespondActivityTaskCompleted(tchCtx, request, opt...)
-			}, serviceOperationRetryPolicy, isServiceTransientError)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	}
 	if reportErr == nil {
 		switch request.(type) {
@@ -966,25 +973,32 @@ func reportActivityCompleteByID(ctx context.Context, service workflowserviceclie
 		return nil
 	}
 
-	tchCtx, cancel, opt := newChannelContext(ctx)
-	defer cancel()
 	var reportErr error
 	switch request := request.(type) {
 	case *s.RespondActivityTaskCanceledByIDRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
+				tchCtx, cancel, opt := newChannelContext(ctx)
+				defer cancel()
+
 				return service.RespondActivityTaskCanceledByID(tchCtx, request, opt...)
-			}, serviceOperationRetryPolicy, isServiceTransientError)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	case *s.RespondActivityTaskFailedByIDRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
+				tchCtx, cancel, opt := newChannelContext(ctx)
+				defer cancel()
+
 				return service.RespondActivityTaskFailedByID(tchCtx, request, opt...)
-			}, serviceOperationRetryPolicy, isServiceTransientError)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	case *s.RespondActivityTaskCompletedByIDRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
+				tchCtx, cancel, opt := newChannelContext(ctx)
+				defer cancel()
+
 				return service.RespondActivityTaskCompletedByID(tchCtx, request, opt...)
-			}, serviceOperationRetryPolicy, isServiceTransientError)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	}
 	if reportErr == nil {
 		switch request.(type) {

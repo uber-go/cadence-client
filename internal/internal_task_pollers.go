@@ -135,14 +135,6 @@ func (lat *localActivityTunnel) sendTask(task *localActivityTask) {
 	lat.taskCh <- task
 }
 
-func createServiceRetryPolicy() backoff.RetryPolicy {
-	policy := backoff.NewExponentialRetryPolicy(20 * time.Millisecond)
-	policy.SetBackoffCoefficient(1.2)
-	policy.SetMaximumInterval(50 * time.Millisecond)
-	policy.SetExpirationInterval(3 * time.Second)
-	return policy
-}
-
 func createDynamicServiceRetryPolicy(ctx context.Context) backoff.RetryPolicy {
 	timeout := retryServiceOperationExpirationInterval
 	if ctx != nil {

@@ -85,7 +85,7 @@ func (c *CapturingStatsReporter) Counts() []CapturedCount {
 	return c.counts
 }
 
-// CapturedCount has accociated name, tags and value
+// CapturedCount has associated name, tags and value
 type CapturedCount struct {
 	name  string
 	tags  map[string]string
@@ -107,7 +107,7 @@ func (c *CapturedCount) Name() string {
 	return c.name
 }
 
-// CapturedGauge has capturedGauge name, tag and values
+// CapturedGauge has CapturedGauge name, tag and values
 type CapturedGauge struct {
 	name  string
 	tags  map[string]string

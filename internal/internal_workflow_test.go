@@ -51,7 +51,7 @@ func (s *WorkflowUnitTest) SetupSuite() {
 	RegisterWorkflow(cancelWorkflowAfterActivityTest)
 	RegisterWorkflow(signalWorkflowTest)
 	RegisterWorkflow(receiveCorruptSignalWorkflowTest)
-	RegisterWorkflow(receiveAysncCorruptSignalWorkflowTest)
+	RegisterWorkflow(receiveAsyncCorruptSignalWorkflowTest)
 	RegisterWorkflow(receiveWithSelectorCorruptSignalWorkflowTest)
 	RegisterWorkflow(splitJoinActivityWorkflow)
 	RegisterWorkflow(returnPanicWorkflow)
@@ -621,7 +621,7 @@ func receiveAsyncCorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]int, e
 	return result, nil
 }
 
-func receiveAysncCorruptSignalWorkflowTest(ctx Context) ([]message, error) {
+func receiveAsyncCorruptSignalWorkflowTest(ctx Context) ([]message, error) {
 	ch := GetSignalChannel(ctx, "channelExpectingTypeMessage")
 	var result []message
 	var m message
@@ -714,7 +714,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_ReceiveAsync_ShouldLogMe
 	s.SetMetricsScope(scope)
 	env := s.NewTestWorkflowEnvironment()
 
-	env.ExecuteWorkflow(receiveAysncCorruptSignalWorkflowTest)
+	env.ExecuteWorkflow(receiveAsyncCorruptSignalWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 

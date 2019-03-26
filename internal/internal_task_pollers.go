@@ -41,10 +41,6 @@ import (
 const (
 	pollTaskServiceTimeOut = 3 * time.Minute // Server long poll is 1 * Minutes + delta
 
-	retryServiceOperationInitialInterval    = 20 * time.Millisecond
-	retryServiceOperationExpirationInterval = 60 * time.Second
-	retryServiceOperationBackoff            = 1.2
-
 	stickyDecisionScheduleToStartTimeoutSeconds = 5
 
 	ratioToForceCompleteDecisionTaskComplete = 0.8
@@ -133,46 +129,6 @@ func (lat *localActivityTunnel) getTask() *localActivityTask {
 
 func (lat *localActivityTunnel) sendTask(task *localActivityTask) {
 	lat.taskCh <- task
-}
-
-func createDynamicServiceRetryPolicy(ctx context.Context) backoff.RetryPolicy {
-	timeout := retryServiceOperationExpirationInterval
-	if ctx != nil {
-		now := time.Now()
-		if expiration, ok := ctx.Deadline(); ok && expiration.After(now) {
-			timeout = expiration.Sub(now)
-		}
-	}
-	initialInterval := retryServiceOperationInitialInterval
-	maximumInterval := timeout / 10
-	if maximumInterval < retryServiceOperationInitialInterval {
-		maximumInterval = retryServiceOperationInitialInterval
-	}
-
-	policy := backoff.NewExponentialRetryPolicy(initialInterval)
-	policy.SetBackoffCoefficient(retryServiceOperationBackoff)
-	policy.SetMaximumInterval(maximumInterval)
-	policy.SetExpirationInterval(timeout)
-	return policy
-}
-
-func isServiceTransientError(err error) bool {
-	// Retrying by default so it covers all transport errors.
-	switch err.(type) {
-	case *s.BadRequestError,
-		*s.EntityNotExistsError,
-		*s.WorkflowExecutionAlreadyStartedError,
-		*s.DomainAlreadyExistsError,
-		*s.QueryFailedError,
-		*s.DomainNotActiveError,
-		*s.CancellationAlreadyRequestedError:
-		return false
-	}
-
-	// s.InternalServiceError
-	// s.ServiceBusyError
-	// s.LimitExceededError
-	return true
 }
 
 func isClientSideError(err error) bool {

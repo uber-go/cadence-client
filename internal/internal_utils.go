@@ -60,6 +60,8 @@ const (
 	defaultRPCTimeout = 10 * time.Second
 	//minRPCTimeout is minimum rpc call timeout allowed
 	minRPCTimeout = 1 * time.Second
+	//maxRPCTimeout is maximum rpc call timeout allowed
+	maxRPCTimeout = 20 * time.Second
 )
 
 var (
@@ -109,6 +111,8 @@ func newChannelContext(ctx context.Context, options ...func(builder *contextBuil
 			// Make sure to not set rpc timeout lower than minRPCTimeout
 			if rpcTimeout < minRPCTimeout {
 				rpcTimeout = minRPCTimeout
+			} else if rpcTimeout > maxRPCTimeout {
+				rpcTimeout = maxRPCTimeout
 			}
 		}
 	}

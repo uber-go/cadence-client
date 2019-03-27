@@ -101,7 +101,7 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 	hostEnv := getHostEnvironment()
 	hostEnv.addActivity(a.ActivityType().Name, a)
 	activityWorker := newActivityWorker(
-		s.service, domain, executionParameters, overrides, hostEnv,
+		s.service, domain, executionParameters, overrides, hostEnv, make(chan struct{}),
 	)
 	activityWorker.Start()
 	activityWorker.Stop()

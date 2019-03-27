@@ -206,6 +206,22 @@ func GetActivityMetricsScope(ctx context.Context) tally.Scope {
 	return env.metricsScope
 }
 
+// GetWorkerShutdownChannel returns a channel to indicate if the worker is stopped.
+// out := make(chan struct{}, 1)
+// go func() {
+//     Your activity implementation
+//     close(out)
+// }()
+// select {
+// case <-activity.GetWorkerShutdownChannel(context):
+//     Handle worker stop
+// case <-out:
+//     Handle activity finish
+// }
+func GetWorkerShutdownChannel(ctx context.Context) <-chan struct{} {
+	return *getWorkerShutdownChannel(ctx)
+}
+
 // RecordActivityHeartbeat sends heartbeat for the currently executing activity
 // If the activity is either cancelled (or) workflow/activity doesn't exist then we would cancel
 // the context with error context.Canceled.

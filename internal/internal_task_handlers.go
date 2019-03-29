@@ -132,6 +132,7 @@ type (
 		hostEnv          *hostEnvImpl
 		activityProvider activityProvider
 		dataConverter    encoded.DataConverter
+		workerStopCh     <-chan struct{}
 	}
 
 	// history wrapper method to help information about events.
@@ -1366,6 +1367,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		hostEnv:          env,
 		activityProvider: activityProvider,
 		dataConverter:    params.DataConverter,
+		workerStopCh:     params.WorkerStopChannel,
 	}
 }
 
@@ -1380,7 +1382,6 @@ type cadenceInvoker struct {
 	lastDetailsToReport   *[]byte
 	closeCh               chan struct{}
 	workerStopChannel     <-chan struct{}
-
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
@@ -1424,6 +1425,7 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 				if i.lastDetailsToReport != nil {
 					i.internalHeartBeat(*i.lastDetailsToReport)
 					i.lastDetailsToReport = nil
+					i.hbBatchEndTimer = nil
 				}
 				return
 			}
@@ -1521,9 +1523,8 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 		rootCtx = context.Background()
 	}
 	canCtx, cancel := context.WithCancel(rootCtx)
-	workerStopChannel := getWorkerStopChannel(rootCtx)
 
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), workerStopChannel)
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh)
 	defer func() {
 		_, activityCompleted := result.(*s.RespondActivityTaskCompletedRequest)
 		invoker.Close(!activityCompleted) // flush buffered heartbeat if activity was not successfully completed.
@@ -1532,7 +1533,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	workflowType := t.WorkflowType.GetName()
 	activityType := t.ActivityType.GetName()
 	metricsScope := getMetricsScopeForActivity(ath.metricsScope, workflowType, activityType)
-	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, workerStopChannel)
+	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, ath.workerStopCh)
 
 	activityImplementation := ath.getActivity(activityType)
 	if activityImplementation == nil {

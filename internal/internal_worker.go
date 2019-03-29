@@ -70,8 +70,6 @@ const (
 	defaultPollerRate = 1000
 
 	testTagsContextKey = "cadence-testTags"
-
-	workerShutdownChannelContextKey contextKey = "workerShutdownChannel"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -165,7 +163,11 @@ type (
 
 		DataConverter encoded.DataConverter
 
+		// WorkerStopTimeout is the time delay before hard terminate worker
 		WorkerStopTimeout time.Duration
+
+		// WorkerStopChannel is a read only channel listen on worker close. The worker will close the channel before exit.
+		WorkerStopChannel <-chan struct{}
 	}
 
 	// defaultDataConverter uses thrift encoder/decoder when possible, for everything else use json.
@@ -1002,7 +1004,11 @@ func newAggregatedWorker(
 	wOptions := fillWorkerOptionsDefaults(options)
 	workerShutdownChannel := make(chan struct{}, 1)
 	readOnlyCh := getReadOnlyChannel(workerShutdownChannel)
-	userContext, cancel := withWorkerStopChannel(options.BackgroundActivityContext, readOnlyCh)
+	ctx := wOptions.BackgroundActivityContext
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	backgroundActivityContext, backgroundActivityContextCancel := context.WithCancel(ctx)
 
 	workerParams := workerExecutionParameters{
 		TaskList:                             taskList,
@@ -1017,14 +1023,15 @@ func newAggregatedWorker(
 		MetricsScope:                         wOptions.MetricsScope,
 		Logger:                               wOptions.Logger,
 		EnableLoggingInReplay:                wOptions.EnableLoggingInReplay,
-		UserContext:                          userContext,
-		UserContextCancel:                    cancel,
+		UserContext:                          backgroundActivityContext,
+		UserContextCancel:                    backgroundActivityContextCancel,
 		DisableStickyExecution:               wOptions.DisableStickyExecution,
 		StickyScheduleToStartTimeout:         wOptions.StickyScheduleToStartTimeout,
 		TaskListActivitiesPerSecond:          wOptions.TaskListActivitiesPerSecond,
 		NonDeterministicWorkflowPolicy:       wOptions.NonDeterministicWorkflowPolicy,
 		DataConverter:                        wOptions.DataConverter,
 		WorkerStopTimeout:                    wOptions.WorkerStopTimeout,
+		WorkerStopChannel:                    readOnlyCh,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -1146,23 +1153,6 @@ func isInterfaceNil(i interface{}) bool {
 
 func getReadOnlyChannel(c chan struct{}) <-chan struct{} {
 	return c
-}
-
-func withWorkerStopChannel(parent context.Context, c <-chan struct{}) (context.Context, context.CancelFunc) {
-	if parent == nil {
-		parent = context.Background()
-	}
-
-	ctx := context.WithValue(parent, workerShutdownChannelContextKey, &c)
-	ctx, cancel := context.WithCancel(ctx)
-	return ctx, cancel
-}
-
-func getWorkerStopChannel(ctx context.Context) <-chan struct{} {
-	if ch := ctx.Value(workerShutdownChannelContextKey); ch != nil {
-		return *ch.(*<-chan struct{})
-	}
-	return nil
 }
 
 // encoding is capable of encoding and decoding objects

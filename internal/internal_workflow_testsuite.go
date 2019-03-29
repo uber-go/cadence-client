@@ -174,6 +174,8 @@ type (
 		executionTimeout time.Duration
 
 		heartbeatDetails []byte
+
+		workerStopChannel chan struct{}
 	}
 )
 
@@ -363,7 +365,7 @@ func (env *testWorkflowEnvironmentImpl) setWorkerOptions(options WorkerOptions) 
 }
 
 func (env *testWorkflowEnvironmentImpl) setWorkerStopChannel(c chan struct{}) {
-	env.workerOptions.BackgroundActivityContext, _ = withWorkerStopChannel(env.workerOptions.BackgroundActivityContext, c)
+	env.workerStopChannel = c
 }
 
 func (env *testWorkflowEnvironmentImpl) setActivityTaskList(tasklist string, activityFns ...interface{}) {
@@ -1418,6 +1420,7 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 		Logger:        wOptions.Logger,
 		UserContext:   wOptions.BackgroundActivityContext,
 		DataConverter: dataConverter,
+		WorkerStopChannel: env.workerStopChannel,
 	}
 	ensureRequiredParams(&params)
 

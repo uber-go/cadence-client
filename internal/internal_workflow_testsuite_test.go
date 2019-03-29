@@ -2426,3 +2426,30 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityGoexit() {
 	err := env.GetWorkflowError()
 	s.EqualError(err, "activity called runtime.Goexit")
 }
+
+func (s *WorkflowTestSuiteUnitTest) Test_SetWorkerStopChannel_EmptyOptions() {
+	env := newTestWorkflowEnvironmentImpl(&s.WorkflowTestSuite)
+	c := make(chan struct{})
+	env.setWorkerStopChannel(c)
+	result := getWorkerStopChannel(env.workerOptions.BackgroundActivityContext)
+	s.NotNil(result)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_SetWorkerStopChannel_EmptyChannel() {
+	env := newTestWorkflowEnvironmentImpl(&s.WorkflowTestSuite)
+	env.setWorkerStopChannel(nil)
+	result := getWorkerStopChannel(env.workerOptions.BackgroundActivityContext)
+	s.Nil(result)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_SetWorkerStopChannel_ExistOptions() {
+	env := newTestWorkflowEnvironmentImpl(&s.WorkflowTestSuite)
+	ctx := context.WithValue(context.Background(), "test", "test")
+	c := make(chan struct{})
+	env.setWorkerOptions(WorkerOptions{BackgroundActivityContext: ctx})
+	env.setWorkerStopChannel(c)
+	result := getWorkerStopChannel(env.workerOptions.BackgroundActivityContext)
+	s.NotNil(result)
+	testCtxValue := env.workerOptions.BackgroundActivityContext.Value("test")
+	s.NotNil(testCtxValue)
+}

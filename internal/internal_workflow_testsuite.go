@@ -362,6 +362,10 @@ func (env *testWorkflowEnvironmentImpl) setWorkerOptions(options WorkerOptions) 
 	}
 }
 
+func (env *testWorkflowEnvironmentImpl) setWorkerStopChannel(c chan struct{}) {
+	env.workerOptions.BackgroundActivityContext, _ = withWorkerStopChannel(env.workerOptions.BackgroundActivityContext, c)
+}
+
 func (env *testWorkflowEnvironmentImpl) setActivityTaskList(tasklist string, activityFns ...interface{}) {
 	for _, activityFn := range activityFns {
 		fnName := getFunctionName(activityFn)

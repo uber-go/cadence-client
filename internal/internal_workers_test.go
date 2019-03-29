@@ -22,6 +22,7 @@ package internal
 
 import (
 	"context"
+	"github.com/pborman/uuid"
 	"testing"
 	"time"
 
@@ -34,6 +35,20 @@ import (
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
 )
+
+// ActivityTaskHandler never returns response
+type noResponseActivityTaskHandler struct {
+}
+
+func newNoResponseActivityTaskHandler() *noResponseActivityTaskHandler {
+	return &noResponseActivityTaskHandler{}
+}
+
+func (ath noResponseActivityTaskHandler) Execute(taskList string, task *m.PollForActivityTaskResponse) (interface{}, error) {
+	c := make(chan struct{})
+	<-c
+	return nil, nil
+}
 
 type (
 	WorkersTestSuite struct {
@@ -96,16 +111,59 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForActivityTaskResponse{}, nil).AnyTimes()
 	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil).AnyTimes()
 
+	executionParameters := workerExecutionParameters{
+		TaskList:                  "testTaskList",
+		ConcurrentPollRoutineSize: 5,
+		Logger:                    logger,
+	}
+	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler()}
+	a := &greeterActivity{}
+	hostEnv := getHostEnvironment()
+	hostEnv.addActivity(a.ActivityType().Name, a)
+	activityWorker := newActivityWorker(
+		s.service, domain, executionParameters, overrides, hostEnv, nil,
+	)
+	activityWorker.Start()
+	activityWorker.Stop()
+}
+
+func (s *WorkersTestSuite) TestActivityWorkerStop() {
+	domain := "testDomain"
+	logger, _ := zap.NewDevelopment()
+
+	pats := &m.PollForActivityTaskResponse{
+		TaskToken: []byte("token"),
+		WorkflowExecution: &m.WorkflowExecution{
+			WorkflowId: common.StringPtr("wID"),
+			RunId:      common.StringPtr("rID")},
+		ActivityType:                  &m.ActivityType{Name: common.StringPtr("test")},
+		ActivityId:                    common.StringPtr(uuid.New()),
+		ScheduledTimestamp:            common.Int64Ptr(time.Now().UnixNano()),
+		ScheduleToCloseTimeoutSeconds: common.Int32Ptr(1),
+		StartedTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
+		StartToCloseTimeoutSeconds:    common.Int32Ptr(1),
+		WorkflowType: &m.WorkflowType{
+			Name: common.StringPtr("wType"),
+		},
+		WorkflowDomain: common.StringPtr("domain"),
+	}
+
+	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil)
+	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptions...).Return(pats, nil).AnyTimes()
+	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil).AnyTimes()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	stopChannel := make(chan struct{})
 	executionParameters := workerExecutionParameters{
 		TaskList:                  "testTaskList",
 		ConcurrentPollRoutineSize: 5,
+		ConcurrentActivityExecutionSize: 2,
 		Logger:                    logger,
 		UserContext:               ctx,
 		UserContextCancel:         cancel,
+		WorkerStopTimeout:         time.Second * 2,
 	}
-	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler()}
+	overrides := &workerOverrides{activityTaskHandler: newNoResponseActivityTaskHandler()}
 	a := &greeterActivity{}
 	hostEnv := getHostEnvironment()
 	hostEnv.addActivity(a.ActivityType().Name, a)
@@ -113,12 +171,15 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 		s.service, domain, executionParameters, overrides, hostEnv, stopChannel,
 	)
 	activityWorker.Start()
-	activityWorker.Stop()
+	time.Sleep(1 * time.Second)
+	go activityWorker.Stop()
+	time.Sleep(1 * time.Second)
+	err := ctx.Err()
+	s.NoError(err)
 
-	_, isContextOpen := <-ctx.Done()
-	_, isChannelOpen := <-stopChannel
-	s.False(isContextOpen)
-	s.False(isChannelOpen)
+	<-ctx.Done()
+	err = ctx.Err()
+	s.Error(err)
 }
 
 

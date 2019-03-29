@@ -229,7 +229,7 @@ func verifyDomainExist(client workflowserviceclient.Interface, domain string, lo
 	}
 
 	// exponential backoff retry for upto a minute
-	return backoff.Retry(ctx, descDomainOp, serviceOperationRetryPolicy, isServiceTransientError)
+	return backoff.Retry(ctx, descDomainOp, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 }
 
 func newWorkflowWorkerInternal(
@@ -1138,6 +1138,9 @@ func (g jsonEncoding) Marshal(objs []interface{}) ([]byte, error) {
 	enc := json.NewEncoder(&buf)
 	for i, obj := range objs {
 		if err := enc.Encode(obj); err != nil {
+			if err == io.EOF {
+				return nil, fmt.Errorf("missing argument at index %d of type %T", i, obj)
+			}
 			return nil, fmt.Errorf(
 				"unable to encode argument: %d, %v, with json error: %v", i, reflect.TypeOf(obj), err)
 		}

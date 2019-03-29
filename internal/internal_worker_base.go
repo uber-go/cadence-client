@@ -323,23 +323,14 @@ func (bw *baseWorker) Stop() {
 	close(bw.shutdownCh)
 	bw.limiterContextCancel()
 
-	// TODO: The poll is longer than wait time, we need some way to hard terminate the
-	// poll routines.
-
-	if success := awaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {
-		traceLog(func() {
-			bw.logger.Info("Worker graceful shutdown timed out.", zap.Duration("Shutdown timeout", bw.options.shutdownTimeout))
-		})
-	}
-
 	// Close activity channel
 	if bw.activityShutdownCh != nil {
 		close(bw.activityShutdownCh)
 	}
 
-	if success := awaitWaitGroup(&bw.shutdownWG, 2*time.Second); !success {
+	if success := awaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {
 		traceLog(func() {
-			bw.logger.Info("Activity cancellation timed out.")
+			bw.logger.Info("Worker graceful shutdown timed out.", zap.Duration("Shutdown timeout", bw.options.shutdownTimeout))
 		})
 	}
 

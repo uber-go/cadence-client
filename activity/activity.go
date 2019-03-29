@@ -111,3 +111,11 @@ func HasHeartbeatDetails(ctx context.Context) bool {
 func GetHeartbeatDetails(ctx context.Context, d ...interface{}) error {
 	return internal.GetHeartbeatDetails(ctx, d...)
 }
+
+// GetWorkerShutdownChannel returns a read-only channel. The closure of this channel indicates the activity worker is stopping.
+// When the worker is stopping, it will close this channel and wait until the worker stop timeout finishes. After the timeout
+// hit, the worker will cancel the activity context and then exit. The timeout can be defined by worker option: WorkerStopTimeout.
+// Use this channel to write logic to handle activity graceful exit when the activity worker stops.
+func GetWorkerShutdownChannel(ctx context.Context) <-chan struct{} {
+	return internal.GetWorkerShutdownChannel(ctx)
+}

@@ -1138,3 +1138,28 @@ func TestDecodeArg(t *testing.T) {
 	require.NoError(t, err)
 	require.Error(t, decodeArg(dc, b, &r))
 }
+
+func testActivityWithWorkerStop(ctx context.Context) error {
+	fmt.Println("Executing Activity with worker stop")
+	workerStopCh := GetWorkerShutdownChannel(ctx)
+
+	select {
+	case <-workerStopCh:
+		return nil
+	case <-time.NewTimer(time.Second * 5).C:
+		return fmt.Errorf("Activity failed to handle worker stop event")
+	}
+}
+
+func TestActivityWithWorkerStop(t *testing.T) {
+	RegisterActivity(testActivityWithWorkerStop)
+	ts := &WorkflowTestSuite{}
+	env := ts.NewTestActivityEnvironment()
+	workerShutdownChannel := make(chan struct{}, 1)
+	ctx, cancel := withWorkerStopChannel(context.Background(), workerShutdownChannel)
+	env.SetWorkerOptions(WorkerOptions{BackgroundActivityContext: ctx})
+	defer cancel()
+	close(workerShutdownChannel)
+	_, err := env.ExecuteActivity(testActivityWithWorkerStop)
+	assert.NoError(t, err)
+}

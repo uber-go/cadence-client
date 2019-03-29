@@ -70,10 +70,13 @@ func (s *WorkersTestSuite) TestWorkflowWorker() {
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, nil).AnyTimes()
 	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil).AnyTimes()
 
+	ctx, cancel := context.WithCancel(context.Background())
 	executionParameters := workerExecutionParameters{
 		TaskList:                  "testTaskList",
 		ConcurrentPollRoutineSize: 5,
 		Logger:                    logger,
+		UserContext:               ctx,
+		UserContextCancel:         cancel,
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
@@ -81,6 +84,8 @@ func (s *WorkersTestSuite) TestWorkflowWorker() {
 	)
 	workflowWorker.Start()
 	workflowWorker.Stop()
+
+	s.Nil(ctx.Err())
 }
 
 func (s *WorkersTestSuite) TestActivityWorker() {
@@ -91,21 +96,31 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForActivityTaskResponse{}, nil).AnyTimes()
 	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil).AnyTimes()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	stopChannel := make(chan struct{})
 	executionParameters := workerExecutionParameters{
 		TaskList:                  "testTaskList",
 		ConcurrentPollRoutineSize: 5,
 		Logger:                    logger,
+		UserContext:               ctx,
+		UserContextCancel:         cancel,
 	}
 	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler()}
 	a := &greeterActivity{}
 	hostEnv := getHostEnvironment()
 	hostEnv.addActivity(a.ActivityType().Name, a)
 	activityWorker := newActivityWorker(
-		s.service, domain, executionParameters, overrides, hostEnv, make(chan struct{}),
+		s.service, domain, executionParameters, overrides, hostEnv, stopChannel,
 	)
 	activityWorker.Start()
 	activityWorker.Stop()
+
+	_, isContextOpen := <-ctx.Done()
+	_, isChannelOpen := <-stopChannel
+	s.False(isContextOpen)
+	s.False(isChannelOpen)
 }
+
 
 func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 	domain := "testDomain"

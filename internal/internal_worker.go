@@ -70,6 +70,8 @@ const (
 	defaultPollerRate = 1000
 
 	testTagsContextKey = "cadence-testTags"
+
+	workerShutdownChannelContextKey contextKey = "workerShutdownChannel"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -1000,7 +1002,7 @@ func newAggregatedWorker(
 	wOptions := fillWorkerOptionsDefaults(options)
 	workerShutdownChannel := make(chan struct{}, 1)
 	readOnlyCh := getReadOnlyChannel(workerShutdownChannel)
-	userContext, cancel := withWorkerShutdownChannel(options.BackgroundActivityContext, readOnlyCh)
+	userContext, cancel := withWorkerStopChannel(options.BackgroundActivityContext, readOnlyCh)
 
 	workerParams := workerExecutionParameters{
 		TaskList:                             taskList,
@@ -1146,7 +1148,7 @@ func getReadOnlyChannel(c chan struct{}) <-chan struct{} {
 	return c
 }
 
-func withWorkerShutdownChannel(parent context.Context, c <-chan struct{}) (context.Context, context.CancelFunc) {
+func withWorkerStopChannel(parent context.Context, c <-chan struct{}) (context.Context, context.CancelFunc) {
 	if parent == nil {
 		parent = context.Background()
 	}
@@ -1154,6 +1156,13 @@ func withWorkerShutdownChannel(parent context.Context, c <-chan struct{}) (conte
 	ctx := context.WithValue(parent, workerShutdownChannelContextKey, &c)
 	ctx, cancel := context.WithCancel(ctx)
 	return ctx, cancel
+}
+
+func getWorkerStopChannel(ctx context.Context) <-chan struct{} {
+	if ch := ctx.Value(workerShutdownChannelContextKey); ch != nil {
+		return *ch.(*<-chan struct{})
+	}
+	return nil
 }
 
 // encoding is capable of encoding and decoding objects

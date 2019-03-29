@@ -127,6 +127,7 @@ type (
 		heartbeatDetails   []byte
 		workflowType       *WorkflowType
 		workflowDomain     string
+		workerStopChannel  <-chan struct{}
 	}
 
 	// context.WithValue need this type instead of basic type string to avoid lint error
@@ -137,7 +138,6 @@ const (
 	activityEnvContextKey           contextKey = "activityEnv"
 	activityOptionsContextKey       contextKey = "activityOptions"
 	localActivityOptionsContextKey  contextKey = "localActivityOptions"
-	workerShutdownChannelContextKey contextKey = "workerShutdownChannel"
 )
 
 func getActivityEnv(ctx context.Context) *activityEnvironment {
@@ -208,14 +208,6 @@ func getValidatedLocalActivityOptions(ctx Context) (*localActivityOptions, error
 	}
 
 	return p, nil
-}
-
-func getWorkerShutdownChannel(ctx context.Context) *<-chan struct{} {
-	channel := ctx.Value(workerShutdownChannelContextKey)
-	if channel == nil {
-		return nil
-	}
-	return channel.(*<-chan struct{})
 }
 
 func validateRetryPolicy(p *shared.RetryPolicy) error {

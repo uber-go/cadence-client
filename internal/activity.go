@@ -206,20 +206,13 @@ func GetActivityMetricsScope(ctx context.Context) tally.Scope {
 	return env.metricsScope
 }
 
-// GetWorkerShutdownChannel returns a channel to indicate if the worker is stopped.
-// out := make(chan struct{}, 1)
-// go func() {
-//     Your activity implementation
-//     close(out)
-// }()
-// select {
-// case <-activity.GetWorkerShutdownChannel(context):
-//     Handle worker stop
-// case <-out:
-//     Handle activity finish
-// }
+// GetWorkerShutdownChannel returns a read-only channel. The closure of this channel indicates the activity worker is stopping.
+// When the worker is stopping, it will close this channel and wait until the worker stop timeout finishes. After the timeout
+// hit, the worker will cancel the activity context and then exit. The timeout can be defined by worker option: WorkerStopTimeout.
+// Use this channel to write logic to handle activity graceful exit when the activity worker stops.
 func GetWorkerShutdownChannel(ctx context.Context) <-chan struct{} {
-	return *getWorkerShutdownChannel(ctx)
+	env := getActivityEnv(ctx)
+	return env.workerStopChannel
 }
 
 // RecordActivityHeartbeat sends heartbeat for the currently executing activity
@@ -270,6 +263,7 @@ func WithActivityTask(
 	logger *zap.Logger,
 	scope tally.Scope,
 	dataConverter encoded.DataConverter,
+	workerStopChannel <-chan struct{},
 ) context.Context {
 	var deadline time.Time
 	scheduled := time.Unix(0, task.GetScheduledTimestamp())
@@ -307,6 +301,7 @@ func WithActivityTask(
 			Name: *task.WorkflowType.Name,
 		},
 		workflowDomain: *task.WorkflowDomain,
+		workerStopChannel: workerStopChannel,
 	})
 }
 

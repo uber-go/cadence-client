@@ -1380,6 +1380,8 @@ type cadenceInvoker struct {
 	hbBatchEndTimer       *time.Timer // Whether we started a batch of operations that need to be reported in the cycle. This gets started on a user call.
 	lastDetailsToReport   *[]byte
 	closeCh               chan struct{}
+	workerStopChannel     <-chan struct{}
+
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
@@ -1417,6 +1419,13 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 				// We are close to deadline.
 			case <-i.closeCh:
 				// We got closed.
+				return
+			case <-i.workerStopChannel:
+				// Activity worker is close to stop. Send batched heartbeat.
+				if i.lastDetailsToReport != nil {
+					i.internalHeartBeat(*i.lastDetailsToReport)
+					i.lastDetailsToReport = nil
+				}
 				return
 			}
 
@@ -1479,6 +1488,7 @@ func newServiceInvoker(
 	service workflowserviceclient.Interface,
 	cancelHandler func(),
 	heartBeatTimeoutInSec int32,
+	workerStopChannel <- chan struct{},
 ) ServiceInvoker {
 	return &cadenceInvoker{
 		taskToken:             taskToken,
@@ -1488,6 +1498,7 @@ func newServiceInvoker(
 		retryPolicy:           serviceOperationRetryPolicy,
 		heartBeatTimeoutInSec: heartBeatTimeoutInSec,
 		closeCh:               make(chan struct{}),
+		workerStopChannel:     workerStopChannel,
 	}
 }
 
@@ -1505,7 +1516,9 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 		rootCtx = context.Background()
 	}
 	canCtx, cancel := context.WithCancel(rootCtx)
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds())
+	workerStopChannel := getWorkerStopChannel(rootCtx)
+
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), workerStopChannel)
 	defer func() {
 		_, activityCompleted := result.(*s.RespondActivityTaskCompletedRequest)
 		invoker.Close(!activityCompleted) // flush buffered heartbeat if activity was not successfully completed.
@@ -1514,7 +1527,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	workflowType := t.WorkflowType.GetName()
 	activityType := t.ActivityType.GetName()
 	metricsScope := getMetricsScopeForActivity(ath.metricsScope, workflowType, activityType)
-	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter)
+	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, workerStopChannel)
 
 	activityImplementation := ath.getActivity(activityType)
 	if activityImplementation == nil {

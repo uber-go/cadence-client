@@ -862,12 +862,12 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionWorkerStop() {
 
 	mockCtrl := gomock.NewController(t.T())
 	mockService := workflowservicetest.NewMockClient(mockCtrl)
-	workerStopCh := make(chan struct{} ,1)
+	workerStopCh := make(chan struct{}, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	wep := workerExecutionParameters{
-		Logger:        t.logger,
-		DataConverter: getDefaultDataConverter(),
-		UserContext:   ctx,
+		Logger:            t.logger,
+		DataConverter:     getDefaultDataConverter(),
+		UserContext:       ctx,
 		UserContextCancel: cancel,
 		WorkerStopChannel: workerStopCh,
 	}

@@ -155,13 +155,13 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	ctx, cancel := context.WithCancel(context.Background())
 	stopChannel := make(chan struct{})
 	executionParameters := workerExecutionParameters{
-		TaskList:                  "testTaskList",
-		ConcurrentPollRoutineSize: 5,
+		TaskList:                        "testTaskList",
+		ConcurrentPollRoutineSize:       5,
 		ConcurrentActivityExecutionSize: 2,
-		Logger:                    logger,
-		UserContext:               ctx,
-		UserContextCancel:         cancel,
-		WorkerStopTimeout:         time.Second * 2,
+		Logger:                          logger,
+		UserContext:                     ctx,
+		UserContextCancel:               cancel,
+		WorkerStopTimeout:               time.Second * 2,
 	}
 	overrides := &workerOverrides{activityTaskHandler: newNoResponseActivityTaskHandler()}
 	a := &greeterActivity{}
@@ -181,7 +181,6 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	err = ctx.Err()
 	s.Error(err)
 }
-
 
 func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 	domain := "testDomain"

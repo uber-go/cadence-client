@@ -1496,7 +1496,7 @@ func newServiceInvoker(
 	service workflowserviceclient.Interface,
 	cancelHandler func(),
 	heartBeatTimeoutInSec int32,
-	workerStopChannel <- chan struct{},
+	workerStopChannel <-chan struct{},
 ) ServiceInvoker {
 	return &cadenceInvoker{
 		taskToken:             taskToken,

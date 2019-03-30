@@ -174,7 +174,7 @@ func (s *activityTestSuite) TestActivityHeartbeat_SuppressContinousInvokes() {
 	// simulate batch picks before expiry, with out any progress specified.
 	waitCh2 := make(chan struct{})
 	service4 := workflowservicetest.NewMockClient(s.mockCtrl)
-	invoker4 := newServiceInvoker([]byte("task-token"), "identity", service4, cancel, 2,make(chan struct{}))
+	invoker4 := newServiceInvoker([]byte("task-token"), "identity", service4, cancel, 2, make(chan struct{}))
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
 		serviceInvoker: invoker4,
 		logger:         getLogger()})
@@ -201,7 +201,6 @@ func (s *activityTestSuite) TestActivityHeartbeat_WorkerStop() {
 	invoker := newServiceInvoker([]byte("task-token"), "identity", s.service, cancel, 5, workerStopChannel)
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{serviceInvoker: invoker})
 
-
 	heartBeatDetail := "testDetails"
 	waitCh := make(chan struct{}, 1)
 	waitCh <- struct{}{}
@@ -209,12 +208,12 @@ func (s *activityTestSuite) TestActivityHeartbeat_WorkerStop() {
 	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
 		Return(&shared.RecordActivityTaskHeartbeatResponse{}, nil).
 		Do(func(ctx context.Context, request *shared.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) {
-			if _, ok := <- waitCh; ok {
+			if _, ok := <-waitCh; ok {
 				close(waitCh)
 				return
 			}
 			close(waitC2)
-	}).Times(2)
+		}).Times(2)
 	RecordActivityHeartbeat(ctx, heartBeatDetail)
 	RecordActivityHeartbeat(ctx, "testDetails")
 	close(workerStopChannel)
@@ -227,4 +226,3 @@ func (s *activityTestSuite) TestGetWorkerShutdownChannel() {
 	channel := GetWorkerShutdownChannel(ctx)
 	s.NotNil(channel)
 }
-

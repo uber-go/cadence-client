@@ -135,9 +135,9 @@ type (
 )
 
 const (
-	activityEnvContextKey           contextKey = "activityEnv"
-	activityOptionsContextKey       contextKey = "activityOptions"
-	localActivityOptionsContextKey  contextKey = "localActivityOptions"
+	activityEnvContextKey          contextKey = "activityEnv"
+	activityOptionsContextKey      contextKey = "activityOptions"
+	localActivityOptionsContextKey contextKey = "localActivityOptions"
 )
 
 func getActivityEnv(ctx context.Context) *activityEnvironment {

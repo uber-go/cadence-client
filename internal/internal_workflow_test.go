@@ -50,14 +50,16 @@ func (s *WorkflowUnitTest) SetupSuite() {
 	RegisterWorkflow(cancelWorkflowTest)
 	RegisterWorkflow(cancelWorkflowAfterActivityTest)
 	RegisterWorkflow(signalWorkflowTest)
-	RegisterWorkflow(receive_CorruptSignalWorkflowTest)
-	RegisterWorkflow(receiveAysnc_CorruptSignalWorkflowTest)
-	RegisterWorkflow(receiveWithSelector_CorruptSignalWorkflowTest)
+	RegisterWorkflow(receiveCorruptSignalWorkflowTest)
+	RegisterWorkflow(receiveAsyncCorruptSignalWorkflowTest)
+	RegisterWorkflow(receiveWithSelectorCorruptSignalWorkflowTest)
 	RegisterWorkflow(splitJoinActivityWorkflow)
 	RegisterWorkflow(returnPanicWorkflow)
 	RegisterWorkflow(activityOptionsWorkflow)
-	RegisterWorkflow(receiveAsync_CorruptSignalOnClosedChannelWorkflowTest)
-	RegisterWorkflow(receive_CorruptSignalOnClosedChannelWorkflowTest)
+	RegisterWorkflow(receiveAsyncCorruptSignalOnClosedChannelWorkflowTest)
+	RegisterWorkflow(receiveCorruptSignalOnClosedChannelWorkflowTest)
+	RegisterWorkflow(bufferedChanWorkflowTest)
+	RegisterWorkflow(bufferedChanWithSelectorWorkflowTest)
 
 	s.activityOptions = ActivityOptions{
 		ScheduleToStartTimeout: time.Minute,
@@ -570,7 +572,7 @@ type message struct {
 	Value string
 }
 
-func receive_CorruptSignalWorkflowTest(ctx Context) ([]message, error) {
+func receiveCorruptSignalWorkflowTest(ctx Context) ([]message, error) {
 	ch := GetSignalChannel(ctx, "channelExpectingTypeMessage")
 	var result []message
 	var m message
@@ -579,7 +581,7 @@ func receive_CorruptSignalWorkflowTest(ctx Context) ([]message, error) {
 	return result, nil
 }
 
-func receive_CorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]message, error) {
+func receiveCorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]message, error) {
 	ch := GetSignalChannel(ctx, "channelExpectingTypeMessage")
 	var result []message
 	var m message
@@ -589,7 +591,7 @@ func receive_CorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]message, e
 	return result, nil
 }
 
-func receiveWithSelector_CorruptSignalWorkflowTest(ctx Context) ([]message, error) {
+func receiveWithSelectorCorruptSignalWorkflowTest(ctx Context) ([]message, error) {
 	var result []message
 
 	// Read on a selector
@@ -604,7 +606,7 @@ func receiveWithSelector_CorruptSignalWorkflowTest(ctx Context) ([]message, erro
 	return result, nil
 }
 
-func receiveAsync_CorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]int, error) {
+func receiveAsyncCorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]int, error) {
 	ch := GetSignalChannel(ctx, "channelExpectingInt")
 	var result []int
 	var m int
@@ -619,7 +621,7 @@ func receiveAsync_CorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]int, 
 	return result, nil
 }
 
-func receiveAysnc_CorruptSignalWorkflowTest(ctx Context) ([]message, error) {
+func receiveAsyncCorruptSignalWorkflowTest(ctx Context) ([]message, error) {
 	ch := GetSignalChannel(ctx, "channelExpectingTypeMessage")
 	var result []message
 	var m message
@@ -657,7 +659,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_ShouldLogMetricsAndNotPa
 		})
 	}, time.Second)
 
-	env.ExecuteWorkflow(receive_CorruptSignalWorkflowTest)
+	env.ExecuteWorkflow(receiveCorruptSignalWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 
@@ -690,7 +692,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_OnSelectorRead_ShouldLog
 		})
 	}, 3*time.Second)
 
-	env.ExecuteWorkflow(receiveWithSelector_CorruptSignalWorkflowTest)
+	env.ExecuteWorkflow(receiveWithSelectorCorruptSignalWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 
@@ -712,7 +714,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_ReceiveAsync_ShouldLogMe
 	s.SetMetricsScope(scope)
 	env := s.NewTestWorkflowEnvironment()
 
-	env.ExecuteWorkflow(receiveAysnc_CorruptSignalWorkflowTest)
+	env.ExecuteWorkflow(receiveAsyncCorruptSignalWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 
@@ -731,7 +733,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_ReceiveAsync_ShouldLogMe
 func (s *WorkflowUnitTest) Test_CorruptedSignalOnClosedChannelWorkflow_ReceiveAsync_ShouldComplete() {
 	env := s.NewTestWorkflowEnvironment()
 
-	env.ExecuteWorkflow(receiveAsync_CorruptSignalOnClosedChannelWorkflowTest)
+	env.ExecuteWorkflow(receiveAsyncCorruptSignalOnClosedChannelWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 
@@ -748,13 +750,90 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalOnClosedChannelWorkflow_Receive_S
 		env.SignalWorkflow("channelExpectingTypeMessage", "wrong")
 	}, time.Second)
 
-	env.ExecuteWorkflow(receiveAsync_CorruptSignalOnClosedChannelWorkflowTest)
+	env.ExecuteWorkflow(receiveAsyncCorruptSignalOnClosedChannelWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 
 	var result []message
 	env.GetWorkflowResult(&result)
 	s.EqualValues(0, len(result))
+}
+
+func bufferedChanWorkflowTest(ctx Context, bufferSize int) error {
+	bufferedCh := NewBufferedChannel(ctx, bufferSize)
+
+	Go(ctx, func(ctx Context) {
+		var dummy int
+		for i := 0; i < bufferSize; i++ {
+			bufferedCh.Receive(ctx, &dummy)
+		}
+	})
+
+	for i := 0; i < bufferSize+1; i++ {
+		bufferedCh.Send(ctx, i)
+	}
+	return nil
+}
+
+func (s *WorkflowUnitTest) Test_BufferedChanWorkflow() {
+	bufferSizeList := []int{1, 5}
+	for _, bufferSize := range bufferSizeList {
+		env := s.NewTestWorkflowEnvironment()
+		env.ExecuteWorkflow(bufferedChanWorkflowTest, bufferSize)
+		s.True(env.IsWorkflowCompleted())
+		s.NoError(env.GetWorkflowError())
+	}
+}
+
+func bufferedChanWithSelectorWorkflowTest(ctx Context, bufferSize int) error {
+	bufferedCh := NewBufferedChannel(ctx, bufferSize)
+	selectedCh := NewChannel(ctx)
+	done := NewChannel(ctx)
+	var dummy struct{}
+
+	// 1. First we need to fill the buffer
+	for i := 0; i < bufferSize; i++ {
+		bufferedCh.Send(ctx, dummy)
+	}
+
+	// DO NOT change the order of these coroutines.
+	Go(ctx, func(ctx Context) {
+		// 3. Add another send callback to bufferedCh's blockedSends.
+		bufferedCh.Send(ctx, dummy)
+		done.Send(ctx, dummy)
+	})
+
+	Go(ctx, func(ctx Context) {
+		// 4.  Make sure selectedCh is selected
+		selectedCh.Receive(ctx, nil)
+
+		// 5. Get a value from channel buffer. Receive call will also check if there's any blocked sends.
+		// The first blockedSends is added by Select(). Since bufferedCh is not selected, it's fn() will
+		// return false. The Receive call should continue to check other blockedSends, until fn() returns
+		// true or the list is empty. In this case, it will move the value sent in step 3 into buffer
+		// and thus unblocks it.
+		bufferedCh.Receive(ctx, nil)
+	})
+
+	selector := NewSelector(ctx)
+	selector.AddSend(selectedCh, dummy, func() {})
+	selector.AddSend(bufferedCh, dummy, func() {})
+	// 2. When select is called, callback for the second send will be added to bufferedCh's blockedSends
+	selector.Select(ctx)
+
+	// Make sure no coroutine blocks
+	done.Receive(ctx, nil)
+	return nil
+}
+
+func (s *WorkflowUnitTest) Test_BufferedChanWithSelectorWorkflow() {
+	bufferSizeList := []int{1, 5}
+	for _, bufferSize := range bufferSizeList {
+		env := s.NewTestWorkflowEnvironment()
+		env.ExecuteWorkflow(bufferedChanWithSelectorWorkflowTest, bufferSize)
+		s.True(env.IsWorkflowCompleted())
+		s.NoError(env.GetWorkflowError())
+	}
 }
 
 func activityOptionsWorkflow(ctx Context) (result string, err error) {

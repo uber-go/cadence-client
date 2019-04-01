@@ -38,16 +38,23 @@ import (
 
 // ActivityTaskHandler never returns response
 type noResponseActivityTaskHandler struct {
+	isExecuteCalled chan struct{}
 }
 
 func newNoResponseActivityTaskHandler() *noResponseActivityTaskHandler {
-	return &noResponseActivityTaskHandler{}
+	return &noResponseActivityTaskHandler{isExecuteCalled: make(chan struct{})}
 }
 
 func (ath noResponseActivityTaskHandler) Execute(taskList string, task *m.PollForActivityTaskResponse) (interface{}, error) {
+	close(ath.isExecuteCalled)
 	c := make(chan struct{})
 	<-c
 	return nil, nil
+}
+
+func (ath noResponseActivityTaskHandler) BlockedOnExecuteCalled() error {
+	<-ath.isExecuteCalled
+	return nil
 }
 
 type (
@@ -163,7 +170,8 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 		UserContextCancel:               cancel,
 		WorkerStopTimeout:               time.Second * 2,
 	}
-	overrides := &workerOverrides{activityTaskHandler: newNoResponseActivityTaskHandler()}
+	activityTaskHandler := newNoResponseActivityTaskHandler()
+	overrides := &workerOverrides{activityTaskHandler: activityTaskHandler}
 	a := &greeterActivity{}
 	hostEnv := getHostEnvironment()
 	hostEnv.addActivity(a.ActivityType().Name, a)
@@ -171,9 +179,9 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 		s.service, domain, executionParameters, overrides, hostEnv, stopChannel,
 	)
 	activityWorker.Start()
-	time.Sleep(1 * time.Second)
+	activityTaskHandler.BlockedOnExecuteCalled()
 	go activityWorker.Stop()
-	time.Sleep(1 * time.Second)
+	<-stopChannel
 	err := ctx.Err()
 	s.NoError(err)
 

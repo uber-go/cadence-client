@@ -170,7 +170,7 @@ func (t *TestActivityEnvironment) SetHeartbeatDetails(details interface{}) {
 	t.impl.setHeartbeatDetails(details)
 }
 
-// SetWorkerStopChannel sets the worker stop channel to be returned from activity.GetWorkerShutdownChannel()
+// SetWorkerStopChannel sets the worker stop channel to be returned from activity.GetWorkerStopChannel()
 func (t *TestActivityEnvironment) SetWorkerStopChannel(c chan struct{}) {
 	t.impl.setWorkerStopChannel(c)
 }
@@ -390,7 +390,7 @@ func (t *TestWorkflowEnvironment) SetWorkerOptions(options WorkerOptions) *TestW
 	return t
 }
 
-// SetWorkerStopChannel sets the worker stop channel to be returned from activity.GetWorkerShutdownChannel()
+// SetWorkerStopChannel sets the worker stop channel to be returned from activity.GetWorkerStopChannel()
 func (t *TestWorkflowEnvironment) SetWorkerStopChannel(c chan struct{}) {
 	t.impl.setWorkerStopChannel(c)
 }

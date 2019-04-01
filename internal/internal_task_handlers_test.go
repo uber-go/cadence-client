@@ -845,7 +845,7 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
 
 func activityWithWorkerStop(ctx context.Context) error {
 	fmt.Println("Executing Activity with worker stop")
-	workerStopCh := GetWorkerShutdownChannel(ctx)
+	workerStopCh := GetWorkerStopChannel(ctx)
 
 	select {
 	case <-workerStopCh:

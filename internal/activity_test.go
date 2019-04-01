@@ -220,9 +220,9 @@ func (s *activityTestSuite) TestActivityHeartbeat_WorkerStop() {
 	<-waitC2
 }
 
-func (s *activityTestSuite) TestGetWorkerShutdownChannel() {
+func (s *activityTestSuite) TestGetWorkerStopChannel() {
 	ch := make(chan struct{}, 1)
 	ctx := context.WithValue(context.Background(), activityEnvContextKey, &activityEnvironment{workerStopChannel: ch})
-	channel := GetWorkerShutdownChannel(ctx)
+	channel := GetWorkerStopChannel(ctx)
 	s.NotNil(channel)
 }

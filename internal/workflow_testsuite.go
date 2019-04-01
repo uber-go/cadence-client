@@ -170,7 +170,9 @@ func (t *TestActivityEnvironment) SetHeartbeatDetails(details interface{}) {
 	t.impl.setHeartbeatDetails(details)
 }
 
-// SetWorkerStopChannel sets the worker stop channel to be returned from activity.GetWorkerStopChannel()
+// SetWorkerStopChannel sets the worker stop channel to be returned from activity.GetWorkerStopChannel(context)
+// To test your activity on worker stop, you can provide a go channel with this function and call ExecuteActivity().
+// Then call close(channel) to test the activity worker stop logic.
 func (t *TestActivityEnvironment) SetWorkerStopChannel(c chan struct{}) {
 	t.impl.setWorkerStopChannel(c)
 }
@@ -390,7 +392,9 @@ func (t *TestWorkflowEnvironment) SetWorkerOptions(options WorkerOptions) *TestW
 	return t
 }
 
-// SetWorkerStopChannel sets the worker stop channel to be returned from activity.GetWorkerStopChannel()
+// SetWorkerStopChannel sets the activity worker stop channel to be returned from activity.GetWorkerStopChannel(context)
+// You can use this function to set the activity worker stop channel and use close(channel) to test your activity execution
+// from workflow execution.
 func (t *TestWorkflowEnvironment) SetWorkerStopChannel(c chan struct{}) {
 	t.impl.setWorkerStopChannel(c)
 }

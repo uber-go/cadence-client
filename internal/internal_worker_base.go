@@ -111,7 +111,7 @@ type (
 		options              baseWorkerOptions
 		isWorkerStarted      bool
 		shutdownCh           chan struct{} // Channel used to shut down the go routines.
-		activityShutdownCh   chan struct{}
+		workerStopCh         chan struct{}
 		shutdownWG           sync.WaitGroup // The WaitGroup for shutting down existing routines.
 		pollLimiter          *rate.Limiter
 		taskLimiter          *rate.Limiter
@@ -142,12 +142,12 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 	return policy
 }
 
-func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, activityShutdownCh chan struct{}) *baseWorker {
+func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, workerStopCh chan struct{}) *baseWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 	bw := &baseWorker{
 		options:            options,
 		shutdownCh:         make(chan struct{}),
-		activityShutdownCh: activityShutdownCh,
+		workerStopCh:       workerStopCh,
 		taskLimiter:        rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
 		retrier:            backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
 		logger:             logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
@@ -324,8 +324,8 @@ func (bw *baseWorker) Stop() {
 	bw.limiterContextCancel()
 
 	// Close activity channel
-	if bw.activityShutdownCh != nil {
-		close(bw.activityShutdownCh)
+	if bw.workerStopCh != nil {
+		close(bw.workerStopCh)
 	}
 
 	if success := awaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {

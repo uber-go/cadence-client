@@ -378,7 +378,7 @@ func newActivityTaskWorker(
 	service workflowserviceclient.Interface,
 	domain string,
 	workerParams workerExecutionParameters,
-	activityShutdownCh chan struct{},
+	workerStopCh chan struct{},
 ) (worker Worker) {
 	ensureRequiredParams(&workerParams)
 
@@ -402,7 +402,7 @@ func newActivityTaskWorker(
 			userContextCancel: workerParams.UserContextCancel},
 		workerParams.Logger,
 		workerParams.MetricsScope,
-		activityShutdownCh,
+		workerStopCh,
 	)
 
 	return &activityWorker{
@@ -1002,8 +1002,8 @@ func newAggregatedWorker(
 	options WorkerOptions,
 ) (worker Worker) {
 	wOptions := fillWorkerOptionsDefaults(options)
-	workerShutdownChannel := make(chan struct{}, 1)
-	readOnlyCh := getReadOnlyChannel(workerShutdownChannel)
+	workerStopChannel := make(chan struct{}, 1)
+	readOnlyWorkerStopCh := getReadOnlyChannel(workerStopChannel)
 	ctx := wOptions.BackgroundActivityContext
 	if ctx == nil {
 		ctx = context.Background()
@@ -1031,7 +1031,7 @@ func newAggregatedWorker(
 		NonDeterministicWorkflowPolicy:       wOptions.NonDeterministicWorkflowPolicy,
 		DataConverter:                        wOptions.DataConverter,
 		WorkerStopTimeout:                    wOptions.WorkerStopTimeout,
-		WorkerStopChannel:                    readOnlyCh,
+		WorkerStopChannel:                    readOnlyWorkerStopCh,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -1080,7 +1080,7 @@ func newAggregatedWorker(
 			workerParams,
 			nil,
 			hostEnv,
-			workerShutdownChannel,
+			workerStopChannel,
 		)
 	}
 	return &aggregatedWorker{

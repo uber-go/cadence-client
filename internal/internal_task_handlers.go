@@ -1417,11 +1417,11 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 			select {
 			case <-i.hbBatchEndTimer.C:
 				// We are close to deadline.
+			case <-i.workerStopChannel:
+				// Activity worker is close to stop. This does the same steps as batch timer ends.
 			case <-i.closeCh:
 				// We got closed.
 				return
-			case <-i.workerStopChannel:
-				// Activity worker is close to stop. Send batched heartbeat.
 			}
 
 			// We close the batch and report the progress.

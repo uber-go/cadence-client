@@ -1422,12 +1422,6 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 				return
 			case <-i.workerStopChannel:
 				// Activity worker is close to stop. Send batched heartbeat.
-				if i.lastDetailsToReport != nil {
-					i.internalHeartBeat(*i.lastDetailsToReport)
-					i.lastDetailsToReport = nil
-					i.hbBatchEndTimer = nil
-				}
-				return
 			}
 
 			// We close the batch and report the progress.

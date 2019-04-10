@@ -73,10 +73,22 @@ type (
 	// Selector must be used instead of native go select by workflow code.
 	// Use workflow.NewSelector(ctx) method to create a Selector instance.
 	Selector interface {
-		AddReceive(c Channel, f func(c Channel, more bool)) Selector
-		AddSend(c Channel, v interface{}, f func()) Selector
-		AddFuture(future Future, f func(f Future)) Selector
-		AddDefault(f func())
+		AddReceive(c Channel, handlerFunc func(c Channel, more bool)) Selector
+		AddSend(c Channel, v interface{}, handlerFunc func()) Selector
+		// AddFuture adds a future to the selector,
+		// calling Get on the provided future inside the handlerFunc is guaranteed not to block,
+		// hence IsReady will return true.
+		// If AddFuture is called after Select, then ???.
+		// If AddFuture is called with the same future twice, then ???.
+		AddFuture(future Future, handlerFunc func(Future)) Selector
+		AddDefault(handlerFunc func())
+		// Select blocks until a Future or Channel is ready, it then calls the handlerFunc provided;
+		// unless a default is provided, then ???.
+		// Select guarantees that only a single handlerFunc is called for a single call to Select.
+		// Even if Select is called multiple times, Select guarantees that handlerFuncs are not executed concurrently.
+		// If select is called with no futures added, then ???.
+		// If select is called more than once, then ???.
+		// If select is called more times that the number of futures added, then ???.
 		Select(ctx Context)
 	}
 

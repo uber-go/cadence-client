@@ -325,7 +325,7 @@ func newWorkflowTaskHandler(
 		hostEnv:                        hostEnv,
 		nonDeterministicWorkflowPolicy: params.NonDeterministicWorkflowPolicy,
 		dataConverter:                  params.DataConverter,
-		laTunnel: 						laTunnel,
+		laTunnel:                       laTunnel,
 	}
 }
 

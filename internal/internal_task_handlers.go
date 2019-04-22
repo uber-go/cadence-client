@@ -309,6 +309,11 @@ func newWorkflowTaskHandler(
 	hostEnv *hostEnvImpl,
 ) WorkflowTaskHandler {
 	ensureRequiredParams(&params)
+	// laTunnel is needed for queueResetStickinessTask
+	laTunnel := &localActivityTunnel{
+		taskCh:   make(chan *localActivityTask, 1000),
+		resultCh: make(chan interface{}),
+	}
 	return &workflowTaskHandlerImpl{
 		domain:                         domain,
 		logger:                         params.Logger,
@@ -320,6 +325,7 @@ func newWorkflowTaskHandler(
 		hostEnv:                        hostEnv,
 		nonDeterministicWorkflowPolicy: params.NonDeterministicWorkflowPolicy,
 		dataConverter:                  params.DataConverter,
+		laTunnel: 						laTunnel,
 	}
 }
 

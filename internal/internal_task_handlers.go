@@ -309,11 +309,6 @@ func newWorkflowTaskHandler(
 	hostEnv *hostEnvImpl,
 ) WorkflowTaskHandler {
 	ensureRequiredParams(&params)
-	// laTunnel is needed for queueResetStickinessTask
-	laTunnel := &localActivityTunnel{
-		taskCh:   make(chan *localActivityTask, 1000),
-		resultCh: make(chan interface{}),
-	}
 	return &workflowTaskHandlerImpl{
 		domain:                         domain,
 		logger:                         params.Logger,
@@ -325,7 +320,6 @@ func newWorkflowTaskHandler(
 		hostEnv:                        hostEnv,
 		nonDeterministicWorkflowPolicy: params.NonDeterministicWorkflowPolicy,
 		dataConverter:                  params.DataConverter,
-		laTunnel:                       laTunnel,
 	}
 }
 
@@ -445,7 +439,11 @@ func (w *workflowExecutionContextImpl) queueResetStickinessTask() {
 			RunId:      common.StringPtr(w.workflowInfo.WorkflowExecution.RunID),
 		},
 	}
-	w.laTunnel.resultCh <- &task
+	// w.laTunnel could be nil for worker.ReplayHistory() because there is no worker started, in that case we don't
+	// care about resetStickinessTask.
+	if w.laTunnel != nil && w.laTunnel.resultCh != nil {
+		w.laTunnel.resultCh <- &task
+	}
 }
 
 func (w *workflowExecutionContextImpl) clearState() {

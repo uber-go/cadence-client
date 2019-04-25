@@ -397,7 +397,7 @@ func newWorkflowContext(env workflowEnvironment) Context {
 	return rootCtx
 }
 
-func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) {
+func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header map[string][]byte, input []byte) {
 	dispatcher, rootCtx := newDispatcher(newWorkflowContext(env), func(ctx Context) {
 		r := &workflowResult{}
 
@@ -411,6 +411,9 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, input []byte) 
 		rpp := getWorkflowResultPointerPointer(ctx)
 		*rpp = r
 	})
+
+	// Add the header information to the Context passed in
+	rootCtx = WithValue(rootCtx, headerContextKey, header)
 	d.rootCtx, d.cancel = WithCancel(rootCtx)
 	d.dispatcher = dispatcher
 

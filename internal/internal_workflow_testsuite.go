@@ -408,7 +408,7 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(delayStart time.
 	// In case of child workflow, this executeWorkflowInternal() is run in separate goroutinue, so use postCallback
 	// to make sure workflowDef.Execute() is run in main loop.
 	env.postCallback(func() {
-		env.workflowDef.Execute(env, input)
+		env.workflowDef.Execute(env, map[string][]byte{}, input)
 		// kick off first decision task to start the workflow
 		if delayStart == 0 {
 			env.startDecisionTask()

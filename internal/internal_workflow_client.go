@@ -178,6 +178,7 @@ func (wc *workflowClient) StartWorkflow(
 		return nil, err
 	}
 
+	// run propagators to extract information about tracing and other stuff, store in headers field
 	startRequest := &s.StartWorkflowExecutionRequest{
 		Domain:                              common.StringPtr(wc.domain),
 		RequestId:                           common.StringPtr(uuid.New()),

@@ -27,6 +27,10 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 )
 
+const (
+	headerContextKey contextKey = "headerKey"
+)
+
 // Context is a clone of context.Context with Done() returning Channel instead
 // of native channel.
 // A Context carries a deadline, a cancellation signal, and other values across

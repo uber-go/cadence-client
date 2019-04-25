@@ -815,7 +815,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionStarted(
 	}
 
 	// Invoke the workflow.
-	weh.workflowDefinition.Execute(weh, attributes.Input)
+	weh.workflowDefinition.Execute(weh, attributes.Header.Fields, attributes.Input)
 	return nil
 }
 

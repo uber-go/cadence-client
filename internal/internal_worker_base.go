@@ -85,7 +85,7 @@ type (
 
 	// WorkflowDefinition wraps the code that can execute a workflow.
 	workflowDefinition interface {
-		Execute(env workflowEnvironment, input []byte)
+		Execute(env workflowEnvironment, headers map[string][]byte, input []byte)
 		// Called for each non timed out startDecision event.
 		// Executed after all history events since the previous decision are applied to workflowDefinition
 		OnDecisionTaskStarted()

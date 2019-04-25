@@ -311,7 +311,7 @@ func WithActivityTask(
 			Name: *task.WorkflowType.Name,
 		},
 		workflowDomain:    *task.WorkflowDomain,
-		workerStopChannel: workerStopChannel,
+		workerStopChannel: 	workerStopChannel,
 	})
 }
 

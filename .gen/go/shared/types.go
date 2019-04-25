@@ -28,10 +28,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/thriftrw/wire"
 	"math"
 	"strconv"
 	"strings"
+
+	"go.uber.org/thriftrw/wire"
 )
 
 type AccessDeniedError struct {

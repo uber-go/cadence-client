@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"encoding/json"
+	"io/ioutil"
+
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
@@ -36,7 +38,6 @@ import (
 	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
-	"io/ioutil"
 )
 
 type (
@@ -163,6 +164,17 @@ type (
 		// Optional: worker graceful shutdown timeout
 		// default: 0s
 		WorkerStopTimeout time.Duration
+
+		// Optional:
+		// default: false
+		EnableSessionActivityWorker bool
+
+		// Required when EnableSessionActivityWorker is set to true
+		SessionResourceID string
+
+		// Optional: Sets the maximum number of concurrently running session
+		// default: 10
+		MaxCurrentSessionExecutionSize int
 	}
 )
 

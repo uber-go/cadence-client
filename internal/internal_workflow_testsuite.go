@@ -216,6 +216,13 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 
 		doneChannel:       make(chan struct{}),
 		workerStopChannel: make(chan struct{}),
+		workerOptions: WorkerOptions{
+			BackgroundActivityContext: context.WithValue(context.Background(), sessionWorkerInfoContextKey, &sessionWorkerInfo{
+				doneChanMap:              newSessionDoneChanMap(),
+				resourceID:               "resourceID",
+				resourceSpecificTasklist: "test resouce specific tasklist",
+			}),
+		},
 	}
 
 	// move forward the mock clock to start time.

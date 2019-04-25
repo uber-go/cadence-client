@@ -51,6 +51,15 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+func init() {
+	RegisterActivityWithOptions(sessionCreationActivity, RegisterActivityOptions{
+		Name: sessionCreationActivityName,
+	})
+	RegisterActivityWithOptions(sessionCompletionActivity, RegisterActivityOptions{
+		Name: sessionCompletionActivityName,
+	})
+}
+
 const (
 	// Set to 2 pollers for now, can adjust later if needed. The typical RTT (round-trip time) is below 1ms within data
 	// center. And the poll API latency is about 5ms. With 2 poller, we could achieve around 300~400 RPS.
@@ -68,6 +77,8 @@ const (
 	defaultWorkerTaskExecutionRate        = 100000 // Large task execution rate (unlimited)
 
 	defaultPollerRate = 1000
+
+	defaultMaxConcurrentSeesionExecutionSize = 10 // ycyang TODO
 
 	testTagsContextKey = "cadence-testTags"
 )
@@ -98,6 +109,11 @@ type (
 		poller              taskPoller
 		worker              *baseWorker
 		identity            string
+	}
+
+	sessionWorker struct {
+		creationWorker Worker
+		activityWorker Worker
 	}
 
 	// Worker overrides.
@@ -168,6 +184,9 @@ type (
 
 		// WorkerStopChannel is a read only channel listen on worker close. The worker will close the channel before exit.
 		WorkerStopChannel <-chan struct{}
+
+		// SessionResourceID is a unique identifier of the resource the session will consume
+		SessionResourceID string
 	}
 
 	// defaultDataConverter uses thrift encoder/decoder when possible, for everything else use json.
@@ -352,6 +371,83 @@ func (ww *workflowWorker) Run() error {
 func (ww *workflowWorker) Stop() {
 	ww.localActivityWorker.Stop()
 	ww.worker.Stop()
+}
+
+func newSessionWorker(service workflowserviceclient.Interface,
+	domain string,
+	params workerExecutionParameters,
+	overrides *workerOverrides,
+	env *hostEnvImpl,
+) Worker {
+	// ycyang TODO: what if user doesn't specify the resourceID? Generate a uuid? Should return an error.
+	ensureRequiredParams(&params)
+
+	doneChanMap := newSessionDoneChanMap()
+	creationTasklist := getCreationTasklist(params.TaskList)
+	resourceSpecificTasklist := getResourceSpecificTasklist(params.Identity, params.SessionResourceID)
+
+	params.UserContext = context.WithValue(params.UserContext, sessionWorkerInfoContextKey, &sessionWorkerInfo{
+		doneChanMap:              doneChanMap,
+		resourceID:               params.SessionResourceID,
+		resourceSpecificTasklist: resourceSpecificTasklist,
+	})
+
+	params.TaskList = creationTasklist
+	creationWorkerStopChannel := make(chan struct{}, 1)
+	params.WorkerStopChannel = getReadOnlyChannel(creationWorkerStopChannel)
+	creationWorker, _ := newActivityWorker(service, domain, params, nil, env, creationWorkerStopChannel).(*activityWorker)
+
+	params.TaskList = resourceSpecificTasklist
+	activityWorkerStopChannel := make(chan struct{}, 1)
+	params.WorkerStopChannel = getReadOnlyChannel(activityWorkerStopChannel)
+	activityWorker, _ := newActivityWorker(service, domain, params, nil, env, activityWorkerStopChannel).(*activityWorker)
+
+	taskCh := make(chan *sessionCreationTask)
+	if creationPoller, ok := creationWorker.poller.(*activityTaskPoller); ok {
+		creationPoller.scTunnel = &sessionCreationTunnel{
+			side:   "Receive",
+			taskCh: taskCh,
+		}
+	}
+
+	if activityPoller, ok := activityWorker.poller.(*activityTaskPoller); ok {
+		activityPoller.scTunnel = &sessionCreationTunnel{
+			side:   "Send",
+			taskCh: taskCh,
+		}
+	}
+
+	return &sessionWorker{
+		creationWorker: creationWorker,
+		activityWorker: activityWorker,
+	}
+}
+
+func (sw *sessionWorker) Start() error {
+	err := sw.creationWorker.Start()
+	if err != nil {
+		return err
+	}
+
+	err = sw.activityWorker.Start()
+	if err != nil {
+		sw.creationWorker.Stop()
+		return err
+	}
+	return nil
+}
+
+func (sw *sessionWorker) Run() error {
+	err := sw.creationWorker.Start()
+	if err != nil {
+		return err
+	}
+	return sw.activityWorker.Run()
+}
+
+func (sw *sessionWorker) Stop() {
+	sw.creationWorker.Stop()
+	sw.activityWorker.Stop()
 }
 
 func newActivityWorker(
@@ -894,6 +990,7 @@ func getDataConverterFromActivityCtx(ctx context.Context) encoded.DataConverter 
 type aggregatedWorker struct {
 	workflowWorker Worker
 	activityWorker Worker
+	sessionWorker  Worker
 	logger         *zap.Logger
 	hostEnv        *hostEnvImpl
 }
@@ -927,6 +1024,20 @@ func (aw *aggregatedWorker) Start() error {
 			return err
 		}
 	}
+
+	if !isInterfaceNil(aw.sessionWorker) {
+		if err := aw.sessionWorker.Start(); err != nil {
+			// stop workflow worker and activity worker.
+			if !isInterfaceNil(aw.workflowWorker) {
+				aw.workflowWorker.Stop()
+			}
+			if !isInterfaceNil(aw.activityWorker) {
+				aw.activityWorker.Stop()
+			}
+			return err
+		}
+	}
+
 	aw.logger.Info("Started Worker")
 	return nil
 }
@@ -988,6 +1099,9 @@ func (aw *aggregatedWorker) Stop() {
 	}
 	if !isInterfaceNil(aw.activityWorker) {
 		aw.activityWorker.Stop()
+	}
+	if !isInterfaceNil(aw.sessionWorker) {
+		aw.sessionWorker.Stop()
 	}
 	aw.logger.Info("Stopped Worker")
 }
@@ -1083,9 +1197,22 @@ func newAggregatedWorker(
 			workerStopChannel,
 		)
 	}
+
+	var sessionWorker Worker
+	if wOptions.EnableSessionActivityWorker {
+		sessionWorker = newSessionWorker(
+			service,
+			domain,
+			workerParams,
+			nil,
+			hostEnv,
+		)
+	}
+
 	return &aggregatedWorker{
 		workflowWorker: workflowWorker,
 		activityWorker: activityWorker,
+		sessionWorker:  sessionWorker,
 		logger:         logger,
 		hostEnv:        hostEnv,
 	}
@@ -1270,6 +1397,9 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 	}
 	if options.DataConverter == nil {
 		options.DataConverter = getDefaultDataConverter()
+	}
+	if options.MaxCurrentSessionExecutionSize == 0 {
+		options.MaxCurrentSessionExecutionSize = defaultMaxConcurrentSeesionExecutionSize
 	}
 	return options
 }

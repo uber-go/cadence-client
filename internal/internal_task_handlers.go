@@ -1484,6 +1484,27 @@ func (i *cadenceInvoker) Close(flushBufferedHeartbeat bool) {
 	}
 }
 
+func (i *cadenceInvoker) SignalWorkflow(domain, wid, rid, signalName string, data []byte) error {
+	request := &s.SignalWorkflowExecutionRequest{
+		Domain: common.StringPtr(domain),
+		WorkflowExecution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(wid),
+			RunId:      getRunID(rid),
+		},
+		SignalName: common.StringPtr(signalName),
+		Input:      data,
+		Identity:   common.StringPtr(i.identity),
+	}
+
+	ctx := context.Background()
+	return backoff.Retry(ctx,
+		func() error {
+			tchCtx, cancel, opt := newChannelContext(ctx)
+			defer cancel()
+			return i.service.SignalWorkflowExecution(tchCtx, request, opt...)
+		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+}
+
 func newServiceInvoker(
 	taskToken []byte,
 	identity string,

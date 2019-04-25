@@ -355,6 +355,16 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 		return future
 	}
 
+	// Validate session state.
+	if sessionInfo := getSessionInfo(ctx); sessionInfo != nil {
+		if sessionInfo.sessionState == sessionStateFailed {
+			settable.Set(nil, errors.New("session for the activity has failed"))
+			return future
+		}
+		// Use session tasklist
+		options.TaskListName = sessionInfo.tasklist
+	}
+
 	params := executeActivityParams{
 		activityOptions: *options,
 		ActivityType:    *activityType,

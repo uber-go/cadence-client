@@ -24,7 +24,6 @@ package internal
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -85,7 +84,7 @@ type (
 		metricsScope        *metrics.TaggedScope
 		logger              *zap.Logger
 		activitiesPerSecond float64
-		scTunnel            *sessionCreationTunnel
+		// scTunnel            *sessionCreationTunnel
 	}
 
 	historyIteratorImpl struct {
@@ -124,15 +123,15 @@ type (
 		resultCh chan interface{}
 	}
 
-	sessionCreationTask struct {
-		task  *activityTask
-		ackCh chan bool
-	}
+	// sessionCreationTask struct {
+	// 	task  *activityTask
+	// 	ackCh chan bool
+	// }
 
-	sessionCreationTunnel struct {
-		side   string
-		taskCh chan *sessionCreationTask
-	}
+	// sessionCreationTunnel struct {
+	// 	side   string
+	// 	taskCh chan *sessionCreationTask
+	// }
 )
 
 func (lat *localActivityTunnel) getTask() *localActivityTask {
@@ -143,32 +142,32 @@ func (lat *localActivityTunnel) sendTask(task *localActivityTask) {
 	lat.taskCh <- task
 }
 
-func (sct *sessionCreationTunnel) sendTask(task *activityTask, maxWaitDuration time.Duration) bool {
-	timer := time.NewTimer(maxWaitDuration)
+// func (sct *sessionCreationTunnel) sendTask(task *activityTask, maxWaitDuration time.Duration) bool {
+// 	timer := time.NewTimer(maxWaitDuration)
 
-	ackCh := make(chan bool)
-	defer close(ackCh)
-	creationTask := &sessionCreationTask{
-		task:  task,
-		ackCh: ackCh,
-	}
-	for {
-		select {
-		case sct.taskCh <- creationTask:
-			if <-ackCh {
-				timer.Stop()
-				return true
-			}
-			continue
-		case <-timer.C:
-			return false
-		}
-	}
-}
+// 	ackCh := make(chan bool)
+// 	defer close(ackCh)
+// 	creationTask := &sessionCreationTask{
+// 		task:  task,
+// 		ackCh: ackCh,
+// 	}
+// 	for {
+// 		select {
+// 		case sct.taskCh <- creationTask:
+// 			if <-ackCh {
+// 				timer.Stop()
+// 				return true
+// 			}
+// 			continue
+// 		case <-timer.C:
+// 			return false
+// 		}
+// 	}
+// }
 
-func (sct *sessionCreationTunnel) getTask() *sessionCreationTask {
-	return <-sct.taskCh
-}
+// func (sct *sessionCreationTunnel) getTask() *sessionCreationTask {
+// 	return <-sct.taskCh
+// }
 
 func isClientSideError(err error) bool {
 	// If an activity execution exceeds deadline.
@@ -853,40 +852,40 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*activityTask, error) 
 // PollTask polls a new task
 func (atp *activityTaskPoller) PollTask() (interface{}, error) {
 	// Get the task.
-	if atp.scTunnel == nil || atp.scTunnel.side != "Receive" {
-		activityTask, err := atp.poll(context.Background())
-		if err != nil {
-			return nil, err
-		}
-		return activityTask, nil
+	// if atp.scTunnel == nil || atp.scTunnel.side != "Receive" {
+	activityTask, err := atp.poll(context.Background())
+	if err != nil {
+		return nil, err
 	}
+	return activityTask, nil
+	// }
 
-	var activityTask *activityTask
-	var err error
-	longPollDoneCh := make(chan struct{})
-	longPollCtx, cancel := context.WithCancel(context.Background())
-	go func() {
-		activityTask, err = atp.poll(longPollCtx)
-		longPollDoneCh <- struct{}{}
-	}()
+	// var activityTask *activityTask
+	// var err error
+	// longPollDoneCh := make(chan struct{})
+	// longPollCtx, cancel := context.WithCancel(context.Background())
+	// go func() {
+	// 	activityTask, err = atp.poll(longPollCtx)
+	// 	longPollDoneCh <- struct{}{}
+	// }()
 
-	select {
-	case <-longPollDoneCh:
-		cancel()
-		if err != nil {
-			return nil, err
-		}
-		return activityTask, nil
-	case t := <-atp.scTunnel.taskCh:
-		cancel()
-		<-longPollDoneCh
-		if err == nil && activityTask.task != nil {
-			t.ackCh <- false
-			return activityTask, nil
-		}
-		t.ackCh <- true
-		return t.task, nil
-	}
+	// select {
+	// case <-longPollDoneCh:
+	// 	cancel()
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	return activityTask, nil
+	// case t := <-atp.scTunnel.taskCh:
+	// 	cancel()
+	// 	<-longPollDoneCh
+	// 	if err == nil && activityTask.task != nil {
+	// 		t.ackCh <- false
+	// 		return activityTask, nil
+	// 	}
+	// 	t.ackCh <- true
+	// 	return t.task, nil
+	// }
 }
 
 // ProcessTask processes a new task
@@ -900,25 +899,25 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 		return nil
 	}
 
-	var request interface{}
-	var err error
-	// if scTunnel exists and it's a session creation activity, pass it to session creation worker
-	if atp.scTunnel != nil && atp.scTunnel.side == "Send" && activityTask.task.ActivityType.GetName() == sessionCreationActivityName {
-		// simulate a scheduleToStartTimeout
-		maxWaitDuration := time.Second * time.Duration(activityTask.task.GetScheduleToCloseTimeoutSeconds()-activityTask.task.GetStartToCloseTimeoutSeconds())
-		if atp.scTunnel.sendTask(activityTask, maxWaitDuration) {
-			return nil
-		}
-		if handler, ok := atp.taskHandler.(*activityTaskHandlerImpl); ok {
-			request = convertActivityResultToRespondRequest(
-				handler.identity,
-				activityTask.task.TaskToken,
-				nil,
-				errors.New("All session worker busy"),
-				handler.dataConverter,
-			)
-		}
-	}
+	// var request interface{}
+	// var err error
+	// // if scTunnel exists and it's a session creation activity, pass it to session creation worker
+	// if atp.scTunnel != nil && atp.scTunnel.side == "Send" && activityTask.task.ActivityType.GetName() == sessionCreationActivityName {
+	// 	// simulate a scheduleToStartTimeout
+	// 	maxWaitDuration := time.Second * time.Duration(activityTask.task.GetScheduleToCloseTimeoutSeconds()-activityTask.task.GetStartToCloseTimeoutSeconds())
+	// 	if atp.scTunnel.sendTask(activityTask, maxWaitDuration) {
+	// 		return nil
+	// 	}
+	// 	if handler, ok := atp.taskHandler.(*activityTaskHandlerImpl); ok {
+	// 		request = convertActivityResultToRespondRequest(
+	// 			handler.identity,
+	// 			activityTask.task.TaskToken,
+	// 			nil,
+	// 			errors.New("All session worker busy"),
+	// 			handler.dataConverter,
+	// 		)
+	// 	}
+	// }
 
 	workflowType := activityTask.task.WorkflowType.GetName()
 	activityType := activityTask.task.ActivityType.GetName()
@@ -930,9 +929,9 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 
 	executionStartTime := time.Now()
 	// Process the activity task.
-	if request == nil {
-		request, err = atp.taskHandler.Execute(atp.taskListName, activityTask.task)
-	}
+	// if request == nil {
+	request, err := atp.taskHandler.Execute(atp.taskListName, activityTask.task)
+	// }
 	if err != nil {
 		metricsScope.Counter(metrics.ActivityExecutionFailedCounter).Inc(1)
 		return err

@@ -162,38 +162,36 @@ func getResourceSpecificTasklist(identity, resourceID string) string {
 const sessionWorkerInfoContextKey contextKey = "sessionWorkerInfo"
 
 type sessionWorkerInfo struct {
-	doneChanMap              *sessionDoneChanMap
+	sync.Mutex
+	doneChanMap              map[string]chan struct{}
 	resourceID               string
 	resourceSpecificTasklist string
+	outstandingSession       int
+	maxConCurrentSession     int
 }
 
-type sessionDoneChanMap struct {
-	sync.Mutex
-	doneChanMap map[string]chan struct{}
-}
+// func newSessionDoneChanMap() *sessionDoneChanMap {
+// 	m := &sessionDoneChanMap{}
+// 	m.doneChanMap = make(map[string]chan struct{})
+// 	return m
+// }
 
-func newSessionDoneChanMap() *sessionDoneChanMap {
-	m := &sessionDoneChanMap{}
-	m.doneChanMap = make(map[string]chan struct{})
-	return m
-}
+// func (d *sessionDoneChanMap) getAndDelete(sessionID string) chan struct{} {
+// 	d.Lock()
+// 	defer d.Unlock()
+// 	doneChan, ok := d.doneChanMap[sessionID]
+// 	if !ok {
+// 		return nil
+// 	}
+// 	delete(d.doneChanMap, sessionID)
+// 	return doneChan
+// }
 
-func (d *sessionDoneChanMap) getAndDelete(sessionID string) chan struct{} {
-	d.Lock()
-	defer d.Unlock()
-	doneChan, ok := d.doneChanMap[sessionID]
-	if !ok {
-		return nil
-	}
-	delete(d.doneChanMap, sessionID)
-	return doneChan
-}
-
-func (d *sessionDoneChanMap) put(sessionID string, doneChan chan struct{}) {
-	d.Lock()
-	defer d.Unlock()
-	d.doneChanMap[sessionID] = doneChan
-}
+// func (d *sessionDoneChanMap) put(sessionID string, doneChan chan struct{}) {
+// 	d.Lock()
+// 	defer d.Unlock()
+// 	d.doneChanMap[sessionID] = doneChan
+// }
 
 func sessionCreationActivity(ctx context.Context, sessionID string) error {
 	workerInfo, ok := ctx.Value(sessionWorkerInfoContextKey).(*sessionWorkerInfo)
@@ -201,8 +199,21 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 		return errors.New("no session worker info in user context")
 	}
 
+	workerInfo.Lock()
+	if workerInfo.outstandingSession == workerInfo.maxConCurrentSession {
+		workerInfo.Unlock()
+		return errors.New("too many outstanding session")
+	}
+	workerInfo.outstandingSession++
 	doneChan := make(chan struct{})
-	workerInfo.doneChanMap.put(sessionID, doneChan)
+	workerInfo.doneChanMap[sessionID] = doneChan
+	workerInfo.Unlock()
+
+	defer func() {
+		workerInfo.Lock()
+		workerInfo.outstandingSession--
+		workerInfo.Unlock()
+	}()
 
 	activityEnv := getActivityEnv(ctx)
 	invoker := activityEnv.serviceInvoker
@@ -242,8 +253,12 @@ func sessionCompletionActivity(ctx context.Context, sessionID string) error {
 	if !ok {
 		return errors.New("no session worker info in user context")
 	}
-	doneChan := workerInfo.doneChanMap.getAndDelete(sessionID)
-	if doneChan != nil {
+
+	workerInfo.Lock()
+	defer workerInfo.Unlock()
+
+	if doneChan, ok := workerInfo.doneChanMap[sessionID]; ok {
+		delete(workerInfo.doneChanMap, sessionID)
 		close(doneChan)
 	}
 	return nil

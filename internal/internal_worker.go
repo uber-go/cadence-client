@@ -78,7 +78,7 @@ const (
 
 	defaultPollerRate = 1000
 
-	defaultMaxConcurrentSeesionExecutionSize = 10 // ycyang TODO
+	defaultMaxConcurrentSeesionExecutionSize = 1000 // ycyang TODO
 
 	testTagsContextKey = "cadence-testTags"
 )
@@ -383,41 +383,42 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	// ycyang TODO: what if user doesn't specify the resourceID? Generate a uuid? Should return an error.
 	ensureRequiredParams(&params)
 
-	doneChanMap := newSessionDoneChanMap()
+	// doneChanMap := newSessionDoneChanMap()
 	creationTasklist := getCreationTasklist(params.TaskList)
 	resourceSpecificTasklist := getResourceSpecificTasklist(params.Identity, params.SessionResourceID)
 
 	params.UserContext = context.WithValue(params.UserContext, sessionWorkerInfoContextKey, &sessionWorkerInfo{
-		doneChanMap:              doneChanMap,
+		doneChanMap:              make(map[string]chan struct{}),
 		resourceID:               params.SessionResourceID,
 		resourceSpecificTasklist: resourceSpecificTasklist,
+		maxConCurrentSession:     maxConCurrentSessionExecutionSize,
 	})
 
 	params.TaskList = resourceSpecificTasklist
 	activityWorkerStopChannel := make(chan struct{}, 1)
 	params.WorkerStopChannel = getReadOnlyChannel(activityWorkerStopChannel)
-	sessionActivityWorker, _ := newActivityWorker(service, domain, params, nil, env, activityWorkerStopChannel).(*activityWorker)
+	sessionActivityWorker := newActivityWorker(service, domain, params, nil, env, activityWorkerStopChannel)
 
 	params.TaskList = creationTasklist
 	creationWorkerStopChannel := make(chan struct{}, 1)
 	params.WorkerStopChannel = getReadOnlyChannel(creationWorkerStopChannel)
-	params.ConcurrentActivityExecutionSize = maxConCurrentSessionExecutionSize
-	creationWorker, _ := newActivityWorker(service, domain, params, nil, env, creationWorkerStopChannel).(*activityWorker)
+	// params.ConcurrentActivityExecutionSize = maxConCurrentSessionExecutionSize
+	creationWorker := newActivityWorker(service, domain, params, nil, env, creationWorkerStopChannel)
 
-	taskCh := make(chan *sessionCreationTask)
-	if creationPoller, ok := creationWorker.poller.(*activityTaskPoller); ok {
-		creationPoller.scTunnel = &sessionCreationTunnel{
-			side:   "Receive",
-			taskCh: taskCh,
-		}
-	}
+	// taskCh := make(chan *sessionCreationTask)
+	// if creationPoller, ok := creationWorker.poller.(*activityTaskPoller); ok {
+	// 	creationPoller.scTunnel = &sessionCreationTunnel{
+	// 		side:   "Receive",
+	// 		taskCh: taskCh,
+	// 	}
+	// }
 
-	if activityPoller, ok := sessionActivityWorker.poller.(*activityTaskPoller); ok {
-		activityPoller.scTunnel = &sessionCreationTunnel{
-			side:   "Send",
-			taskCh: taskCh,
-		}
-	}
+	// if activityPoller, ok := sessionActivityWorker.poller.(*activityTaskPoller); ok {
+	// 	activityPoller.scTunnel = &sessionCreationTunnel{
+	// 		side:   "Send",
+	// 		taskCh: taskCh,
+	// 	}
+	// }
 
 	return &sessionWorker{
 		creationWorker: creationWorker,

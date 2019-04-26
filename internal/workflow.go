@@ -362,7 +362,11 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 			return future
 		}
 		// Use session tasklist
+		oldTaskListName := options.TaskListName
 		options.TaskListName = sessionInfo.tasklist
+		defer func() {
+			options.TaskListName = oldTaskListName
+		}()
 	}
 
 	params := executeActivityParams{

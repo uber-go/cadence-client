@@ -174,7 +174,7 @@ type (
 
 		// Optional: Sets the maximum number of concurrently running session
 		// default: 10
-		MaxCurrentSessionExecutionSize int
+		MaxConCurrentSessionExecutionSize int
 	}
 )
 

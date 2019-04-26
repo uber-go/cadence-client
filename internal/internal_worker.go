@@ -378,6 +378,7 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	params workerExecutionParameters,
 	overrides *workerOverrides,
 	env *hostEnvImpl,
+	maxConCurrentSessionExecutionSize int,
 ) Worker {
 	// ycyang TODO: what if user doesn't specify the resourceID? Generate a uuid? Should return an error.
 	ensureRequiredParams(&params)
@@ -392,15 +393,16 @@ func newSessionWorker(service workflowserviceclient.Interface,
 		resourceSpecificTasklist: resourceSpecificTasklist,
 	})
 
-	params.TaskList = creationTasklist
-	creationWorkerStopChannel := make(chan struct{}, 1)
-	params.WorkerStopChannel = getReadOnlyChannel(creationWorkerStopChannel)
-	creationWorker, _ := newActivityWorker(service, domain, params, nil, env, creationWorkerStopChannel).(*activityWorker)
-
 	params.TaskList = resourceSpecificTasklist
 	activityWorkerStopChannel := make(chan struct{}, 1)
 	params.WorkerStopChannel = getReadOnlyChannel(activityWorkerStopChannel)
-	activityWorker, _ := newActivityWorker(service, domain, params, nil, env, activityWorkerStopChannel).(*activityWorker)
+	sessionActivityWorker, _ := newActivityWorker(service, domain, params, nil, env, activityWorkerStopChannel).(*activityWorker)
+
+	params.TaskList = creationTasklist
+	creationWorkerStopChannel := make(chan struct{}, 1)
+	params.WorkerStopChannel = getReadOnlyChannel(creationWorkerStopChannel)
+	params.ConcurrentActivityExecutionSize = maxConCurrentSessionExecutionSize
+	creationWorker, _ := newActivityWorker(service, domain, params, nil, env, creationWorkerStopChannel).(*activityWorker)
 
 	taskCh := make(chan *sessionCreationTask)
 	if creationPoller, ok := creationWorker.poller.(*activityTaskPoller); ok {
@@ -410,7 +412,7 @@ func newSessionWorker(service workflowserviceclient.Interface,
 		}
 	}
 
-	if activityPoller, ok := activityWorker.poller.(*activityTaskPoller); ok {
+	if activityPoller, ok := sessionActivityWorker.poller.(*activityTaskPoller); ok {
 		activityPoller.scTunnel = &sessionCreationTunnel{
 			side:   "Send",
 			taskCh: taskCh,
@@ -419,7 +421,7 @@ func newSessionWorker(service workflowserviceclient.Interface,
 
 	return &sessionWorker{
 		creationWorker: creationWorker,
-		activityWorker: activityWorker,
+		activityWorker: sessionActivityWorker,
 	}
 }
 
@@ -1146,6 +1148,7 @@ func newAggregatedWorker(
 		DataConverter:                        wOptions.DataConverter,
 		WorkerStopTimeout:                    wOptions.WorkerStopTimeout,
 		WorkerStopChannel:                    readOnlyWorkerStopCh,
+		SessionResourceID:                    wOptions.SessionResourceID,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -1206,6 +1209,7 @@ func newAggregatedWorker(
 			workerParams,
 			nil,
 			hostEnv,
+			wOptions.MaxConCurrentSessionExecutionSize,
 		)
 	}
 
@@ -1398,8 +1402,8 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 	if options.DataConverter == nil {
 		options.DataConverter = getDefaultDataConverter()
 	}
-	if options.MaxCurrentSessionExecutionSize == 0 {
-		options.MaxCurrentSessionExecutionSize = defaultMaxConcurrentSeesionExecutionSize
+	if options.MaxConCurrentSessionExecutionSize == 0 {
+		options.MaxConCurrentSessionExecutionSize = defaultMaxConcurrentSeesionExecutionSize
 	}
 	return options
 }

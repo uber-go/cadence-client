@@ -66,7 +66,13 @@ func CompleteSession(ctx Context) error {
 	}
 
 	// the tasklist will be overrided to use the one stored in sessionInfo
-	return ExecuteActivity(ctx, sessionCompletionActivityName, sessionInfo.SessionID).Get(ctx, nil)
+	err := ExecuteActivity(ctx, sessionCompletionActivityName, sessionInfo.SessionID).Get(ctx, nil)
+	if err == nil {
+		sessionInfo.sessionState = sessionStateClosed
+	} else {
+		sessionInfo.sessionState = sessionStateFailed
+	}
+	return err
 }
 
 // GetSessionInfo returns session information
@@ -126,9 +132,9 @@ func createSession(ctx Context, sessionID string, creationTasklist string) (Cont
 	Go(ctx, func(ctx Context) {
 		if creationFuture.Get(ctx, nil) != nil {
 			sessionInfo.sessionState = sessionStateFailed
-			return
+			//return
 		}
-		sessionInfo.sessionState = sessionStateClosed
+		//sessionInfo.sessionState = sessionStateClosed
 	})
 
 	return setSessionInfo(ctx, sessionInfo), nil

@@ -50,7 +50,12 @@ const (
 
 // CreateSession create a session
 func CreateSession(ctx Context) (Context, error) {
-	return createSession(ctx, generateSessionID(ctx), getCreationTasklist(getActivityOptions(ctx).TaskListName))
+	options := getActivityOptions(ctx)
+	baseTasklist := options.TaskListName
+	if baseTasklist == "" {
+		baseTasklist = options.OriginalTaskListName
+	}
+	return createSession(ctx, generateSessionID(ctx), getCreationTasklist(baseTasklist))
 }
 
 // RecreateSession recreate a session

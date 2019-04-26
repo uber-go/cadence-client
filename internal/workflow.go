@@ -361,12 +361,14 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 			settable.Set(nil, errors.New("session for the activity has failed"))
 			return future
 		}
-		// Use session tasklist
-		oldTaskListName := options.TaskListName
-		options.TaskListName = sessionInfo.tasklist
-		defer func() {
-			options.TaskListName = oldTaskListName
-		}()
+		if sessionInfo.sessionState == sessionStateOpen {
+			// Use session tasklist
+			oldTaskListName := options.TaskListName
+			options.TaskListName = sessionInfo.tasklist
+			defer func() {
+				options.TaskListName = oldTaskListName
+			}()
+		}
 	}
 
 	params := executeActivityParams{

@@ -27,25 +27,47 @@ import (
 	"time"
 )
 
-type sessionState string
+type (
+	sessionState string
 
-// SessionInfo contains information for a created session
-// we may also want to expose resourceID
-type SessionInfo struct {
-	SessionID    string
-	tasklist     string // tasklist is resource specific
-	sessionState sessionState
-}
+	// SessionInfo contains information for a created session
+	SessionInfo struct {
+		SessionID    string
+		tasklist     string // tasklist is resource specific
+		sessionState sessionState
+	}
+
+	sessionToken struct {
+		*sync.Cond
+		availableToken int
+	}
+
+	sessionEnvironment struct {
+		*sync.Mutex
+		doneChanMap              map[string]chan struct{}
+		resourceID               string
+		resourceSpecificTasklist string
+		sessionToken             *sessionToken
+	}
+)
 
 const (
 	sessionStateOpen   sessionState = "open"
 	sessionStateFailed sessionState = "failed"
 	sessionStateClosed sessionState = "closed"
 
-	sessionInfoContextKey contextKey = "sessionInfo"
+	sessionInfoContextKey        contextKey = "sessionInfo"
+	sessionEnvironmentContextKey contextKey = "sessionEnvironment"
 
 	sessionCreationActivityName   string = "internalSessionCreationActivity"
 	sessionCompletionActivityName string = "internalSessionCompletionActivity"
+)
+
+var (
+	errNoOpenSession            = errors.New("no open session in the context")
+	errNoSessionInfo            = errors.New("no session information found in the context")
+	errFoundExistingOpenSession = errors.New("found exisiting open session in the context")
+	errTooManySessions          = errors.New("too many outstanding sessions")
 )
 
 // CreateSession create a session
@@ -67,7 +89,7 @@ func RecreateSession(ctx Context, sessionInfo *SessionInfo) (Context, error) {
 func CompleteSession(ctx Context) error {
 	sessionInfo := getSessionInfo(ctx)
 	if sessionInfo == nil || sessionInfo.sessionState != sessionStateOpen {
-		return errors.New("no open session in the context")
+		return errNoOpenSession
 	}
 
 	// the tasklist will be overrided to use the one stored in sessionInfo
@@ -84,7 +106,7 @@ func CompleteSession(ctx Context) error {
 func GetSessionInfo(ctx Context) (SessionInfo, error) {
 	info := getSessionInfo(ctx)
 	if info == nil {
-		return SessionInfo{}, errors.New("no session information found in the context")
+		return SessionInfo{}, errNoSessionInfo
 	}
 	return *info, nil
 }
@@ -103,7 +125,7 @@ func setSessionInfo(ctx Context, sessionInfo *SessionInfo) Context {
 
 func createSession(ctx Context, sessionID string, creationTasklist string) (Context, error) {
 	if prevSessionInfo := getSessionInfo(ctx); prevSessionInfo != nil && prevSessionInfo.sessionState == sessionStateOpen {
-		return nil, errors.New("found exisiting open session in the context")
+		return nil, errFoundExistingOpenSession
 	}
 
 	tasklistChan := GetSignalChannel(ctx, sessionID) // use sessionID as channel name
@@ -118,9 +140,7 @@ func createSession(ctx Context, sessionID string, creationTasklist string) (Cont
 	})
 	s.AddFuture(creationFuture, func(f Future) {
 		// activity stoped before signal is received, must be creation timeout.
-		creationErr = f.Get(ctx, nil)
-		// ycyang TODO: provide better error message
-		creationErr = errors.New("failed to create session: " + creationErr.Error())
+		creationErr = errors.New("failed to create session: " + f.Get(ctx, nil).Error())
 	})
 	s.Select(ctx)
 
@@ -137,9 +157,7 @@ func createSession(ctx Context, sessionID string, creationTasklist string) (Cont
 	Go(ctx, func(ctx Context) {
 		if creationFuture.Get(ctx, nil) != nil {
 			sessionInfo.sessionState = sessionStateFailed
-			//return
 		}
-		//sessionInfo.sessionState = sessionStateClosed
 	})
 
 	return setSessionInfo(ctx, sessionInfo), nil
@@ -156,69 +174,33 @@ func getCreationTasklist(base string) string {
 }
 
 func getResourceSpecificTasklist(identity, resourceID string) string {
-	return identity + "_" + resourceID
+	return resourceID + "@" + identity
 }
-
-const sessionWorkerInfoContextKey contextKey = "sessionWorkerInfo"
-
-type sessionWorkerInfo struct {
-	sync.Mutex
-	doneChanMap              map[string]chan struct{}
-	resourceID               string
-	resourceSpecificTasklist string
-	outstandingSession       int
-	maxConCurrentSession     int
-}
-
-// func newSessionDoneChanMap() *sessionDoneChanMap {
-// 	m := &sessionDoneChanMap{}
-// 	m.doneChanMap = make(map[string]chan struct{})
-// 	return m
-// }
-
-// func (d *sessionDoneChanMap) getAndDelete(sessionID string) chan struct{} {
-// 	d.Lock()
-// 	defer d.Unlock()
-// 	doneChan, ok := d.doneChanMap[sessionID]
-// 	if !ok {
-// 		return nil
-// 	}
-// 	delete(d.doneChanMap, sessionID)
-// 	return doneChan
-// }
-
-// func (d *sessionDoneChanMap) put(sessionID string, doneChan chan struct{}) {
-// 	d.Lock()
-// 	defer d.Unlock()
-// 	d.doneChanMap[sessionID] = doneChan
-// }
 
 func sessionCreationActivity(ctx context.Context, sessionID string) error {
-	workerInfo, ok := ctx.Value(sessionWorkerInfoContextKey).(*sessionWorkerInfo)
+	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(*sessionEnvironment)
 	if !ok {
-		return errors.New("no session worker info in user context")
+		panic("no session environment in context")
+	}
+	sessionEnv.Lock()
+	if sessionEnv.sessionToken.availableToken == 0 {
+		sessionEnv.Unlock()
+		return errTooManySessions
 	}
 
-	workerInfo.Lock()
-	if workerInfo.outstandingSession == workerInfo.maxConCurrentSession {
-		workerInfo.Unlock()
-		return errors.New("too many outstanding session")
-	}
-	workerInfo.outstandingSession++
+	sessionEnv.sessionToken.availableToken--
 	doneChan := make(chan struct{})
-	workerInfo.doneChanMap[sessionID] = doneChan
-	workerInfo.Unlock()
+	sessionEnv.doneChanMap[sessionID] = doneChan
+	sessionEnv.Unlock()
 
 	defer func() {
-		workerInfo.Lock()
-		workerInfo.outstandingSession--
-		workerInfo.Unlock()
+		sessionEnv.sessionToken.addToken()
 	}()
 
 	activityEnv := getActivityEnv(ctx)
 	invoker := activityEnv.serviceInvoker
 
-	data, err := encodeArg(getDataConverterFromActivityCtx(ctx), workerInfo.resourceSpecificTasklist)
+	data, err := encodeArg(getDataConverterFromActivityCtx(ctx), sessionEnv.resourceSpecificTasklist)
 	if err != nil {
 		return err
 	}
@@ -249,17 +231,32 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 }
 
 func sessionCompletionActivity(ctx context.Context, sessionID string) error {
-	workerInfo, ok := ctx.Value(sessionWorkerInfoContextKey).(*sessionWorkerInfo)
+	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(*sessionEnvironment)
 	if !ok {
-		return errors.New("no session worker info in user context")
+		panic("no session environment in context")
 	}
 
-	workerInfo.Lock()
-	defer workerInfo.Unlock()
+	sessionEnv.Lock()
+	defer sessionEnv.Unlock()
 
-	if doneChan, ok := workerInfo.doneChanMap[sessionID]; ok {
-		delete(workerInfo.doneChanMap, sessionID)
+	if doneChan, ok := sessionEnv.doneChanMap[sessionID]; ok {
+		delete(sessionEnv.doneChanMap, sessionID)
 		close(doneChan)
 	}
 	return nil
+}
+
+func (t *sessionToken) waitForAvailableToken() {
+	t.L.Lock()
+	for t.availableToken == 0 {
+		t.Wait()
+	}
+	t.L.Unlock()
+}
+
+func (t *sessionToken) addToken() {
+	t.L.Lock()
+	t.availableToken++
+	t.L.Unlock()
+	t.Signal()
 }

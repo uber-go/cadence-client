@@ -123,6 +123,7 @@ type (
 
 		pollerRequestCh chan struct{}
 		taskQueueCh     chan interface{}
+		sessionToken    *sessionToken
 	}
 
 	polledTask struct {
@@ -142,7 +143,7 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 	return policy
 }
 
-func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, workerStopCh chan struct{}) *baseWorker {
+func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, workerStopCh chan struct{}, sessionToken *sessionToken) *baseWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 	bw := &baseWorker{
 		options:         options,
@@ -157,6 +158,7 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 
 		limiterContext:       ctx,
 		limiterContextCancel: cancel,
+		sessionToken:         sessionToken,
 	}
 	if options.pollerRate > 0 {
 		bw.pollLimiter = rate.NewLimiter(rate.Limit(options.pollerRate), 1)
@@ -209,6 +211,10 @@ func (bw *baseWorker) runPoller() {
 		case <-bw.shutdownCh:
 			return
 		case <-bw.pollerRequestCh:
+			if bw.sessionToken != nil {
+				bw.sessionToken.waitForAvailableToken()
+			}
+
 			ch := make(chan struct{})
 			go func(ch chan struct{}) {
 				bw.pollTask()

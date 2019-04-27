@@ -304,6 +304,7 @@ func newWorkflowTaskWorkerInternal(
 		params.Logger,
 		params.MetricsScope,
 		nil,
+		nil,
 	)
 
 	// laTunnel is the glue that hookup 3 parts
@@ -329,6 +330,7 @@ func newWorkflowTaskWorkerInternal(
 		shutdownTimeout:   params.WorkerStopTimeout},
 		params.Logger,
 		params.MetricsScope,
+		nil,
 		nil,
 	)
 
@@ -383,46 +385,30 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	// ycyang TODO: what if user doesn't specify the resourceID? Generate a uuid? Should return an error.
 	ensureRequiredParams(&params)
 
-	// doneChanMap := newSessionDoneChanMap()
-	creationTasklist := getCreationTasklist(params.TaskList)
 	resourceSpecificTasklist := getResourceSpecificTasklist(params.Identity, params.SessionResourceID)
-
-	params.UserContext = context.WithValue(params.UserContext, sessionWorkerInfoContextKey, &sessionWorkerInfo{
+	sessionMutex := &sync.Mutex{}
+	sessionToken := &sessionToken{
+		Cond:           sync.NewCond(sessionMutex),
+		availableToken: maxConCurrentSessionExecutionSize,
+	}
+	sessionEnvironment := &sessionEnvironment{
+		Mutex:                    sessionMutex,
 		doneChanMap:              make(map[string]chan struct{}),
 		resourceID:               params.SessionResourceID,
 		resourceSpecificTasklist: resourceSpecificTasklist,
-		maxConCurrentSession:     maxConCurrentSessionExecutionSize,
-	})
+		sessionToken:             sessionToken,
+	}
+
+	params.UserContext = context.WithValue(params.UserContext, sessionEnvironmentContextKey, sessionEnvironment)
+	params.TaskList = getCreationTasklist(params.TaskList)
+	creationWorker := newActivityWorker(service, domain, params, nil, env, sessionToken)
 
 	params.TaskList = resourceSpecificTasklist
-	activityWorkerStopChannel := make(chan struct{}, 1)
-	params.WorkerStopChannel = getReadOnlyChannel(activityWorkerStopChannel)
-	sessionActivityWorker := newActivityWorker(service, domain, params, nil, env, activityWorkerStopChannel)
-
-	params.TaskList = creationTasklist
-	creationWorkerStopChannel := make(chan struct{}, 1)
-	params.WorkerStopChannel = getReadOnlyChannel(creationWorkerStopChannel)
-	// params.ConcurrentActivityExecutionSize = maxConCurrentSessionExecutionSize
-	creationWorker := newActivityWorker(service, domain, params, nil, env, creationWorkerStopChannel)
-
-	// taskCh := make(chan *sessionCreationTask)
-	// if creationPoller, ok := creationWorker.poller.(*activityTaskPoller); ok {
-	// 	creationPoller.scTunnel = &sessionCreationTunnel{
-	// 		side:   "Receive",
-	// 		taskCh: taskCh,
-	// 	}
-	// }
-
-	// if activityPoller, ok := sessionActivityWorker.poller.(*activityTaskPoller); ok {
-	// 	activityPoller.scTunnel = &sessionCreationTunnel{
-	// 		side:   "Send",
-	// 		taskCh: taskCh,
-	// 	}
-	// }
+	activityWorker := newActivityWorker(service, domain, params, nil, env, nil)
 
 	return &sessionWorker{
 		creationWorker: creationWorker,
-		activityWorker: sessionActivityWorker,
+		activityWorker: activityWorker,
 	}
 }
 
@@ -459,9 +445,12 @@ func newActivityWorker(
 	params workerExecutionParameters,
 	overrides *workerOverrides,
 	env *hostEnvImpl,
-	activityShutdownCh chan struct{},
+	sessionToken *sessionToken,
 ) Worker {
+	workerStopChannel := make(chan struct{}, 1)
+	params.WorkerStopChannel = getReadOnlyChannel(workerStopChannel)
 	ensureRequiredParams(&params)
+
 	// Get a activity task handler.
 	var taskHandler ActivityTaskHandler
 	if overrides != nil && overrides.activityTaskHandler != nil {
@@ -469,7 +458,7 @@ func newActivityWorker(
 	} else {
 		taskHandler = newActivityTaskHandler(service, params, env)
 	}
-	return newActivityTaskWorker(taskHandler, service, domain, params, activityShutdownCh)
+	return newActivityTaskWorker(taskHandler, service, domain, params, workerStopChannel, sessionToken)
 }
 
 func newActivityTaskWorker(
@@ -478,6 +467,7 @@ func newActivityTaskWorker(
 	domain string,
 	workerParams workerExecutionParameters,
 	workerStopCh chan struct{},
+	sessionToken *sessionToken,
 ) (worker Worker) {
 	ensureRequiredParams(&workerParams)
 
@@ -502,6 +492,7 @@ func newActivityTaskWorker(
 		workerParams.Logger,
 		workerParams.MetricsScope,
 		workerStopCh,
+		sessionToken,
 	)
 
 	return &activityWorker{
@@ -1119,8 +1110,6 @@ func newAggregatedWorker(
 	options WorkerOptions,
 ) (worker Worker) {
 	wOptions := fillWorkerOptionsDefaults(options)
-	workerStopChannel := make(chan struct{}, 1)
-	readOnlyWorkerStopCh := getReadOnlyChannel(workerStopChannel)
 	ctx := wOptions.BackgroundActivityContext
 	if ctx == nil {
 		ctx = context.Background()
@@ -1148,7 +1137,6 @@ func newAggregatedWorker(
 		NonDeterministicWorkflowPolicy:       wOptions.NonDeterministicWorkflowPolicy,
 		DataConverter:                        wOptions.DataConverter,
 		WorkerStopTimeout:                    wOptions.WorkerStopTimeout,
-		WorkerStopChannel:                    readOnlyWorkerStopCh,
 		SessionResourceID:                    wOptions.SessionResourceID,
 	}
 
@@ -1198,7 +1186,7 @@ func newAggregatedWorker(
 			workerParams,
 			nil,
 			hostEnv,
-			workerStopChannel,
+			nil,
 		)
 	}
 

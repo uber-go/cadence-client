@@ -22,9 +22,10 @@ package internal
 
 import (
 	"context"
-	"github.com/pborman/uuid"
 	"testing"
 	"time"
+
+	"github.com/pborman/uuid"
 
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
@@ -160,7 +161,6 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil).AnyTimes()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	stopChannel := make(chan struct{})
 	executionParameters := workerExecutionParameters{
 		TaskList:                        "testTaskList",
 		ConcurrentPollRoutineSize:       5,
@@ -175,13 +175,17 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	a := &greeterActivity{}
 	hostEnv := getHostEnvironment()
 	hostEnv.addActivity(a.ActivityType().Name, a)
-	activityWorker := newActivityWorker(
-		s.service, domain, executionParameters, overrides, hostEnv, stopChannel,
+	worker := newActivityWorker(
+		s.service, domain, executionParameters, overrides, hostEnv, nil,
 	)
-	activityWorker.Start()
+	worker.Start()
 	activityTaskHandler.BlockedOnExecuteCalled()
-	go activityWorker.Stop()
-	<-stopChannel
+	go worker.Stop()
+
+	activityWorker, ok := worker.(*activityWorker)
+	s.Equal(true, ok)
+
+	<-activityWorker.worker.workerStopCh
 	err := ctx.Err()
 	s.NoError(err)
 

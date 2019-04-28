@@ -51,15 +51,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func init() {
-	RegisterActivityWithOptions(sessionCreationActivity, RegisterActivityOptions{
-		Name: sessionCreationActivityName,
-	})
-	RegisterActivityWithOptions(sessionCompletionActivity, RegisterActivityOptions{
-		Name: sessionCompletionActivityName,
-	})
-}
-
 const (
 	// Set to 2 pollers for now, can adjust later if needed. The typical RTT (round-trip time) is below 1ms within data
 	// center. And the poll API latency is about 5ms. With 2 poller, we could achieve around 300~400 RPS.
@@ -383,27 +374,16 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	maxConCurrentSessionExecutionSize int,
 ) Worker {
 	// ycyang TODO: what if user doesn't specify the resourceID? Generate a uuid? Should return an error.
-	ensureRequiredParams(&params)
-
-	resourceSpecificTasklist := getResourceSpecificTasklist(params.Identity, params.SessionResourceID)
-	sessionMutex := &sync.Mutex{}
-	sessionToken := &sessionToken{
-		Cond:           sync.NewCond(sessionMutex),
-		availableToken: maxConCurrentSessionExecutionSize,
+	if params.Identity == "" {
+		params.Identity = getWorkerIdentity(params.TaskList)
 	}
-	sessionEnvironment := &sessionEnvironment{
-		Mutex:                    sessionMutex,
-		doneChanMap:              make(map[string]chan struct{}),
-		resourceID:               params.SessionResourceID,
-		resourceSpecificTasklist: resourceSpecificTasklist,
-		sessionToken:             sessionToken,
-	}
+	sessionEnvironment := newSessionEnvironment(params.Identity, params.SessionResourceID, maxConCurrentSessionExecutionSize)
 
 	params.UserContext = context.WithValue(params.UserContext, sessionEnvironmentContextKey, sessionEnvironment)
 	params.TaskList = getCreationTasklist(params.TaskList)
-	creationWorker := newActivityWorker(service, domain, params, nil, env, sessionToken)
+	creationWorker := newActivityWorker(service, domain, params, nil, env, sessionEnvironment.sessionToken)
 
-	params.TaskList = resourceSpecificTasklist
+	params.TaskList = sessionEnvironment.resourceSpecificTasklist
 	activityWorker := newActivityWorker(service, domain, params, nil, env, nil)
 
 	return &sessionWorker{

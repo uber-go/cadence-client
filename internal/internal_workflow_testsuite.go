@@ -175,7 +175,8 @@ type (
 
 		heartbeatDetails []byte
 
-		workerStopChannel chan struct{}
+		workerStopChannel  chan struct{}
+		sessionEnvironment *sessionEnvironment
 	}
 )
 
@@ -216,13 +217,6 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 
 		doneChannel:       make(chan struct{}),
 		workerStopChannel: make(chan struct{}),
-		// workerOptions: WorkerOptions{
-		// 	BackgroundActivityContext: context.WithValue(context.Background(), sessionWorkerInfoContextKey, &sessionWorkerInfo{
-		// 		doneChanMap:              newSessionDoneChanMap(),
-		// 		resourceID:               "resourceID",
-		// 		resourceSpecificTasklist: "test resouce specific tasklist",
-		// 	}),
-		// },
 	}
 
 	// move forward the mock clock to start time.
@@ -369,6 +363,12 @@ func (env *testWorkflowEnvironmentImpl) setWorkerOptions(options WorkerOptions) 
 	}
 	if options.DataConverter != nil {
 		env.workerOptions.DataConverter = options.DataConverter
+	}
+	if options.SessionResourceID != "" {
+		env.workerOptions.SessionResourceID = options.SessionResourceID
+	}
+	if options.MaxConCurrentSessionExecutionSize != 0 {
+		env.workerOptions.MaxConCurrentSessionExecutionSize = options.MaxConCurrentSessionExecutionSize
 	}
 }
 
@@ -1431,6 +1431,14 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 		WorkerStopChannel: env.workerStopChannel,
 	}
 	ensureRequiredParams(&params)
+	if params.UserContext == nil {
+		params.UserContext = context.Background()
+	}
+	if env.sessionEnvironment == nil {
+		env.sessionEnvironment = getTestSessionEnvironment(&params, wOptions.MaxConCurrentSessionExecutionSize)
+		env.sessionEnvironment.testEnv = env
+	}
+	params.UserContext = context.WithValue(params.UserContext, sessionEnvironmentContextKey, env.sessionEnvironment)
 
 	if len(getHostEnvironment().getRegisteredActivities()) == 0 {
 		panic(fmt.Sprintf("no activity is registered for tasklist '%v'", taskList))

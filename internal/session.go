@@ -27,6 +27,15 @@ import (
 	"time"
 )
 
+func init() {
+	RegisterActivityWithOptions(sessionCreationActivity, RegisterActivityOptions{
+		Name: sessionCreationActivityName,
+	})
+	RegisterActivityWithOptions(sessionCompletionActivity, RegisterActivityOptions{
+		Name: sessionCompletionActivityName,
+	})
+}
+
 type (
 	sessionState string
 
@@ -48,6 +57,7 @@ type (
 		resourceID               string
 		resourceSpecificTasklist string
 		sessionToken             *sessionToken
+		testEnv                  *testWorkflowEnvironmentImpl
 	}
 )
 
@@ -198,20 +208,25 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 	}()
 
 	activityEnv := getActivityEnv(ctx)
-	invoker := activityEnv.serviceInvoker
 
-	data, err := encodeArg(getDataConverterFromActivityCtx(ctx), sessionEnv.resourceSpecificTasklist)
-	if err != nil {
-		return err
-	}
+	if sessionEnv.testEnv == nil {
+		invoker := activityEnv.serviceInvoker
 
-	err = invoker.SignalWorkflow(activityEnv.workflowDomain,
-		activityEnv.workflowExecution.ID,
-		activityEnv.workflowExecution.RunID,
-		sessionID,
-		data)
-	if err != nil {
-		return err
+		data, err := encodeArg(getDataConverterFromActivityCtx(ctx), sessionEnv.resourceSpecificTasklist)
+		if err != nil {
+			return err
+		}
+
+		err = invoker.SignalWorkflow(activityEnv.workflowDomain,
+			activityEnv.workflowExecution.ID,
+			activityEnv.workflowExecution.RunID,
+			sessionID,
+			data)
+		if err != nil {
+			return err
+		}
+	} else {
+		sessionEnv.testEnv.signalWorkflow(sessionID, sessionEnv.resourceSpecificTasklist)
 	}
 
 	ticker := time.NewTicker(activityEnv.heartbeatTimeout / 2)
@@ -259,4 +274,32 @@ func (t *sessionToken) addToken() {
 	t.availableToken++
 	t.L.Unlock()
 	t.Signal()
+}
+
+func newSessionEnvironment(identity, resourceID string, concurrentSessionExecutionSize int) *sessionEnvironment {
+	resourceSpecificTasklist := getResourceSpecificTasklist(identity, resourceID)
+	sessionMutex := &sync.Mutex{}
+	sessionToken := &sessionToken{
+		Cond:           sync.NewCond(sessionMutex),
+		availableToken: concurrentSessionExecutionSize,
+	}
+	return &sessionEnvironment{
+		Mutex:                    sessionMutex,
+		doneChanMap:              make(map[string]chan struct{}),
+		resourceID:               resourceID,
+		resourceSpecificTasklist: resourceSpecificTasklist,
+		sessionToken:             sessionToken,
+	}
+}
+
+func getTestSessionEnvironment(params *workerExecutionParameters, concurrentSessionExecutionSize int) *sessionEnvironment {
+	resourceID := params.SessionResourceID
+	if resourceID == "" {
+		resourceID = "testResourceID"
+	}
+	if concurrentSessionExecutionSize == 0 {
+		concurrentSessionExecutionSize = defaultMaxConcurrentSeesionExecutionSize
+	}
+
+	return newSessionEnvironment(params.Identity, resourceID, concurrentSessionExecutionSize)
 }

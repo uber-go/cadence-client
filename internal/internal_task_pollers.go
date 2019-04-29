@@ -774,7 +774,7 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserv
 }
 
 // Poll for a single activity task from the service
-func (atp *activityTaskPoller) poll(ctx context.Context) (*activityTask, error) {
+func (atp *activityTaskPoller) poll() (*activityTask, error) {
 	startTime := time.Now()
 
 	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
@@ -789,7 +789,7 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*activityTask, error) 
 		TaskListMetadata: &s.TaskListMetadata{MaxTasksPerSecond: &atp.activitiesPerSecond},
 	}
 
-	tchCtx, cancel, opt := newChannelContext(ctx, chanTimeout(pollTaskServiceTimeOut))
+	tchCtx, cancel, opt := newChannelContext(context.Background(), chanTimeout(pollTaskServiceTimeOut))
 	defer cancel()
 
 	response, err := atp.service.PollForActivityTask(tchCtx, request, opt...)
@@ -814,7 +814,7 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*activityTask, error) 
 // PollTask polls a new task
 func (atp *activityTaskPoller) PollTask() (interface{}, error) {
 	// Get the task.
-	activityTask, err := atp.poll(context.Background())
+	activityTask, err := atp.poll()
 	if err != nil {
 		return nil, err
 	}
@@ -842,9 +842,7 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 
 	executionStartTime := time.Now()
 	// Process the activity task.
-	// if request == nil {
 	request, err := atp.taskHandler.Execute(atp.taskListName, activityTask.task)
-	// }
 	if err != nil {
 		metricsScope.Counter(metrics.ActivityExecutionFailedCounter).Inc(1)
 		return err

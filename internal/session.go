@@ -23,8 +23,11 @@ package internal
 import (
 	"context"
 	"errors"
+	"math"
 	"sync"
 	"time"
+
+	"github.com/pborman/uuid"
 )
 
 func init() {
@@ -71,13 +74,15 @@ const (
 
 	sessionCreationActivityName   string = "internalSessionCreationActivity"
 	sessionCompletionActivityName string = "internalSessionCompletionActivity"
+
+	errTooManySessionsMsg string = "too many outstanding sessions"
 )
 
 var (
 	errNoOpenSession            = errors.New("no open session in the context")
 	errNoSessionInfo            = errors.New("no session information found in the context")
 	errFoundExistingOpenSession = errors.New("found exisiting open session in the context")
-	errTooManySessions          = errors.New("too many outstanding sessions")
+	errSessionFailed            = errors.New("session has already failed")
 )
 
 // CreateSession create a session
@@ -87,23 +92,42 @@ func CreateSession(ctx Context) (Context, error) {
 	if baseTasklist == "" {
 		baseTasklist = options.OriginalTaskListName
 	}
-	return createSession(ctx, generateSessionID(ctx), getCreationTasklist(baseTasklist))
+	sessionID, err := generateSessionID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return createSession(ctx, sessionID, getCreationTasklist(baseTasklist), true)
 }
 
 // RecreateSession recreate a session
 func RecreateSession(ctx Context, sessionInfo *SessionInfo) (Context, error) {
-	return createSession(ctx, sessionInfo.SessionID, sessionInfo.tasklist)
+	return createSession(ctx, sessionInfo.SessionID, sessionInfo.tasklist, false)
 }
 
 // CompleteSession complete a session
 func CompleteSession(ctx Context) error {
 	sessionInfo := getSessionInfo(ctx)
-	if sessionInfo == nil || sessionInfo.sessionState != sessionStateOpen {
+	if sessionInfo == nil || sessionInfo.sessionState == sessionStateClosed {
 		return errNoOpenSession
 	}
 
+	if sessionInfo.sessionState == sessionStateFailed {
+		return nil
+	}
+	retryPolicy := &RetryPolicy{
+		InitialInterval:    time.Second,
+		BackoffCoefficient: 1.1,
+		MaximumInterval:    time.Second * 10,
+		MaximumAttempts:    5,
+	}
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: time.Second * 10,
+		StartToCloseTimeout:    time.Second * 10,
+		RetryPolicy:            retryPolicy,
+	}
+	completionCtx := WithActivityOptions(ctx, ao)
 	// the tasklist will be overrided to use the one stored in sessionInfo
-	err := ExecuteActivity(ctx, sessionCompletionActivityName, sessionInfo.SessionID).Get(ctx, nil)
+	err := ExecuteActivity(completionCtx, sessionCompletionActivityName, sessionInfo.SessionID).Get(ctx, nil)
 	if err == nil {
 		sessionInfo.sessionState = sessionStateClosed
 	} else {
@@ -133,14 +157,40 @@ func setSessionInfo(ctx Context, sessionInfo *SessionInfo) Context {
 	return WithValue(ctx, sessionInfoContextKey, sessionInfo)
 }
 
-func createSession(ctx Context, sessionID string, creationTasklist string) (Context, error) {
+func createSession(ctx Context, sessionID string, creationTasklist string, retryable bool) (Context, error) {
 	if prevSessionInfo := getSessionInfo(ctx); prevSessionInfo != nil && prevSessionInfo.sessionState == sessionStateOpen {
 		return nil, errFoundExistingOpenSession
 	}
 
 	tasklistChan := GetSignalChannel(ctx, sessionID) // use sessionID as channel name
-	childCtx := WithTaskList(ctx, creationTasklist)
-	creationFuture := ExecuteActivity(childCtx, sessionCreationActivityName, sessionID)
+	// Retry is only needed when creating new session and the error returned is NewCustomError(errTooManySessionsMsg)
+	retryPolicy := &RetryPolicy{
+		InitialInterval:    time.Second,
+		BackoffCoefficient: 1.1,
+		MaximumInterval:    time.Second * 10,
+		MaximumAttempts:    10,
+		NonRetriableErrorReasons: []string{
+			"cadenceInternal:Panic",
+			"cadenceInternal:Generic",
+			"cadenceInternal:Timeout START_TO_CLOSE",
+			"cadenceInternal:Timeout HEARTBEAT",
+		},
+	}
+	// Creation activity need an infinite StartToCloseTimeout.
+	scheduleToStartTimeout := time.Second * 10
+	startToCloseTimeout := time.Second*math.MaxInt32 - scheduleToStartTimeout
+	HeartbeatTimeout := time.Second * 20
+	ao := ActivityOptions{
+		TaskList:               creationTasklist,
+		ScheduleToStartTimeout: scheduleToStartTimeout,
+		StartToCloseTimeout:    startToCloseTimeout,
+		HeartbeatTimeout:       HeartbeatTimeout,
+	}
+	if retryable {
+		ao.RetryPolicy = retryPolicy
+	}
+	creationCtx := WithActivityOptions(ctx, ao)
+	creationFuture := ExecuteActivity(creationCtx, sessionCreationActivityName, sessionID)
 
 	var creationErr error
 	var tasklist string
@@ -150,7 +200,7 @@ func createSession(ctx Context, sessionID string, creationTasklist string) (Cont
 	})
 	s.AddFuture(creationFuture, func(f Future) {
 		// activity stoped before signal is received, must be creation timeout.
-		creationErr = errors.New("failed to create session: " + f.Get(ctx, nil).Error())
+		creationErr = f.Get(ctx, nil)
 	})
 	s.Select(ctx)
 
@@ -173,10 +223,12 @@ func createSession(ctx Context, sessionID string, creationTasklist string) (Cont
 	return setSessionInfo(ctx, sessionInfo), nil
 }
 
-func generateSessionID(ctx Context) string {
-	// ycyang TODO: figure out how to generate sessionID which should be deterministic and unique
-	// we can also use the side effect API
-	return getWorkflowEnvironment(ctx).WorkflowInfo().WorkflowExecution.RunID + Now(ctx).String()
+func generateSessionID(ctx Context) (string, error) {
+	var sessionID string
+	err := SideEffect(ctx, func(ctx Context) interface{} {
+		return uuid.New()
+	}).Get(&sessionID)
+	return sessionID, err
 }
 
 func getCreationTasklist(base string) string {
@@ -195,7 +247,7 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 	sessionEnv.Lock()
 	if sessionEnv.sessionToken.availableToken == 0 {
 		sessionEnv.Unlock()
-		return errTooManySessions
+		return NewCustomError(errTooManySessionsMsg)
 	}
 
 	sessionEnv.sessionToken.availableToken--
@@ -237,7 +289,8 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 		case <-ticker.C:
 			err := activityEnv.serviceInvoker.Heartbeat([]byte{})
 			if err != nil {
-				return nil
+				sessionEnv.closeAndDeleteDoneChan(sessionID)
+				return err
 			}
 		case <-doneChan:
 			return nil
@@ -250,15 +303,13 @@ func sessionCompletionActivity(ctx context.Context, sessionID string) error {
 	if !ok {
 		panic("no session environment in context")
 	}
-
-	sessionEnv.Lock()
-	defer sessionEnv.Unlock()
-
-	if doneChan, ok := sessionEnv.doneChanMap[sessionID]; ok {
-		delete(sessionEnv.doneChanMap, sessionID)
-		close(doneChan)
-	}
+	sessionEnv.closeAndDeleteDoneChan(sessionID)
 	return nil
+}
+
+func isSessionCreationActivity(activity interface{}) bool {
+	activityName, ok := activity.(string)
+	return ok && activityName == sessionCreationActivityName
 }
 
 func (t *sessionToken) waitForAvailableToken() {
@@ -289,6 +340,16 @@ func newSessionEnvironment(identity, resourceID string, concurrentSessionExecuti
 		resourceID:               resourceID,
 		resourceSpecificTasklist: resourceSpecificTasklist,
 		sessionToken:             sessionToken,
+	}
+}
+
+func (env *sessionEnvironment) closeAndDeleteDoneChan(sessionID string) {
+	env.Lock()
+	defer env.Unlock()
+
+	if doneChan, ok := env.doneChanMap[sessionID]; ok {
+		delete(env.doneChanMap, sessionID)
+		close(doneChan)
 	}
 }
 

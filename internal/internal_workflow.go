@@ -413,7 +413,9 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header map[str
 	})
 
 	// Add the header information to the Context passed in
-	rootCtx = WithValue(rootCtx, headerContextKey, header)
+	if len(header) > 0 {
+		rootCtx = WithValue(rootCtx, headerContextKey, header)
+	}
 	d.rootCtx, d.cancel = WithCancel(rootCtx)
 	d.dispatcher = dispatcher
 

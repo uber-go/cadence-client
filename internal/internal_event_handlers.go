@@ -814,8 +814,14 @@ func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionStarted(
 		return err
 	}
 
+	// Extract the headers from the attributes
+	var headers map[string][]byte
+	if attributes.Header != nil {
+		headers = attributes.Header.Fields
+	}
+
 	// Invoke the workflow.
-	weh.workflowDefinition.Execute(weh, attributes.Header.Fields, attributes.Input)
+	weh.workflowDefinition.Execute(weh, headers, attributes.Input)
 	return nil
 }
 

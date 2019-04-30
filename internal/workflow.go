@@ -846,6 +846,13 @@ func WithDataConverter(ctx Context, dc encoded.DataConverter) Context {
 	return ctx1
 }
 
+// WithContextPropagators adds ContextPropagators to the context.
+func WithContextPropagators(ctx Context, contextPropagators []ContextPropagator) Context {
+	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
+	getWorkflowEnvOptions(ctx1).contextPropagators = contextPropagators
+	return ctx1
+}
+
 // GetSignalChannel returns channel corresponding to the signal name.
 func GetSignalChannel(ctx Context, signalName string) Channel {
 	return getWorkflowEnvOptions(ctx).getSignalChannel(ctx, signalName)

@@ -118,21 +118,23 @@ type (
 		laTunnel                       *localActivityTunnel
 		nonDeterministicWorkflowPolicy NonDeterministicWorkflowPolicy
 		dataConverter                  encoded.DataConverter
+		contextPropagators             []ContextPropagator
 	}
 
 	activityProvider func(name string) activity
 	// activityTaskHandlerImpl is the implementation of ActivityTaskHandler
 	activityTaskHandlerImpl struct {
-		taskListName     string
-		identity         string
-		service          workflowserviceclient.Interface
-		metricsScope     *metrics.TaggedScope
-		logger           *zap.Logger
-		userContext      context.Context
-		hostEnv          *hostEnvImpl
-		activityProvider activityProvider
-		dataConverter    encoded.DataConverter
-		workerStopCh     <-chan struct{}
+		taskListName       string
+		identity           string
+		service            workflowserviceclient.Interface
+		metricsScope       *metrics.TaggedScope
+		logger             *zap.Logger
+		userContext        context.Context
+		hostEnv            *hostEnvImpl
+		activityProvider   activityProvider
+		dataConverter      encoded.DataConverter
+		workerStopCh       <-chan struct{}
+		contextPropagators []ContextPropagator
 	}
 
 	// history wrapper method to help information about events.
@@ -320,6 +322,7 @@ func newWorkflowTaskHandler(
 		hostEnv:                        hostEnv,
 		nonDeterministicWorkflowPolicy: params.NonDeterministicWorkflowPolicy,
 		dataConverter:                  params.DataConverter,
+		contextPropagators:             params.ContextPropagators,
 	}
 }
 
@@ -475,7 +478,8 @@ func (w *workflowExecutionContextImpl) createEventHandler() {
 		w.wth.enableLoggingInReplay,
 		w.wth.metricsScope,
 		w.wth.hostEnv,
-		w.wth.dataConverter).(*workflowExecutionEventHandlerImpl)
+		w.wth.dataConverter,
+		w.wth.contextPropagators).(*workflowExecutionEventHandlerImpl)
 }
 
 func resetHistory(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (*s.History, error) {
@@ -1369,16 +1373,17 @@ func newActivityTaskHandlerWithCustomProvider(
 	activityProvider activityProvider,
 ) ActivityTaskHandler {
 	return &activityTaskHandlerImpl{
-		taskListName:     params.TaskList,
-		identity:         params.Identity,
-		service:          service,
-		logger:           params.Logger,
-		metricsScope:     metrics.NewTaggedScope(params.MetricsScope),
-		userContext:      params.UserContext,
-		hostEnv:          env,
-		activityProvider: activityProvider,
-		dataConverter:    params.DataConverter,
-		workerStopCh:     params.WorkerStopChannel,
+		taskListName:       params.TaskList,
+		identity:           params.Identity,
+		service:            service,
+		logger:             params.Logger,
+		metricsScope:       metrics.NewTaggedScope(params.MetricsScope),
+		userContext:        params.UserContext,
+		hostEnv:            env,
+		activityProvider:   activityProvider,
+		dataConverter:      params.DataConverter,
+		workerStopCh:       params.WorkerStopChannel,
+		contextPropagators: params.ContextPropagators,
 	}
 }
 

@@ -173,6 +173,7 @@ type (
 		dataConverter                       encoded.DataConverter
 		retryPolicy                         *shared.RetryPolicy
 		cronSchedule                        string
+		contextPropagators                  []ContextPropagator
 	}
 
 	executeWorkflowParams struct {
@@ -392,12 +393,13 @@ func newWorkflowContext(env workflowEnvironment) Context {
 	rootCtx = WithWorkflowTaskStartToCloseTimeout(rootCtx, time.Duration(wInfo.TaskStartToCloseTimeoutSeconds)*time.Second)
 	rootCtx = WithTaskList(rootCtx, wInfo.TaskListName)
 	rootCtx = WithDataConverter(rootCtx, env.GetDataConverter())
+	rootCtx = WithContextPropagators(rootCtx, env.GetContextPropagators())
 	getActivityOptions(rootCtx).OriginalTaskListName = wInfo.TaskListName
 
 	return rootCtx
 }
 
-func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header map[string][]byte, input []byte) {
+func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header *shared.Header, input []byte) {
 	dispatcher, rootCtx := newDispatcher(newWorkflowContext(env), func(ctx Context) {
 		r := &workflowResult{}
 
@@ -412,10 +414,13 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header map[str
 		*rpp = r
 	})
 
-	// Add the header information to the Context passed in
-	if len(header) > 0 {
-		rootCtx = WithValue(rootCtx, headerContextKey, header)
+	for _, ctxProp := range env.GetContextPropagators() {
+		var err error
+		if rootCtx, err = ctxProp.ExtractToWorkflow(rootCtx, NewHeaderReader(header)); err != nil {
+			panic(fmt.Sprintf("Unable to propagate context %v", err))
+		}
 	}
+
 	d.rootCtx, d.cancel = WithCancel(rootCtx)
 	d.dispatcher = dispatcher
 

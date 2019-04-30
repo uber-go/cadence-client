@@ -408,7 +408,7 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(delayStart time.
 	// In case of child workflow, this executeWorkflowInternal() is run in separate goroutinue, so use postCallback
 	// to make sure workflowDef.Execute() is run in main loop.
 	env.postCallback(func() {
-		env.workflowDef.Execute(env, map[string][]byte{}, input)
+		env.workflowDef.Execute(env, &shared.Header{}, input)
 		// kick off first decision task to start the workflow
 		if delayStart == 0 {
 			env.startDecisionTask()
@@ -854,6 +854,10 @@ func (env *testWorkflowEnvironmentImpl) GetMetricsScope() tally.Scope {
 
 func (env *testWorkflowEnvironmentImpl) GetDataConverter() encoded.DataConverter {
 	return env.workerOptions.DataConverter
+}
+
+func (env *testWorkflowEnvironmentImpl) GetContextPropagators() []ContextPropagator {
+	return env.workerOptions.ContextPropagators
 }
 
 func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParams, callback resultHandler) *activityInfo {

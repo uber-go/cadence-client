@@ -104,6 +104,9 @@ type (
 		identity            string
 	}
 
+	// sessionWorker wraps the code for hosting session creation, completion and
+	// activities within a session. The creationWorker polls from a global tasklist,
+	// while the activityWorker polls from a resource specific tasklist.
 	sessionWorker struct {
 		creationWorker Worker
 		activityWorker Worker

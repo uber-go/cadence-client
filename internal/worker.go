@@ -169,7 +169,7 @@ type (
 		// Session workers is for activities within a session.
 		// Enable this option to allow worker to process sessions.
 		// default: false
-		EnableSessionActivityWorker bool
+		EnableSessionWorker bool
 
 		// Optional: The identifier of the resource consumed by sessions.
 		// It's the user's responsibility to ensure there's only one worker using this resourceID.

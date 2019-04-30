@@ -49,7 +49,7 @@ type (
 		sessionState sessionState
 	}
 
-	sessionToken struct {
+	sessionTokenBucket struct {
 		*sync.Cond
 		availableToken int
 	}
@@ -59,7 +59,7 @@ type (
 		doneChanMap              map[string]chan struct{}
 		resourceID               string
 		resourceSpecificTasklist string
-		sessionToken             *sessionToken
+		sessionTokenBucket       *sessionTokenBucket
 		testEnv                  *testWorkflowEnvironmentImpl
 	}
 )
@@ -245,18 +245,18 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 		panic("no session environment in context")
 	}
 	sessionEnv.Lock()
-	if sessionEnv.sessionToken.availableToken == 0 {
+	if sessionEnv.sessionTokenBucket.availableToken == 0 {
 		sessionEnv.Unlock()
 		return NewCustomError(errTooManySessionsMsg)
 	}
 
-	sessionEnv.sessionToken.availableToken--
+	sessionEnv.sessionTokenBucket.availableToken--
 	doneChan := make(chan struct{})
 	sessionEnv.doneChanMap[sessionID] = doneChan
 	sessionEnv.Unlock()
 
 	defer func() {
-		sessionEnv.sessionToken.addToken()
+		sessionEnv.sessionTokenBucket.addToken()
 	}()
 
 	activityEnv := getActivityEnv(ctx)
@@ -312,7 +312,7 @@ func isSessionCreationActivity(activity interface{}) bool {
 	return ok && activityName == sessionCreationActivityName
 }
 
-func (t *sessionToken) waitForAvailableToken() {
+func (t *sessionTokenBucket) waitForAvailableToken() {
 	t.L.Lock()
 	for t.availableToken == 0 {
 		t.Wait()
@@ -320,7 +320,7 @@ func (t *sessionToken) waitForAvailableToken() {
 	t.L.Unlock()
 }
 
-func (t *sessionToken) addToken() {
+func (t *sessionTokenBucket) addToken() {
 	t.L.Lock()
 	t.availableToken++
 	t.L.Unlock()
@@ -330,7 +330,7 @@ func (t *sessionToken) addToken() {
 func newSessionEnvironment(identity, resourceID string, concurrentSessionExecutionSize int) *sessionEnvironment {
 	resourceSpecificTasklist := getResourceSpecificTasklist(identity, resourceID)
 	sessionMutex := &sync.Mutex{}
-	sessionToken := &sessionToken{
+	sessionTokenBucket := &sessionTokenBucket{
 		Cond:           sync.NewCond(sessionMutex),
 		availableToken: concurrentSessionExecutionSize,
 	}
@@ -339,7 +339,7 @@ func newSessionEnvironment(identity, resourceID string, concurrentSessionExecuti
 		doneChanMap:              make(map[string]chan struct{}),
 		resourceID:               resourceID,
 		resourceSpecificTasklist: resourceSpecificTasklist,
-		sessionToken:             sessionToken,
+		sessionTokenBucket:       sessionTokenBucket,
 	}
 }
 

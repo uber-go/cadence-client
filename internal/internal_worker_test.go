@@ -380,7 +380,7 @@ func createWorkerWithThrottle(
 	if dc != nil {
 		workerOptions.DataConverter = dc
 	}
-	workerOptions.EnableSessionActivityWorker = true
+	workerOptions.EnableSessionWorker = true
 	workerOptions.SessionResourceID = "testResourceID"
 
 	// Start Worker.

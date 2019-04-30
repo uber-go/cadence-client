@@ -26,7 +26,7 @@ import (
 
 // SessionInfo contains information of a created session. For now, the only exported
 // field is SessionID which has string type. SessionID is a uuid generated when
-// calling CreateSession() or RecreateSession() and can be used to uniquely identify
+// CreateSession() or RecreateSession() is called and can be used to uniquely identify
 // a session.
 type SessionInfo = internal.SessionInfo
 

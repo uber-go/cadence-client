@@ -385,8 +385,9 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	sessionEnvironment := newSessionEnvironment(params.Identity, params.SessionResourceID, maxConCurrentSessionExecutionSize)
 
 	params.UserContext = context.WithValue(params.UserContext, sessionEnvironmentContextKey, sessionEnvironment)
+	params.ConcurrentPollRoutineSize = 1
 	params.TaskList = getCreationTasklist(params.TaskList)
-	creationWorker := newActivityWorker(service, domain, params, nil, env, sessionEnvironment.sessionToken)
+	creationWorker := newActivityWorker(service, domain, params, nil, env, sessionEnvironment.sessionTokenBucket)
 
 	params.TaskList = sessionEnvironment.resourceSpecificTasklist
 	activityWorker := newActivityWorker(service, domain, params, nil, env, nil)
@@ -430,7 +431,7 @@ func newActivityWorker(
 	params workerExecutionParameters,
 	overrides *workerOverrides,
 	env *hostEnvImpl,
-	sessionToken *sessionToken,
+	sessionTokenBucket *sessionTokenBucket,
 ) Worker {
 	workerStopChannel := make(chan struct{}, 1)
 	params.WorkerStopChannel = getReadOnlyChannel(workerStopChannel)
@@ -443,7 +444,7 @@ func newActivityWorker(
 	} else {
 		taskHandler = newActivityTaskHandler(service, params, env)
 	}
-	return newActivityTaskWorker(taskHandler, service, domain, params, workerStopChannel, sessionToken)
+	return newActivityTaskWorker(taskHandler, service, domain, params, workerStopChannel, sessionTokenBucket)
 }
 
 func newActivityTaskWorker(
@@ -452,7 +453,7 @@ func newActivityTaskWorker(
 	domain string,
 	workerParams workerExecutionParameters,
 	workerStopCh chan struct{},
-	sessionToken *sessionToken,
+	sessionTokenBucket *sessionTokenBucket,
 ) (worker Worker) {
 	ensureRequiredParams(&workerParams)
 
@@ -477,7 +478,7 @@ func newActivityTaskWorker(
 		workerParams.Logger,
 		workerParams.MetricsScope,
 		workerStopCh,
-		sessionToken,
+		sessionTokenBucket,
 	)
 
 	return &activityWorker{
@@ -1176,7 +1177,7 @@ func newAggregatedWorker(
 	}
 
 	var sessionWorker Worker
-	if wOptions.EnableSessionActivityWorker {
+	if wOptions.EnableSessionWorker {
 		sessionWorker = newSessionWorker(
 			service,
 			domain,

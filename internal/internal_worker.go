@@ -39,6 +39,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pborman/uuid"
+
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
@@ -69,7 +71,7 @@ const (
 
 	defaultPollerRate = 1000
 
-	defaultMaxConcurrentSeesionExecutionSize = 1000 // ycyang TODO
+	defaultMaxConcurrentSeesionExecutionSize = 1000 // Large concurrent session execution size (1k)
 
 	testTagsContextKey = "cadence-testTags"
 )
@@ -373,9 +375,12 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	env *hostEnvImpl,
 	maxConCurrentSessionExecutionSize int,
 ) Worker {
-	// ycyang TODO: what if user doesn't specify the resourceID? Generate a uuid? Should return an error.
 	if params.Identity == "" {
 		params.Identity = getWorkerIdentity(params.TaskList)
+	}
+	if params.SessionResourceID == "" {
+		// TODO: Should we generate a uuid for user?
+		params.SessionResourceID = "Resource_" + uuid.New()
 	}
 	sessionEnvironment := newSessionEnvironment(params.Identity, params.SessionResourceID, maxConCurrentSessionExecutionSize)
 

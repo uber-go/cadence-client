@@ -165,15 +165,19 @@ type (
 		// default: 0s
 		WorkerStopTimeout time.Duration
 
-		// Optional:
+		// Optional: Enable running session workers.
+		// Session workers is for activities within a session.
+		// Enable this option to allow worker to process sessions.
 		// default: false
 		EnableSessionActivityWorker bool
 
-		// Required when EnableSessionActivityWorker is set to true
+		// Optional: The identifier of the resource consumed by sessions.
+		// It's the user's responsibility to ensure there's only one worker using this resourceID.
+		// For now, if user doesn't specify one, a new uuid will be used as the resourceID.
 		SessionResourceID string
 
-		// Optional: Sets the maximum number of concurrently running session
-		// default: 10
+		// Optional: Sets the maximum number of concurrently running sessions the resource support.
+		// default: 1000
 		MaxConCurrentSessionExecutionSize int
 	}
 )

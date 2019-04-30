@@ -502,11 +502,7 @@ func (s *SessionTestSuite) createSessionWithoutRetry(ctx Context) (Context, erro
 	if baseTasklist == "" {
 		baseTasklist = options.OriginalTaskListName
 	}
-	sessionID, err := generateSessionID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return createSession(ctx, sessionID, getCreationTasklist(baseTasklist), false)
+	return createSession(ctx, getCreationTasklist(baseTasklist), false)
 }
 
 func testSessionActivity(ctx context.Context, name string) (string, error) {

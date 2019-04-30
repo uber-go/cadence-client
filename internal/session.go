@@ -82,7 +82,7 @@ var (
 	errNoOpenSession            = errors.New("no open session in the context")
 	errNoSessionInfo            = errors.New("no session information found in the context")
 	errFoundExistingOpenSession = errors.New("found exisiting open session in the context")
-	errSessionFailed            = errors.New("session has already failed")
+	errSessionFailed            = errors.New("session has failed")
 )
 
 // CreateSession create a session
@@ -92,16 +92,12 @@ func CreateSession(ctx Context) (Context, error) {
 	if baseTasklist == "" {
 		baseTasklist = options.OriginalTaskListName
 	}
-	sessionID, err := generateSessionID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return createSession(ctx, sessionID, getCreationTasklist(baseTasklist), true)
+	return createSession(ctx, getCreationTasklist(baseTasklist), true)
 }
 
 // RecreateSession recreate a session
 func RecreateSession(ctx Context, sessionInfo *SessionInfo) (Context, error) {
-	return createSession(ctx, sessionInfo.SessionID, sessionInfo.tasklist, false)
+	return createSession(ctx, sessionInfo.tasklist, false)
 }
 
 // CompleteSession complete a session
@@ -157,9 +153,13 @@ func setSessionInfo(ctx Context, sessionInfo *SessionInfo) Context {
 	return WithValue(ctx, sessionInfoContextKey, sessionInfo)
 }
 
-func createSession(ctx Context, sessionID string, creationTasklist string, retryable bool) (Context, error) {
+func createSession(ctx Context, creationTasklist string, retryable bool) (Context, error) {
 	if prevSessionInfo := getSessionInfo(ctx); prevSessionInfo != nil && prevSessionInfo.sessionState == sessionStateOpen {
 		return nil, errFoundExistingOpenSession
+	}
+	sessionID, err := generateSessionID(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	tasklistChan := GetSignalChannel(ctx, sessionID) // use sessionID as channel name

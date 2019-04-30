@@ -304,6 +304,7 @@ func (wc *workflowEnvironmentImpl) ExecuteChildWorkflow(
 	attributes.ChildPolicy = params.childPolicy.toThriftChildPolicyPtr()
 	attributes.WorkflowIdReusePolicy = params.workflowIDReusePolicy.toThriftPtr()
 	attributes.RetryPolicy = params.retryPolicy
+	attributes.Header = params.header
 	if len(params.cronSchedule) > 0 {
 		attributes.CronSchedule = common.StringPtr(params.cronSchedule)
 	}

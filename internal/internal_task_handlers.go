@@ -1295,6 +1295,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			TaskList:                            common.TaskListPtr(s.TaskList{Name: contErr.params.taskListName}),
 			ExecutionStartToCloseTimeoutSeconds: contErr.params.executionStartToCloseTimeoutSeconds,
 			TaskStartToCloseTimeoutSeconds:      contErr.params.taskStartToCloseTimeoutSeconds,
+			Header:                              contErr.params.header,
 		}
 	} else if workflowContext.err != nil {
 		// Workflow failures
@@ -1543,7 +1544,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	workflowType := t.WorkflowType.GetName()
 	activityType := t.ActivityType.GetName()
 	metricsScope := getMetricsScopeForActivity(ath.metricsScope, workflowType, activityType)
-	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, ath.workerStopCh)
+	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, ath.workerStopCh, ath.contextPropagators)
 
 	activityImplementation := ath.getActivity(activityType)
 	if activityImplementation == nil {
@@ -1568,6 +1569,15 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr, ath.dataConverter), nil
 		}
 	}()
+
+	// propagate context information into the activity context from the headers
+	for _, ctxProp := range ath.contextPropagators {
+		var err error
+		if ctx, err = ctxProp.Extract(ctx, NewHeaderReader(t.Header)); err != nil {
+			return nil, fmt.Errorf("unable to propagate context %v", err)
+		}
+	}
+
 	info := ctx.Value(activityEnvContextKey).(*activityEnvironment)
 	ctx, dlCancelFunc := context.WithDeadline(ctx, info.deadline)
 

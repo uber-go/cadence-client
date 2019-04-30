@@ -545,6 +545,7 @@ func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interf
 		return result
 	}
 	options.dataConverter = dc
+	options.contextPropagators = getWorkflowEnvOptions(ctx).contextPropagators
 
 	params := executeWorkflowParams{
 		workflowOptions: *options,

@@ -180,6 +180,7 @@ type (
 		workflowOptions
 		workflowType         *WorkflowType
 		input                []byte
+		header               *shared.Header
 		attempt              int32     // used by test framework to support child workflow retry
 		scheduledTime        time.Time // used by test framework to support child workflow retry
 		lastCompletionResult []byte    // used by test framework to support cron
@@ -414,6 +415,7 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header *shared
 		*rpp = r
 	})
 
+	// set the information from the headers that is to be propagated in the workflow context
 	for _, ctxProp := range env.GetContextPropagators() {
 		var err error
 		if rootCtx, err = ctxProp.ExtractToWorkflow(rootCtx, NewHeaderReader(header)); err != nil {

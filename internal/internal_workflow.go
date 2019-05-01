@@ -395,7 +395,7 @@ func newWorkflowContext(env workflowEnvironment) Context {
 	rootCtx = WithWorkflowTaskStartToCloseTimeout(rootCtx, time.Duration(wInfo.TaskStartToCloseTimeoutSeconds)*time.Second)
 	rootCtx = WithTaskList(rootCtx, wInfo.TaskListName)
 	rootCtx = WithDataConverter(rootCtx, env.GetDataConverter())
-	rootCtx = WithContextPropagators(rootCtx, env.GetContextPropagators())
+	rootCtx = withContextPropagators(rootCtx, env.GetContextPropagators())
 	getActivityOptions(rootCtx).OriginalTaskListName = wInfo.TaskListName
 
 	return rootCtx

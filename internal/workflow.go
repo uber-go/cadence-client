@@ -851,8 +851,8 @@ func WithDataConverter(ctx Context, dc encoded.DataConverter) Context {
 	return ctx1
 }
 
-// WithContextPropagators adds ContextPropagators to the context.
-func WithContextPropagators(ctx Context, contextPropagators []ContextPropagator) Context {
+// withContextPropagators adds ContextPropagators to the context.
+func withContextPropagators(ctx Context, contextPropagators []ContextPropagator) Context {
 	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
 	getWorkflowEnvOptions(ctx1).contextPropagators = contextPropagators
 	return ctx1

@@ -84,6 +84,14 @@
   version = "v1.0"
 
 [[projects]]
+  digest = "1:1d7e1867c49a6dd9856598ef7c3123604ea3daabf5b83f303ff457bcbc410b1d"
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  pruneopts = ""
+  revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
+  version = "v0.8.1"
+
+[[projects]]
   digest = "1:256484dbbcd271f9ecebc6795b2df8cad4c458dd0f5fd82a8c2fa0c29f233411"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
@@ -182,15 +190,21 @@
   name = "github.com/uber/jaeger-client-go"
   packages = [
     ".",
+    "config",
     "internal/baggage",
+    "internal/baggage/remote",
     "internal/spanlog",
     "internal/throttler",
+    "internal/throttler/remote",
     "log",
+    "rpcmetrics",
     "thrift",
     "thrift-gen/agent",
+    "thrift-gen/baggage",
     "thrift-gen/jaeger",
     "thrift-gen/sampling",
     "thrift-gen/zipkincore",
+    "transport",
     "utils",
   ]
   pruneopts = ""
@@ -342,6 +356,7 @@
     "github.com/facebookgo/clock",
     "github.com/golang/mock/gomock",
     "github.com/opentracing/opentracing-go",
+    "github.com/opentracing/opentracing-go/ext",
     "github.com/pborman/uuid",
     "github.com/robfig/cron",
     "github.com/sirupsen/logrus",
@@ -350,7 +365,7 @@
     "github.com/stretchr/testify/require",
     "github.com/stretchr/testify/suite",
     "github.com/uber-go/tally",
-    "github.com/uber/jaeger-client-go",
+    "github.com/uber/jaeger-client-go/config",
     "github.com/uber/tchannel-go/thrift",
     "go.uber.org/atomic",
     "go.uber.org/thriftrw/thriftreflect",

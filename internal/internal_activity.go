@@ -75,6 +75,7 @@ type (
 		ActivityType  ActivityType
 		Input         []byte
 		DataConverter encoded.DataConverter
+		Header        *shared.Header
 	}
 
 	executeLocalActivityParams struct {

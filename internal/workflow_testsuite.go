@@ -68,6 +68,11 @@ type (
 		runFn        func(args mock.Arguments)
 		waitDuration func() time.Duration
 	}
+
+	// TestContextPropagator propagates test keys across a workflow
+	TestContextPropagator struct {
+		keys []string
+	}
 )
 
 func newEncodedValues(values []byte, dc encoded.DataConverter) encoded.Values {
@@ -107,6 +112,60 @@ func (b ErrorDetailsValues) Get(valuePtr ...interface{}) error {
 // HasValues return whether there are values.
 func (b ErrorDetailsValues) HasValues() bool {
 	return b != nil && len(b) != 0
+}
+
+// Inject injects values from context into headers for propagation
+func (t *TestContextPropagator) Inject(ctx context.Context, writer HeaderWriter) error {
+	for _, key := range t.keys {
+		value, ok := ctx.Value(contextKey(key)).([]byte)
+		if !ok {
+			return fmt.Errorf("unable to extract key from context %v", key)
+		}
+		writer.Set(key, value)
+	}
+	return nil
+}
+
+// InjectFromWorkflow injects values from context into headers for propagation
+func (t *TestContextPropagator) InjectFromWorkflow(ctx Context, writer HeaderWriter) error {
+	for _, key := range t.keys {
+		value, ok := ctx.Value(contextKey(key)).([]byte)
+		if !ok {
+			return fmt.Errorf("unable to extract key from context %v", key)
+		}
+		writer.Set(key, value)
+	}
+	return nil
+}
+
+// Extract extracts values from headers and puts them into context
+func (t *TestContextPropagator) Extract(ctx context.Context, reader HeaderReader) (context.Context, error) {
+	if err := reader.ForEachKey(func(key string, value []byte) error {
+		for _, k := range t.keys {
+			if key == k {
+				ctx = context.WithValue(ctx, contextKey(key), value)
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return ctx, nil
+}
+
+// ExtractToWorkflow extracts values from headers and puts them into context
+func (t *TestContextPropagator) ExtractToWorkflow(ctx Context, reader HeaderReader) (Context, error) {
+	if err := reader.ForEachKey(func(key string, value []byte) error {
+		for _, k := range t.keys {
+			if key == k {
+				ctx = WithValue(ctx, contextKey(key), value)
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return ctx, nil
 }
 
 // NewTestWorkflowEnvironment creates a new instance of TestWorkflowEnvironment. Use the returned TestWorkflowEnvironment

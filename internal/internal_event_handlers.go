@@ -383,6 +383,7 @@ func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityPar
 	scheduleTaskAttr.ScheduleToStartTimeoutSeconds = common.Int32Ptr(parameters.ScheduleToStartTimeoutSeconds)
 	scheduleTaskAttr.HeartbeatTimeoutSeconds = common.Int32Ptr(parameters.HeartbeatTimeoutSeconds)
 	scheduleTaskAttr.RetryPolicy = parameters.RetryPolicy
+	scheduleTaskAttr.Header = parameters.Header
 
 	decision := wc.decisionsHelper.scheduleActivityTask(scheduleTaskAttr)
 	decision.setData(&scheduledActivity{

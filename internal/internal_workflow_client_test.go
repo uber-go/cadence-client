@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -782,6 +783,35 @@ func (s *workflowClientTestSuite) TestStartWorkflow() {
 
 	resp, err := client.StartWorkflow(context.Background(), options, f1, []byte("test"))
 	s.Equal(getDefaultDataConverter(), client.dataConverter)
+	s.Nil(err)
+	s.Equal(createResponse.GetRunId(), resp.RunID)
+}
+
+func (s *workflowClientTestSuite) TestStartWorkflow_WithContext() {
+	s.client = NewClient(s.service, domain, &ClientOptions{ContextPropagators: []ContextPropagator{&TestContextPropagator{keys: []string{testHeader}}}})
+	client, ok := s.client.(*workflowClient)
+	s.True(ok)
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        tasklist,
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+	}
+	f1 := func(ctx Context, r []byte) error {
+		value := ctx.Value(contextKey(testHeader))
+		if val, ok := value.([]byte); ok {
+			s.Equal("test-data", string(val))
+			return nil
+		}
+		return fmt.Errorf("context did not propagate to workflow")
+	}
+
+	createResponse := &shared.StartWorkflowExecutionResponse{
+		RunId: common.StringPtr(runID),
+	}
+	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil)
+
+	resp, err := client.StartWorkflow(context.Background(), options, f1, []byte("test"))
 	s.Nil(err)
 	s.Equal(createResponse.GetRunId(), resp.RunID)
 }

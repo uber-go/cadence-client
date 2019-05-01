@@ -355,11 +355,15 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 		return future
 	}
 
+	// Retrieve headers from context to pass them on
+	header := getHeadersFromContext(ctx)
+
 	params := executeActivityParams{
 		activityOptions: *options,
 		ActivityType:    *activityType,
 		Input:           input,
 		DataConverter:   dataConverter,
+		Header:          header,
 	}
 
 	ctxDone, cancellable := ctx.Done().(*channelImpl)

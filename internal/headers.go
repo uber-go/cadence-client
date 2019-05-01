@@ -59,6 +59,9 @@ type headerReader struct {
 }
 
 func (hr *headerReader) ForEachKey(handler func(string, []byte) error) error {
+	if hr.header == nil {
+		return nil
+	}
 	for key, value := range hr.header.Fields {
 		if err := handler(key, value); err != nil {
 			return err
@@ -77,10 +80,16 @@ type headerWriter struct {
 }
 
 func (hw *headerWriter) Set(key string, value []byte) {
+	if hw.header == nil {
+		return
+	}
 	hw.header.Fields[key] = value
 }
 
 // NewHeaderWriter returns a header writer interface
 func NewHeaderWriter(header *shared.Header) HeaderWriter {
+	if header != nil && header.Fields == nil {
+		header.Fields = make(map[string][]byte)
+	}
 	return &headerWriter{header}
 }

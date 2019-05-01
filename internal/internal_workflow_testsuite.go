@@ -52,6 +52,7 @@ const (
 	defaultTestWorkflowTypeName = "default-test-workflow-type-name"
 	defaultTestDomainName       = "default-test-domain-name"
 	workflowTypeNotSpecified    = "workflow-type-not-specified"
+	testHeader                  = "test-header"
 )
 
 type (
@@ -283,6 +284,7 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 	if env.workerOptions.DataConverter == nil {
 		env.workerOptions.DataConverter = getDefaultDataConverter()
 	}
+	env.workerOptions.ContextPropagators = append(env.workerOptions.ContextPropagators, &TestContextPropagator{keys: []string{testHeader}})
 
 	return env
 }
@@ -404,11 +406,16 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(delayStart time.
 		panic(err)
 	}
 	env.workflowDef = workflowDefinition
+	header := &shared.Header{
+		Fields: map[string][]byte{
+			"test-header": []byte("test-data"),
+		},
+	}
 	// env.workflowDef.Execute() method will execute dispatcher. We want the dispatcher to only run in main loop.
 	// In case of child workflow, this executeWorkflowInternal() is run in separate goroutinue, so use postCallback
 	// to make sure workflowDef.Execute() is run in main loop.
 	env.postCallback(func() {
-		env.workflowDef.Execute(env, &shared.Header{}, input)
+		env.workflowDef.Execute(env, header, input)
 		// kick off first decision task to start the workflow
 		if delayStart == 0 {
 			env.startDecisionTask()
@@ -463,6 +470,11 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 		},
 		ActivityType: *activityType,
 		Input:        input,
+		Header: &shared.Header{
+			Fields: map[string][]byte{
+				testHeader: []byte("test-data"),
+			},
+		},
 	}
 
 	task := newTestActivityTask(
@@ -1475,6 +1487,7 @@ func newTestActivityTask(workflowID, runID, activityID, workflowTypeName, domain
 			Name: common.StringPtr(workflowTypeName),
 		},
 		WorkflowDomain: common.StringPtr(domainName),
+		Header:         params.Header,
 	}
 	return task
 }

@@ -37,6 +37,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/atomic"
 	"go.uber.org/cadence/.gen/go/shared"
+	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/metrics"
@@ -1168,6 +1169,22 @@ func getDataConverterFromWorkflowContext(ctx Context) encoded.DataConverter {
 		return getDefaultDataConverter()
 	}
 	return options.dataConverter
+}
+
+func getContextPropagatorsFromWorkflowContext(ctx Context) []ContextPropagator {
+	options := getWorkflowEnvOptions(ctx)
+	return options.contextPropagators
+}
+
+func getHeadersFromContext(ctx Context) *shared.Header {
+	header := &s.Header{
+		Fields: make(map[string][]byte),
+	}
+	contextPropagators := getContextPropagatorsFromWorkflowContext(ctx)
+	for _, ctxProp := range contextPropagators {
+		ctxProp.InjectFromWorkflow(ctx, NewHeaderWriter(header))
+	}
+	return header
 }
 
 // getSignalChannel finds the associated channel for the signal.

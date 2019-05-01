@@ -25,7 +25,6 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 )
 
 // HeaderWriter is an interface to write information to cadence headers
@@ -57,17 +56,14 @@ type ContextPropagator interface {
 }
 
 // NewTracingContextPropagator returns new tracing context propagator object
-func NewTracingContextPropagator(dataConverter encoded.DataConverter) ContextPropagator {
-	if dataConverter == nil {
-		dataConverter = getDefaultDataConverter()
-	}
-	return &tracingContextPropagator{dataConverter}
+func NewTracingContextPropagator() ContextPropagator {
+	return &tracingContextPropagator{}
 }
 
 const tracingKey = "tracingContextKey"
 
 type tracingContextPropagator struct {
-	converter encoded.DataConverter
+	tracer opentracing.Tracer
 }
 
 func (t *tracingContextPropagator) Inject(
@@ -77,12 +73,7 @@ func (t *tracingContextPropagator) Inject(
 	// retrieve span from context object
 	span := opentracing.SpanFromContext(ctx)
 
-	// marshal span object
-	data, err := t.converter.ToData(span)
-	if err != nil {
-		return err
-	}
-	hw.Set(tracingKey, data)
+	t.tracer.Inject(span.Context(), opentracing.HTTPHeaders, hw)
 	return nil
 }
 
@@ -92,11 +83,6 @@ func (t *tracingContextPropagator) Extract(
 ) (context.Context, error) {
 	err := hr.ForEachKey(func(key string, value []byte) error {
 		if key == tracingKey {
-			var span opentracing.Span
-			if err := t.converter.FromData(value, &span); err != nil {
-				return err
-			}
-			ctx = opentracing.ContextWithSpan(ctx, span)
 			return nil
 		}
 		return nil
@@ -114,12 +100,7 @@ func (t *tracingContextPropagator) InjectFromWorkflow(
 	// retrieve span from context object
 	span := spanFromContext(ctx)
 
-	// marshal span object
-	data, err := t.converter.ToData(span)
-	if err != nil {
-		return err
-	}
-	hw.Set(tracingKey, data)
+	t.tracer.Inject(span.Context(), opentracing.HTTPHeaders, hw)
 	return nil
 }
 
@@ -129,11 +110,6 @@ func (t *tracingContextPropagator) ExtractToWorkflow(
 ) (Context, error) {
 	err := hr.ForEachKey(func(key string, value []byte) error {
 		if key == tracingKey {
-			var span opentracing.Span
-			if err := t.converter.FromData(value, &span); err != nil {
-				return err
-			}
-			ctx = contextWithSpan(ctx, span)
 			return nil
 		}
 		return nil

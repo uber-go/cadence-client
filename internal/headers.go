@@ -23,7 +23,6 @@ package internal
 import (
 	"context"
 
-	"github.com/opentracing/opentracing-go"
 	"go.uber.org/cadence/.gen/go/shared"
 )
 
@@ -53,71 +52,6 @@ type ContextPropagator interface {
 	// ExtractToWorkflow extracts context information from headers and returns
 	// a workflow context
 	ExtractToWorkflow(Context, HeaderReader) (Context, error)
-}
-
-// NewTracingContextPropagator returns new tracing context propagator object
-func NewTracingContextPropagator() ContextPropagator {
-	return &tracingContextPropagator{}
-}
-
-const tracingKey = "tracingContextKey"
-
-type tracingContextPropagator struct {
-	tracer opentracing.Tracer
-}
-
-func (t *tracingContextPropagator) Inject(
-	ctx context.Context,
-	hw HeaderWriter,
-) error {
-	// retrieve span from context object
-	span := opentracing.SpanFromContext(ctx)
-
-	t.tracer.Inject(span.Context(), opentracing.HTTPHeaders, hw)
-	return nil
-}
-
-func (t *tracingContextPropagator) Extract(
-	ctx context.Context,
-	hr HeaderReader,
-) (context.Context, error) {
-	err := hr.ForEachKey(func(key string, value []byte) error {
-		if key == tracingKey {
-			return nil
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return ctx, nil
-}
-
-func (t *tracingContextPropagator) InjectFromWorkflow(
-	ctx Context,
-	hw HeaderWriter,
-) error {
-	// retrieve span from context object
-	span := spanFromContext(ctx)
-
-	t.tracer.Inject(span.Context(), opentracing.HTTPHeaders, hw)
-	return nil
-}
-
-func (t *tracingContextPropagator) ExtractToWorkflow(
-	ctx Context,
-	hr HeaderReader,
-) (Context, error) {
-	err := hr.ForEachKey(func(key string, value []byte) error {
-		if key == tracingKey {
-			return nil
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return ctx, nil
 }
 
 type headerReader struct {

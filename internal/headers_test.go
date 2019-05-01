@@ -139,29 +139,3 @@ func TestHeaderReader(t *testing.T) {
 		})
 	}
 }
-
-func TestTracingContextPropagator(t *testing.T) {
-	/*
-		ctxProp := NewTracingContextPropagator()
-
-		tracer := opentracing.NoopTracer{}
-		span := tracer.StartSpan("test-operation")
-		ctx := context.Background()
-		ctx = opentracing.ContextWithSpan(ctx, span)
-		header := &shared.Header{
-			Fields: map[string][]byte{},
-		}
-
-		err := ctxProp.Inject(ctx, NewHeaderWriter(header))
-		assert.NoError(t, err)
-
-		_, ok := header.Fields[tracingKey]
-		assert.True(t, ok)
-
-		returnCtx := context.Background()
-		returnCtx, err = ctxProp.Extract(returnCtx, NewHeaderReader(header))
-		assert.NoError(t, err)
-		newSpan := opentracing.SpanFromContext(returnCtx)
-		assert.Equal(t, span, newSpan)
-	*/
-}

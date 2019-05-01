@@ -72,7 +72,7 @@ func (t *tracingContextPropagator) Extract(
 	if err != nil {
 		return nil, err
 	}
-	span := t.tracer.StartSpan("test-operation", ext.RPCServerOption(spanContext))
+	span := t.tracer.StartSpan("", ext.RPCServerOption(spanContext))
 	return opentracing.ContextWithSpan(ctx, span), nil
 }
 
@@ -83,7 +83,7 @@ func (t *tracingContextPropagator) InjectFromWorkflow(
 	// retrieve span from context object
 	span := spanFromContext(ctx)
 
-	t.tracer.Inject(span.Context(), opentracing.HTTPHeaders, hw)
+	t.tracer.Inject(span.Context(), opentracing.HTTPHeaders, tracingWriter{hw})
 	return nil
 }
 
@@ -91,10 +91,10 @@ func (t *tracingContextPropagator) ExtractToWorkflow(
 	ctx Context,
 	hr HeaderReader,
 ) (Context, error) {
-	spanContext, err := t.tracer.Extract(opentracing.TextMap, hr)
+	spanContext, err := t.tracer.Extract(opentracing.TextMap, tracingReader{hr})
 	if err != nil {
 		return nil, err
 	}
-	span := t.tracer.StartSpan("test-operation", ext.RPCServerOption(spanContext))
+	span := t.tracer.StartSpan("", ext.RPCServerOption(spanContext))
 	return contextWithSpan(ctx, span), nil
 }

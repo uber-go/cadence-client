@@ -164,6 +164,10 @@ var (
 	todo       = new(emptyCtx)
 )
 
+func Background() Context {
+	return background
+}
+
 // ErrCanceled is the error returned by Context.Err when the context is canceled.
 var ErrCanceled = NewCanceledError()
 

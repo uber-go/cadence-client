@@ -55,3 +55,28 @@ func TestTracingContextPropagator(t *testing.T) {
 	span = opentracing.SpanFromContext(returnCtx)
 	assert.NotNil(t, span)
 }
+
+func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
+	config := jaeger_config.Configuration{}
+	closer, err := config.InitGlobalTracer("test-service")
+	assert.NoError(t, err)
+	defer closer.Close()
+	tracer := opentracing.GlobalTracer()
+	ctxProp := NewTracingContextPropagator(tracer)
+
+	span := tracer.StartSpan("test-operation")
+	ctx := contextWithSpan(Background(), span)
+	header := &shared.Header{
+		Fields: map[string][]byte{},
+	}
+
+	err = ctxProp.InjectFromWorkflow(ctx, NewHeaderWriter(header))
+	assert.NoError(t, err)
+
+	returnCtx := Background()
+	returnCtx, err = ctxProp.ExtractToWorkflow(returnCtx, NewHeaderReader(header))
+	assert.NoError(t, err)
+
+	span = spanFromContext(returnCtx)
+	assert.NotNil(t, span)
+}

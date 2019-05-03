@@ -132,6 +132,7 @@ type (
 		hostEnv          *hostEnvImpl
 		activityProvider activityProvider
 		dataConverter    encoded.DataConverter
+		workerStopCh     <-chan struct{}
 	}
 
 	// history wrapper method to help information about events.
@@ -438,7 +439,11 @@ func (w *workflowExecutionContextImpl) queueResetStickinessTask() {
 			RunId:      common.StringPtr(w.workflowInfo.WorkflowExecution.RunID),
 		},
 	}
-	w.laTunnel.resultCh <- &task
+	// w.laTunnel could be nil for worker.ReplayHistory() because there is no worker started, in that case we don't
+	// care about resetStickinessTask.
+	if w.laTunnel != nil && w.laTunnel.resultCh != nil {
+		w.laTunnel.resultCh <- &task
+	}
 }
 
 func (w *workflowExecutionContextImpl) clearState() {
@@ -1366,6 +1371,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		hostEnv:          env,
 		activityProvider: activityProvider,
 		dataConverter:    params.DataConverter,
+		workerStopCh:     params.WorkerStopChannel,
 	}
 }
 
@@ -1379,6 +1385,7 @@ type cadenceInvoker struct {
 	hbBatchEndTimer       *time.Timer // Whether we started a batch of operations that need to be reported in the cycle. This gets started on a user call.
 	lastDetailsToReport   *[]byte
 	closeCh               chan struct{}
+	workerStopChannel     <-chan struct{}
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
@@ -1414,6 +1421,8 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 			select {
 			case <-i.hbBatchEndTimer.C:
 				// We are close to deadline.
+			case <-i.workerStopChannel:
+				// Activity worker is close to stop. This does the same steps as batch timer ends.
 			case <-i.closeCh:
 				// We got closed.
 				return
@@ -1485,6 +1494,7 @@ func newServiceInvoker(
 	service workflowserviceclient.Interface,
 	cancelHandler func(),
 	heartBeatTimeoutInSec int32,
+	workerStopChannel <-chan struct{},
 ) ServiceInvoker {
 	return &cadenceInvoker{
 		taskToken:             taskToken,
@@ -1493,6 +1503,7 @@ func newServiceInvoker(
 		cancelHandler:         cancelHandler,
 		heartBeatTimeoutInSec: heartBeatTimeoutInSec,
 		closeCh:               make(chan struct{}),
+		workerStopChannel:     workerStopChannel,
 	}
 }
 
@@ -1510,7 +1521,8 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 		rootCtx = context.Background()
 	}
 	canCtx, cancel := context.WithCancel(rootCtx)
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds())
+
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh)
 	defer func() {
 		_, activityCompleted := result.(*s.RespondActivityTaskCompletedRequest)
 		invoker.Close(!activityCompleted) // flush buffered heartbeat if activity was not successfully completed.
@@ -1519,7 +1531,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	workflowType := t.WorkflowType.GetName()
 	activityType := t.ActivityType.GetName()
 	metricsScope := getMetricsScopeForActivity(ath.metricsScope, workflowType, activityType)
-	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter)
+	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, ath.workerStopCh)
 
 	activityImplementation := ath.getActivity(activityType)
 	if activityImplementation == nil {

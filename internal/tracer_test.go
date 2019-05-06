@@ -52,8 +52,8 @@ func TestTracingContextPropagator(t *testing.T) {
 	returnCtx, err = ctxProp.Extract(returnCtx, NewHeaderReader(header))
 	assert.NoError(t, err)
 
-	span = opentracing.SpanFromContext(returnCtx)
-	assert.NotNil(t, span)
+	spanCtx := returnCtx.Value(activeSpanContextKey)
+	assert.NotNil(t, spanCtx)
 }
 
 func TestTracingContextPropagatorWorkflowContext(t *testing.T) {

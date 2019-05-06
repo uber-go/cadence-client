@@ -356,7 +356,6 @@
     "github.com/facebookgo/clock",
     "github.com/golang/mock/gomock",
     "github.com/opentracing/opentracing-go",
-    "github.com/opentracing/opentracing-go/ext",
     "github.com/pborman/uuid",
     "github.com/robfig/cron",
     "github.com/sirupsen/logrus",

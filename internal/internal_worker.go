@@ -383,7 +383,7 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	}
 	if params.SessionResourceID == "" {
 		// TODO: Should we generate a uuid for user?
-		params.SessionResourceID = "Resource_" + uuid.New()
+		params.SessionResourceID = params.Identity + "-" + uuid.New()
 	}
 	sessionEnvironment := newSessionEnvironment(params.Identity, params.SessionResourceID, maxConCurrentSessionExecutionSize)
 

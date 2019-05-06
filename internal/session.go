@@ -326,18 +326,9 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 	activityEnv := getActivityEnv(ctx)
 
 	if sessionEnv.testEnv == nil {
-		invoker := activityEnv.serviceInvoker
-
-		data, err := encodeArg(getDataConverterFromActivityCtx(ctx), sessionEnv.resourceSpecificTasklist)
-		if err != nil {
-			return err
-		}
-
-		err = invoker.SignalWorkflow(activityEnv.workflowDomain,
-			activityEnv.workflowExecution.ID,
-			activityEnv.workflowExecution.RunID,
-			sessionID,
-			data)
+		client := activityEnv.serviceInvoker.GetClient(activityEnv.workflowDomain, &ClientOptions{})
+		err := client.SignalWorkflow(ctx, activityEnv.workflowExecution.ID, activityEnv.workflowExecution.RunID,
+			sessionID, sessionEnv.resourceSpecificTasklist)
 		if err != nil {
 			return err
 		}

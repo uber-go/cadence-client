@@ -692,29 +692,6 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PageToken() {
 	t.NotNil(response)
 }
 
-func (t *TaskHandlersTestSuite) TestSignalWorkflow() {
-	mockCtrl := gomock.NewController(t.T())
-	mockService := workflowservicetest.NewMockClient(mockCtrl)
-
-	mockService.EXPECT().SignalWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(nil)
-
-	cadenceInvoker := &cadenceInvoker{
-		identity:  "Test_Cadence_Invoker",
-		service:   mockService,
-		taskToken: nil,
-	}
-
-	err := cadenceInvoker.SignalWorkflow(
-		"some random domain",
-		"some random workflow id",
-		"some random run id",
-		"random signal name",
-		nil,
-	)
-
-	t.Nil(err)
-}
-
 func (t *TaskHandlersTestSuite) TestHeartBeat_NoError() {
 	mockCtrl := gomock.NewController(t.T())
 	mockService := workflowservicetest.NewMockClient(mockCtrl)

@@ -24,7 +24,6 @@ import (
 	"context"
 
 	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
 )
 
 // NewTracingContextPropagator returns new tracing context propagator object
@@ -50,6 +49,18 @@ func (t tracingWriter) Set(key, val string) {
 	t.writer.Set(key, []byte(val))
 }
 
+// tracingContextPropagator implements the ContextPropagator interface for
+// tracing context propagation.
+//
+// Inject -> context.Context to Header - this extracts the Span from the
+//		context and places the SpanContext into the Header
+// Extract -> Header to context.Context - this extracts the SpanContext from
+//		the header, returns a context.Context containing the SpanContext
+// InjectFromWorkflow -> Context to Header - extracts a SpanContext from the
+//		workflow context and puts it in the header
+// ExtractToWorkflow -> Header to Context - takes the SpanContext present in
+//		the header and puts it in the Context object. Does not start a new span
+//		as that is started outside when the workflow is actually executed
 type tracingContextPropagator struct {
 	tracer opentracing.Tracer
 }
@@ -72,8 +83,7 @@ func (t *tracingContextPropagator) Extract(
 	if err != nil {
 		return nil, err
 	}
-	span := t.tracer.StartSpan("", ext.RPCServerOption(spanContext))
-	return opentracing.ContextWithSpan(ctx, span), nil
+	return context.WithValue(ctx, activeSpanContextKey, spanContext), nil
 }
 
 func (t *tracingContextPropagator) InjectFromWorkflow(
@@ -81,9 +91,9 @@ func (t *tracingContextPropagator) InjectFromWorkflow(
 	hw HeaderWriter,
 ) error {
 	// retrieve span from context object
-	span := spanFromContext(ctx)
+	spanContext := spanFromContext(ctx)
 
-	t.tracer.Inject(span.Context(), opentracing.HTTPHeaders, tracingWriter{hw})
+	t.tracer.Inject(spanContext, opentracing.HTTPHeaders, tracingWriter{hw})
 	return nil
 }
 
@@ -95,6 +105,5 @@ func (t *tracingContextPropagator) ExtractToWorkflow(
 	if err != nil {
 		return nil, err
 	}
-	span := t.tracer.StartSpan("", ext.RPCServerOption(spanContext))
-	return contextWithSpan(ctx, span), nil
+	return contextWithSpan(ctx, spanContext), nil
 }

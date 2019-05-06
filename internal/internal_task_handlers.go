@@ -1581,6 +1581,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	info := ctx.Value(activityEnvContextKey).(*activityEnvironment)
 	ctx, dlCancelFunc := context.WithDeadline(ctx, info.deadline)
 
+	// TODO: @shreyassrivatsan - trace the activity execution here
 	output, err := activityImplementation.Execute(ctx, t.Input)
 
 	dlCancelFunc()

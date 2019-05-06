@@ -411,6 +411,7 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header *shared
 		state := getState(d.rootCtx)
 		state.yield("yield before executing to setup state")
 
+		// TODO: @shreyassrivatsan - add workflow trace span here
 		r.workflowResult, r.error = d.workflow.Execute(d.rootCtx, input)
 		rpp := getWorkflowResultPointerPointer(ctx)
 		*rpp = r

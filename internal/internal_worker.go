@@ -788,9 +788,6 @@ func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
 	// Workflow context.
 	args := []reflect.Value{reflect.ValueOf(ctx)}
 
-	// TODO: @shreyassrivatsan add tracing support for workflow here. Mark is
-	// as child workflow if that is the case.
-
 	dataConverter := getWorkflowEnvOptions(ctx).dataConverter
 	if fnType.NumIn() > 1 && isTypeByteSlice(fnType.In(1)) {
 		// 0 - is workflow context.
@@ -831,8 +828,6 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 	args := []reflect.Value{}
 	dataConverter := getDataConverterFromActivityCtx(ctx)
 
-	// TODO: @shreyassrivatsan add tracing support for activity here
-
 	// activities optionally might not take context.
 	if fnType.NumIn() > 0 && isActivityContext(fnType.In(0)) {
 		args = append(args, reflect.ValueOf(ctx))
@@ -865,8 +860,6 @@ func (ae *activityExecutor) ExecuteWithActualArgs(ctx context.Context, actualArg
 func (ae *activityExecutor) executeWithActualArgsWithoutParseResult(ctx context.Context, actualArgs []interface{}) []reflect.Value {
 	fnType := reflect.TypeOf(ae.fn)
 	args := []reflect.Value{}
-
-	// TODO: @shreyassrivatsan add tracing support for activity here
 
 	// activities optionally might not take context.
 	argsOffeset := 0

@@ -28,7 +28,7 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 )
 
-const activeSpanKey contextKey = "activeSpanKey"
+const activeSpanContextKey contextKey = "activeSpanContextKey"
 
 // Context is a clone of context.Context with Done() returning Channel instead
 // of native channel.
@@ -427,14 +427,14 @@ func (c *valueCtx) Value(key interface{}) interface{} {
 	return c.Context.Value(key)
 }
 
-func spanFromContext(ctx Context) opentracing.Span {
-	val := ctx.Value(activeSpanKey)
-	if sp, ok := val.(opentracing.Span); ok {
+func spanFromContext(ctx Context) opentracing.SpanContext {
+	val := ctx.Value(activeSpanContextKey)
+	if sp, ok := val.(opentracing.SpanContext); ok {
 		return sp
 	}
 	return nil
 }
 
-func contextWithSpan(ctx Context, span opentracing.Span) Context {
-	return WithValue(ctx, activeSpanKey, span)
+func contextWithSpan(ctx Context, spanContext opentracing.SpanContext) Context {
+	return WithValue(ctx, activeSpanContextKey, spanContext)
 }

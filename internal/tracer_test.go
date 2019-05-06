@@ -65,7 +65,7 @@ func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
 	ctxProp := NewTracingContextPropagator(tracer)
 
 	span := tracer.StartSpan("test-operation")
-	ctx := contextWithSpan(Background(), span)
+	ctx := contextWithSpan(Background(), span.Context())
 	header := &shared.Header{
 		Fields: map[string][]byte{},
 	}
@@ -77,6 +77,7 @@ func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
 	returnCtx, err = ctxProp.ExtractToWorkflow(returnCtx, NewHeaderReader(header))
 	assert.NoError(t, err)
 
-	span = spanFromContext(returnCtx)
-	assert.NotNil(t, span)
+	newSpanContext := spanFromContext(returnCtx)
+	assert.NotNil(t, newSpanContext)
+	assert.Equal(t, span.Context(), newSpanContext)
 }

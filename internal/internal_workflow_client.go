@@ -267,14 +267,7 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, runID string) (WorkflowRun, error) {
 
 	// retrieve the workflow execution information
-	request := &s.DescribeWorkflowExecutionRequest{
-		Domain: &wc.domain,
-		Execution: &s.WorkflowExecution{
-			WorkflowId: &workflowID,
-			RunId:      &runID,
-		},
-	}
-	resp, err := wc.workflowService.DescribeWorkflowExecution(ctx, request)
+	resp, err := wc.DescribeWorkflowExecution(ctx, workflowID, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -284,6 +277,8 @@ func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, ru
 		resp.WorkflowExecutionInfo.Execution != nil {
 		workflowID = resp.WorkflowExecutionInfo.Execution.GetWorkflowId()
 		runID = resp.WorkflowExecutionInfo.Execution.GetRunId()
+	} else {
+		return nil, errors.New("describeWorkflowExecution did not return workflowID and runID")
 	}
 
 	iterFn := func(fnCtx context.Context, fnRunID string) HistoryEventIterator {

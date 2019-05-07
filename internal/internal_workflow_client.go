@@ -216,13 +216,13 @@ func (wc *workflowClient) StartWorkflow(
 	return executionInfo, nil
 }
 
-// ExecuteWorkflow starts a workflow execution and wait until this workflow reaches the end state, such as
-// workflow finished successfully or timeout.
+// ExecuteWorkflow starts a workflow execution and returns a WorkflowRun that will allow you to wait until this workflow
+// reaches the end state, such as workflow finished successfully or timeout.
 // The user can use this to start using a functor like below and get the workflow execution result, as encoded.Value
 // Either by
-//     RunWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
+//     ExecuteWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
 //     or
-//     RunWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+//     ExecuteWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
 // The current timeout resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
 // subjected to change in the future.
 // NOTE: the context.Context should have a fairly large timeout, since workflow execution may take a while to be finished
@@ -252,6 +252,45 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 
 	return &workflowRunImpl{
 		workflowFn:    workflow,
+		workflowID:    workflowID,
+		firstRunID:    runID,
+		currentRunID:  runID,
+		iterFn:        iterFn,
+		dataConverter: wc.dataConverter,
+	}, nil
+}
+
+// GetWorkflow gets a workflow execution and returns a WorkflowRun that will allow you to wait until this workflow
+// reaches the end state, such as workflow finished successfully or timeout.
+// The current timeout resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
+// subjected to change in the future.
+func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, runID string) (WorkflowRun, error) {
+
+	// retrieve the workflow execution information
+	request := &s.DescribeWorkflowExecutionRequest{
+		Domain: &wc.domain,
+		Execution: &s.WorkflowExecution{
+			WorkflowId: &workflowID,
+			RunId:      &runID,
+		},
+	}
+	resp, err := wc.workflowService.DescribeWorkflowExecution(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the current run ID
+	if resp.WorkflowExecutionInfo != nil &&
+		resp.WorkflowExecutionInfo.Execution != nil {
+		workflowID = resp.WorkflowExecutionInfo.Execution.GetWorkflowId()
+		runID = resp.WorkflowExecutionInfo.Execution.GetRunId()
+	}
+
+	iterFn := func(fnCtx context.Context, fnRunID string) HistoryEventIterator {
+		return wc.GetWorkflowHistory(fnCtx, workflowID, fnRunID, true, s.HistoryEventFilterTypeCloseEvent)
+	}
+
+	return &workflowRunImpl{
 		workflowID:    workflowID,
 		firstRunID:    runID,
 		currentRunID:  runID,

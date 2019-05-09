@@ -687,7 +687,7 @@ ProcessEvents:
 					return nil, err
 				}
 				if w.isWorkflowCompleted {
-					if i != len(reorderedEvents)-1 || reorderedHistory.hasMoreEvents() {
+					if i != len(markers)-1 || reorderedHistory.hasMoreEvents() {
 						nonDeterministicErr = errors.New("workflow completed earlier than expected")
 					}
 					break ProcessEvents
@@ -733,7 +733,7 @@ ProcessEvents:
 					return nil, err
 				}
 				if w.isWorkflowCompleted {
-					if i != len(reorderedEvents)-1 || reorderedHistory.hasMoreEvents() {
+					if i != len(markers)-1 || reorderedHistory.hasMoreEvents() {
 						nonDeterministicErr = errors.New("workflow completed earlier than expected")
 					}
 					break ProcessEvents

@@ -172,7 +172,7 @@ func (eh *history) IsReplayEvent(event *s.HistoryEvent) bool {
 func (eh *history) IsNextDecisionFailed() (bool, error) {
 
 	nextIndex := eh.currentIndex + 1
-	if nextIndex >= len(eh.loadedEvents) && eh.hasMoreEvents() { // current page ends and there is more pages
+	if nextIndex >= len(eh.loadedEvents) && eh.hasMorePages() { // current page ends and there is more pages
 		if err := eh.loadMoreEvents(); err != nil {
 			return false, err
 		}
@@ -188,7 +188,7 @@ func (eh *history) IsNextDecisionFailed() (bool, error) {
 }
 
 func (eh *history) loadMoreEvents() error {
-	historyPage, err := eh.getMoreEvents()
+	historyPage, err := eh.getMorePages()
 	if err != nil {
 		return err
 	}
@@ -233,17 +233,21 @@ func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.
 	return result, markers, err
 }
 
-func (eh *history) hasMoreEvents() bool {
+func (eh *history) hasMorePages() bool {
 	historyIterator := eh.workflowTask.historyIterator
 	return historyIterator != nil && historyIterator.HasNextPage()
 }
 
-func (eh *history) getMoreEvents() (*s.History, error) {
+func (eh *history) getMorePages() (*s.History, error) {
 	return eh.workflowTask.historyIterator.GetNextPage()
 }
 
+func (eh *history) hasMoreEvents() bool {
+	return eh.currentIndex < len(eh.loadedEvents) || eh.hasMorePages();
+}
+
 func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
-	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMoreEvents() {
+	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMorePages() {
 		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, nil
 	}
 
@@ -253,7 +257,7 @@ OrderEvents:
 	for {
 		// load more history events if needed
 		for eh.currentIndex == len(eh.loadedEvents) {
-			if !eh.hasMoreEvents() {
+			if !eh.hasMorePages() {
 				break OrderEvents
 			}
 			if err1 := eh.loadMoreEvents(); err1 != nil {
@@ -662,6 +666,7 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	var respondEvents []*s.HistoryEvent
 
 	skipReplayCheck := w.skipReplayCheck()
+	var nonDeterministicErr error
 	// Process events
 ProcessEvents:
 	for {
@@ -682,6 +687,9 @@ ProcessEvents:
 					return nil, err
 				}
 				if w.isWorkflowCompleted {
+					if reorderedHistory.hasMoreEvents() {
+						nonDeterministicErr = errors.New("workflow completed earlier than expected")
+					}
 					break ProcessEvents
 				}
 			}
@@ -710,6 +718,9 @@ ProcessEvents:
 				return nil, err
 			}
 			if w.isWorkflowCompleted {
+				if reorderedHistory.hasMoreEvents() {
+					nonDeterministicErr = errors.New("workflow completed earlier than expected")
+				}
 				break ProcessEvents
 			}
 		}
@@ -722,6 +733,9 @@ ProcessEvents:
 					return nil, err
 				}
 				if w.isWorkflowCompleted {
+					if reorderedHistory.hasMoreEvents() {
+						nonDeterministicErr = errors.New("workflow completed earlier than expected")
+					}
 					break ProcessEvents
 				}
 			}
@@ -742,7 +756,6 @@ ProcessEvents:
 	// activity task completed), but the corresponding decider code that start the event has been removed. In that case
 	// the replay of that event will panic on the decision state machine and the workflow will be marked as completed
 	// with the panic error.
-	var nonDeterministicErr error
 	if !skipReplayCheck && !w.isWorkflowCompleted {
 		// check if decisions from reply matches to the history events
 		if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {

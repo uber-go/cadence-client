@@ -679,7 +679,7 @@ ProcessEvents:
 			break ProcessEvents
 		}
 		// Markers are from the events that are produced from the current decision
-		for _, m := range markers {
+		for i, m := range markers {
 			if m.MarkerRecordedEventAttributes.GetMarkerName() != localActivityMarkerName {
 				// local activity marker needs to be applied after decision task started event
 				err := eventHandler.ProcessEvent(m, true, false)
@@ -687,7 +687,7 @@ ProcessEvents:
 					return nil, err
 				}
 				if w.isWorkflowCompleted {
-					if reorderedHistory.hasMoreEvents() {
+					if i != len(reorderedEvents)-1 || reorderedHistory.hasMoreEvents() {
 						nonDeterministicErr = errors.New("workflow completed earlier than expected")
 					}
 					break ProcessEvents
@@ -718,7 +718,7 @@ ProcessEvents:
 				return nil, err
 			}
 			if w.isWorkflowCompleted {
-				if reorderedHistory.hasMoreEvents() {
+				if i != len(reorderedEvents)-1 || reorderedHistory.hasMoreEvents() {
 					nonDeterministicErr = errors.New("workflow completed earlier than expected")
 				}
 				break ProcessEvents
@@ -726,14 +726,14 @@ ProcessEvents:
 		}
 
 		// now apply local activity markers
-		for _, m := range markers {
+		for i, m := range markers {
 			if m.MarkerRecordedEventAttributes.GetMarkerName() == localActivityMarkerName {
 				err := eventHandler.ProcessEvent(m, true, false)
 				if err != nil {
 					return nil, err
 				}
 				if w.isWorkflowCompleted {
-					if reorderedHistory.hasMoreEvents() {
+					if i != len(reorderedEvents)-1 || reorderedHistory.hasMoreEvents() {
 						nonDeterministicErr = errors.New("workflow completed earlier than expected")
 					}
 					break ProcessEvents

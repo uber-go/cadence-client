@@ -679,6 +679,7 @@ ProcessEvents:
 			break ProcessEvents
 		}
 		// Markers are from the events that are produced from the current decision
+		var localActivityMarkers []*s.HistoryEvent
 		for i, m := range markers {
 			if m.MarkerRecordedEventAttributes.GetMarkerName() != localActivityMarkerName {
 				// local activity marker needs to be applied after decision task started event
@@ -687,11 +688,13 @@ ProcessEvents:
 					return nil, err
 				}
 				if w.isWorkflowCompleted {
-					if i != len(markers)-1 || reorderedHistory.hasMoreEvents() {
+					if i != len(markers)-1 || len(reorderedEvents) != 0 || len(localActivityMarkers) != 0 || reorderedHistory.hasMoreEvents() {
 						nonDeterministicErr = errors.New("workflow completed earlier than expected")
 					}
 					break ProcessEvents
 				}
+			} else {
+				localActivityMarkers = append(localActivityMarkers, m)
 			}
 		}
 
@@ -718,7 +721,7 @@ ProcessEvents:
 				return nil, err
 			}
 			if w.isWorkflowCompleted {
-				if i != len(reorderedEvents)-1 || reorderedHistory.hasMoreEvents() {
+				if i != len(reorderedEvents)-1 || len(localActivityMarkers) != 0 || reorderedHistory.hasMoreEvents() {
 					nonDeterministicErr = errors.New("workflow completed earlier than expected")
 				}
 				break ProcessEvents
@@ -726,20 +729,19 @@ ProcessEvents:
 		}
 
 		// now apply local activity markers
-		for i, m := range markers {
-			if m.MarkerRecordedEventAttributes.GetMarkerName() == localActivityMarkerName {
-				err := eventHandler.ProcessEvent(m, true, false)
-				if err != nil {
-					return nil, err
+		for i, m := range localActivityMarkers {
+			err := eventHandler.ProcessEvent(m, true, false)
+			if err != nil {
+				return nil, err
+			}
+			if w.isWorkflowCompleted {
+				if i != len(localActivityMarkers)-1 || reorderedHistory.hasMoreEvents() {
+					nonDeterministicErr = errors.New("workflow completed earlier than expected")
 				}
-				if w.isWorkflowCompleted {
-					if i != len(markers)-1 || reorderedHistory.hasMoreEvents() {
-						nonDeterministicErr = errors.New("workflow completed earlier than expected")
-					}
-					break ProcessEvents
-				}
+				break ProcessEvents
 			}
 		}
+
 		isReplay := len(reorderedEvents) > 0 && reorderedHistory.IsReplayEvent(reorderedEvents[len(reorderedEvents)-1])
 		if isReplay {
 			eventDecisions := eventHandler.decisionsHelper.getDecisions(true)

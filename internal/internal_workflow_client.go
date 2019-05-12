@@ -364,6 +364,8 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 		return nil, err
 	}
 
+	header := wc.getWorkflowHeader(ctx)
+
 	signalWithStartRequest := &s.SignalWithStartWorkflowExecutionRequest{
 		Domain:                              common.StringPtr(wc.domain),
 		RequestId:                           common.StringPtr(uuid.New()),
@@ -381,6 +383,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 		Memo:                                memo,
 		SearchAttributes:                    searchAttr,
 		WorkflowIdReusePolicy:               options.WorkflowIDReusePolicy.toThriftPtr(),
+		Header:                              header,
 	}
 
 	var response *s.StartWorkflowExecutionResponse

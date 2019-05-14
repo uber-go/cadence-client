@@ -110,7 +110,7 @@ type (
 		Identity string
 
 		// Optional: Metrics to be reported. Metrics emitted by the cadence client are not prometheus compatible by
-		// default. To ensure metrics are compatible with prometheus make sure to create tally scope with sanitzer
+		// default. To ensure metrics are compatible with prometheus make sure to create tally scope with sanitizer
 		// options set.
 		// var (
 		// _safeCharacters = []rune{'_'}

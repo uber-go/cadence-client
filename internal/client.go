@@ -85,13 +85,9 @@ type (
 		// NOTE: DO NOT USE THIS API INSIDE A WORKFLOW, USE workflow.ExecuteChildWorkflow instead
 		ExecuteWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (WorkflowRun, error)
 
-		// GetWorkfow retrieves a workflow execution and return a WorkflowRun instance and error
+		// GetWorkfow retrieves a workflow execution and return a WorkflowRun instance
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
-		// The errors it can return:
-		//	- EntityNotExistsError, if domain does not exists
-		//	- BadRequestError
-		//	- InternalServiceError
 		//
 		// WorkflowRun has three methods:
 		//  - GetID() string: which return workflow ID (which is same as StartWorkflowOptions.ID if provided)

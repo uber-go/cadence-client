@@ -672,22 +672,6 @@ func (s *workflowRunSuite) TestGetWorkflow_Success() {
 	s.Equal(workflowResult, decodedResult)
 }
 
-func (s *workflowRunSuite) TestGetWorkflow_IncompleteResponse() {
-	workflowID := workflowID
-	runID := runID
-	describeResponse := &shared.DescribeWorkflowExecutionResponse{
-		WorkflowExecutionInfo: &shared.WorkflowExecutionInfo{},
-	}
-	s.workflowServiceClient.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(describeResponse, nil).Times(1)
-
-	_, err := s.workflowClient.GetWorkflow(
-		context.Background(),
-		workflowID,
-		runID,
-	)
-	s.EqualError(err, "describeWorkflowExecution did not return workflowID and runID")
-}
-
 func (s *workflowRunSuite) TestGetWorkflow_Error() {
 	s.workflowServiceClient.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, &shared.BadRequestError{Message: "test error"}).Times(1)
 

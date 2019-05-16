@@ -273,13 +273,8 @@ func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, ru
 	}
 
 	// get the current run ID
-	if resp.WorkflowExecutionInfo != nil &&
-		resp.WorkflowExecutionInfo.Execution != nil {
-		workflowID = resp.WorkflowExecutionInfo.Execution.GetWorkflowId()
-		runID = resp.WorkflowExecutionInfo.Execution.GetRunId()
-	} else {
-		return nil, errors.New("describeWorkflowExecution did not return workflowID and runID")
-	}
+	workflowID = resp.WorkflowExecutionInfo.Execution.GetWorkflowId()
+	runID = resp.WorkflowExecutionInfo.Execution.GetRunId()
 
 	iterFn := func(fnCtx context.Context, fnRunID string) HistoryEventIterator {
 		return wc.GetWorkflowHistory(fnCtx, workflowID, fnRunID, true, s.HistoryEventFilterTypeCloseEvent)

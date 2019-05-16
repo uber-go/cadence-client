@@ -148,7 +148,7 @@ func (_m *Client) ExecuteWorkflow(ctx context.Context, options internal.StartWor
 }
 
 // GetWorkflow provides a mock function with given fields: ctx, workflowID, runID
-func (_m *Client) GetWorkflow(ctx context.Context, workflowID string, runID string) (internal.WorkflowRun, error) {
+func (_m *Client) GetWorkflow(ctx context.Context, workflowID string, runID string) internal.WorkflowRun {
 	ret := _m.Called(ctx, workflowID, runID)
 
 	var r0 internal.WorkflowRun
@@ -160,14 +160,7 @@ func (_m *Client) GetWorkflow(ctx context.Context, workflowID string, runID stri
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, workflowID, runID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // GetWorkflowHistory provides a mock function with given fields: ctx, workflowID, runID, isLongPoll, filterType

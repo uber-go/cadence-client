@@ -102,7 +102,7 @@ type (
 		// NOTE: if the retrieved workflow returned ContinueAsNewError during the workflow execution, the
 		// return result of GetRunID() will be the retrieved workflow run ID, not the new run ID caused by ContinueAsNewError,
 		// however, Get(ctx context.Context, valuePtr interface{}) will return result from the run which did not return ContinueAsNewError.
-		GetWorkflow(ctx context.Context, workflowID string, runID string) (WorkflowRun, error)
+		GetWorkflow(ctx context.Context, workflowID string, runID string) WorkflowRun
 
 		// SignalWorkflow sends a signals to a workflow in execution
 		// - workflow ID of the workflow.

@@ -264,17 +264,7 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 // reaches the end state, such as workflow finished successfully or timeout.
 // The current timeout resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
 // subjected to change in the future.
-func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, runID string) (WorkflowRun, error) {
-
-	// retrieve the workflow execution information
-	resp, err := wc.DescribeWorkflowExecution(ctx, workflowID, runID)
-	if err != nil {
-		return nil, err
-	}
-
-	// get the current run ID
-	workflowID = resp.WorkflowExecutionInfo.Execution.GetWorkflowId()
-	runID = resp.WorkflowExecutionInfo.Execution.GetRunId()
+func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, runID string) WorkflowRun {
 
 	iterFn := func(fnCtx context.Context, fnRunID string) HistoryEventIterator {
 		return wc.GetWorkflowHistory(fnCtx, workflowID, fnRunID, true, s.HistoryEventFilterTypeCloseEvent)
@@ -286,7 +276,7 @@ func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, ru
 		currentRunID:  runID,
 		iterFn:        iterFn,
 		dataConverter: wc.dataConverter,
-	}, nil
+	}
 }
 
 // SignalWorkflow signals a workflow in execution.

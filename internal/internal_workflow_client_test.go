@@ -625,7 +625,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_ContinueAsNew() {
 	s.Equal(workflowResult, decodedResult)
 }
 
-func (s *workflowRunSuite) TestGetWorkflow_Success() {
+func (s *workflowRunSuite) TestGetWorkflow() {
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType := shared.EventTypeWorkflowExecutionCompleted
 	workflowResult := time.Hour * 59
@@ -648,39 +648,18 @@ func (s *workflowRunSuite) TestGetWorkflow_Success() {
 
 	workflowID := workflowID
 	runID := runID
-	describeResponse := &shared.DescribeWorkflowExecutionResponse{
-		WorkflowExecutionInfo: &shared.WorkflowExecutionInfo{
-			Execution: &shared.WorkflowExecution{
-				WorkflowId: &workflowID,
-				RunId:      &runID,
-			},
-		},
-	}
-	s.workflowServiceClient.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(describeResponse, nil).Times(1)
 
-	workflowRun, err := s.workflowClient.GetWorkflow(
+	workflowRun := s.workflowClient.GetWorkflow(
 		context.Background(),
 		workflowID,
 		runID,
 	)
-	s.Nil(err)
 	s.Equal(workflowRun.GetID(), workflowID)
 	s.Equal(workflowRun.GetRunID(), runID)
 	decodedResult := time.Minute
-	err = workflowRun.Get(context.Background(), &decodedResult)
+	err := workflowRun.Get(context.Background(), &decodedResult)
 	s.Nil(err)
 	s.Equal(workflowResult, decodedResult)
-}
-
-func (s *workflowRunSuite) TestGetWorkflow_Error() {
-	s.workflowServiceClient.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, &shared.BadRequestError{Message: "test error"}).Times(1)
-
-	_, err := s.workflowClient.GetWorkflow(
-		context.Background(),
-		workflowID,
-		runID,
-	)
-	s.Error(err)
 }
 
 func getGetWorkflowExecutionHistoryRequest(filterType shared.HistoryEventFilterType) *shared.GetWorkflowExecutionHistoryRequest {

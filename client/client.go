@@ -243,7 +243,7 @@ type (
 		//  - "CloseTime between '2019-08-27T15:04:05+00:00' and '2019-08-28T15:04:05+00:00'".
 		//  - to list only open workflow use "CloseTime = missing"
 		// Retrieved workflow executions are sorted by StartTime in descending order when list open workflow,
-		// are sorted by CloseTime in descending order for other query.
+		// and sorted by CloseTime in descending order for other queries.
 		// The errors it can return:
 		//  - BadRequestError
 		//  - InternalServiceError
@@ -252,8 +252,9 @@ type (
 		// ScanWorkflow gets workflow executions based on query. This API only works with ElasticSearch,
 		// and will return BadRequestError when using Cassandra or MySQL. The query is basically the SQL WHERE clause
 		// (see ListWorkflow for query examples).
-		// ScanWorkflow is similar to ListWorkflow, but it is more efficient to retrieve large amount of workflows,
-		// and the result is not sorted.
+		// ScanWorkflow should be used when retrieving large amount of workflows and order is not needed.
+		// It will use more ElasticSearch resources than ListWorkflow, but will be several times faster
+		// when retrieving millions of workflows.
 		// The errors it can return:
 		//  - BadRequestError
 		//  - InternalServiceError

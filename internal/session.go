@@ -40,7 +40,7 @@ func init() {
 }
 
 type (
-	sessionState string
+	sessionState int
 
 	// SessionInfo contains information of a created session. For now, the only exported
 	// field is SessionID which has string type. SessionID is a uuid generated when
@@ -50,6 +50,7 @@ type (
 		SessionID    string
 		tasklist     string // tasklist is resource specific
 		sessionState sessionState
+		cancelFunc   CancelFunc
 	}
 
 	sessionTokenBucket struct {
@@ -67,11 +68,14 @@ type (
 	}
 )
 
+// Session State enum
 const (
-	sessionStateOpen   sessionState = "open"
-	sessionStateFailed sessionState = "failed"
-	sessionStateClosed sessionState = "closed"
+	sessionStateOpen sessionState = iota
+	sessionStateFailed
+	sessionStateClosed
+)
 
+const (
 	sessionInfoContextKey        contextKey = "sessionInfo"
 	sessionEnvironmentContextKey contextKey = "sessionEnvironment"
 
@@ -148,7 +152,7 @@ func CreateSession(ctx Context) (Context, error) {
 // The main usage of RecreateSession is for long sessions that are splited into multiple runs. At the end of
 // one run, complete the current session, get sessionInfo from the context and pass the information to the
 // next run. In the new run, the session can be recreated on the information.
-func RecreateSession(ctx Context, sessionInfo *SessionInfo) (Context, error) {
+func CreateSessionForResourceID(ctx Context, sessionInfo *SessionInfo) (Context, error) {
 	return createSession(ctx, sessionInfo.tasklist, false)
 }
 
@@ -161,14 +165,14 @@ func RecreateSession(ctx Context, sessionInfo *SessionInfo) (Context, error) {
 // This API will return an error if the session in the context has already completed, or the resource release
 // process has failed. No error will returned if user tries to complete a session that has already failed and
 // the API call won't do anything.
-func CompleteSession(ctx Context) error {
+func CompleteSession(ctx Context) {
 	sessionInfo := getSessionInfo(ctx)
 	if sessionInfo == nil || sessionInfo.sessionState == sessionStateClosed {
-		return errNoOpenSession
+		return
 	}
 
 	if sessionInfo.sessionState == sessionStateFailed {
-		return nil
+		return
 	}
 	retryPolicy := &RetryPolicy{
 		InitialInterval:    time.Second,
@@ -181,15 +185,14 @@ func CompleteSession(ctx Context) error {
 		StartToCloseTimeout:    time.Second * 10,
 		RetryPolicy:            retryPolicy,
 	}
+
+	// first cancel the creation activity context
+	sessionInfo.cancelFunc()
+
 	completionCtx := WithActivityOptions(ctx, ao)
 	// the tasklist will be overrided to use the one stored in sessionInfo
-	err := ExecuteActivity(completionCtx, sessionCompletionActivityName, sessionInfo.SessionID).Get(ctx, nil)
-	if err == nil {
-		sessionInfo.sessionState = sessionStateClosed
-	} else {
-		sessionInfo.sessionState = sessionStateFailed
-	}
-	return err
+	ExecuteActivity(completionCtx, sessionCompletionActivityName, sessionInfo.SessionID)
+	sessionInfo.sessionState = sessionStateClosed
 }
 
 // GetSessionInfo returns the sessionInfo stored in the context. If there are multiple sessions in the context,
@@ -197,12 +200,8 @@ func CompleteSession(ctx Context) error {
 // session has failed, and created a new one on it), the most recent sessionInfo will be returned.
 //
 // This API will return an error if there's no sessionInfo in the context.
-func GetSessionInfo(ctx Context) (SessionInfo, error) {
-	info := getSessionInfo(ctx)
-	if info == nil {
-		return SessionInfo{}, errNoSessionInfo
-	}
-	return *info, nil
+func GetSessionInfo(ctx Context) *SessionInfo {
+	return getSessionInfo(ctx)
 }
 
 func getSessionInfo(ctx Context) *SessionInfo {
@@ -253,7 +252,7 @@ func createSession(ctx Context, creationTasklist string, retryable bool) (Contex
 	if retryable {
 		ao.RetryPolicy = retryPolicy
 	}
-	creationCtx := WithActivityOptions(ctx, ao)
+	creationCtx, cancel := WithCancel(WithActivityOptions(ctx, ao))
 	creationFuture := ExecuteActivity(creationCtx, sessionCreationActivityName, sessionID)
 
 	var creationErr error
@@ -276,6 +275,7 @@ func createSession(ctx Context, creationTasklist string, retryable bool) (Contex
 		SessionID:    sessionID,
 		tasklist:     tasklist,
 		sessionState: sessionStateOpen,
+		cancelFunc:   cancel,
 	}
 
 	Go(ctx, func(ctx Context) {
@@ -414,7 +414,7 @@ func getTestSessionEnvironment(params *workerExecutionParameters, concurrentSess
 		resourceID = "testResourceID"
 	}
 	if concurrentSessionExecutionSize == 0 {
-		concurrentSessionExecutionSize = defaultMaxConcurrentSeesionExecutionSize
+		concurrentSessionExecutionSize = defaultMaxConcurrentSessionExecutionSize
 	}
 
 	return newSessionEnvironment(params.Identity, resourceID, concurrentSessionExecutionSize)

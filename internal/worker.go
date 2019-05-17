@@ -22,12 +22,11 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"math"
 	"time"
-
-	"encoding/json"
-	"io/ioutil"
 
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"

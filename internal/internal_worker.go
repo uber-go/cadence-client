@@ -39,9 +39,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pborman/uuid"
-
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -71,7 +70,7 @@ const (
 
 	defaultPollerRate = 1000
 
-	defaultMaxConcurrentSeesionExecutionSize = 1000 // Large concurrent session execution size (1k)
+	defaultMaxConcurrentSessionExecutionSize = 1000 // Large concurrent session execution size (1k)
 
 	testTagsContextKey = "cadence-testTags"
 )
@@ -382,7 +381,6 @@ func newSessionWorker(service workflowserviceclient.Interface,
 		params.Identity = getWorkerIdentity(params.TaskList)
 	}
 	if params.SessionResourceID == "" {
-		// TODO: Should we generate a uuid for user?
 		params.SessionResourceID = params.Identity + "-" + uuid.New()
 	}
 	sessionEnvironment := newSessionEnvironment(params.Identity, params.SessionResourceID, maxConCurrentSessionExecutionSize)
@@ -1381,7 +1379,7 @@ func fillWorkerOptionsDefaults(options WorkerOptions) WorkerOptions {
 		options.DataConverter = getDefaultDataConverter()
 	}
 	if options.MaxConCurrentSessionExecutionSize == 0 {
-		options.MaxConCurrentSessionExecutionSize = defaultMaxConcurrentSeesionExecutionSize
+		options.MaxConCurrentSessionExecutionSize = defaultMaxConcurrentSessionExecutionSize
 	}
 	return options
 }

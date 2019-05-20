@@ -24,10 +24,9 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
-
-	"fmt"
 
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/encoded"
@@ -81,6 +80,8 @@ type (
 		IsReplaying() bool
 		MutableSideEffect(id string, f func() interface{}, equals func(a, b interface{}) bool) encoded.Value
 		GetDataConverter() encoded.DataConverter
+		AddSession(sessionInfo *SessionInfo)
+		RemoveSession(sessionID string)
 	}
 
 	// WorkflowDefinition wraps the code that can execute a workflow.

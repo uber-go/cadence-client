@@ -23,7 +23,6 @@ package internal
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -36,10 +35,15 @@ type SessionTestSuite struct {
 	*require.Assertions
 	suite.Suite
 	WorkflowTestSuite
+	sessionOptions *SessionOptions
 }
 
 func (s *SessionTestSuite) SetupSuite() {
 	RegisterActivityWithOptions(testSessionActivity, RegisterActivityOptions{Name: "testSessionActivity"})
+	s.sessionOptions = &SessionOptions{
+		ExecutionTimeout: time.Minute,
+		CreationTimeout:  time.Minute,
+	}
 }
 
 func (s *SessionTestSuite) SetupTest() {
@@ -58,21 +62,19 @@ func (s *SessionTestSuite) TestCreationCompletion() {
 			HeartbeatTimeout:       time.Second * 20,
 		}
 		ctx = WithActivityOptions(ctx, ao)
-		sessionCtx, err := CreateSession(ctx)
+		sessionCtx, err := CreateSession(ctx, s.sessionOptions)
 		if err != nil {
 			return err
 		}
-		info, err := GetSessionInfo(sessionCtx)
-		if err != nil || info.sessionState != sessionStateOpen {
+		info := GetSessionInfo(sessionCtx)
+		if info == nil || info.sessionState != sessionStateOpen {
 			return errors.New("session state should be open after creation")
 		}
 
-		err = CompleteSession(sessionCtx)
-		if err != nil {
-			return err
-		}
-		info, err = GetSessionInfo(sessionCtx)
-		if err != nil || info.sessionState != sessionStateClosed {
+		CompleteSession(sessionCtx)
+
+		info = GetSessionInfo(sessionCtx)
+		if info == nil || info.sessionState != sessionStateClosed {
 			return errors.New("session state should be closed after completion")
 		}
 		return nil
@@ -93,7 +95,7 @@ func (s *SessionTestSuite) TestCreationWithOpenSessionContext() {
 			tasklist:     "some random tasklist",
 			sessionState: sessionStateOpen,
 		})
-		_, err := CreateSession(sessionCtx)
+		_, err := CreateSession(sessionCtx, s.sessionOptions)
 		return err
 	}
 
@@ -119,11 +121,12 @@ func (s *SessionTestSuite) TestCreationWithClosedSessionContext() {
 			sessionState: sessionStateClosed,
 		})
 
-		sessionCtx, err := CreateSession(sessionCtx)
+		sessionCtx, err := CreateSession(sessionCtx, s.sessionOptions)
 		if err != nil {
 			return err
 		}
-		return CompleteSession(sessionCtx)
+		CompleteSession(sessionCtx)
+		return nil
 	}
 
 	RegisterWorkflow(workflowFn)
@@ -148,11 +151,12 @@ func (s *SessionTestSuite) TestCreationWithFailedSessionContext() {
 			sessionState: sessionStateFailed,
 		})
 
-		sessionCtx, err := CreateSession(sessionCtx)
+		sessionCtx, err := CreateSession(sessionCtx, s.sessionOptions)
 		if err != nil {
 			return err
 		}
-		return CompleteSession(sessionCtx)
+		CompleteSession(sessionCtx)
+		return nil
 	}
 
 	RegisterWorkflow(workflowFn)
@@ -170,7 +174,8 @@ func (s *SessionTestSuite) TestCompletionWithClosedSessionContext() {
 			tasklist:     "some random tasklist",
 			sessionState: sessionStateClosed,
 		})
-		return CompleteSession(sessionCtx)
+		CompleteSession(sessionCtx)
+		return nil
 	}
 
 	RegisterWorkflow(workflowFn)
@@ -178,7 +183,7 @@ func (s *SessionTestSuite) TestCompletionWithClosedSessionContext() {
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
-	s.Equal(errNoOpenSession.Error(), env.GetWorkflowError().Error())
+	s.NoError(env.GetWorkflowError())
 }
 
 func (s *SessionTestSuite) TestCompletionWithFailedSessionContext() {
@@ -188,7 +193,8 @@ func (s *SessionTestSuite) TestCompletionWithFailedSessionContext() {
 			tasklist:     "some random tasklist",
 			sessionState: sessionStateFailed,
 		})
-		return CompleteSession(sessionCtx)
+		CompleteSession(sessionCtx)
+		return nil
 	}
 
 	RegisterWorkflow(workflowFn)
@@ -201,9 +207,9 @@ func (s *SessionTestSuite) TestCompletionWithFailedSessionContext() {
 
 func (s *SessionTestSuite) TestGetSessionInfo() {
 	workflowFn := func(ctx Context) error {
-		_, err := GetSessionInfo(ctx)
-		if err == nil {
-			return errors.New("GetSessionInfo should return error when there's no such info")
+		info := GetSessionInfo(ctx)
+		if info != nil {
+			return errors.New("GetSessionInfo should return nil when there's no session info")
 		}
 
 		sessionCtx := setSessionInfo(ctx, &SessionInfo{
@@ -211,9 +217,9 @@ func (s *SessionTestSuite) TestGetSessionInfo() {
 			tasklist:     "some random tasklist",
 			sessionState: sessionStateFailed,
 		})
-		_, err = GetSessionInfo(sessionCtx)
-		if err != nil {
-			return err
+		info = GetSessionInfo(sessionCtx)
+		if info == nil {
+			return errors.New("returned session info should not be nil")
 		}
 
 		newSessionInfo := &SessionInfo{
@@ -222,11 +228,11 @@ func (s *SessionTestSuite) TestGetSessionInfo() {
 			sessionState: sessionStateClosed,
 		}
 		sessionCtx = setSessionInfo(ctx, newSessionInfo)
-		info, err := GetSessionInfo(sessionCtx)
-		if err != nil {
-			return err
+		info = GetSessionInfo(sessionCtx)
+		if info == nil {
+			return errors.New("returned session info should not be nil")
 		}
-		if info != *newSessionInfo {
+		if info != newSessionInfo {
 			return errors.New("GetSessionInfo should return info for the most recent session in the context")
 		}
 		return nil
@@ -254,11 +260,12 @@ func (s *SessionTestSuite) TestRecreation() {
 			sessionState: sessionStateFailed,
 		}
 
-		sessionCtx, err := RecreateSession(ctx, sessionInfo)
+		sessionCtx, err := RecreateSession(ctx, sessionInfo.GetRecreateParams(), s.sessionOptions)
 		if err != nil {
 			return err
 		}
-		return CompleteSession(sessionCtx)
+		CompleteSession(sessionCtx)
+		return nil
 	}
 
 	RegisterWorkflow(workflowFn)
@@ -306,20 +313,20 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_WithRecreation() {
 			HeartbeatTimeout:       time.Second * 20,
 		}
 		ctx = WithActivityOptions(ctx, ao)
-		sessionCtx, err := CreateSession(ctx)
+		sessionCtx, err := CreateSession(ctx, s.sessionOptions)
 		if err != nil {
 			return err
 		}
-		sessionInfo, err := GetSessionInfo(sessionCtx)
-		if err != nil {
-			return nil
+		sessionInfo := GetSessionInfo(sessionCtx)
+		if sessionInfo == nil {
+			return errors.New("Returned session info should not be nil")
 		}
 
 		for i := 0; i != maxConCurrentSessionExecutionSize; i++ {
 			if i%2 == 0 {
 				_, err = s.createSessionWithoutRetry(ctx)
 			} else {
-				_, err = RecreateSession(ctx, &sessionInfo)
+				_, err = RecreateSession(ctx, sessionInfo.GetRecreateParams(), s.sessionOptions)
 			}
 			if err != nil {
 				return err
@@ -348,19 +355,19 @@ func (s *SessionTestSuite) TestSessionTaskList() {
 			HeartbeatTimeout:       time.Second * 20,
 		}
 		ctx = WithActivityOptions(ctx, ao)
-		sessionCtx, err := CreateSession(ctx)
+		sessionCtx, err := CreateSession(ctx, s.sessionOptions)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println("session created")
 		for i := 0; i != numActivities; i++ {
 			if err := ExecuteActivity(sessionCtx, testSessionActivity, "a random name").Get(sessionCtx, nil); err != nil {
 				return err
 			}
 		}
 
-		return CompleteSession(sessionCtx)
+		CompleteSession(sessionCtx)
+		return nil
 	}
 
 	RegisterWorkflow(workflowFn)
@@ -369,19 +376,13 @@ func (s *SessionTestSuite) TestSessionTaskList() {
 	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values) {
 		taskListUsed = append(taskListUsed, activityInfo.TaskList)
 	})
-	workerIdentity := "testWorker"
 	resourceID := "testResourceID"
-	env.SetWorkerOptions(WorkerOptions{
-		Identity:          workerIdentity,
-		SessionResourceID: resourceID,
-	})
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
-	s.Equal(numActivities+2, len(taskListUsed))
 	s.Equal(getCreationTasklist(defaultTestTaskList), taskListUsed[0])
-	expectedTaskList := getResourceSpecificTasklist(workerIdentity, resourceID)
+	expectedTaskList := getResourceSpecificTasklist(resourceID)
 	for _, taskList := range taskListUsed[1:] {
 		s.Equal(expectedTaskList, taskList)
 	}
@@ -389,9 +390,8 @@ func (s *SessionTestSuite) TestSessionTaskList() {
 
 func (s *SessionTestSuite) TestSessionRecreationTaskList() {
 	numActivities := 3
-	workerIdentity := "testWorker"
 	resourceID := "testResourceID"
-	resourceSpecificTaskList := getResourceSpecificTasklist(workerIdentity, resourceID)
+	resourceSpecificTaskList := getResourceSpecificTasklist(resourceID)
 	workflowFn := func(ctx Context) error {
 		ao := ActivityOptions{
 			ScheduleToStartTimeout: time.Minute,
@@ -405,7 +405,7 @@ func (s *SessionTestSuite) TestSessionRecreationTaskList() {
 			tasklist:     resourceSpecificTaskList,
 			sessionState: sessionStateClosed,
 		}
-		sessionCtx, err := RecreateSession(ctx, sessionInfo)
+		sessionCtx, err := RecreateSession(ctx, sessionInfo.GetRecreateParams(), s.sessionOptions)
 		if err != nil {
 			return err
 		}
@@ -416,15 +416,12 @@ func (s *SessionTestSuite) TestSessionRecreationTaskList() {
 			}
 		}
 
-		return CompleteSession(sessionCtx)
+		CompleteSession(sessionCtx)
+		return nil
 	}
 
 	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.SetWorkerOptions(WorkerOptions{
-		Identity:          workerIdentity,
-		SessionResourceID: resourceID,
-	})
 	taskListUsed := []string{}
 	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values) {
 		taskListUsed = append(taskListUsed, activityInfo.TaskList)
@@ -433,7 +430,6 @@ func (s *SessionTestSuite) TestSessionRecreationTaskList() {
 
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
-	s.Equal(numActivities+2, len(taskListUsed))
 	for _, taskList := range taskListUsed {
 		s.Equal(resourceSpecificTaskList, taskList)
 	}
@@ -462,7 +458,7 @@ func (s *SessionTestSuite) TestExecuteActivityInFailedSession() {
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
-	s.Equal(errSessionFailed.Error(), env.GetWorkflowError().Error())
+	s.Equal(ErrSessionFailed.Error(), env.GetWorkflowError().Error())
 }
 
 func (s *SessionTestSuite) TestExecuteActivityInClosedSession() {
@@ -479,7 +475,7 @@ func (s *SessionTestSuite) TestExecuteActivityInClosedSession() {
 			sessionState: sessionStateClosed,
 		})
 
-		return ExecuteActivity(sessionCtx, testActivityHello, "some random message").Get(sessionCtx, nil)
+		return ExecuteActivity(sessionCtx, testSessionActivity, "some random message").Get(sessionCtx, nil)
 	}
 
 	RegisterWorkflow(workflowFn)
@@ -502,7 +498,7 @@ func (s *SessionTestSuite) createSessionWithoutRetry(ctx Context) (Context, erro
 	if baseTasklist == "" {
 		baseTasklist = options.OriginalTaskListName
 	}
-	return createSession(ctx, getCreationTasklist(baseTasklist), false)
+	return createSession(ctx, getCreationTasklist(baseTasklist), s.sessionOptions, false)
 }
 
 func testSessionActivity(ctx context.Context, name string) (string, error) {

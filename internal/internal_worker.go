@@ -380,18 +380,19 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	if params.Identity == "" {
 		params.Identity = getWorkerIdentity(params.TaskList)
 	}
+	// For now resourceID is hiden from user so we will always create a unique one for each worker.
 	if params.SessionResourceID == "" {
-		params.SessionResourceID = params.Identity + "-" + uuid.New()
+		params.SessionResourceID = uuid.New()
 	}
-	sessionEnvironment := newSessionEnvironment(params.Identity, params.SessionResourceID, maxConCurrentSessionExecutionSize)
+	sessionEnvironment := newSessionEnvironment(params.SessionResourceID, maxConCurrentSessionExecutionSize)
 
 	params.UserContext = context.WithValue(params.UserContext, sessionEnvironmentContextKey, sessionEnvironment)
+	params.TaskList = sessionEnvironment.GetResourceSpecificTasklist()
+	activityWorker := newActivityWorker(service, domain, params, overrides, env, nil)
+
 	params.ConcurrentPollRoutineSize = 1
 	params.TaskList = getCreationTasklist(params.TaskList)
-	creationWorker := newActivityWorker(service, domain, params, nil, env, sessionEnvironment.sessionTokenBucket)
-
-	params.TaskList = sessionEnvironment.resourceSpecificTasklist
-	activityWorker := newActivityWorker(service, domain, params, nil, env, nil)
+	creationWorker := newActivityWorker(service, domain, params, overrides, env, sessionEnvironment.GetTokenBucket())
 
 	return &sessionWorker{
 		creationWorker: creationWorker,
@@ -1124,7 +1125,6 @@ func newAggregatedWorker(
 		NonDeterministicWorkflowPolicy:       wOptions.NonDeterministicWorkflowPolicy,
 		DataConverter:                        wOptions.DataConverter,
 		WorkerStopTimeout:                    wOptions.WorkerStopTimeout,
-		SessionResourceID:                    wOptions.SessionResourceID,
 	}
 
 	ensureRequiredParams(&workerParams)

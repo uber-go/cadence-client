@@ -23,11 +23,11 @@ package internal
 import (
 	"context"
 	"errors"
-	"math"
 	"sync"
 	"time"
 
 	"github.com/pborman/uuid"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -40,31 +40,64 @@ func init() {
 }
 
 type (
-	sessionState int
-
-	// SessionInfo contains information of a created session. For now, the only exported
-	// field is SessionID which has string type. SessionID is a uuid generated when
-	// CreateSession() or RecreateSession() is called and can be used to uniquely identify
-	// a session.
+	// SessionInfo contains information of a created session. For now, exported
+	// fields are SessionID and HostName.
+	// SessionID is a uuid generated when CreateSession() or RecreateSession()
+	// is called and can be used to uniquely identify a session.
+	// HostName specifies which host is executing the session
 	SessionInfo struct {
 		SessionID    string
-		tasklist     string // tasklist is resource specific
+		HostName     string
+		resourceID   string // hide from user for now
+		tasklist     string // resource specific tasklist
 		sessionState sessionState
 		cancelFunc   CancelFunc
 	}
+
+	// SessionOptions specifies metadata for a session.
+	// ExecutionTimeout: required, no default
+	//     Specifies the maximum amount of time the session can run
+	// CreationTimeout: required, no default
+	//     Specfifies how long session creation can take before returning an error
+	SessionOptions struct {
+		ExecutionTimeout time.Duration
+		CreationTimeout  time.Duration
+	}
+
+	// RecreateSessionParams contains information needed to recreate a session on the same worker.
+	// Use SessionInfo.GetRecreateParameter() and pass the returned value to RecreateSession().
+	RecreateSessionParams struct {
+		tasklist string
+	}
+
+	sessionState int
 
 	sessionTokenBucket struct {
 		*sync.Cond
 		availableToken int
 	}
 
-	sessionEnvironment struct {
+	sessionEnvironment interface {
+		CreateSession(ctx context.Context, sessionID string) (<-chan struct{}, error)
+		CompleteSession(sessionID string)
+		AddSessionToken()
+		SignalCreationResponse(ctx context.Context, sessionID string) error
+		GetResourceSpecificTasklist() string
+		GetTokenBucket() *sessionTokenBucket
+	}
+
+	sessionEnvironmentImpl struct {
 		*sync.Mutex
 		doneChanMap              map[string]chan struct{}
 		resourceID               string
 		resourceSpecificTasklist string
 		sessionTokenBucket       *sessionTokenBucket
-		testEnv                  *testWorkflowEnvironmentImpl
+	}
+
+	sessionCreationResponse struct {
+		Tasklist   string
+		HostName   string
+		ResourceID string
 	}
 )
 
@@ -83,13 +116,15 @@ const (
 	sessionCompletionActivityName string = "internalSessionCompletionActivity"
 
 	errTooManySessionsMsg string = "too many outstanding sessions"
+
+	sessionHeartBeatTimeout time.Duration = time.Second * 20
 )
 
 var (
-	errNoOpenSession            = errors.New("no open session in the context")
-	errNoSessionInfo            = errors.New("no session information found in the context")
+	// ErrSessionFailed is the error returned when user tries to execute an activity but the
+	// session it belongs to has already failed
+	ErrSessionFailed            = errors.New("session has failed")
 	errFoundExistingOpenSession = errors.New("found exisiting open session in the context")
-	errSessionFailed            = errors.New("session has failed")
 )
 
 // Note: Worker should be configured to process session. To do this, set the following
@@ -97,6 +132,7 @@ var (
 //     EnableSessionWorker: true
 //     SessionResourceID: The identifier of the resource consumed by sessions.
 //         It's the user's responsibility to ensure there's only one worker using this resourceID.
+//         This option is not available for now as automatic session reestablishing is not implemented.
 //     MaxConCurrentSessionExecutionSize: the maximum number of concurrently sessions the resource
 //         support. By default, 1000 is used.
 
@@ -107,18 +143,19 @@ var (
 // CreationSession will fail in the following situations:
 //     1. The context passed in already contains a session which is still open
 //        (not closed and failed).
-//     2. The number of sessions currently running on the worker has reached
-//        MaxConCurrentSessionExecutionSize, which is specified when starting the worker.
+//     2. All the workers are busy (number of sessions currently running on all the workers have reached
+//        MaxConCurrentSessionExecutionSize, which is specified when starting the workers) and session
+//        cannot be created within a specified timeout.
 //
 // If an activity is executed using the returned context, it's regarded as part of the
-// session and all activities within a session will be executed by the same worker.
+// session. All activities within the same session will be executed by the same worker.
 // User still needs to handle the error returned when executing an activity. Session will
 // not be marked as failed if an activity within it returns an error. Only when the worker
 // executing the session is down, that session will be marked as failed. Executing an activity
-// within a failed session will return an [TODO] error immediately without even scheduling the activity.
+// within a failed session will return ErrSessionFailed immediately without scheduling that activity.
 //
-// If user wants to end a session since some activity returns an error, use the CompleteSession API below,
-// and new session can be created if necessary to retry the whole session.
+// If user wants to end a session since activity returns some error, use CompleteSession API below.
+// New session can be created if necessary to retry the whole session.
 //
 // Example:
 //    sessionCtx, err := CreateSession(ctx)
@@ -134,13 +171,13 @@ var (
 //    if err != nil {
 //        // Wrong ctx is used or failed to release session resource.
 //    }
-func CreateSession(ctx Context) (Context, error) {
+func CreateSession(ctx Context, sessionOptions *SessionOptions) (Context, error) {
 	options := getActivityOptions(ctx)
 	baseTasklist := options.TaskListName
 	if baseTasklist == "" {
 		baseTasklist = options.OriginalTaskListName
 	}
-	return createSession(ctx, getCreationTasklist(baseTasklist), true)
+	return createSession(ctx, getCreationTasklist(baseTasklist), sessionOptions, true)
 }
 
 // RecreateSession recreate a session based on the sessionInfo passed in. Activities executed within
@@ -150,30 +187,25 @@ func CreateSession(ctx Context) (Context, error) {
 // a session based on a failed or completed session.
 //
 // The main usage of RecreateSession is for long sessions that are splited into multiple runs. At the end of
-// one run, complete the current session, get sessionInfo from the context and pass the information to the
-// next run. In the new run, the session can be recreated on the information.
-func CreateSessionForResourceID(ctx Context, sessionInfo *SessionInfo) (Context, error) {
-	return createSession(ctx, sessionInfo.tasklist, false)
+// one run, complete the current session, get recreateSessionParams from sessionInfo and pass the parameter to
+// next run. In the new run, the session can be recreated using the parameter.
+func RecreateSession(ctx Context, params *RecreateSessionParams, sessionOptions *SessionOptions) (Context, error) {
+	return createSession(ctx, params.tasklist, sessionOptions, false)
 }
 
 // CompleteSession completes a session. It releases worker resources, so other sessions can be created.
+// CompleteSession won't do anything if the context passed in doesn't contain any session information or the
+// session has already completed or failed.
 //
-// After a session is completed, user can continue to use the context, but the activities will be scheduled
+// After a session has completed, user can continue to use the context, but the activities will be scheduled
 // on the normal taskList (as user specified in ActivityOptions) and may be picked up by another worker since
 // it's not in a session.
-//
-// This API will return an error if the session in the context has already completed, or the resource release
-// process has failed. No error will returned if user tries to complete a session that has already failed and
-// the API call won't do anything.
 func CompleteSession(ctx Context) {
 	sessionInfo := getSessionInfo(ctx)
-	if sessionInfo == nil || sessionInfo.sessionState == sessionStateClosed {
+	if sessionInfo == nil || sessionInfo.sessionState != sessionStateOpen {
 		return
 	}
 
-	if sessionInfo.sessionState == sessionStateFailed {
-		return
-	}
 	retryPolicy := &RetryPolicy{
 		InitialInterval:    time.Second,
 		BackoffCoefficient: 1.1,
@@ -189,19 +221,34 @@ func CompleteSession(ctx Context) {
 	// first cancel the creation activity context
 	sessionInfo.cancelFunc()
 
+	// then execute then completion activity
 	completionCtx := WithActivityOptions(ctx, ao)
 	// the tasklist will be overrided to use the one stored in sessionInfo
 	ExecuteActivity(completionCtx, sessionCompletionActivityName, sessionInfo.SessionID)
 	sessionInfo.sessionState = sessionStateClosed
+	getWorkflowEnvironment(ctx).RemoveSession(sessionInfo.SessionID)
+	GetLogger(ctx).Debug("Completed session", zap.String("sessionID", sessionInfo.SessionID))
 }
 
 // GetSessionInfo returns the sessionInfo stored in the context. If there are multiple sessions in the context,
 // (for example, the same context is used to create, complete, create another session. Then user found that the
 // session has failed, and created a new one on it), the most recent sessionInfo will be returned.
 //
-// This API will return an error if there's no sessionInfo in the context.
+// This API will return nil if there's no sessionInfo in the context.
 func GetSessionInfo(ctx Context) *SessionInfo {
-	return getSessionInfo(ctx)
+	info := getSessionInfo(ctx)
+	if info == nil {
+		GetLogger(ctx).Warn("Context contains no session information")
+	}
+	return info
+}
+
+// GetRecreateParams returns the parameters needed to recreate a session. The returned value should be passed to
+// RecreateSession() API.
+func (s *SessionInfo) GetRecreateParams() *RecreateSessionParams {
+	return &RecreateSessionParams{
+		tasklist: s.tasklist,
+	}
 }
 
 func getSessionInfo(ctx Context) *SessionInfo {
@@ -216,7 +263,9 @@ func setSessionInfo(ctx Context, sessionInfo *SessionInfo) Context {
 	return WithValue(ctx, sessionInfoContextKey, sessionInfo)
 }
 
-func createSession(ctx Context, creationTasklist string, retryable bool) (Context, error) {
+func createSession(ctx Context, creationTasklist string, options *SessionOptions, retryable bool) (Context, error) {
+	logger := GetLogger(ctx)
+	logger.Debug("Start creating session")
 	if prevSessionInfo := getSessionInfo(ctx); prevSessionInfo != nil && prevSessionInfo.sessionState == sessionStateOpen {
 		return nil, errFoundExistingOpenSession
 	}
@@ -231,7 +280,7 @@ func createSession(ctx Context, creationTasklist string, retryable bool) (Contex
 		InitialInterval:    time.Second,
 		BackoffCoefficient: 1.1,
 		MaximumInterval:    time.Second * 10,
-		MaximumAttempts:    10,
+		ExpirationInterval: options.CreationTimeout,
 		NonRetriableErrorReasons: []string{
 			"cadenceInternal:Panic",
 			"cadenceInternal:Generic",
@@ -239,15 +288,12 @@ func createSession(ctx Context, creationTasklist string, retryable bool) (Contex
 			"cadenceInternal:Timeout HEARTBEAT",
 		},
 	}
-	// Creation activity need an infinite StartToCloseTimeout.
-	scheduleToStartTimeout := time.Second * 10
-	startToCloseTimeout := time.Second*math.MaxInt32 - scheduleToStartTimeout
-	HeartbeatTimeout := time.Second * 20
+
 	ao := ActivityOptions{
 		TaskList:               creationTasklist,
-		ScheduleToStartTimeout: scheduleToStartTimeout,
-		StartToCloseTimeout:    startToCloseTimeout,
-		HeartbeatTimeout:       HeartbeatTimeout,
+		ScheduleToStartTimeout: options.CreationTimeout,
+		StartToCloseTimeout:    options.ExecutionTimeout,
+		HeartbeatTimeout:       sessionHeartBeatTimeout,
 	}
 	if retryable {
 		ao.RetryPolicy = retryPolicy
@@ -256,14 +302,15 @@ func createSession(ctx Context, creationTasklist string, retryable bool) (Contex
 	creationFuture := ExecuteActivity(creationCtx, sessionCreationActivityName, sessionID)
 
 	var creationErr error
-	var tasklist string
+	var creationResponse sessionCreationResponse
 	s := NewSelector(ctx)
 	s.AddReceive(tasklistChan, func(c Channel, more bool) {
-		c.Receive(ctx, &tasklist)
+		c.Receive(ctx, &creationResponse)
 	})
 	s.AddFuture(creationFuture, func(f Future) {
 		// activity stoped before signal is received, must be creation timeout.
 		creationErr = f.Get(ctx, nil)
+		GetLogger(ctx).Debug("Failed to create session", zap.String("sessionID", sessionID), zap.Error(creationErr))
 	})
 	s.Select(ctx)
 
@@ -273,17 +320,23 @@ func createSession(ctx Context, creationTasklist string, retryable bool) (Contex
 
 	sessionInfo := &SessionInfo{
 		SessionID:    sessionID,
-		tasklist:     tasklist,
+		tasklist:     creationResponse.Tasklist,
+		resourceID:   creationResponse.ResourceID,
+		HostName:     creationResponse.HostName,
 		sessionState: sessionStateOpen,
 		cancelFunc:   cancel,
 	}
 
 	Go(ctx, func(ctx Context) {
-		if creationFuture.Get(ctx, nil) != nil {
+		if err = creationFuture.Get(ctx, nil); err != nil {
+			getWorkflowEnvironment(ctx).RemoveSession(sessionID)
+			GetLogger(ctx).Debug("Session failed", zap.String("sessionID", sessionID), zap.Error(err))
 			sessionInfo.sessionState = sessionStateFailed
 		}
 	})
 
+	logger.Debug("Created session", zap.String("sessionID", sessionID))
+	getWorkflowEnvironment(ctx).AddSession(sessionInfo)
 	return setSessionInfo(ctx, sessionInfo), nil
 }
 
@@ -299,43 +352,28 @@ func getCreationTasklist(base string) string {
 	return base + "__internal_session_creation"
 }
 
-func getResourceSpecificTasklist(identity, resourceID string) string {
-	return resourceID + "@" + identity
+func getResourceSpecificTasklist(resourceID string) string {
+	return resourceID + "@" + getHostName()
 }
 
 func sessionCreationActivity(ctx context.Context, sessionID string) error {
-	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(*sessionEnvironment)
+	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(sessionEnvironment)
 	if !ok {
 		panic("no session environment in context")
 	}
-	sessionEnv.Lock()
-	if sessionEnv.sessionTokenBucket.availableToken == 0 {
-		sessionEnv.Unlock()
-		return NewCustomError(errTooManySessionsMsg)
+
+	doneCh, err := sessionEnv.CreateSession(ctx, sessionID)
+	if err != nil {
+		return err
 	}
 
-	sessionEnv.sessionTokenBucket.availableToken--
-	doneChan := make(chan struct{})
-	sessionEnv.doneChanMap[sessionID] = doneChan
-	sessionEnv.Unlock()
+	defer sessionEnv.AddSessionToken()
 
-	defer func() {
-		sessionEnv.sessionTokenBucket.addToken()
-	}()
+	if err := sessionEnv.SignalCreationResponse(ctx, sessionID); err != nil {
+		return err
+	}
 
 	activityEnv := getActivityEnv(ctx)
-
-	if sessionEnv.testEnv == nil {
-		client := activityEnv.serviceInvoker.GetClient(activityEnv.workflowDomain, &ClientOptions{})
-		err := client.SignalWorkflow(ctx, activityEnv.workflowExecution.ID, activityEnv.workflowExecution.RunID,
-			sessionID, sessionEnv.resourceSpecificTasklist)
-		if err != nil {
-			return err
-		}
-	} else {
-		sessionEnv.testEnv.signalWorkflow(sessionID, sessionEnv.resourceSpecificTasklist)
-	}
-
 	ticker := time.NewTicker(activityEnv.heartbeatTimeout / 2)
 	defer ticker.Stop()
 
@@ -344,21 +382,21 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 		case <-ticker.C:
 			err := activityEnv.serviceInvoker.Heartbeat([]byte{})
 			if err != nil {
-				sessionEnv.closeAndDeleteDoneChan(sessionID)
+				sessionEnv.CompleteSession(sessionID)
 				return err
 			}
-		case <-doneChan:
+		case <-doneCh:
 			return nil
 		}
 	}
 }
 
 func sessionCompletionActivity(ctx context.Context, sessionID string) error {
-	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(*sessionEnvironment)
+	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(sessionEnvironment)
 	if !ok {
 		panic("no session environment in context")
 	}
-	sessionEnv.closeAndDeleteDoneChan(sessionID)
+	sessionEnv.CompleteSession(sessionID)
 	return nil
 }
 
@@ -382,14 +420,14 @@ func (t *sessionTokenBucket) addToken() {
 	t.Signal()
 }
 
-func newSessionEnvironment(identity, resourceID string, concurrentSessionExecutionSize int) *sessionEnvironment {
-	resourceSpecificTasklist := getResourceSpecificTasklist(identity, resourceID)
+func newSessionEnvironment(resourceID string, concurrentSessionExecutionSize int) sessionEnvironment {
+	resourceSpecificTasklist := getResourceSpecificTasklist(resourceID)
 	sessionMutex := &sync.Mutex{}
 	sessionTokenBucket := &sessionTokenBucket{
 		Cond:           sync.NewCond(sessionMutex),
 		availableToken: concurrentSessionExecutionSize,
 	}
-	return &sessionEnvironment{
+	return &sessionEnvironmentImpl{
 		Mutex:                    sessionMutex,
 		doneChanMap:              make(map[string]chan struct{}),
 		resourceID:               resourceID,
@@ -398,7 +436,40 @@ func newSessionEnvironment(identity, resourceID string, concurrentSessionExecuti
 	}
 }
 
-func (env *sessionEnvironment) closeAndDeleteDoneChan(sessionID string) {
+func (env *sessionEnvironmentImpl) CreateSession(ctx context.Context, sessionID string) (<-chan struct{}, error) {
+	env.Lock()
+	defer env.Unlock()
+	if env.sessionTokenBucket.availableToken == 0 {
+		return nil, NewCustomError(errTooManySessionsMsg)
+	}
+
+	env.sessionTokenBucket.availableToken--
+	doneCh := make(chan struct{})
+	env.doneChanMap[sessionID] = doneCh
+
+	return doneCh, nil
+}
+
+func (env *sessionEnvironmentImpl) AddSessionToken() {
+	env.sessionTokenBucket.addToken()
+}
+
+func (env *sessionEnvironmentImpl) SignalCreationResponse(ctx context.Context, sessionID string) error {
+	activityEnv := getActivityEnv(ctx)
+	client := activityEnv.serviceInvoker.GetClient(activityEnv.workflowDomain, &ClientOptions{})
+	return client.SignalWorkflow(ctx, activityEnv.workflowExecution.ID, activityEnv.workflowExecution.RunID,
+		sessionID, env.getCreationResponse())
+}
+
+func (env *sessionEnvironmentImpl) getCreationResponse() *sessionCreationResponse {
+	return &sessionCreationResponse{
+		Tasklist:   env.resourceSpecificTasklist,
+		ResourceID: env.resourceID,
+		HostName:   getHostName(),
+	}
+}
+
+func (env *sessionEnvironmentImpl) CompleteSession(sessionID string) {
 	env.Lock()
 	defer env.Unlock()
 
@@ -408,14 +479,10 @@ func (env *sessionEnvironment) closeAndDeleteDoneChan(sessionID string) {
 	}
 }
 
-func getTestSessionEnvironment(params *workerExecutionParameters, concurrentSessionExecutionSize int) *sessionEnvironment {
-	resourceID := params.SessionResourceID
-	if resourceID == "" {
-		resourceID = "testResourceID"
-	}
-	if concurrentSessionExecutionSize == 0 {
-		concurrentSessionExecutionSize = defaultMaxConcurrentSessionExecutionSize
-	}
+func (env *sessionEnvironmentImpl) GetResourceSpecificTasklist() string {
+	return env.resourceSpecificTasklist
+}
 
-	return newSessionEnvironment(params.Identity, resourceID, concurrentSessionExecutionSize)
+func (env *sessionEnvironmentImpl) GetTokenBucket() *sessionTokenBucket {
+	return env.sessionTokenBucket
 }

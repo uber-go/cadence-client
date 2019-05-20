@@ -160,6 +160,7 @@ type (
 		workflowInfo   *WorkflowInfo
 		workflowDef    workflowDefinition
 		changeVersions map[string]Version
+		openSessions   map[string]*SessionInfo
 
 		workflowCancelHandler func()
 		signalHandler         func(name string, input []byte)
@@ -176,7 +177,12 @@ type (
 		heartbeatDetails []byte
 
 		workerStopChannel  chan struct{}
-		sessionEnvironment *sessionEnvironment
+		sessionEnvironment *testSessionEnvironmentImpl
+	}
+
+	testSessionEnvironmentImpl struct {
+		*sessionEnvironmentImpl
+		testWorkflowEnvironment *testWorkflowEnvironmentImpl
 	}
 )
 
@@ -214,6 +220,7 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 		},
 
 		changeVersions: make(map[string]Version),
+		openSessions:   make(map[string]*SessionInfo),
 
 		doneChannel:       make(chan struct{}),
 		workerStopChannel: make(chan struct{}),
@@ -364,9 +371,10 @@ func (env *testWorkflowEnvironmentImpl) setWorkerOptions(options WorkerOptions) 
 	if options.DataConverter != nil {
 		env.workerOptions.DataConverter = options.DataConverter
 	}
-	if options.SessionResourceID != "" {
-		env.workerOptions.SessionResourceID = options.SessionResourceID
-	}
+	// Uncomment when resourceID is exposed to user.
+	// if options.SessionResourceID != "" {
+	// 	env.workerOptions.SessionResourceID = options.SessionResourceID
+	// }
 	if options.MaxConCurrentSessionExecutionSize != 0 {
 		env.workerOptions.MaxConCurrentSessionExecutionSize = options.MaxConCurrentSessionExecutionSize
 	}
@@ -1435,8 +1443,7 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 		params.UserContext = context.Background()
 	}
 	if env.sessionEnvironment == nil {
-		env.sessionEnvironment = getTestSessionEnvironment(&params, wOptions.MaxConCurrentSessionExecutionSize)
-		env.sessionEnvironment.testEnv = env
+		env.sessionEnvironment = newTestSessionEnvironment(env, &params, wOptions.MaxConCurrentSessionExecutionSize)
 	}
 	params.UserContext = context.WithValue(params.UserContext, sessionEnvironmentContextKey, env.sessionEnvironment)
 
@@ -1727,6 +1734,14 @@ func (env *testWorkflowEnvironmentImpl) MutableSideEffect(id string, f func() in
 	return newEncodedValue(env.encodeValue(f()), env.GetDataConverter())
 }
 
+func (env *testWorkflowEnvironmentImpl) AddSession(sessionInfo *SessionInfo) {
+	env.openSessions[sessionInfo.SessionID] = sessionInfo
+}
+
+func (env *testWorkflowEnvironmentImpl) RemoveSession(sessionID string) {
+	delete(env.openSessions, sessionID)
+}
+
 func (env *testWorkflowEnvironmentImpl) encodeValue(value interface{}) []byte {
 	blob, err := env.GetDataConverter().ToData(value)
 	if err != nil {
@@ -1831,6 +1846,27 @@ func (env *testWorkflowEnvironmentImpl) setHeartbeatDetails(details interface{})
 		panic(err)
 	}
 	env.heartbeatDetails = data
+}
+
+func newTestSessionEnvironment(testWorkflowEnvironment *testWorkflowEnvironmentImpl,
+	params *workerExecutionParameters, concurrentSessionExecutionSize int) *testSessionEnvironmentImpl {
+	resourceID := params.SessionResourceID
+	if resourceID == "" {
+		resourceID = "testResourceID"
+	}
+	if concurrentSessionExecutionSize == 0 {
+		concurrentSessionExecutionSize = defaultMaxConcurrentSessionExecutionSize
+	}
+
+	return &testSessionEnvironmentImpl{
+		sessionEnvironmentImpl:  newSessionEnvironment(resourceID, concurrentSessionExecutionSize).(*sessionEnvironmentImpl),
+		testWorkflowEnvironment: testWorkflowEnvironment,
+	}
+}
+
+func (t *testSessionEnvironmentImpl) SignalCreationResponse(ctx context.Context, sessionID string) error {
+	t.testWorkflowEnvironment.signalWorkflow(sessionID, t.sessionEnvironmentImpl.getCreationResponse())
+	return nil
 }
 
 // function signature for mock SignalExternalWorkflow

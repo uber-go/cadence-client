@@ -358,7 +358,7 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 	// Validate session state.
 	if sessionInfo := getSessionInfo(ctx); sessionInfo != nil {
 		if sessionInfo.sessionState == sessionStateFailed && !isSessionCreationActivity(activity) {
-			settable.Set(nil, errSessionFailed)
+			settable.Set(nil, ErrSessionFailed)
 			return future
 		}
 		if sessionInfo.sessionState == sessionStateOpen {

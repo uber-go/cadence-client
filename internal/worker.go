@@ -170,10 +170,11 @@ type (
 		// default: false
 		EnableSessionWorker bool
 
+		// Uncomment this option when we support automatic restablish failed sessions.
 		// Optional: The identifier of the resource consumed by sessions.
 		// It's the user's responsibility to ensure there's only one worker using this resourceID.
 		// For now, if user doesn't specify one, a new uuid will be used as the resourceID.
-		SessionResourceID string
+		// SessionResourceID string
 
 		// Optional: Sets the maximum number of concurrently running sessions the resource support.
 		// default: 1000

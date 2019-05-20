@@ -24,17 +24,33 @@ import (
 	"go.uber.org/cadence/internal"
 )
 
-// SessionInfo contains information of a created session. For now, the only exported
-// field is SessionID which has string type. SessionID is a uuid generated when
-// CreateSession() or RecreateSession() is called and can be used to uniquely identify
-// a session.
-type SessionInfo = internal.SessionInfo
+type (
+	// SessionInfo contains information of a created session. For now, exported
+	// fields are SessionID and HostName.
+	// SessionID is a uuid generated when CreateSession() or RecreateSession()
+	// is called and can be used to uniquely identify a session.
+	// HostName specifies which host is executing the session
+	SessionInfo = internal.SessionInfo
+
+	// SessionOptions specifies metadata for a session.
+	// ExecutionTimeout: required, no default
+	//     Specifies the maximum amount of time the session can run
+	// CreationTimeout: required, no default
+	//     Specfifies how long session creation can take before returning an error
+	SessionOptions = internal.SessionOptions
+
+	// RecreateSessionParams contains information needed to recreate a session on the same worker.
+	// Use SessionInfo.GetRecreateParameter() and pass the returned value to RecreateSession().
+	RecreateSessionParams = internal.RecreateSessionParams
+)
+
+// ErrSessionFailed is the error returned when user tries to execute an activity but the
+// session it belongs to has already failed
+var ErrSessionFailed = internal.ErrSessionFailed
 
 // Note: Worker should be configured to process session. To do this, set the following
 // fields in WorkerOptions:
 //     EnableSessionWorker: true
-//     SessionResourceID: The identifier of the resource consumed by sessions.
-//         It's the user's responsibility to ensure there's only one worker using this resourceID.
 //     MaxConCurrentSessionExecutionSize: the maximum number of concurrently sessions the resource
 //         support. By default, 1000 is used.
 
@@ -50,14 +66,14 @@ type SessionInfo = internal.SessionInfo
 //        cannot be created within a specified timeout.
 //
 // If an activity is executed using the returned context, it's regarded as part of the
-// session and all activities within a session will be executed by the same worker.
+// session. All activities within the same session will be executed by the same worker.
 // User still needs to handle the error returned when executing an activity. Session will
 // not be marked as failed if an activity within it returns an error. Only when the worker
 // executing the session is down, that session will be marked as failed. Executing an activity
-// within a failed session will return an session failed error immediately without even scheduling the activity.
+// within a failed session will return ErrSessionFailed immediately without scheduling that activity.
 //
-// If user wants to end a session since some activity returns an error, use the CompleteSession API below,
-// and new session can be created if necessary to retry the whole session.
+// If user wants to end a session since activity returns some error, use CompleteSession API below.
+// New session can be created if necessary to retry the whole session.
 //
 // Example:
 //    sessionCtx, err := CreateSession(ctx)
@@ -73,26 +89,28 @@ type SessionInfo = internal.SessionInfo
 //    if err != nil {
 //        // Wrong ctx is used or failed to release session resource.
 //    }
-func CreateSession(ctx Context) (Context, error) {
-	return internal.CreateSession(ctx)
+func CreateSession(ctx Context, sessionOptions *SessionOptions) (Context, error) {
+	return internal.CreateSession(ctx, sessionOptions)
 }
 
-// CreateSessionForResourceID recreate a session based on the sessionInfo passed in. Activities executed within
+// RecreateSession recreate a session based on the sessionInfo passed in. Activities executed within
 // the recreated session will be executed by the same worker as the previous session. CreateSessionForResourceID()
 // returns an error under the same situation as CreateSession() and has the same usage as CreateSession().
 // It will not check the state of the session described by the sessionInfo passed in, so user can recreate
 // a session based on a failed or completed session.
 //
-// The main usage of CreateSessionForResourceID is for long sessions that are splited into multiple runs. At the end of
-// one run, complete the current session, get sessionInfo from the context and pass the information to the
-// next run. In the new run, the session can be recreated on the information.
-func CreateSessionForResourceID(ctx Context, sessionInfo *SessionInfo) (Context, error) {
-	return internal.CreateSessionForResourceID(ctx, sessionInfo)
+// The main usage of RecreateSession is for long sessions that are splited into multiple runs. At the end of
+// one run, complete the current session, get recreateSessionParams from sessionInfo and pass the parameter to
+// next run. In the new run, the session can be recreated using the parameter.
+func RecreateSession(ctx Context, params *RecreateSessionParams, sessionOptions *SessionOptions) (Context, error) {
+	return internal.RecreateSession(ctx, params, sessionOptions)
 }
 
 // CompleteSession completes a session. It releases worker resources, so other sessions can be created.
+// CompleteSession won't do anything if the context passed in doesn't contain any session information or the
+// session has already completed or failed.
 //
-// After a session is completed, user can continue to use the context, but the activities will be scheduled
+// After a session has completed, user can continue to use the context, but the activities will be scheduled
 // on the normal taskList (as user specified in ActivityOptions) and may be picked up by another worker since
 // it's not in a session.
 func CompleteSession(ctx Context) {

@@ -36,7 +36,7 @@ type HeaderReader interface {
 	ForEachKey(handler func(string, []byte) error) error
 }
 
-// ContextPropagator is an interface that determins what information from
+// ContextPropagator is an interface that determines what information from
 // context to pass along
 type ContextPropagator interface {
 	// Inject injects information from a Go Context into headers

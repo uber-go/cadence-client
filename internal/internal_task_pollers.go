@@ -666,6 +666,9 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 
 	wtp.metricsScope.Counter(metrics.DecisionPollSucceedCounter).Inc(1)
 	wtp.metricsScope.Timer(metrics.DecisionPollLatency).Record(time.Now().Sub(startTime))
+
+	scheduledTime := time.Unix(0, response.GetScheduledTimestamp())
+	wtp.metricsScope.Timer(metrics.DecisionScheduledToStartLatency).Record(time.Now().Sub(scheduledTime))
 	return task, nil
 }
 

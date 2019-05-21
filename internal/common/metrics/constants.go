@@ -42,6 +42,7 @@ const (
 	DecisionPollNoTaskCounter          = CadenceMetricsPrefix + "decision-poll-no-task"
 	DecisionPollSucceedCounter         = CadenceMetricsPrefix + "decision-poll-succeed"
 	DecisionPollLatency                = CadenceMetricsPrefix + "decision-poll-latency" // measure succeed poll request latency
+	DecisionScheduledToStartLatency    = CadenceMetricsPrefix + "decision-scheduled-to-start-latency"
 	DecisionExecutionFailedCounter     = CadenceMetricsPrefix + "decision-execution-failed"
 	DecisionExecutionLatency           = CadenceMetricsPrefix + "decision-execution-latency"
 	DecisionResponseFailedCounter      = CadenceMetricsPrefix + "decision-response-failed"

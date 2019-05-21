@@ -20024,6 +20024,8 @@ type PollForDecisionTaskResponse struct {
 	NextPageToken             []byte             `json:"nextPageToken,omitempty"`
 	Query                     *WorkflowQuery     `json:"query,omitempty"`
 	WorkflowExecutionTaskList *TaskList          `json:"WorkflowExecutionTaskList,omitempty"`
+	ScheduledTimestamp        *int64             `json:"scheduledTimestamp,omitempty"`
+	StartedTimestamp          *int64             `json:"startedTimestamp,omitempty"`
 }
 
 // ToWire translates a PollForDecisionTaskResponse struct into a Thrift-level intermediate
@@ -20043,7 +20045,7 @@ type PollForDecisionTaskResponse struct {
 //   }
 func (v *PollForDecisionTaskResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [11]wire.Field
+		fields [13]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -20135,6 +20137,22 @@ func (v *PollForDecisionTaskResponse) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 90, Value: w}
+		i++
+	}
+	if v.ScheduledTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.ScheduledTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 100, Value: w}
+		i++
+	}
+	if v.StartedTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.StartedTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 110, Value: w}
 		i++
 	}
 
@@ -20265,6 +20283,26 @@ func (v *PollForDecisionTaskResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 100:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.ScheduledTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 110:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.StartedTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -20278,7 +20316,7 @@ func (v *PollForDecisionTaskResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [11]string
+	var fields [13]string
 	i := 0
 	if v.TaskToken != nil {
 		fields[i] = fmt.Sprintf("TaskToken: %v", v.TaskToken)
@@ -20324,6 +20362,14 @@ func (v *PollForDecisionTaskResponse) String() string {
 		fields[i] = fmt.Sprintf("WorkflowExecutionTaskList: %v", v.WorkflowExecutionTaskList)
 		i++
 	}
+	if v.ScheduledTimestamp != nil {
+		fields[i] = fmt.Sprintf("ScheduledTimestamp: %v", *(v.ScheduledTimestamp))
+		i++
+	}
+	if v.StartedTimestamp != nil {
+		fields[i] = fmt.Sprintf("StartedTimestamp: %v", *(v.StartedTimestamp))
+		i++
+	}
 
 	return fmt.Sprintf("PollForDecisionTaskResponse{%v}", strings.Join(fields[:i], ", "))
 }
@@ -20366,6 +20412,12 @@ func (v *PollForDecisionTaskResponse) Equals(rhs *PollForDecisionTaskResponse) b
 	if !((v.WorkflowExecutionTaskList == nil && rhs.WorkflowExecutionTaskList == nil) || (v.WorkflowExecutionTaskList != nil && rhs.WorkflowExecutionTaskList != nil && v.WorkflowExecutionTaskList.Equals(rhs.WorkflowExecutionTaskList))) {
 		return false
 	}
+	if !_I64_EqualsPtr(v.ScheduledTimestamp, rhs.ScheduledTimestamp) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.StartedTimestamp, rhs.StartedTimestamp) {
+		return false
+	}
 
 	return true
 }
@@ -20405,6 +20457,26 @@ func (v *PollForDecisionTaskResponse) GetAttempt() (o int64) {
 func (v *PollForDecisionTaskResponse) GetBacklogCountHint() (o int64) {
 	if v.BacklogCountHint != nil {
 		return *v.BacklogCountHint
+	}
+
+	return
+}
+
+// GetScheduledTimestamp returns the value of ScheduledTimestamp if it is set or its
+// zero value if it is unset.
+func (v *PollForDecisionTaskResponse) GetScheduledTimestamp() (o int64) {
+	if v.ScheduledTimestamp != nil {
+		return *v.ScheduledTimestamp
+	}
+
+	return
+}
+
+// GetStartedTimestamp returns the value of StartedTimestamp if it is set or its
+// zero value if it is unset.
+func (v *PollForDecisionTaskResponse) GetStartedTimestamp() (o int64) {
+	if v.StartedTimestamp != nil {
+		return *v.StartedTimestamp
 	}
 
 	return
@@ -37249,6 +37321,7 @@ type WorkflowExecutionInfo struct {
 	ParentExecution *WorkflowExecution            `json:"parentExecution,omitempty"`
 	ExecutionTime   *int64                        `json:"executionTime,omitempty"`
 	Memo            *Memo                         `json:"memo,omitempty"`
+	AutoResetPoints *ResetPoints                  `json:"autoResetPoints,omitempty"`
 }
 
 // ToWire translates a WorkflowExecutionInfo struct into a Thrift-level intermediate
@@ -37268,7 +37341,7 @@ type WorkflowExecutionInfo struct {
 //   }
 func (v *WorkflowExecutionInfo) ToWire() (wire.Value, error) {
 	var (
-		fields [10]wire.Field
+		fields [11]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -37354,8 +37427,22 @@ func (v *WorkflowExecutionInfo) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 100, Value: w}
 		i++
 	}
+	if v.AutoResetPoints != nil {
+		w, err = v.AutoResetPoints.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 110, Value: w}
+		i++
+	}
 
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _ResetPoints_Read(w wire.Value) (*ResetPoints, error) {
+	var v ResetPoints
+	err := v.FromWire(w)
+	return &v, err
 }
 
 // FromWire deserializes a WorkflowExecutionInfo struct from its Thrift-level
@@ -37472,6 +37559,14 @@ func (v *WorkflowExecutionInfo) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 110:
+			if field.Value.Type() == wire.TStruct {
+				v.AutoResetPoints, err = _ResetPoints_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -37485,7 +37580,7 @@ func (v *WorkflowExecutionInfo) String() string {
 		return "<nil>"
 	}
 
-	var fields [10]string
+	var fields [11]string
 	i := 0
 	if v.Execution != nil {
 		fields[i] = fmt.Sprintf("Execution: %v", v.Execution)
@@ -37527,6 +37622,10 @@ func (v *WorkflowExecutionInfo) String() string {
 		fields[i] = fmt.Sprintf("Memo: %v", v.Memo)
 		i++
 	}
+	if v.AutoResetPoints != nil {
+		fields[i] = fmt.Sprintf("AutoResetPoints: %v", v.AutoResetPoints)
+		i++
+	}
 
 	return fmt.Sprintf("WorkflowExecutionInfo{%v}", strings.Join(fields[:i], ", "))
 }
@@ -37564,6 +37663,9 @@ func (v *WorkflowExecutionInfo) Equals(rhs *WorkflowExecutionInfo) bool {
 		return false
 	}
 	if !((v.Memo == nil && rhs.Memo == nil) || (v.Memo != nil && rhs.Memo != nil && v.Memo.Equals(rhs.Memo))) {
+		return false
+	}
+	if !((v.AutoResetPoints == nil && rhs.AutoResetPoints == nil) || (v.AutoResetPoints != nil && rhs.AutoResetPoints != nil && v.AutoResetPoints.Equals(rhs.AutoResetPoints))) {
 		return false
 	}
 
@@ -38041,12 +38143,6 @@ func (v *WorkflowExecutionStartedEventAttributes) ToWire() (wire.Value, error) {
 	}
 
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
-}
-
-func _ResetPoints_Read(w wire.Value) (*ResetPoints, error) {
-	var v ResetPoints
-	err := v.FromWire(w)
-	return &v, err
 }
 
 // FromWire deserializes a WorkflowExecutionStartedEventAttributes struct from its Thrift-level

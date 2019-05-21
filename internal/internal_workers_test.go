@@ -25,9 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pborman/uuid"
-
 	"github.com/golang/mock/gomock"
+	"github.com/pborman/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"

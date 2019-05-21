@@ -841,10 +841,6 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 	activityType := activityTask.task.ActivityType.GetName()
 	metricsScope := getMetricsScopeForActivity(atp.metricsScope, workflowType, activityType)
 
-	// record tasklist queue latency
-	queueLatency := time.Duration(activityTask.task.GetStartedTimestamp() - activityTask.task.GetScheduledTimestamp())
-	metricsScope.Timer(metrics.TaskListQueueLatency).Record(queueLatency)
-
 	executionStartTime := time.Now()
 	// Process the activity task.
 	request, err := atp.taskHandler.Execute(atp.taskListName, activityTask.task)

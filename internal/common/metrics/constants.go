@@ -77,8 +77,6 @@ const (
 	LocalActivityExecutionLatency      = CadenceMetricsPrefix + "local-activity-execution-latency"
 	WorkerPanicCounter                 = CadenceMetricsPrefix + "worker-panic"
 
-	TaskListQueueLatency = CadenceMetricsPrefix + "tasklist-queue-latency"
-
 	UnhandledSignalsCounter = CadenceMetricsPrefix + "unhandled-signals"
 	CorruptedSignalsCounter = CadenceMetricsPrefix + "corrupted-signals"
 

@@ -38,16 +38,6 @@ type (
 	// Options is used to configure a worker instance.
 	Options = internal.WorkerOptions
 
-	// HeaderReader is an interface to read information from cadence headers
-	HeaderReader = internal.HeaderReader
-
-	// HeaderWriter is an interface to write information to cadence headers
-	HeaderWriter = internal.HeaderWriter
-
-	// ContextPropagator is an interface that determines what information from
-	// context to pass along
-	ContextPropagator = internal.ContextPropagator
-
 	// NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 	// mismatched history events (presumably arising from non-deterministic workflow definitions).
 	NonDeterministicWorkflowPolicy = internal.NonDeterministicWorkflowPolicy

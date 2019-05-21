@@ -389,8 +389,7 @@ func (w *workflowExecutionContextImpl) Unlock(err error) {
 		// TODO: in case of closed, it asumes the close decision always succeed. need server side change to return
 		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
 		// if the close decision failed, the next decision will have to rebuild the state.
-		runID := w.workflowInfo.WorkflowExecution.RunID
-		if getWorkflowCache().Exist(runID) {
+		if getWorkflowCache().Exist(w.workflowInfo.WorkflowExecution.RunID) {
 			removeWorkflowContext(w.workflowInfo.WorkflowExecution.RunID)
 		} else {
 			// sticky is disabled, manually clear the workflow state.

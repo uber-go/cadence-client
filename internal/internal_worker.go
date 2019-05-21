@@ -386,12 +386,13 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	}
 	sessionEnvironment := newSessionEnvironment(params.SessionResourceID, maxConCurrentSessionExecutionSize)
 
+	creationTasklist := getCreationTasklist(params.TaskList)
 	params.UserContext = context.WithValue(params.UserContext, sessionEnvironmentContextKey, sessionEnvironment)
 	params.TaskList = sessionEnvironment.GetResourceSpecificTasklist()
 	activityWorker := newActivityWorker(service, domain, params, overrides, env, nil)
 
 	params.ConcurrentPollRoutineSize = 1
-	params.TaskList = getCreationTasklist(params.TaskList)
+	params.TaskList = creationTasklist
 	creationWorker := newActivityWorker(service, domain, params, overrides, env, sessionEnvironment.GetTokenBucket())
 
 	return &sessionWorker{

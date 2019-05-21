@@ -405,12 +405,19 @@ func isSessionCreationActivity(activity interface{}) bool {
 	return ok && activityName == sessionCreationActivityName
 }
 
+func newSessionTokenBucket(concurrentSessionExecutionSize int) *sessionTokenBucket {
+	return &sessionTokenBucket{
+		Cond:           sync.NewCond(&sync.Mutex{}),
+		availableToken: concurrentSessionExecutionSize,
+	}
+}
+
 func (t *sessionTokenBucket) waitForAvailableToken() {
 	t.L.Lock()
+	defer t.L.Unlock()
 	for t.availableToken == 0 {
 		t.Wait()
 	}
-	t.L.Unlock()
 }
 
 func (t *sessionTokenBucket) addToken() {
@@ -420,33 +427,35 @@ func (t *sessionTokenBucket) addToken() {
 	t.Signal()
 }
 
-func newSessionEnvironment(resourceID string, concurrentSessionExecutionSize int) sessionEnvironment {
-	resourceSpecificTasklist := getResourceSpecificTasklist(resourceID)
-	sessionMutex := &sync.Mutex{}
-	sessionTokenBucket := &sessionTokenBucket{
-		Cond:           sync.NewCond(sessionMutex),
-		availableToken: concurrentSessionExecutionSize,
+func (t *sessionTokenBucket) getToken() bool {
+	t.L.Lock()
+	defer t.L.Unlock()
+	if t.availableToken == 0 {
+		return false
 	}
+	t.availableToken--
+	return true
+}
+
+func newSessionEnvironment(resourceID string, concurrentSessionExecutionSize int) sessionEnvironment {
 	return &sessionEnvironmentImpl{
-		Mutex:                    sessionMutex,
+		Mutex:                    &sync.Mutex{},
 		doneChanMap:              make(map[string]chan struct{}),
 		resourceID:               resourceID,
-		resourceSpecificTasklist: resourceSpecificTasklist,
-		sessionTokenBucket:       sessionTokenBucket,
+		resourceSpecificTasklist: getResourceSpecificTasklist(resourceID),
+		sessionTokenBucket:       newSessionTokenBucket(concurrentSessionExecutionSize),
 	}
 }
 
 func (env *sessionEnvironmentImpl) CreateSession(ctx context.Context, sessionID string) (<-chan struct{}, error) {
-	env.Lock()
-	defer env.Unlock()
-	if env.sessionTokenBucket.availableToken == 0 {
+	if !env.sessionTokenBucket.getToken() {
 		return nil, NewCustomError(errTooManySessionsMsg)
 	}
 
-	env.sessionTokenBucket.availableToken--
+	env.Lock()
+	defer env.Unlock()
 	doneCh := make(chan struct{})
 	env.doneChanMap[sessionID] = doneCh
-
 	return doneCh, nil
 }
 

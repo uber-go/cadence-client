@@ -666,6 +666,9 @@ func (wtp *workflowTaskPoller) poll() (*workflowTask, error) {
 
 	wtp.metricsScope.Counter(metrics.DecisionPollSucceedCounter).Inc(1)
 	wtp.metricsScope.Timer(metrics.DecisionPollLatency).Record(time.Now().Sub(startTime))
+
+	scheduledTime := time.Unix(0, response.GetScheduledTimestamp())
+	wtp.metricsScope.Timer(metrics.DecisionScheduledToStartLatency).Record(time.Now().Sub(scheduledTime))
 	return task, nil
 }
 
@@ -809,6 +812,10 @@ func (atp *activityTaskPoller) poll() (*activityTask, error) {
 
 	atp.metricsScope.Counter(metrics.ActivityPollSucceedCounter).Inc(1)
 	atp.metricsScope.Timer(metrics.ActivityPollLatency).Record(time.Now().Sub(startTime))
+
+	scheduledTime := time.Unix(0, response.GetScheduledTimestampOfThisAttempt())
+	atp.metricsScope.Timer(metrics.ActivityScheduledToStartLatency).Record(time.Now().Sub(scheduledTime))
+
 	return &activityTask{task: response, pollStartTime: startTime}, nil
 }
 
@@ -836,10 +843,6 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 	workflowType := activityTask.task.WorkflowType.GetName()
 	activityType := activityTask.task.ActivityType.GetName()
 	metricsScope := getMetricsScopeForActivity(atp.metricsScope, workflowType, activityType)
-
-	// record tasklist queue latency
-	queueLatency := time.Duration(activityTask.task.GetStartedTimestamp() - activityTask.task.GetScheduledTimestamp())
-	metricsScope.Timer(metrics.TaskListQueueLatency).Record(queueLatency)
 
 	executionStartTime := time.Now()
 	// Process the activity task.

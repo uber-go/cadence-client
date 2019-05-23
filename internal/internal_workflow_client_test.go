@@ -21,6 +21,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"os"
@@ -820,6 +821,75 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithDataConverter() {
 	s.Equal(createResponse.GetRunId(), resp.RunID)
 }
 
+func (s *workflowClientTestSuite) TestStartWorkflow_WithMemoAndSearchAttr() {
+	memo := map[string]interface{}{
+		"testMemo": "memo value",
+	}
+	searchAttributes := map[string]interface{}{
+		"testAttr": "attr value",
+	}
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        tasklist,
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+		Memo:                            memo,
+		SearchAttributes:                searchAttributes,
+	}
+	wf := func(ctx Context) string {
+		return "result"
+	}
+	startResp := &shared.StartWorkflowExecutionResponse{}
+
+	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, nil).
+		Do(func(_ interface{}, req *shared.StartWorkflowExecutionRequest, _ ...interface{}) {
+			var resultMemo, resultAttr string
+			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
+			s.NoError(err)
+			s.Equal("memo value", resultMemo)
+
+			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
+			s.NoError(err)
+			s.Equal("attr value", resultAttr)
+		})
+	s.client.StartWorkflow(context.Background(), options, wf)
+}
+
+func (s *workflowClientTestSuite) SignalWithStartWorkflow_WithMemoAndSearchAttr() {
+	memo := map[string]interface{}{
+		"testMemo": "memo value",
+	}
+	searchAttributes := map[string]interface{}{
+		"testAttr": "attr value",
+	}
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        tasklist,
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+		Memo:                            memo,
+		SearchAttributes:                searchAttributes,
+	}
+	wf := func(ctx Context) string {
+		return "result"
+	}
+	startResp := &shared.StartWorkflowExecutionResponse{}
+
+	s.service.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(),
+		gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, nil).
+		Do(func(_ interface{}, req *shared.SignalWithStartWorkflowExecutionRequest, _ ...interface{}) {
+			var resultMemo, resultAttr string
+			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
+			s.NoError(err)
+			s.Equal("memo value", resultMemo)
+
+			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
+			s.NoError(err)
+			s.Equal("attr value", resultAttr)
+		})
+	s.client.SignalWithStartWorkflow(context.Background(), "wid", "signal", "value", options, wf)
+}
+
 func (s *workflowClientTestSuite) TestGetWorkflowMemo() {
 	var input1 map[string]interface{}
 	result1, err := getWorkflowMemo(input1, nil)
@@ -932,5 +1002,18 @@ func (s *workflowClientTestSuite) TestCountWorkflow() {
 			s.Equal("another", request.GetDomain())
 		})
 	resp, err = s.client.CountWorkflow(context.Background(), request)
+	s.Equal(responseErr, err)
+}
+
+func (s *workflowClientTestSuite) TestGetSearchAttributesAPI() {
+	response := &shared.GetSearchAttributesResponse{}
+	s.service.EXPECT().GetSearchAttributes(gomock.Any(), gomock.Any()).Return(response, nil)
+	resp, err := s.client.GetSearchAttributes(context.Background())
+	s.Nil(err)
+	s.Equal(response, resp)
+
+	responseErr := &shared.BadRequestError{}
+	s.service.EXPECT().GetSearchAttributes(gomock.Any(), gomock.Any()).Return(nil, responseErr)
+	resp, err = s.client.GetSearchAttributes(context.Background())
 	s.Equal(responseErr, err)
 }

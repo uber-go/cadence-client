@@ -660,6 +660,23 @@ func (wc *workflowClient) CountWorkflow(ctx context.Context, request *s.CountWor
 	return response, nil
 }
 
+// GetSearchAttributes implementation
+func (wc *workflowClient) GetSearchAttributes(ctx context.Context) (*s.GetSearchAttributesResponse, error) {
+	var response *s.GetSearchAttributesResponse
+	err := backoff.Retry(ctx,
+		func() error {
+			var err1 error
+			tchCtx, cancel, opt := newChannelContext(ctx)
+			defer cancel()
+			response, err1 = wc.workflowService.GetSearchAttributes(tchCtx, opt...)
+			return err1
+		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 // DescribeWorkflowExecution returns information about the specified workflow execution.
 // The errors it can return:
 //  - BadRequestError

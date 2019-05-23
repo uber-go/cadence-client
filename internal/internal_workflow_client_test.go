@@ -846,6 +846,32 @@ func (s *workflowClientTestSuite) TestGetWorkflowMemo() {
 	s.Error(err)
 }
 
+func (s *workflowClientTestSuite) TestGetSearchAttributes() {
+	var input1 map[string]interface{}
+	result1, err := getSearchAttributes(input1)
+	s.NoError(err)
+	s.Nil(result1)
+
+	input1 = make(map[string]interface{})
+	result2, err := getSearchAttributes(input1)
+	s.NoError(err)
+	s.NotNil(result2)
+	s.Equal(0, len(result2.IndexedFields))
+
+	input1["t1"] = "v1"
+	result3, err := getSearchAttributes(input1)
+	s.NoError(err)
+	s.NotNil(result3)
+	s.Equal(1, len(result3.IndexedFields))
+	var resultString string
+	decodeArg(nil, result3.IndexedFields["t1"], &resultString)
+	s.Equal("v1", resultString)
+
+	input1["non-serializable"] = make(chan int)
+	_, err = getSearchAttributes(input1)
+	s.Error(err)
+}
+
 func (s *workflowClientTestSuite) TestListWorkflow() {
 	request := &shared.ListWorkflowExecutionsRequest{}
 	response := &shared.ListWorkflowExecutionsResponse{}

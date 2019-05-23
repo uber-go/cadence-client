@@ -350,8 +350,13 @@ type (
 		// * * * * *
 		CronSchedule string
 
-		// Memo - Optional info that will be showed in list workflow.
+		// Memo - Optional non-indexed info that will be showed in list workflow.
 		Memo map[string]interface{}
+
+		// SearchAttributes - Optional indexed info that can be used in query of List/Scan/Count workflow APIs (only
+		// supported when using ElasticSearch). The key and value type must be registered on cadence server side.
+		// Use GetSearchAttributes API to get valid key and corresponding value type.
+		SearchAttributes map[string]interface{}
 	}
 
 	// RetryPolicy defines the retry policy.

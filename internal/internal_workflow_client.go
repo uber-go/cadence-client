@@ -173,7 +173,7 @@ func (wc *workflowClient) StartWorkflow(
 		return nil, err
 	}
 
-	searchAttr, err := getSearchAttributes(options.SearchAttributes)
+	searchAttr, err := serializeSearchAttributes(options.SearchAttributes)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +354,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 		return nil, err
 	}
 
-	searchAttr, err := getSearchAttributes(options.SearchAttributes)
+	searchAttr, err := serializeSearchAttributes(options.SearchAttributes)
 	if err != nil {
 		return nil, err
 	}
@@ -978,7 +978,7 @@ func getWorkflowMemo(input map[string]interface{}, dc encoded.DataConverter) (*s
 	return &s.Memo{Fields: memo}, nil
 }
 
-func getSearchAttributes(input map[string]interface{}) (*s.SearchAttributes, error) {
+func serializeSearchAttributes(input map[string]interface{}) (*s.SearchAttributes, error) {
 	if input == nil {
 		return nil, nil
 	}

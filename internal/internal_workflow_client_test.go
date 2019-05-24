@@ -916,20 +916,20 @@ func (s *workflowClientTestSuite) TestGetWorkflowMemo() {
 	s.Error(err)
 }
 
-func (s *workflowClientTestSuite) TestGetSearchAttributes() {
+func (s *workflowClientTestSuite) TestSerializeSearchAttributes() {
 	var input1 map[string]interface{}
-	result1, err := getSearchAttributes(input1)
+	result1, err := serializeSearchAttributes(input1)
 	s.NoError(err)
 	s.Nil(result1)
 
 	input1 = make(map[string]interface{})
-	result2, err := getSearchAttributes(input1)
+	result2, err := serializeSearchAttributes(input1)
 	s.NoError(err)
 	s.NotNil(result2)
 	s.Equal(0, len(result2.IndexedFields))
 
 	input1["t1"] = "v1"
-	result3, err := getSearchAttributes(input1)
+	result3, err := serializeSearchAttributes(input1)
 	s.NoError(err)
 	s.NotNil(result3)
 	s.Equal(1, len(result3.IndexedFields))
@@ -938,7 +938,7 @@ func (s *workflowClientTestSuite) TestGetSearchAttributes() {
 	s.Equal("v1", resultString)
 
 	input1["non-serializable"] = make(chan int)
-	_, err = getSearchAttributes(input1)
+	_, err = serializeSearchAttributes(input1)
 	s.Error(err)
 }
 
@@ -1005,7 +1005,7 @@ func (s *workflowClientTestSuite) TestCountWorkflow() {
 	s.Equal(responseErr, err)
 }
 
-func (s *workflowClientTestSuite) TestGetSearchAttributesAPI() {
+func (s *workflowClientTestSuite) TestGetSearchAttributes() {
 	response := &shared.GetSearchAttributesResponse{}
 	s.service.EXPECT().GetSearchAttributes(gomock.Any(), gomock.Any()).Return(response, nil)
 	resp, err := s.client.GetSearchAttributes(context.Background())

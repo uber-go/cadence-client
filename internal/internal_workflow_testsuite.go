@@ -120,12 +120,14 @@ type (
 		service      workflowserviceclient.Interface
 		logger       *zap.Logger
 		metricsScope *metrics.TaggedScope
+		ctxProps     []ContextPropagator
 		mockClock    *clock.Mock
 		wallClock    clock.Clock
 		startTime    time.Time
 
 		callbackChannel chan testCallbackHandle
 		testTimeout     time.Duration
+		header          *shared.Header
 
 		counterID        int
 		activities       map[string]*testActivityHandle
@@ -231,6 +233,8 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 	if env.metricsScope == nil {
 		env.metricsScope = metrics.NewTaggedScope(s.scope)
 	}
+	env.ctxProps = s.ctxProps
+	env.header = s.header
 
 	// setup mock service
 	mockCtrl := gomock.NewController(&testReporter{logger: env.logger})
@@ -282,6 +286,9 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 	}
 	if env.workerOptions.DataConverter == nil {
 		env.workerOptions.DataConverter = getDefaultDataConverter()
+	}
+	if len(env.workerOptions.ContextPropagators) == 0 {
+		env.workerOptions.ContextPropagators = env.ctxProps
 	}
 
 	return env
@@ -363,6 +370,9 @@ func (env *testWorkflowEnvironmentImpl) setWorkerOptions(options WorkerOptions) 
 	if options.DataConverter != nil {
 		env.workerOptions.DataConverter = options.DataConverter
 	}
+	if len(options.ContextPropagators) > 0 {
+		env.workerOptions.ContextPropagators = options.ContextPropagators
+	}
 }
 
 func (env *testWorkflowEnvironmentImpl) setWorkerStopChannel(c chan struct{}) {
@@ -409,7 +419,7 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(delayStart time.
 	// In case of child workflow, this executeWorkflowInternal() is run in separate goroutinue, so use postCallback
 	// to make sure workflowDef.Execute() is run in main loop.
 	env.postCallback(func() {
-		env.workflowDef.Execute(env, nil, input)
+		env.workflowDef.Execute(env, env.header, input)
 		// kick off first decision task to start the workflow
 		if delayStart == 0 {
 			env.startDecisionTask()
@@ -464,6 +474,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 		},
 		ActivityType: *activityType,
 		Input:        input,
+		Header:       env.header,
 	}
 
 	task := newTestActivityTask(

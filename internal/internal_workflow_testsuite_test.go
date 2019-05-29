@@ -365,17 +365,25 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithHeaderContext() {
-	workerOptions := WorkerOptions{}
+	workerOptions := WorkerOptions{
+		ContextPropagators: []ContextPropagator{NewStringMapPropagator([]string{testHeader})},
+	}
 
 	// inline activity using value passing through user context.
 	activityWithUserContext := func(ctx context.Context) (string, error) {
-		value := ctx.Value(contextKey(testHeader))
-		if val, ok := value.([]byte); ok {
-			return string(val), nil
+		value := ctx.Value(ContextKey(testHeader))
+		if val, ok := value.(string); ok {
+			return val, nil
 		}
 		return "", errors.New("value not found from ctx")
 	}
 	RegisterActivity(activityWithUserContext)
+
+	s.SetHeader(&shared.Header{
+		Fields: map[string][]byte{
+			testHeader: []byte("test-data"),
+		},
+	})
 
 	env := s.NewTestActivityEnvironment()
 	env.SetWorkerOptions(workerOptions)
@@ -463,8 +471,8 @@ func testWorkflowHello(ctx Context) (string, error) {
 }
 
 func testWorkflowContext(ctx Context) (string, error) {
-	value := ctx.Value(contextKey(testHeader))
-	if val, ok := value.([]byte); ok {
+	value := ctx.Value(ContextKey(testHeader))
+	if val, ok := value.(string); ok {
 		return string(val), nil
 	}
 	return "", fmt.Errorf("context did not propagate to workflow")
@@ -475,8 +483,8 @@ func testActivityHello(ctx context.Context, msg string) (string, error) {
 }
 
 func testActivityContext(ctx context.Context) (string, error) {
-	value := ctx.Value(contextKey(testHeader))
-	if val, ok := value.([]byte); ok {
+	value := ctx.Value(ContextKey(testHeader))
+	if val, ok := value.(string); ok {
 		return string(val), nil
 	}
 	return "", fmt.Errorf("context did not propagate to workflow")
@@ -1348,9 +1356,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFriendlyName() {
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowHeaderContext() {
 
 	workflowFn := func(ctx Context) error {
-		value := ctx.Value(contextKey(testHeader))
-		if val, ok := value.([]byte); ok {
-			s.Equal("test-data", string(val))
+		value := ctx.Value(ContextKey(testHeader))
+		if val, ok := value.(string); ok {
+			s.Equal("test-data", val)
 		} else {
 			return fmt.Errorf("context did not propagate to workflow")
 		}
@@ -1375,6 +1383,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowHeaderContext() {
 		s.Equal("test-data", result)
 		return nil
 	}
+
+	s.SetContextPropagators([]ContextPropagator{NewStringMapPropagator([]string{testHeader})})
+	s.SetHeader(&shared.Header{
+		Fields: map[string][]byte{
+			testHeader: []byte("test-data"),
+		},
+	})
 
 	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()

@@ -48,6 +48,7 @@ const (
 	identity              = "some random identity"
 	timeoutInSeconds      = 20
 	workflowIDReusePolicy = WorkflowIDReusePolicyAllowDuplicateFailedOnly
+	testHeader            = "test-header"
 )
 
 // historyEventIteratorSuite
@@ -788,7 +789,7 @@ func (s *workflowClientTestSuite) TestStartWorkflow() {
 }
 
 func (s *workflowClientTestSuite) TestStartWorkflow_WithContext() {
-	s.client = NewClient(s.service, domain, &ClientOptions{ContextPropagators: []ContextPropagator{&TestContextPropagator{keys: []string{testHeader}}}})
+	s.client = NewClient(s.service, domain, &ClientOptions{ContextPropagators: []ContextPropagator{NewStringMapPropagator([]string{testHeader})}})
 	client, ok := s.client.(*workflowClient)
 	s.True(ok)
 	options := StartWorkflowOptions{

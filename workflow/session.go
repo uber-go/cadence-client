@@ -54,7 +54,7 @@ var ErrSessionFailed = internal.ErrSessionFailed
 //     MaxConCurrentSessionExecutionSize: the maximum number of concurrently sessions the resource
 //         support. By default, 1000 is used.
 
-// CreateSession creates a session and return a new context which contains information
+// CreateSession creates a session and returns a new context which contains information
 // of the created session. The session will be created on the tasklist user specified in
 // ActivityOptions. If none is specified, the default one will be used.
 //
@@ -80,15 +80,14 @@ var ErrSessionFailed = internal.ErrSessionFailed
 //    if err != nil {
 //		    // Creation failed. Wrong ctx or too many outstanding sessions.
 //    }
+//    defer CompleteSession(sessionCtx)
 //    err = ExecuteActivity(sessionCtx, someActivityFunc, activityInput).Get(sessionCtx, nil)
-//    if err != nil {
-//        // Session has failed or activity itself failed.
+//    if err == ErrSessionFailed {
+//        // Session has failed
+//    } else {
+//        // Handle activity error
 //    }
 //    ... // execute more activities using sessionCtx
-//    err = CompleteSession(sessionCtx)
-//    if err != nil {
-//        // Wrong ctx is used or failed to release session resource.
-//    }
 func CreateSession(ctx Context, sessionOptions *SessionOptions) (Context, error) {
 	return internal.CreateSession(ctx, sessionOptions)
 }

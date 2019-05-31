@@ -172,8 +172,13 @@ func NewCustomError(reason string, details ...interface{}) *CustomError {
 
 // NewTimeoutError creates TimeoutError instance.
 // Use NewHeartbeatTimeoutError to create heartbeat TimeoutError
-func NewTimeoutError(timeoutType shared.TimeoutType) *TimeoutError {
-	return &TimeoutError{timeoutType: timeoutType}
+func NewTimeoutError(timeoutType shared.TimeoutType, details ...interface{}) *TimeoutError {
+	if len(details) == 1 {
+		if d, ok := details[0].(*EncodedValues); ok {
+			return &TimeoutError{timeoutType: timeoutType, details: d}
+		}
+	}
+	return &TimeoutError{timeoutType: timeoutType, details: ErrorDetailsValues(details)}
 }
 
 // NewHeartbeatTimeoutError creates TimeoutError instance

@@ -126,7 +126,7 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *C
 // WARNING: This function is public only to support unit testing of workflows.
 // It shouldn't be used by application level code.
 func NewTimeoutError(timeoutType shared.TimeoutType, details ...interface{}) *TimeoutError {
-	return internal.NewTimeoutError(timeoutType, details)
+	return internal.NewTimeoutError(timeoutType, details...)
 }
 
 // NewHeartbeatTimeoutError creates TimeoutError instance

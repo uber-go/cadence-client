@@ -183,12 +183,7 @@ func NewTimeoutError(timeoutType shared.TimeoutType, details ...interface{}) *Ti
 
 // NewHeartbeatTimeoutError creates TimeoutError instance
 func NewHeartbeatTimeoutError(details ...interface{}) *TimeoutError {
-	if len(details) == 1 {
-		if d, ok := details[0].(*EncodedValues); ok {
-			return &TimeoutError{timeoutType: shared.TimeoutTypeHeartbeat, details: d}
-		}
-	}
-	return &TimeoutError{timeoutType: shared.TimeoutTypeHeartbeat, details: ErrorDetailsValues(details)}
+	return NewTimeoutError(shared.TimeoutTypeHeartbeat, details...)
 }
 
 // NewCanceledError creates CanceledError instance

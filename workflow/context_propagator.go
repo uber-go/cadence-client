@@ -32,9 +32,4 @@ type (
 	// ContextPropagator is an interface that determines what information from
 	// context to pass along
 	ContextPropagator = internal.ContextPropagator
-
-	// StringMapPropagator is a ContextPropagator that propagates a list of keys
-	// across a workflow, interpreting the payloads as strings. This is provided
-	// as a sample for other context propagator implementations.
-	StringMapPropagator = internal.StringMapPropagator
 )

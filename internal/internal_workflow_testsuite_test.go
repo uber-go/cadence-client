@@ -371,7 +371,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithHeaderContext() {
 
 	// inline activity using value passing through user context.
 	activityWithUserContext := func(ctx context.Context) (string, error) {
-		value := ctx.Value(ContextKey(testHeader))
+		value := ctx.Value(contextKey(testHeader))
 		if val, ok := value.(string); ok {
 			return val, nil
 		}
@@ -471,7 +471,7 @@ func testWorkflowHello(ctx Context) (string, error) {
 }
 
 func testWorkflowContext(ctx Context) (string, error) {
-	value := ctx.Value(ContextKey(testHeader))
+	value := ctx.Value(contextKey(testHeader))
 	if val, ok := value.(string); ok {
 		return string(val), nil
 	}
@@ -483,7 +483,7 @@ func testActivityHello(ctx context.Context, msg string) (string, error) {
 }
 
 func testActivityContext(ctx context.Context) (string, error) {
-	value := ctx.Value(ContextKey(testHeader))
+	value := ctx.Value(contextKey(testHeader))
 	if val, ok := value.(string); ok {
 		return string(val), nil
 	}
@@ -1356,7 +1356,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFriendlyName() {
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowHeaderContext() {
 
 	workflowFn := func(ctx Context) error {
-		value := ctx.Value(ContextKey(testHeader))
+		value := ctx.Value(contextKey(testHeader))
 		if val, ok := value.(string); ok {
 			s.Equal("test-data", val)
 		} else {

@@ -66,8 +66,11 @@ type (
 
 	// RecreateSessionParams contains information needed to recreate a session on the same worker.
 	// Use SessionInfo.GetRecreateParameter() and pass the returned value to RecreateSession().
+	// The field of this struct is exported so that it can be pass to new run of a workflow and user
+	// should NOT handcraft this object. Always use GetRecreateParameter() and pass the returned value
+	// to the new run.
 	RecreateSessionParams struct {
-		tasklist string
+		Tasklist string
 	}
 
 	sessionState int
@@ -189,7 +192,7 @@ func CreateSession(ctx Context, sessionOptions *SessionOptions) (Context, error)
 // one run, complete the current session, get recreateSessionParams from sessionInfo and pass the parameter to
 // next run. In the new run, the session can be recreated using the parameter.
 func RecreateSession(ctx Context, params *RecreateSessionParams, sessionOptions *SessionOptions) (Context, error) {
-	return createSession(ctx, params.tasklist, sessionOptions, false)
+	return createSession(ctx, params.Tasklist, sessionOptions, false)
 }
 
 // CompleteSession completes a session. It releases worker resources, so other sessions can be created.
@@ -246,7 +249,7 @@ func GetSessionInfo(ctx Context) *SessionInfo {
 // RecreateSession() API.
 func (s *SessionInfo) GetRecreateParams() *RecreateSessionParams {
 	return &RecreateSessionParams{
-		tasklist: s.tasklist,
+		Tasklist: s.tasklist,
 	}
 }
 

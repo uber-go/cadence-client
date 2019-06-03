@@ -41,6 +41,9 @@ type (
 
 	// RecreateSessionParams contains information needed to recreate a session on the same worker.
 	// Use SessionInfo.GetRecreateParameter() and pass the returned value to RecreateSession().
+	// The field of this struct is exported so that it can be pass to new run of a workflow and user
+	// should NOT handcraft this object. Always use GetRecreateParameter() and pass the returned value
+	// to the new run.
 	RecreateSessionParams = internal.RecreateSessionParams
 )
 

@@ -39,6 +39,7 @@ type SessionTestSuite struct {
 }
 
 func (s *SessionTestSuite) SetupSuite() {
+	RegisterWorkflow(sessionContinueAsNewWorkflow)
 	RegisterActivityWithOptions(testSessionActivity, RegisterActivityOptions{Name: "testSessionActivity"})
 	s.sessionOptions = &SessionOptions{
 		ExecutionTimeout: time.Minute,
@@ -490,6 +491,27 @@ func (s *SessionTestSuite) TestExecuteActivityInClosedSession() {
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 	s.Equal(defaultTestTaskList, taskListUsed)
+}
+
+func sessionContinueAsNewWorkflow(ctx Context, recreateParams *RecreateSessionParams) error {
+	sessionInfo := &SessionInfo{
+		SessionID:    "testSessionID",
+		tasklist:     "random resource specific tasklist",
+		sessionState: sessionStateClosed,
+	}
+	return NewContinueAsNewError(ctx, sessionContinueAsNewWorkflow, sessionInfo.GetRecreateParams())
+}
+
+func (s *SessionTestSuite) TestSessionContinueAsNew() {
+	env := s.NewTestWorkflowEnvironment()
+
+	env.ExecuteWorkflow(sessionContinueAsNewWorkflow, nil)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
+
+	_, ok := env.GetWorkflowError().(*ContinueAsNewError)
+	s.True(ok)
 }
 
 func (s *SessionTestSuite) createSessionWithoutRetry(ctx Context) (Context, error) {

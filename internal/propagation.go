@@ -33,24 +33,47 @@ const (
 	runTag = "cadenceRunID"
 )
 
-// createOpenTracingActivitySpan creates a new context with a started span
+// createOpenTracingActivitySpan creates a new context with a workflow started span
+func createOpenTracingWorkflowSpan(
+	ctx context.Context,
+	tracer opentracing.Tracer,
+	start time.Time,
+	workflowType, workflowID string,
+) (context.Context, opentracing.Span) {
+	tags := opentracing.Tags{
+		workflowTag: workflowID,
+	}
+	return createOpenTracingSpan(ctx, tracer, start, workflowType, tags)
+}
+
+// createOpenTracingActivitySpan creates a new context with an activity started span
 func createOpenTracingActivitySpan(
 	ctx context.Context,
 	tracer opentracing.Tracer,
 	start time.Time,
 	activityType, workflowID, runID string,
 ) (context.Context, opentracing.Span) {
+	tags := opentracing.Tags{
+		workflowTag: workflowID,
+		runTag:      runID,
+	}
+	return createOpenTracingSpan(ctx, tracer, start, activityType, tags)
+}
+
+func createOpenTracingSpan(
+	ctx context.Context,
+	tracer opentracing.Tracer,
+	start time.Time,
+	name string,
+	tags opentracing.Tags,
+) (context.Context, opentracing.Span) {
 	var parent opentracing.SpanContext
 	if parentSpan := opentracing.SpanFromContext(ctx); parentSpan != nil {
 		parent = parentSpan.Context()
 	}
 
-	tags := opentracing.Tags{
-		workflowTag: workflowID,
-		runTag:      runID,
-	}
 	span := tracer.StartSpan(
-		activityType,
+		name,
 		opentracing.StartTime(start),
 		opentracing.FollowsFrom(parent),
 		tags,

@@ -180,6 +180,11 @@ func (wc *workflowClient) StartWorkflow(
 	if err != nil {
 		return nil, err
 	}
+
+	// create a workflow start span and attach it to the context object. finish it immediately
+	ctx, span := createOpenTracingWorkflowSpan(ctx, wc.tracer, time.Now(), workflowType.Name, workflowID)
+	span.Finish()
+
 	// get workflow headers from the context
 	header := wc.getWorkflowHeader(ctx)
 
@@ -366,6 +371,11 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 		return nil, err
 	}
 
+	// create a workflow start span and attach it to the context object. finish it immediately
+	ctx, span := createOpenTracingWorkflowSpan(ctx, wc.tracer, time.Now(), workflowType.Name, workflowID)
+	span.Finish()
+
+	// get workflow headers from the context
 	header := wc.getWorkflowHeader(ctx)
 
 	signalWithStartRequest := &s.SignalWithStartWorkflowExecutionRequest{

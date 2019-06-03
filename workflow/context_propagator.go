@@ -18,28 +18,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package internal
+package workflow
 
-// below are the metadata which will be embedded as part
-// of headers in every rpc call made by this client to
-// cadence server.
+import "go.uber.org/cadence/internal"
 
-// Update to the metadata below is typically done
-// by the cadence team as part of a major feature or
-// behavior change
+type (
+	// HeaderReader is an interface to read information from cadence headers
+	HeaderReader = internal.HeaderReader
 
-// LibraryVersion is a semver that represents
-// the version of this cadence client library.
-// This represents API changes visible to Cadence
-// client side library consumers, i.e. developers
-// that are writing workflows. So every time we change API
-// that can affect them we have to change this number.
-// Format: MAJOR.MINOR.PATCH
-const LibraryVersion = "0.8.3"
+	// HeaderWriter is an interface to write information to cadence headers
+	HeaderWriter = internal.HeaderWriter
 
-// FeatureVersion is a semver that represents the
-// feature set of this cadence client library support.
-// This can be used for client capability check, on
-// Cadence server, for backward compatibility
-// Format: MAJOR.MINOR.PATCH
-const FeatureVersion = "1.1.0"
+	// ContextPropagator is an interface that determines what information from
+	// context to pass along
+	ContextPropagator = internal.ContextPropagator
+)

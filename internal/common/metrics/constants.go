@@ -42,6 +42,7 @@ const (
 	DecisionPollNoTaskCounter          = CadenceMetricsPrefix + "decision-poll-no-task"
 	DecisionPollSucceedCounter         = CadenceMetricsPrefix + "decision-poll-succeed"
 	DecisionPollLatency                = CadenceMetricsPrefix + "decision-poll-latency" // measure succeed poll request latency
+	DecisionScheduledToStartLatency    = CadenceMetricsPrefix + "decision-scheduled-to-start-latency"
 	DecisionExecutionFailedCounter     = CadenceMetricsPrefix + "decision-execution-failed"
 	DecisionExecutionLatency           = CadenceMetricsPrefix + "decision-execution-latency"
 	DecisionResponseFailedCounter      = CadenceMetricsPrefix + "decision-response-failed"
@@ -56,6 +57,7 @@ const (
 	ActivityPollNoTaskCounter          = CadenceMetricsPrefix + "activity-poll-no-task"
 	ActivityPollSucceedCounter         = CadenceMetricsPrefix + "activity-poll-succeed"
 	ActivityPollLatency                = CadenceMetricsPrefix + "activity-poll-latency"
+	ActivityScheduledToStartLatency    = CadenceMetricsPrefix + "activity-scheduled-to-start-latency"
 	ActivityExecutionFailedCounter     = CadenceMetricsPrefix + "activity-execution-failed"
 	ActivityExecutionLatency           = CadenceMetricsPrefix + "activity-execution-latency"
 	ActivityResponseLatency            = CadenceMetricsPrefix + "activity-response-latency"
@@ -75,8 +77,6 @@ const (
 	LocalActivityPanicCounter          = CadenceMetricsPrefix + "local-activity-panic"
 	LocalActivityExecutionLatency      = CadenceMetricsPrefix + "local-activity-execution-latency"
 	WorkerPanicCounter                 = CadenceMetricsPrefix + "worker-panic"
-
-	TaskListQueueLatency = CadenceMetricsPrefix + "tasklist-queue-latency"
 
 	UnhandledSignalsCounter = CadenceMetricsPrefix + "unhandled-signals"
 	CorruptedSignalsCounter = CadenceMetricsPrefix + "corrupted-signals"

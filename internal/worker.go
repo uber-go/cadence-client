@@ -109,7 +109,32 @@ type (
 		// default: default identity that include hostname, groupName and process ID.
 		Identity string
 
-		// Optional: Metrics to be reported.
+		// Optional: Metrics to be reported. Metrics emitted by the cadence client are not prometheus compatible by
+		// default. To ensure metrics are compatible with prometheus make sure to create tally scope with sanitizer
+		// options set.
+		// var (
+		// _safeCharacters = []rune{'_'}
+		// _sanitizeOptions = tally.SanitizeOptions{
+		// 	NameCharacters: tally.ValidCharacters{
+		// 		Ranges:     tally.AlphanumericRange,
+		// 		Characters: _safeCharacters,
+		// 	},
+		// 		KeyCharacters: tally.ValidCharacters{
+		// 			Ranges:     tally.AlphanumericRange,
+		// 			Characters: _safeCharacters,
+		// 		},
+		// 		ValueCharacters: tally.ValidCharacters{
+		// 			Ranges:     tally.AlphanumericRange,
+		// 			Characters: _safeCharacters,
+		// 		},
+		// 		ReplacementCharacter: tally.DefaultReplacementCharacter,
+		// 	}
+		// )
+		// opts := tally.ScopeOptions{
+		// 	Reporter:        reporter,
+		// 	SanitizeOptions: &_sanitizeOptions,
+		// }
+		// scope, _ := tally.NewRootScope(opts, time.Second)
 		// default: no metrics.
 		MetricsScope tally.Scope
 
@@ -179,6 +204,10 @@ type (
 		// Optional: Sets the maximum number of concurrently running sessions the resource support.
 		// default: 1000
 		MaxConCurrentSessionExecutionSize int
+
+		// Optional: Sets ContextPropagators that allows users to control the context information passed through a workflow
+		// default: no ContextPropagators
+		ContextPropagators []ContextPropagator
 	}
 )
 

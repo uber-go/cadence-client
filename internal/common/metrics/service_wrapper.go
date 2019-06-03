@@ -52,6 +52,9 @@ const (
 	scopeNameGetWorkflowExecutionHistory      = CadenceMetricsPrefix + "GetWorkflowExecutionHistory"
 	scopeNameListClosedWorkflowExecutions     = CadenceMetricsPrefix + "ListClosedWorkflowExecutions"
 	scopeNameListOpenWorkflowExecutions       = CadenceMetricsPrefix + "ListOpenWorkflowExecutions"
+	scopeNameListWorkflowExecutions           = CadenceMetricsPrefix + "ListWorkflowExecutions"
+	scopeNameScanWorkflowExecutions           = CadenceMetricsPrefix + "ScanWorkflowExecutions"
+	scopeNameCountWorkflowExecutions          = CadenceMetricsPrefix + "CountWorkflowExecutions"
 	scopeNamePollForActivityTask              = CadenceMetricsPrefix + "PollForActivityTask"
 	scopeNamePollForDecisionTask              = CadenceMetricsPrefix + "PollForDecisionTask"
 	scopeNameRecordActivityTaskHeartbeat      = CadenceMetricsPrefix + "RecordActivityTaskHeartbeat"
@@ -77,6 +80,7 @@ const (
 	scopeNameRespondQueryTaskCompleted        = CadenceMetricsPrefix + "RespondQueryTaskCompleted"
 	scopeNameDescribeWorkflowExecution        = CadenceMetricsPrefix + "DescribeWorkflowExecution"
 	scopeNameResetStickyTaskList              = CadenceMetricsPrefix + "ResetStickyTaskList"
+	scopeNameGetSearchAttributes              = CadenceMetricsPrefix + "GetSearchAttributes"
 )
 
 // NewWorkflowServiceWrapper creates a new wrapper to WorkflowService that will emit metrics for each service call.
@@ -165,6 +169,27 @@ func (w *workflowServiceMetricsWrapper) ListClosedWorkflowExecutions(ctx context
 func (w *workflowServiceMetricsWrapper) ListOpenWorkflowExecutions(ctx context.Context, request *shared.ListOpenWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListOpenWorkflowExecutionsResponse, error) {
 	scope := w.getOperationScope(scopeNameListOpenWorkflowExecutions)
 	result, err := w.service.ListOpenWorkflowExecutions(ctx, request, opts...)
+	scope.handleError(err)
+	return result, err
+}
+
+func (w *workflowServiceMetricsWrapper) ListWorkflowExecutions(ctx context.Context, request *shared.ListWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListWorkflowExecutionsResponse, error) {
+	scope := w.getOperationScope(scopeNameListWorkflowExecutions)
+	result, err := w.service.ListWorkflowExecutions(ctx, request, opts...)
+	scope.handleError(err)
+	return result, err
+}
+
+func (w *workflowServiceMetricsWrapper) ScanWorkflowExecutions(ctx context.Context, request *shared.ListWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListWorkflowExecutionsResponse, error) {
+	scope := w.getOperationScope(scopeNameScanWorkflowExecutions)
+	result, err := w.service.ScanWorkflowExecutions(ctx, request, opts...)
+	scope.handleError(err)
+	return result, err
+}
+
+func (w *workflowServiceMetricsWrapper) CountWorkflowExecutions(ctx context.Context, request *shared.CountWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.CountWorkflowExecutionsResponse, error) {
+	scope := w.getOperationScope(scopeNameCountWorkflowExecutions)
+	result, err := w.service.CountWorkflowExecutions(ctx, request, opts...)
 	scope.handleError(err)
 	return result, err
 }
@@ -335,4 +360,11 @@ func (w *workflowServiceMetricsWrapper) RespondQueryTaskCompleted(ctx context.Co
 	err := w.service.RespondQueryTaskCompleted(ctx, request, opts...)
 	scope.handleError(err)
 	return err
+}
+
+func (w *workflowServiceMetricsWrapper) GetSearchAttributes(ctx context.Context, opts ...yarpc.CallOption) (*shared.GetSearchAttributesResponse, error) {
+	scope := w.getOperationScope(scopeNameGetSearchAttributes)
+	result, err := w.service.GetSearchAttributes(ctx, opts...)
+	scope.handleError(err)
+	return result, err
 }

@@ -100,8 +100,15 @@ func Test_TimeoutError(t *testing.T) {
 	require.True(t, heartbeatErr.HasDetails())
 	require.NoError(t, heartbeatErr.Details(&data))
 	require.Equal(t, testErrorDetails1, data)
+}
 
-	// test heartbeatTimeout inside internal_event_handlers
+func Test_TimeoutError_WithDetails(t *testing.T) {
+	testTimeoutErrorDetails(t, shared.TimeoutTypeHeartbeat)
+	testTimeoutErrorDetails(t, shared.TimeoutTypeScheduleToClose)
+	testTimeoutErrorDetails(t, shared.TimeoutTypeStartToClose)
+}
+
+func testTimeoutErrorDetails(t *testing.T, timeoutType shared.TimeoutType) {
 	context := &workflowEnvironmentImpl{
 		decisionsHelper: newDecisionsHelper(),
 		dataConverter:   getDefaultDataConverter(),
@@ -119,7 +126,6 @@ func Test_TimeoutError(t *testing.T) {
 		},
 	})
 	context.decisionsHelper.addDecision(di)
-	timeoutType := shared.TimeoutTypeHeartbeat
 	encodedDetails1, _ := context.dataConverter.ToData(testErrorDetails1)
 	event := createTestEventActivityTaskTimedOut(7, &shared.ActivityTaskTimedOutEventAttributes{
 		Details:          encodedDetails1,
@@ -132,7 +138,7 @@ func Test_TimeoutError(t *testing.T) {
 	err, ok := actualErr.(*TimeoutError)
 	require.True(t, ok)
 	require.True(t, err.HasDetails())
-	data = ""
+	data := ""
 	require.NoError(t, err.Details(&data))
 	require.Equal(t, testErrorDetails1, data)
 }
@@ -385,4 +391,35 @@ func Test_SignalExternalWorkflowExecutionFailedError(t *testing.T) {
 	require.NoError(t, weh.handleSignalExternalWorkflowExecutionFailed(event))
 	_, ok := actualErr.(*UnknownExternalWorkflowExecutionError)
 	require.True(t, ok)
+}
+
+func Test_ContinueAsNewError(t *testing.T) {
+	var a1 = 1234
+	var a2 = "some random input"
+
+	continueAsNewWfName := "continueAsNewWorkflowFn"
+	continueAsNewWorkflowFn := func(ctx Context, testInt int, testString string) error {
+		return NewContinueAsNewError(ctx, continueAsNewWfName, a1, a2)
+	}
+	RegisterWorkflowWithOptions(continueAsNewWorkflowFn, RegisterWorkflowOptions{
+		Name: continueAsNewWfName,
+	})
+
+	s := &WorkflowTestSuite{}
+	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv.ExecuteWorkflow(continueAsNewWorkflowFn, 101, "another random string")
+	err := wfEnv.GetWorkflowError()
+
+	require.Error(t, err)
+	continueAsNewErr, ok := err.(*ContinueAsNewError)
+	require.True(t, ok)
+	require.Equal(t, continueAsNewWfName, continueAsNewErr.WorkflowType().Name)
+
+	args := continueAsNewErr.Args()
+	intArg, ok := args[0].(int)
+	require.True(t, ok)
+	require.Equal(t, a1, intArg)
+	stringArg, ok := args[1].(string)
+	require.True(t, ok)
+	require.Equal(t, a2, stringArg)
 }

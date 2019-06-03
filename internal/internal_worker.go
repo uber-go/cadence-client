@@ -182,6 +182,8 @@ type (
 
 		// SessionResourceID is a unique identifier of the resource the session will consume
 		SessionResourceID string
+
+		ContextPropagators []ContextPropagator
 	}
 
 	// defaultDataConverter uses thrift encoder/decoder when possible, for everything else use json.
@@ -1126,6 +1128,7 @@ func newAggregatedWorker(
 		NonDeterministicWorkflowPolicy:       wOptions.NonDeterministicWorkflowPolicy,
 		DataConverter:                        wOptions.DataConverter,
 		WorkerStopTimeout:                    wOptions.WorkerStopTimeout,
+		ContextPropagators:                   wOptions.ContextPropagators,
 	}
 
 	ensureRequiredParams(&workerParams)

@@ -28,6 +28,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
 
@@ -57,6 +58,7 @@ type (
 		identity           string
 		dataConverter      encoded.DataConverter
 		contextPropagators []ContextPropagator
+		tracer             opentracing.Tracer
 	}
 
 	// domainClient is the client for managing domains.

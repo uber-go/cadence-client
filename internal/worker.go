@@ -195,7 +195,7 @@ type (
 		ContextPropagators []ContextPropagator
 
 		// Optional: Sets opentracing Tracer that is to be used to emit tracing information
-		// default: no Tracer
+		// default: no tracer - opentracing.NoopTracer
 		Tracer opentracing.Tracer
 	}
 )

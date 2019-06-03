@@ -473,6 +473,8 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	if options != nil && options.Tracer != nil {
 		tracer = options.Tracer
 		contextPropagators = append(contextPropagators, NewTracingContextPropagator(tracer))
+	} else {
+		tracer = opentracing.NoopTracer{}
 	}
 	return &workflowClient{
 		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),

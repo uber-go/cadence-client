@@ -39,7 +39,6 @@ type SessionTestSuite struct {
 }
 
 func (s *SessionTestSuite) SetupSuite() {
-	RegisterWorkflow(sessionContinueAsNewWorkflow)
 	RegisterActivityWithOptions(testSessionActivity, RegisterActivityOptions{Name: "testSessionActivity"})
 	s.sessionOptions = &SessionOptions{
 		ExecutionTimeout: time.Minute,
@@ -261,7 +260,7 @@ func (s *SessionTestSuite) TestRecreation() {
 			sessionState: sessionStateFailed,
 		}
 
-		sessionCtx, err := RecreateSession(ctx, sessionInfo.GetRecreateParams(), s.sessionOptions)
+		sessionCtx, err := RecreateSession(ctx, sessionInfo.GetRecreateToken(), s.sessionOptions)
 		if err != nil {
 			return err
 		}
@@ -327,7 +326,7 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_WithRecreation() {
 			if i%2 == 0 {
 				_, err = s.createSessionWithoutRetry(ctx)
 			} else {
-				_, err = RecreateSession(ctx, sessionInfo.GetRecreateParams(), s.sessionOptions)
+				_, err = RecreateSession(ctx, sessionInfo.GetRecreateToken(), s.sessionOptions)
 			}
 			if err != nil {
 				return err
@@ -406,7 +405,7 @@ func (s *SessionTestSuite) TestSessionRecreationTaskList() {
 			tasklist:     resourceSpecificTaskList,
 			sessionState: sessionStateClosed,
 		}
-		sessionCtx, err := RecreateSession(ctx, sessionInfo.GetRecreateParams(), s.sessionOptions)
+		sessionCtx, err := RecreateSession(ctx, sessionInfo.GetRecreateToken(), s.sessionOptions)
 		if err != nil {
 			return err
 		}
@@ -493,25 +492,18 @@ func (s *SessionTestSuite) TestExecuteActivityInClosedSession() {
 	s.Equal(defaultTestTaskList, taskListUsed)
 }
 
-func sessionContinueAsNewWorkflow(ctx Context, recreateParams *RecreateSessionParams) error {
+func (s *SessionTestSuite) TestSessionRecreateToken() {
+	testTasklist := "some random tasklist"
+
 	sessionInfo := &SessionInfo{
 		SessionID:    "testSessionID",
-		tasklist:     "random resource specific tasklist",
+		tasklist:     tasklist,
 		sessionState: sessionStateClosed,
 	}
-	return NewContinueAsNewError(ctx, sessionContinueAsNewWorkflow, sessionInfo.GetRecreateParams())
-}
-
-func (s *SessionTestSuite) TestSessionContinueAsNew() {
-	env := s.NewTestWorkflowEnvironment()
-
-	env.ExecuteWorkflow(sessionContinueAsNewWorkflow, nil)
-
-	s.True(env.IsWorkflowCompleted())
-	s.Error(env.GetWorkflowError())
-
-	_, ok := env.GetWorkflowError().(*ContinueAsNewError)
-	s.True(ok)
+	token := sessionInfo.GetRecreateToken()
+	params, err := deserializeRecreateToken(token)
+	s.NoError(err)
+	s.Equal(testTasklist, params.Tasklist)
 }
 
 func (s *SessionTestSuite) createSessionWithoutRetry(ctx Context) (Context, error) {

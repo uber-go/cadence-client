@@ -38,13 +38,6 @@ type (
 	// CreationTimeout: required, no default
 	//     Specfifies how long session creation can take before returning an error
 	SessionOptions = internal.SessionOptions
-
-	// RecreateSessionParams contains information needed to recreate a session on the same worker.
-	// Use SessionInfo.GetRecreateParameter() and pass the returned value to RecreateSession().
-	// The field of this struct is exported so that it can be pass to new run of a workflow and user
-	// should NOT handcraft this object. Always use GetRecreateParameter() and pass the returned value
-	// to the new run.
-	RecreateSessionParams = internal.RecreateSessionParams
 )
 
 // ErrSessionFailed is the error returned when user tries to execute an activity but the
@@ -96,16 +89,15 @@ func CreateSession(ctx Context, sessionOptions *SessionOptions) (Context, error)
 }
 
 // RecreateSession recreate a session based on the sessionInfo passed in. Activities executed within
-// the recreated session will be executed by the same worker as the previous session. CreateSessionForResourceID()
-// returns an error under the same situation as CreateSession() and has the same usage as CreateSession().
-// It will not check the state of the session described by the sessionInfo passed in, so user can recreate
-// a session based on a failed or completed session.
+// the recreated session will be executed by the same worker as the previous session. RecreateSession()
+// returns an error under the same situation as CreateSession() or the token passed in is invalid.
+// It also has the same usage as CreateSession().
 //
 // The main usage of RecreateSession is for long sessions that are splited into multiple runs. At the end of
-// one run, complete the current session, get recreateSessionParams from sessionInfo and pass the parameter to
-// next run. In the new run, the session can be recreated using the parameter.
-func RecreateSession(ctx Context, params *RecreateSessionParams, sessionOptions *SessionOptions) (Context, error) {
-	return internal.RecreateSession(ctx, params, sessionOptions)
+// one run, complete the current session, get recreateToken from sessionInfo by calling SessionInfo.GetRecreateToken()
+// and pass the token to the next run. In the new run, session can be recreated using that token.
+func RecreateSession(ctx Context, recreateToken []byte, sessionOptions *SessionOptions) (Context, error) {
+	return internal.RecreateSession(ctx, recreateToken, sessionOptions)
 }
 
 // CompleteSession completes a session. It releases worker resources, so other sessions can be created.

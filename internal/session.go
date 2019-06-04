@@ -23,6 +23,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -64,12 +65,7 @@ type (
 		CreationTimeout  time.Duration
 	}
 
-	// RecreateSessionParams contains information needed to recreate a session on the same worker.
-	// Use SessionInfo.GetRecreateParameter() and pass the returned value to RecreateSession().
-	// The field of this struct is exported so that it can be pass to new run of a workflow and user
-	// should NOT handcraft this object. Always use GetRecreateParameter() and pass the returned value
-	// to the new run.
-	RecreateSessionParams struct {
+	recreateSessionParams struct {
 		Tasklist string
 	}
 
@@ -184,15 +180,18 @@ func CreateSession(ctx Context, sessionOptions *SessionOptions) (Context, error)
 
 // RecreateSession recreate a session based on the sessionInfo passed in. Activities executed within
 // the recreated session will be executed by the same worker as the previous session. RecreateSession()
-// returns an error under the same situation as CreateSession() and has the same usage as CreateSession().
-// It will not check the state of the session described by the sessionInfo passed in, so user can recreate
-// a session based on a failed or completed session.
+// returns an error under the same situation as CreateSession() or the token passed in is invalid.
+// It also has the same usage as CreateSession().
 //
 // The main usage of RecreateSession is for long sessions that are splited into multiple runs. At the end of
-// one run, complete the current session, get recreateSessionParams from sessionInfo and pass the parameter to
-// next run. In the new run, the session can be recreated using the parameter.
-func RecreateSession(ctx Context, params *RecreateSessionParams, sessionOptions *SessionOptions) (Context, error) {
-	return createSession(ctx, params.Tasklist, sessionOptions, false)
+// one run, complete the current session, get recreateToken from sessionInfo by calling SessionInfo.GetRecreateToken()
+// and pass the token to the next run. In the new run, session can be recreated using that token.
+func RecreateSession(ctx Context, recreateToken []byte, sessionOptions *SessionOptions) (Context, error) {
+	recreateParams, err := deserializeRecreateToken(recreateToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserilalize recreate token: %v", err)
+	}
+	return createSession(ctx, recreateParams.Tasklist, sessionOptions, false)
 }
 
 // CompleteSession completes a session. It releases worker resources, so other sessions can be created.
@@ -245,12 +244,13 @@ func GetSessionInfo(ctx Context) *SessionInfo {
 	return info
 }
 
-// GetRecreateParams returns the parameters needed to recreate a session. The returned value should be passed to
+// GetRecreateToken returns the token needed to recreate a session. The returned value should be passed to
 // RecreateSession() API.
-func (s *SessionInfo) GetRecreateParams() *RecreateSessionParams {
-	return &RecreateSessionParams{
+func (s *SessionInfo) GetRecreateToken() []byte {
+	params := recreateSessionParams{
 		Tasklist: s.tasklist,
 	}
+	return mustSerializeRecreateToken(&params)
 }
 
 func getSessionInfo(ctx Context) *SessionInfo {
@@ -405,6 +405,22 @@ func sessionCompletionActivity(ctx context.Context, sessionID string) error {
 func isSessionCreationActivity(activity interface{}) bool {
 	activityName, ok := activity.(string)
 	return ok && activityName == sessionCreationActivityName
+}
+
+func mustSerializeRecreateToken(params *recreateSessionParams) []byte {
+	dc := getDefaultDataConverter()
+	token, err := dc.ToData(params)
+	if err != nil {
+		panic(err)
+	}
+	return token
+}
+
+func deserializeRecreateToken(token []byte) (*recreateSessionParams, error) {
+	dc := getDefaultDataConverter()
+	var recreateParams recreateSessionParams
+	err := dc.FromData(token, &recreateParams)
+	return &recreateParams, err
 }
 
 func newSessionTokenBucket(concurrentSessionExecutionSize int) *sessionTokenBucket {

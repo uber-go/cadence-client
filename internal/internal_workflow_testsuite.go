@@ -1758,15 +1758,13 @@ func (env *testWorkflowEnvironmentImpl) getActivityInfo(activityID, activityType
 }
 
 func (env *testWorkflowEnvironmentImpl) cancelWorkflow(callback resultHandler) {
-	env.postCallback(func() {
-		// RequestCancelWorkflow needs to be run in main thread
-		env.RequestCancelExternalWorkflow(
-			env.workflowInfo.Domain,
-			env.workflowInfo.WorkflowExecution.ID,
-			env.workflowInfo.WorkflowExecution.RunID,
-			callback,
-		)
-	}, true)
+	// RequestCancelWorkflow needs to be run in main thread
+	env.RequestCancelExternalWorkflow(
+		env.workflowInfo.Domain,
+		env.workflowInfo.WorkflowExecution.ID,
+		env.workflowInfo.WorkflowExecution.RunID,
+		callback,
+	)
 }
 
 func (env *testWorkflowEnvironmentImpl) signalWorkflow(name string, input interface{}) {
@@ -1774,9 +1772,7 @@ func (env *testWorkflowEnvironmentImpl) signalWorkflow(name string, input interf
 	if err != nil {
 		panic(err)
 	}
-	env.postCallback(func() {
-		env.signalHandler(name, data)
-	}, true)
+	env.signalHandler(name, data)
 }
 
 func (env *testWorkflowEnvironmentImpl) signalWorkflowByID(workflowID, signalName string, input interface{}) error {
@@ -1789,9 +1785,7 @@ func (env *testWorkflowEnvironmentImpl) signalWorkflowByID(workflowID, signalNam
 		if workflowHandle.handled {
 			return &shared.EntityNotExistsError{Message: fmt.Sprintf("Workflow %v already completed", workflowID)}
 		}
-		workflowHandle.env.postCallback(func() {
-			workflowHandle.env.signalHandler(signalName, data)
-		}, true)
+		workflowHandle.env.signalHandler(signalName, data)
 		return nil
 	}
 

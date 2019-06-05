@@ -181,7 +181,13 @@ func (wc *workflowClient) StartWorkflow(
 		return nil, err
 	}
 
-	// create a workflow start span and attach it to the context object. finish it immediately
+	// create a workflow start span and attach it to the context object.
+	// N.B. we need to finish this immediately as jaeger does not give us a way
+	// to recreate a span given a span context - which means we will run into
+	// issues during replay. we work around this by creating and ending the
+	// workflow start span and passing in that context to the workflow. So
+	// everything beginning with the StartWorkflowExecutionRequest will be
+	// parented by the created start workflow span.
 	ctx, span := createOpenTracingWorkflowSpan(ctx, wc.tracer, time.Now(), fmt.Sprintf("StartWorkflow-%s", workflowType.Name), workflowID)
 	span.Finish()
 

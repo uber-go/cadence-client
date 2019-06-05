@@ -116,7 +116,7 @@ const (
 
 	errTooManySessionsMsg string = "too many outstanding sessions"
 
-	sessionHeartBeatTimeout time.Duration = time.Second * 20
+	sessionHeartBeatTimeout time.Duration = time.Second * 10
 )
 
 var (
@@ -191,7 +191,7 @@ func RecreateSession(ctx Context, recreateToken []byte, sessionOptions *SessionO
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserilalize recreate token: %v", err)
 	}
-	return createSession(ctx, recreateParams.Tasklist, sessionOptions, false)
+	return createSession(ctx, recreateParams.Tasklist, sessionOptions, true)
 }
 
 // CompleteSession completes a session. It releases worker resources, so other sessions can be created.
@@ -330,7 +330,11 @@ func createSession(ctx Context, creationTasklist string, options *SessionOptions
 	}
 
 	Go(ctx, func(ctx Context) {
-		if err = creationFuture.Get(ctx, nil); err != nil {
+		err := creationFuture.Get(ctx, nil)
+		if err == nil {
+			return
+		}
+		if _, ok := err.(*CanceledError); !ok {
 			getWorkflowEnvironment(ctx).RemoveSession(sessionID)
 			GetLogger(ctx).Debug("Session failed", zap.String("sessionID", sessionID), zap.Error(err))
 			sessionInfo.sessionState = sessionStateFailed
@@ -381,6 +385,9 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 
 	for {
 		select {
+		case <-ctx.Done():
+			sessionEnv.CompleteSession(sessionID)
+			return ctx.Err()
 		case <-ticker.C:
 			err := activityEnv.serviceInvoker.Heartbeat([]byte{})
 			if err != nil {

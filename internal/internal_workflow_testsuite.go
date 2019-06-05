@@ -31,6 +31,7 @@ import (
 
 	"github.com/facebookgo/clock"
 	"github.com/golang/mock/gomock"
+	"github.com/opentracing/opentracing-go"
 	"github.com/robfig/cron"
 	"github.com/stretchr/testify/mock"
 	"github.com/uber-go/tally"
@@ -552,6 +553,7 @@ func (env *testWorkflowEnvironmentImpl) executeLocalActivity(
 		userContext:  env.workerOptions.BackgroundActivityContext,
 		metricsScope: env.metricsScope,
 		logger:       env.logger,
+		tracer:       opentracing.NoopTracer{},
 	}
 
 	result := taskHandler.executeLocalActivityTask(task)
@@ -1020,7 +1022,7 @@ func getRetryBackoffFromThriftRetryPolicy(tp *shared.RetryPolicy, attempt int32,
 
 func (env *testWorkflowEnvironmentImpl) ExecuteLocalActivity(params executeLocalActivityParams, callback laResultHandler) *localActivityInfo {
 	activityID := getStringID(env.nextID())
-	wOptions := fillWorkerOptionsDefaults(env.workerOptions)
+	wOptions := augmentWorkerOptions(env.workerOptions)
 	ae := &activityExecutor{name: getFunctionName(params.ActivityFn), fn: params.ActivityFn}
 	if at, _, _ := getValidatedActivityFunction(params.ActivityFn, params.InputArgs, wOptions.DataConverter); at != nil {
 		// local activity could be registered, if so use the registered name. This name is only used to find a mock.
@@ -1035,10 +1037,12 @@ func (env *testWorkflowEnvironmentImpl) ExecuteLocalActivity(params executeLocal
 
 	task := newLocalActivityTask(params, callback, activityID)
 	taskHandler := localActivityTaskHandler{
-		userContext:   wOptions.BackgroundActivityContext,
-		metricsScope:  metrics.NewTaggedScope(wOptions.MetricsScope),
-		logger:        wOptions.Logger,
-		dataConverter: wOptions.DataConverter,
+		userContext:        wOptions.BackgroundActivityContext,
+		metricsScope:       metrics.NewTaggedScope(wOptions.MetricsScope),
+		logger:             wOptions.Logger,
+		dataConverter:      wOptions.DataConverter,
+		tracer:             wOptions.Tracer,
+		contextPropagators: wOptions.ContextPropagators,
 	}
 
 	env.localActivities[activityID] = task
@@ -1444,7 +1448,7 @@ func (m *mockWrapper) executeMockWithActualArgs(ctx interface{}, inputArgs []int
 }
 
 func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList string, dataConverter encoded.DataConverter) ActivityTaskHandler {
-	wOptions := fillWorkerOptionsDefaults(env.workerOptions)
+	wOptions := augmentWorkerOptions(env.workerOptions)
 	params := workerExecutionParameters{
 		TaskList:           taskList,
 		Identity:           wOptions.Identity,
@@ -1454,6 +1458,7 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 		DataConverter:      dataConverter,
 		WorkerStopChannel:  env.workerStopChannel,
 		ContextPropagators: wOptions.ContextPropagators,
+		Tracer:             wOptions.Tracer,
 	}
 	ensureRequiredParams(&params)
 	if params.UserContext == nil {

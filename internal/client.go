@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
@@ -302,6 +303,7 @@ type (
 		MetricsScope       tally.Scope
 		Identity           string
 		DataConverter      encoded.DataConverter
+		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
 	}
 
@@ -472,6 +474,13 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	if options != nil {
 		contextPropagators = options.ContextPropagators
 	}
+	var tracer opentracing.Tracer
+	if options != nil && options.Tracer != nil {
+		tracer = options.Tracer
+		contextPropagators = append(contextPropagators, NewTracingContextPropagator(tracer))
+	} else {
+		tracer = opentracing.NoopTracer{}
+	}
 	return &workflowClient{
 		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),
 		domain:             domain,
@@ -479,6 +488,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 		identity:           identity,
 		dataConverter:      dataConverter,
 		contextPropagators: contextPropagators,
+		tracer:             tracer,
 	}
 }
 

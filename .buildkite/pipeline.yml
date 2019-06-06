@@ -22,10 +22,6 @@ steps:
       - docker-compose#v3.0.0:
           run: integ-test
           config: docker/buildkite/docker-compose.yml
-    plugins:
-      - docker-login#v2.0.1:
-          username: ubercadence
-          password-env: DOCKER_LOGIN_PASSWORD
 
   - label: ":golang: integration test sticky ON"
     agents:

@@ -101,6 +101,7 @@ type (
 		handler      *localActivityTaskHandler
 		metricsScope tally.Scope
 		logger       *zap.Logger
+		shutdownC    <-chan struct{}
 		laTunnel     *localActivityTunnel
 	}
 
@@ -126,8 +127,13 @@ type (
 	}
 )
 
-func (lat *localActivityTunnel) getTask() *localActivityTask {
-	return <-lat.taskCh
+func (lat *localActivityTunnel) getTask(stopC <-chan struct{}) *localActivityTask {
+	select {
+	case task := <-lat.taskCh:
+		return task
+	case <-stopC:
+		return nil
+	}
 }
 
 func (lat *localActivityTunnel) sendTask(task *localActivityTask) {
@@ -428,12 +434,13 @@ func newLocalActivityPoller(params workerExecutionParameters, laTunnel *localAct
 		handler:      handler,
 		metricsScope: params.MetricsScope,
 		logger:       params.Logger,
+		shutdownC:    params.WorkerStopChannel,
 		laTunnel:     laTunnel,
 	}
 }
 
 func (latp *localActivityTaskPoller) PollTask() (interface{}, error) {
-	return latp.laTunnel.getTask(), nil
+	return latp.laTunnel.getTask(latp.shutdownC), nil
 }
 
 func (latp *localActivityTaskPoller) ProcessTask(task interface{}) error {

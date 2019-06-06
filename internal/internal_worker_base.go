@@ -277,7 +277,10 @@ func (bw *baseWorker) pollTask() {
 	}
 
 	if task != nil {
-		bw.taskQueueCh <- &polledTask{task}
+		select {
+		case bw.taskQueueCh <- &polledTask{task}:
+		case <-bw.shutdownCh:
+		}
 	} else {
 		bw.pollerRequestCh <- struct{}{} // poll failed, trigger a new poll
 	}

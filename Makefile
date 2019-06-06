@@ -107,6 +107,7 @@ unit_test: $(BUILD)/dummy
 
 integ_test_sticky_off: $(BUILD)/dummy
 	@mkdir -p $(COVER_ROOT)
+	@echo "DOCKER_LOGIN_PASSWORD", $(DOCKER_LOGIN_PASSWORD)
 	STICKY_OFF=true go test $(TEST_ARG) ./test -coverprofile=$(INTEG_STICKY_OFF_COVER_FILE) -coverpkg=./...
 
 integ_test_sticky_on: $(BUILD)/dummy

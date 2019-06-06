@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"time"
@@ -361,7 +362,10 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 		Logger:   logger,
 	}
 	taskHandler := newWorkflowTaskHandler(domain, params, nil, getHostEnvironment())
-	_, _, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator})
+	resp, _, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator})
+	if err == nil && resp != nil {
+		err = fmt.Errorf("workflow task has unfinished decision: %v", resp)
+	}
 	return err
 }
 

@@ -379,7 +379,11 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 			for _, d := range completeReq.Decisions {
 				if d.GetDecisionType() == shared.DecisionTypeContinueAsNewWorkflowExecution {
 					if last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
-						return nil
+						inputA := d.ContinueAsNewWorkflowExecutionDecisionAttributes.Input
+						inputB := last.WorkflowExecutionContinuedAsNewEventAttributes.Input
+						if bytes.Compare(inputA, inputB) == 0 {
+							return nil
+						}
 					}
 				}
 				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution {

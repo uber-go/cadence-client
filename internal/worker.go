@@ -363,8 +363,15 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 	}
 	taskHandler := newWorkflowTaskHandler(domain, params, nil, getHostEnvironment())
 	resp, _, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator})
-	if err == nil && resp != nil {
-		err = fmt.Errorf("workflow task has unfinished decision: %v", resp)
+	if err != nil {
+		return err
+	}
+	err = fmt.Errorf("replay workflow task should return workflow completed as decision, %v", resp)
+	if resp != nil {
+		completeReq, ok := resp.(*shared.RespondDecisionTaskCompletedRequest)
+		if ok && len(completeReq.Decisions) == 1 && completeReq.Decisions[0].GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution {
+			return nil
+		}
 	}
 	return err
 }

@@ -228,6 +228,66 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity() {
 	require.NoError(s.T(), err)
 }
 
+func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity_Result_Mismatch() {
+	taskList := "taskList1"
+	testEvents := []*shared.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
+			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow_LocalActivity")},
+			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
+			Input:        testEncodeFunctionArgs(nil, testReplayWorkflow_LocalActivity),
+		}),
+		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
+
+		createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
+			MarkerName:                   common.StringPtr(localActivityMarkerName),
+			Details:                      s.createLocalActivityMarkerDataForTest("0"),
+			DecisionTaskCompletedEventId: common.Int64Ptr(4),
+		}),
+
+		createTestEventWorkflowExecutionCompleted(6, &shared.WorkflowExecutionCompletedEventAttributes{
+			Result:                       []byte("some-incorrect-result"),
+			DecisionTaskCompletedEventId: common.Int64Ptr(4),
+		}),
+	}
+
+	history := &shared.History{Events: testEvents}
+	logger := getLogger()
+	err := ReplayWorkflowHistory(logger, history)
+	require.Error(s.T(), err)
+}
+
+func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity_Activity_Type_Mismatch() {
+	taskList := "taskList1"
+	testEvents := []*shared.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
+			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
+			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
+			Input:        testEncodeFunctionArgs(nil, testReplayWorkflow),
+		}),
+		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
+
+		createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
+			MarkerName:                   common.StringPtr(localActivityMarkerName),
+			Details:                      s.createLocalActivityMarkerDataForTest("0"),
+			DecisionTaskCompletedEventId: common.Int64Ptr(4),
+		}),
+
+		createTestEventWorkflowExecutionCompleted(6, &shared.WorkflowExecutionCompletedEventAttributes{
+			Result:                       []byte("some-incorrect-result"),
+			DecisionTaskCompletedEventId: common.Int64Ptr(4),
+		}),
+	}
+
+	history := &shared.History{Events: testEvents}
+	logger := getLogger()
+	err := ReplayWorkflowHistory(logger, history)
+	require.Error(s.T(), err)
+}
+
 func (s *internalWorkerTestSuite) TestReplayWorkflowHistoryFromFile() {
 	logger := getLogger()
 	err := ReplayWorkflowHistoryFromJSONFile(logger, "testdata/sampleHistory.json")

@@ -21,6 +21,7 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -326,6 +327,11 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 	if first.GetEventType() != shared.EventTypeWorkflowExecutionStarted {
 		return errors.New("first event is not WorkflowExecutionStarted")
 	}
+	last := events[len(events)-1]
+	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted && last.GetEventType() != shared.EventTypeWorkflowExecutionContinuedAsNew {
+		return errors.New("last event is not WorkflowExecutionCompleted or WorkflowExecutionContinuedAsNew")
+	}
+
 	attr := first.WorkflowExecutionStartedEventAttributes
 	if attr == nil {
 		return errors.New("corrupted WorkflowExecutionStarted")
@@ -366,11 +372,26 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 	if err != nil {
 		return err
 	}
-	err = fmt.Errorf("replay workflow task should return workflow completed as decision, %v", resp)
+	err = fmt.Errorf("replay workflow doesn't return the same result as the last event, resp: %v, last: %v", resp, last)
 	if resp != nil {
 		completeReq, ok := resp.(*shared.RespondDecisionTaskCompletedRequest)
-		if ok && len(completeReq.Decisions) == 1 && completeReq.Decisions[0].GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution {
-			return nil
+		if ok {
+			for _, d := range completeReq.Decisions {
+				if d.GetDecisionType() == shared.DecisionTypeContinueAsNewWorkflowExecution {
+					if last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
+						return nil
+					}
+				}
+				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution {
+					if last.GetEventType() == shared.EventTypeWorkflowExecutionCompleted {
+						resultA := last.WorkflowExecutionCompletedEventAttributes.Result
+						resultB := d.CompleteWorkflowExecutionDecisionAttributes.Result
+						if bytes.Compare(resultA, resultB) == 0 {
+							return nil
+						}
+					}
+				}
+			}
 		}
 	}
 	return err

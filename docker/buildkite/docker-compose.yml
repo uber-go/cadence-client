@@ -70,6 +70,8 @@ services:
     build:
       context: ../../
       dockerfile: ./docker/buildkite/Dockerfile
+    environment:
+      - BUILDKITE_BUILD_ID
     volumes:
       - ../../:/go/src/go.uber.org/cadence
       - /usr/bin/buildkite-agent:/usr/bin/buildkite-agent

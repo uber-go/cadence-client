@@ -41,7 +41,7 @@ steps:
     agents:
       queue: "workers"
       docker: "*"
-    command: "./scripts/buildkite/gocov.sh"
+    command: ".buildkite/scripts/gocov.sh"
     plugins:
       - docker-compose#v3.0.0:
           run: coverage-report

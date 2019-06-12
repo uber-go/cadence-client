@@ -42,3 +42,7 @@ steps:
       queue: "workers"
       docker: "*"
     command: ".buildkite/scripts/gocov.sh"
+    plugins:
+      - docker-compose#v3.0.0:
+          run: coverage-report
+          config: docker/buildkite/docker-compose.yml

@@ -66,6 +66,13 @@ services:
         aliases:
           - unit-test
 
+  coverage-report:
+    build:
+      context: ../../
+      dockerfile: ./docker/buildkite/Dockerfile
+    volumes:
+      - ../../:/go/src/go.uber.org/cadence
+
 networks:
   services-network:
     name: services-network

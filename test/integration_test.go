@@ -23,12 +23,12 @@ package test
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/pborman/uuid"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -40,6 +40,7 @@ import (
 )
 
 type IntegrationTestSuite struct {
+	*require.Assertions
 	suite.Suite
 	config       Config
 	rpcClient    *rpcClient
@@ -48,12 +49,13 @@ type IntegrationTestSuite struct {
 	workflows    *Workflows
 	worker       worker.Worker
 	seq          int64
-	domainName   string
 	taskListName string
 }
 
 const (
-	ctxTimeout = 10 * time.Second
+	ctxTimeout                 = 10 * time.Second
+	domainName                 = "integration-test-domain"
+	domainCacheRefreshInterval = 11 * time.Second
 )
 
 func TestIntegrationSuite(t *testing.T) {
@@ -61,6 +63,7 @@ func TestIntegrationSuite(t *testing.T) {
 }
 
 func (ts *IntegrationTestSuite) SetupSuite() {
+	ts.Assertions = require.New(ts.T())
 	ts.config = newConfig()
 	ts.activities = &Activities{}
 	ts.workflows = &Workflows{}
@@ -78,16 +81,15 @@ func (ts *IntegrationTestSuite) TearDownSuite() {
 func (ts *IntegrationTestSuite) SetupTest() {
 	ts.seq++
 	ts.activities.clearInvoked()
-	ts.domainName = fmt.Sprintf("integration-test-domain-%v", rand.Int63())
 	ts.taskListName = fmt.Sprintf("tl-%v", ts.seq)
 	rpcClient, err := newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
 	ts.Nil(err)
 	ts.rpcClient = rpcClient
-	ts.libClient = client.NewClient(ts.rpcClient.Interface, ts.domainName, &client.Options{})
+	ts.libClient = client.NewClient(ts.rpcClient.Interface, domainName, &client.Options{})
 	ts.registerDomain()
 	logger, err := zap.NewDevelopment()
 	ts.Nil(err)
-	ts.worker = worker.New(rpcClient.Interface, ts.domainName, ts.taskListName, worker.Options{
+	ts.worker = worker.New(rpcClient.Interface, domainName, ts.taskListName, worker.Options{
 		DisableStickyExecution: ts.config.StickyOff,
 		Logger:                 logger,
 	})
@@ -152,6 +154,7 @@ func (ts *IntegrationTestSuite) TestCancellation() {
 	run, err := ts.libClient.ExecuteWorkflow(ctx,
 		ts.startWorkflowOptions("test-cancellation"), ts.workflows.Basic)
 	ts.Nil(err)
+	ts.NotNil(run)
 	ts.Nil(ts.libClient.CancelWorkflow(ctx, "test-cancellation", run.GetRunID()))
 	err = run.Get(ctx, nil)
 	ts.Error(err)
@@ -253,14 +256,19 @@ func (ts *IntegrationTestSuite) registerDomain() {
 	client := client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	name := ts.domainName
-	err := client.Register(ctx, &shared.RegisterDomainRequest{Name: &name})
+	name := domainName
+	retention := int32(1)
+	err := client.Register(ctx, &shared.RegisterDomainRequest{
+		Name:                                   &name,
+		WorkflowExecutionRetentionPeriodInDays: &retention,
+	})
 	if err != nil {
 		if _, ok := err.(*shared.DomainAlreadyExistsError); ok {
 			return
 		}
 	}
 	ts.Nil(err)
+	time.Sleep(domainCacheRefreshInterval) // wait for domain cache refresh on cadence-server
 }
 
 // executeWorkflow executes a given workflow and waits for the result

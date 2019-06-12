@@ -72,6 +72,7 @@ services:
       dockerfile: ./docker/buildkite/Dockerfile
     volumes:
       - ../../:/go/src/go.uber.org/cadence
+      - /usr/bin/buildkite-agent:/usr/bin/buildkite-agent
 
 networks:
   services-network:

@@ -15,8 +15,8 @@ echo "download complete"
 
 CURRDIR=`pwd`
 echo $CURRDIR
-ls -l .build
-ls -l .build/coverage
+ls -al .build
+ls -al .build/coverage
 
 # report coverage
 make cover_ci

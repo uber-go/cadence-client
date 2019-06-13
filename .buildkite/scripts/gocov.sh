@@ -18,6 +18,7 @@ echo $CURRDIR
 ls -al .build
 ls -al .build/coverage
 
+#export BUILDKITE_REPO="https://github.com/uber-go/cadence-client"
 # report coverage
 make cover_ci
 

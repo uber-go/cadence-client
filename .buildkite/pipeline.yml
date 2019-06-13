@@ -1,5 +1,5 @@
 steps:
-  - label: "unit-test"
+  - label: ":golang: unit-test"
     agents:
       queue: "workers"
       docker: "*"
@@ -11,7 +11,7 @@ steps:
           run: unit-test
           config: docker/buildkite/docker-compose.yml
 
-  - label: "integration-test-sticky-off"
+  - label: ":golang: integration-test-sticky-off"
     agents:
       queue: "workers"
       docker: "*"
@@ -23,7 +23,7 @@ steps:
           run: integ-test
           config: docker/buildkite/docker-compose.yml
 
-  - label: "integration-test-sticky-on"
+  - label: ":golang: integration-test-sticky-on"
     agents:
       queue: "workers"
       docker: "*"
@@ -37,7 +37,7 @@ steps:
 
   - wait
 
-  - label: "test-code-coverage"
+  - label: ":golang: code-coverage"
     agents:
       queue: "workers"
       docker: "*"

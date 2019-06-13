@@ -16,6 +16,7 @@
     "identity": "19934@longer-C02V60N3HTDG@",
     "attempt": 0,
     "cronSchedule": "",
+    "originalExecutionRunId": "d77927e6-7cee-4504-bd6c-1ad9da424b12",
     "firstDecisionTaskBackoffSeconds": 0
   }
 }, {
@@ -62,7 +63,7 @@
   "taskId": 40894474,
   "startChildWorkflowExecutionInitiatedEventAttributes": {
     "domain": "samples-domain",
-    "workflowId": "child_workflow:60236fb2-bb48-45f0-8df4-57ee8d51f18f",
+    "workflowId": "d77927e6-7cee-4504-bd6c-1ad9da424b12_0",
     "workflowType": {
       "name": "go.uber.org/cadence/internal.testReplayWorkflow"
     },
@@ -86,7 +87,7 @@
     "domain": "samples-domain",
     "initiatedEventId": 5,
     "workflowExecution": {
-      "workflowId": "child_workflow:60236fb2-bb48-45f0-8df4-57ee8d51f18f",
+      "workflowId": "d77927e6-7cee-4504-bd6c-1ad9da424b12_0",
       "runId": "d969aa2e-99c6-4c77-9ae2-38ae980a67f2"
     },
     "workflowType": {
@@ -139,7 +140,7 @@
     "decisionTaskCompletedEventId": 9,
     "domain": "samples-domain",
     "workflowExecution": {
-      "workflowId": "child_workflow:60236fb2-bb48-45f0-8df4-57ee8d51f18f",
+      "workflowId": "d77927e6-7cee-4504-bd6c-1ad9da424b12_0",
       "runId": ""
     },
     "signalName": "test-signal",
@@ -157,7 +158,7 @@
     "initiatedEventId": 10,
     "domain": "2896806f-7a10-47d0-b963-ad80dc5df011",
     "workflowExecution": {
-      "workflowId": "child_workflow:60236fb2-bb48-45f0-8df4-57ee8d51f18f",
+      "workflowId": "d77927e6-7cee-4504-bd6c-1ad9da424b12_0",
       "runId": ""
     },
     "control": "MA=="
@@ -208,7 +209,7 @@
     "result": "IkNoaWxkIHdvcmtmbG93IGV4ZWN1dGlvbiBjb21wbGV0ZWQgYWZ0ZXIgNSBydW5zIgo=",
     "domain": "samples-domain",
     "workflowExecution": {
-      "workflowId": "child_workflow:60236fb2-bb48-45f0-8df4-57ee8d51f18f",
+      "workflowId": "d77927e6-7cee-4504-bd6c-1ad9da424b12_0",
       "runId": "d1a2c91a-6168-4a05-8fdf-79cb7947869b"
     },
     "workflowType": {

@@ -373,6 +373,7 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 	fmt.Println("debug", resp)
 	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted && last.GetEventType() != shared.EventTypeWorkflowExecutionContinuedAsNew {
 		//TODO we can still check if the last decision makes the same result
+		// consider doing it if customers really need.
 		return nil
 	}
 	err = fmt.Errorf("replay workflow doesn't return the same result as the last event, resp: %v, last: %v", resp, last)

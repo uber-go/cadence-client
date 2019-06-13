@@ -34,7 +34,6 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
-	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/zap"
 )
 
@@ -194,9 +193,6 @@ func getValidatedActivityOptions(ctx Context) (*activityOptions, error) {
 	}
 	if p.HeartbeatTimeoutSeconds < 0 {
 		return nil, errors.New("invalid negative HeartbeatTimeoutSeconds")
-	}
-	if p.RetryPolicy.GetBackoffCoefficient() == 0 {
-		p.RetryPolicy.BackoffCoefficient = common.Float64Ptr(backoff.DefaultBackoffCoefficient)
 	}
 	if err := validateRetryPolicy(p.RetryPolicy); err != nil {
 		return nil, err

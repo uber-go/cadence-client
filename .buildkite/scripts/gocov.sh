@@ -13,6 +13,9 @@ buildkite-agent artifact download ".build/coverage/integ_test_sticky_on_cover.ou
 
 echo "download complete"
 
+CURRDIR=`pwd`
+echo $CURRDIR
+ls -l .build
 ls -l .build/coverage
 
 # report coverage

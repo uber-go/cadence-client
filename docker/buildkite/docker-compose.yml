@@ -83,6 +83,11 @@ services:
       - BUILDKITE_COMMIT
       - BUILDKITE_PULL_REQUEST
       - BUILDKITE_TAG
+      - BUILDKITE_REPO
+      - BUILDKITE_BUILD_CREATOR
+      - BUILDKITE_BUILD_CREATOR_EMAIL
+      - BUILDKITE_BUILD_CREATOR_TEAMS
+      - BUILDKITE_PULL_REQUEST_REPO
     volumes:
       - ../../:/go/src/go.uber.org/cadence
       - /usr/bin/buildkite-agent:/usr/bin/buildkite-agent

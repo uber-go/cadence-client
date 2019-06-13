@@ -338,6 +338,10 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 		RunId:      common.StringPtr(uuid.NewUUID().String()),
 		WorkflowId: common.StringPtr("ReplayId"),
 	}
+	if first.WorkflowExecutionStartedEventAttributes.GetOriginalExecutionRunId() != "" {
+		execution.RunId = common.StringPtr(first.WorkflowExecutionStartedEventAttributes.GetOriginalExecutionRunId())
+	}
+
 	task := &shared.PollForDecisionTaskResponse{
 		Attempt:                common.Int64Ptr(0),
 		TaskToken:              []byte("ReplayTaskToken"),

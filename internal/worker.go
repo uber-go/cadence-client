@@ -328,9 +328,6 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 		return errors.New("first event is not WorkflowExecutionStarted")
 	}
 	last := events[len(events)-1]
-	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted && last.GetEventType() != shared.EventTypeWorkflowExecutionContinuedAsNew {
-		return errors.New("last event is not WorkflowExecutionCompleted or WorkflowExecutionContinuedAsNew")
-	}
 
 	attr := first.WorkflowExecutionStartedEventAttributes
 	if attr == nil {
@@ -371,6 +368,12 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 	resp, _, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator})
 	if err != nil {
 		return err
+	}
+
+	fmt.Println("debug", resp)
+	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted && last.GetEventType() != shared.EventTypeWorkflowExecutionContinuedAsNew {
+		//TODO we can still check if the last decision makes the same result
+		return nil
 	}
 	err = fmt.Errorf("replay workflow doesn't return the same result as the last event, resp: %v, last: %v", resp, last)
 	if resp != nil {

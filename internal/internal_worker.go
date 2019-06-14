@@ -376,6 +376,7 @@ func (ww *workflowWorker) Run() error {
 // Shutdown the worker.
 func (ww *workflowWorker) Stop() {
 	close(ww.stopC)
+	// TODO: remove the stop methods in favor of the workerStopChannel
 	ww.localActivityWorker.Stop()
 	ww.worker.Stop()
 }

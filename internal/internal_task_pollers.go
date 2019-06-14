@@ -56,7 +56,7 @@ type (
 		ProcessTask(interface{}) error
 	}
 
-	// basePoller the base class for all poller implementations
+	// basePoller is the base class for all poller implementations
 	basePoller struct {
 		shutdownC <-chan struct{}
 	}

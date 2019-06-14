@@ -62,8 +62,9 @@ func (a *Activities) ToUpper(ctx context.Context, arg string) (string, error) {
 	return strings.ToUpper(arg), nil
 }
 
-func (a *Activities) ToUpperWithDelay(ctx context.Context, arg string) (string, error) {
+func (a *Activities) ToUpperWithDelay(ctx context.Context, arg string, delay time.Duration) (string, error) {
 	a.append("toUpperWithDelay")
+	time.Sleep(delay)
 	return strings.ToUpper(arg), nil
 }
 

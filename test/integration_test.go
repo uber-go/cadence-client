@@ -73,7 +73,7 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 func (ts *IntegrationTestSuite) TearDownSuite() {
 	// sleep for a while to allow the pollers to shutdown
 	// then assert that there are no lingering go routines
-	time.Sleep(time.Minute + time.Second)
+	time.Sleep(11 * time.Second)
 	// https://github.com/uber-go/cadence-client/issues/739
 	goleak.VerifyNoLeaks(ts.T(), goleak.IgnoreTopFunction("go.uber.org/cadence/internal.(*coroutineState).initialYield"))
 }
@@ -90,7 +90,7 @@ func (ts *IntegrationTestSuite) SetupTest() {
 	logger, err := zap.NewDevelopment()
 	ts.Nil(err)
 	ts.worker = worker.New(rpcClient.Interface, domainName, ts.taskListName, worker.Options{
-		DisableStickyExecution: ts.config.StickyOff,
+		DisableStickyExecution: ts.config.IsStickyOff,
 		Logger:                 logger,
 	})
 	ts.Nil(ts.worker.Start())

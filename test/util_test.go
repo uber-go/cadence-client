@@ -33,7 +33,7 @@ import (
 type Config struct {
 	ServiceAddr string
 	ServiceName string
-	StickyOff   bool
+	IsStickyOff bool
 	Debug       bool
 }
 
@@ -41,7 +41,7 @@ func newConfig() Config {
 	cfg := Config{
 		ServiceName: "cadence-frontend",
 		ServiceAddr: "127.0.0.1:7933",
-		StickyOff:   true,
+		IsStickyOff: true,
 	}
 	if name := getEnvServiceName(); name != "" {
 		cfg.ServiceName = name
@@ -50,7 +50,7 @@ func newConfig() Config {
 		cfg.ServiceAddr = addr
 	}
 	if so := getEnvStickyOff(); so != "" {
-		cfg.StickyOff = so == "true"
+		cfg.IsStickyOff = so == "true"
 	}
 	if debug := getDebug(); debug != "" {
 		cfg.Debug = debug == "true"

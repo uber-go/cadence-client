@@ -24,6 +24,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -46,6 +47,8 @@ const (
 var (
 	pollOperationRetryPolicy = createPollRetryPolicy()
 )
+
+var errShutdown = errors.New("worker shutting down")
 
 type (
 	// resultHandler that returns result
@@ -215,19 +218,7 @@ func (bw *baseWorker) runPoller() {
 			if bw.sessionTokenBucket != nil {
 				bw.sessionTokenBucket.waitForAvailableToken()
 			}
-
-			ch := make(chan struct{})
-			go func(ch chan struct{}) {
-				bw.pollTask()
-				close(ch)
-			}(ch)
-
-			// block until previous poll completed or return immediately when shutdown
-			select {
-			case <-bw.shutdownCh:
-				return
-			case <-ch:
-			}
+			bw.pollTask()
 		}
 	}
 }

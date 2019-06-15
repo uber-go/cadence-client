@@ -374,7 +374,6 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 		return err
 	}
 
-	fmt.Println("debug", resp)
 	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted && last.GetEventType() != shared.EventTypeWorkflowExecutionContinuedAsNew {
 		return nil
 	}

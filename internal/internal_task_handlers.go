@@ -148,6 +148,10 @@ type (
 		currentIndex  int
 		next          []*s.HistoryEvent
 	}
+
+	localActivityTimedOutError struct {
+		Message string
+	}
 )
 
 func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandlerImpl) *history {
@@ -159,6 +163,10 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 	}
 
 	return result
+}
+
+func (e *localActivityTimedOutError) Error() string {
+	return e.Message
 }
 
 // Get workflow start event.
@@ -632,6 +640,7 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *s.PollForDeci
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
 ) (completeRequest interface{}, context WorkflowExecutionContext, errRet error) {
+	startTime := time.Now()
 	if workflowTask == nil || workflowTask.task == nil {
 		return nil, nil, errors.New("nil workflow task provided")
 	}
@@ -665,6 +674,31 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	}()
 
 	response, err := workflowContext.ProcessWorkflowTask(workflowTask)
+	if err == nil && response == nil {
+	wait_LocalActivity_Loop:
+		for {
+			deadlineToTrigger := time.Duration(float32(ratioToForceCompleteDecisionTaskComplete) * float32(workflowContext.GetDecisionTimeout()))
+			delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
+			select {
+			case <-time.After(delayDuration):
+				fmt.Println("timed out force complete")
+				// force complete
+				// return force decision task completed error
+				return response, workflowContext, &localActivityTimedOutError{Message: "local activity did not complete within decision timeout"}
+
+			case lar := <-workflowTask.laResultCh:
+				fmt.Println("got result")
+				// local activity result ready
+				response, err = workflowContext.ProcessLocalActivityResult(workflowTask, lar)
+				if err == nil && response == nil {
+					fmt.Println("not complete, continue")
+					// decision task is not done yet, still waiting for more local activities
+					continue wait_LocalActivity_Loop
+				}
+				break wait_LocalActivity_Loop
+			}
+		}
+	}
 	return response, workflowContext, err
 }
 

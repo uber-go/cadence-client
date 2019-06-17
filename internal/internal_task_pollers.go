@@ -261,54 +261,19 @@ process_WorkflowTask_Loop:
 		workflowTask.doneCh = doneCh
 		workflowTask.laResultCh = laResultCh
 		completedRequest, wc, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
-		if err == nil && completedRequest == nil {
-			// decision task cannot complete because it is waiting for local activity to finish
-			// we need a timer to force complete it to avoid the decision task timeout on server.
-		wait_LocalActivity_Loop:
-			for {
-				deadlineToTrigger := time.Duration(float32(ratioToForceCompleteDecisionTaskComplete) * float32(wc.GetDecisionTimeout()))
-				delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
-				select {
-				case <-time.After(delayDuration):
-					// force complete
-					response, err := wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
-					if err != nil {
-						return err
-					}
-					if response == nil || response.DecisionTask == nil {
-						return nil
-					}
-
-					// we are getting new decision task, so reset the workflowTask and continue process the new one
-					workflowTask = wtp.toWorkflowTask(response.DecisionTask)
-					continue process_WorkflowTask_Loop
-
-				case lar := <-laResultCh:
-					// local activity result ready
-					completedRequest, err := wtp.processLocalActivityResult(lar.task.workflowTask, lar)
-
-					if _, ok := err.(*workflowContextAlreadyDestroyedError); ok {
-						return nil
-					}
-
-					if err == nil && completedRequest == nil {
-						// decision task is not done yet, still waiting for more local activities
-						continue wait_LocalActivity_Loop
-					}
-
-					response, err := wtp.RespondTaskCompletedWithMetrics(completedRequest, err, workflowTask.task, startTime)
-					if err != nil {
-						return err
-					}
-					if response == nil || response.DecisionTask == nil {
-						return nil
-					}
-
-					// we are getting new decision task, so reset the workflowTask and continue process the new one
-					workflowTask = wtp.toWorkflowTask(response.DecisionTask)
-					continue process_WorkflowTask_Loop
-				}
+		if _, ok := err.(*localActivityTimedOutError); ok {
+			// force complete
+			response, err := wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
+			if err != nil {
+				return err
 			}
+			if response == nil || response.DecisionTask == nil {
+				return nil
+			}
+
+			// we are getting new decision task, so reset the workflowTask and continue process the new one
+			workflowTask = wtp.toWorkflowTask(response.DecisionTask)
+			continue process_WorkflowTask_Loop
 		}
 
 		response, err := wtp.RespondTaskCompletedWithMetrics(completedRequest, err, workflowTask.task, startTime)
@@ -323,8 +288,6 @@ process_WorkflowTask_Loop:
 		workflowTask = wtp.toWorkflowTask(response.DecisionTask)
 		continue process_WorkflowTask_Loop
 	}
-
-	return nil
 }
 
 func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTask) error {
@@ -501,6 +464,7 @@ func (latp *localActivityTaskPoller) ProcessTask(task interface{}) error {
 	}
 
 	result := latp.handler.executeLocalActivityTask(task.(*localActivityTask))
+	fmt.Println("returned local activity task")
 	// We need to send back the local activity result to unblock workflowTaskPoller.processWorkflowTask() which is
 	// synchronously listening on the laResultCh. We also want to make sure we don't block here forever in case
 	// processWorkflowTask() already returns and nobody is receiving from laResultCh. We guarantee that doneCh is closed
@@ -512,7 +476,6 @@ func (latp *localActivityTaskPoller) ProcessTask(task interface{}) error {
 		// processWorkflowTask() already returns, just drop this local activity result.
 		return nil
 	}
-	return nil
 }
 
 func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivityTask) (result *localActivityResult) {

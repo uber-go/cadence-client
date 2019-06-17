@@ -345,7 +345,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 	select {
 	case <-doneCh:
 		break
-	case <-time.After(time.Second * 5):
+	case <-time.After(time.Second * 10):
 	}
 	worker.Stop()
 

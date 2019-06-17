@@ -263,14 +263,17 @@ process_WorkflowTask_Loop:
 		completedRequest, wc, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
 		if _, ok := err.(*localActivityTimedOutError); ok {
 			// force complete
+			fmt.Println("force complete")
 			response, err := wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
 			if err != nil {
 				return err
 			}
 			if response == nil || response.DecisionTask == nil {
+				fmt.Println("response is nil")
 				return nil
 			}
 
+			fmt.Println("got new decision")
 			// we are getting new decision task, so reset the workflowTask and continue process the new one
 			workflowTask = wtp.toWorkflowTask(response.DecisionTask)
 			continue process_WorkflowTask_Loop

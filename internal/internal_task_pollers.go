@@ -254,9 +254,10 @@ func (wtp *workflowTaskPoller) processWorkflowTask(workflowTask *workflowTask) e
 	doneCh := make(chan struct{})
 	laResultCh := make(chan *localActivityResult)
 	// close doneCh so local activity worker won't get blocked forever when trying to send back result to laResultCh.
+	rand.Seed(time.Now().UTC().UnixNano())
 	id := rand.Int31()
 	defer func() {
-		fmt.Println("closing stuff")
+		fmt.Printf("closing stuff %v\n", id)
 		close(doneCh)
 	}()
 
@@ -266,8 +267,9 @@ process_WorkflowTask_Loop:
 		startTime := time.Now()
 		workflowTask.doneCh = doneCh
 		workflowTask.laResultCh = laResultCh
-		//		fmt.Printf("going to process workflow task result %v\n", id)
+		fmt.Printf("going to process workflow task result %v\n", id)
 		completedRequest, wc, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
+		fmt.Printf("returned from process workflow task %v\n", id)
 		if err != nil {
 			if _, ok := err.(*localActivityTimedOutError); ok {
 				// force complete
@@ -301,8 +303,8 @@ process_WorkflowTask_Loop:
 
 		// we are getting new decision task, so reset the workflowTask and continue process the new one
 		workflowTask = wtp.toWorkflowTask(response.DecisionTask)
-		continue process_WorkflowTask_Loop
 	}
+	fmt.Println("going to return from the function")
 	return nil
 }
 
@@ -480,7 +482,6 @@ func (latp *localActivityTaskPoller) ProcessTask(task interface{}) error {
 	}
 
 	result := latp.handler.executeLocalActivityTask(task.(*localActivityTask))
-	fmt.Println("returned local activity task")
 	// We need to send back the local activity result to unblock workflowTaskPoller.processWorkflowTask() which is
 	// synchronously listening on the laResultCh. We also want to make sure we don't block here forever in case
 	// processWorkflowTask() already returns and nobody is receiving from laResultCh. We guarantee that doneCh is closed

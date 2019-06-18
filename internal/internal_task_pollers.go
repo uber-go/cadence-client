@@ -238,7 +238,6 @@ func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 	default:
 		panic("unknown task type.")
 	}
-	return nil
 }
 
 func (wtp *workflowTaskPoller) processWorkflowTask(workflowTask *workflowTask) error {
@@ -255,33 +254,25 @@ func (wtp *workflowTaskPoller) processWorkflowTask(workflowTask *workflowTask) e
 	// close doneCh so local activity worker won't get blocked forever when trying to send back result to laResultCh.
 	defer close(doneCh)
 
-process_WorkflowTask_Loop:
 	for {
+		var response *s.RespondDecisionTaskCompletedResponse
 		startTime := time.Now()
 		workflowTask.doneCh = doneCh
 		workflowTask.laResultCh = laResultCh
 		completedRequest, wc, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
-		if err != nil {
-			if _, ok := err.(*localActivityTimedOutError); ok {
-				// force complete
-				response, err := wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
-				if err != nil {
-					return err
-				}
-				if response == nil || response.DecisionTask == nil {
-					return nil
-				}
-
-				// we are getting new decision task, so reset the workflowTask and continue process the new one
-				workflowTask = wtp.toWorkflowTask(response.DecisionTask)
-				continue process_WorkflowTask_Loop
+		if _, ok := err.(*localActivityTimedOutError); ok {
+			// force complete
+			response, err = wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
+			if err != nil {
+				return err
+			}
+		} else {
+			response, err = wtp.RespondTaskCompletedWithMetrics(completedRequest, err, workflowTask.task, startTime)
+			if err != nil {
+				return err
 			}
 		}
 
-		response, err := wtp.RespondTaskCompletedWithMetrics(completedRequest, err, workflowTask.task, startTime)
-		if err != nil {
-			return err
-		}
 		if response == nil || response.DecisionTask == nil {
 			return nil
 		}
@@ -289,7 +280,6 @@ process_WorkflowTask_Loop:
 		// we are getting new decision task, so reset the workflowTask and continue process the new one
 		workflowTask = wtp.toWorkflowTask(response.DecisionTask)
 	}
-	return nil
 }
 
 func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTask) error {

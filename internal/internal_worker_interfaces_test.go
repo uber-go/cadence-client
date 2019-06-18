@@ -22,7 +22,6 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -177,5 +176,4 @@ func (s *InterfacesTestSuite) TestInterface() {
 	workflowClient := NewClient(s.service, domain, nil)
 	wfExecution, err := workflowClient.StartWorkflow(context.Background(), workflowOptions, "workflowType")
 	s.NoError(err)
-	fmt.Printf("Started workflow: %v \n", wfExecution)
 }

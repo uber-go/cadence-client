@@ -22,7 +22,6 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -312,7 +311,6 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 		respondCounter++
 		switch respondCounter {
 		case 1:
-			fmt.Println("respond decision task - came in 1")
 			s.Equal(1, len(request.Decisions))
 			s.Equal(m.DecisionTypeRecordMarker, request.Decisions[0].GetDecisionType())
 			*task.PreviousStartedEventId = 3
@@ -320,7 +318,6 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 			task.History.Events = testEvents[3:7]
 			return &m.RespondDecisionTaskCompletedResponse{DecisionTask: task}, nil
 		case 2:
-			fmt.Println("respond decision task - came in 2")
 			s.Equal(2, len(request.Decisions))
 			s.Equal(m.DecisionTypeRecordMarker, request.Decisions[0].GetDecisionType())
 			s.Equal(m.DecisionTypeCompleteWorkflowExecution, request.Decisions[1].GetDecisionType())

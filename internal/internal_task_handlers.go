@@ -400,6 +400,10 @@ func (w *workflowExecutionContextImpl) Lock() {
 }
 
 func (w *workflowExecutionContextImpl) Unlock(err error) {
+	if _, ok := err.(*localActivityTimedOutError); ok {
+		w.mutex.Unlock()
+		return
+	}
 	if err != nil || w.err != nil || w.isWorkflowCompleted || (w.wth.disableStickyExecution && !w.hasPendingLocalActivityWork()) {
 		// TODO: in case of closed, it asumes the close decision always succeed. need server side change to return
 		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and

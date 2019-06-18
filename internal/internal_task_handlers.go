@@ -648,7 +648,6 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 ) (completeRequest interface{}, context WorkflowExecutionContext, errRet error) {
 	startTime := time.Now()
 	if workflowTask == nil || workflowTask.task == nil {
-		fmt.Println("workflow task is nil")
 		return nil, nil, errors.New("nil workflow task provided")
 	}
 	task := workflowTask.task

@@ -317,7 +317,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 			s.Equal(m.DecisionTypeRecordMarker, request.Decisions[0].GetDecisionType())
 			*task.PreviousStartedEventId = 3
 			*task.StartedEventId = 7
-			task.History.Events = testEvents[0:7]
+			task.History.Events = testEvents[3:7]
 			return &m.RespondDecisionTaskCompletedResponse{DecisionTask: task}, nil
 		case 2:
 			fmt.Println("respond decision task - came in 2")

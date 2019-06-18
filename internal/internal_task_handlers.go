@@ -28,7 +28,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand"
 	"reflect"
 	"strings"
 	"sync"
@@ -558,12 +557,6 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	task *s.PollForDecisionTaskResponse,
 	historyIterator HistoryIterator,
 ) (workflowContext *workflowExecutionContextImpl, err error) {
-	rand.Seed(time.Now().UTC().UnixNano())
-	id := rand.Int31()
-	defer func() {
-		fmt.Printf("get workflow context completed %v\n", id)
-	}()
-	fmt.Printf("get workflow context 1 %v\n", id)
 	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
 	defer func() {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
@@ -572,21 +565,17 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 		metricsScope.Gauge(metrics.StickyCacheSize).Update(float64(getWorkflowCache().Size()))
 	}()
 
-	fmt.Printf("get workflow context 2 %v\n", id)
 	runID := task.WorkflowExecution.GetRunId()
 
 	history := task.History
 	isFullHistory := isFullHistory(history)
 
-	fmt.Printf("get workflow context 3 %v\n", id)
 	workflowContext = nil
 	if task.Query == nil || (task.Query != nil && !isFullHistory) {
 		workflowContext = getWorkflowContext(runID)
 	}
 
-	fmt.Printf("get workflow context 4 %v\n", id)
 	if workflowContext != nil {
-		fmt.Printf("get workflow context 5 %v\n", id)
 		workflowContext.Lock()
 		if task.Query != nil && !isFullHistory {
 			// query task and we have a valid cached state
@@ -599,7 +588,6 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 			workflowContext.ResetIfStale(task, historyIterator)
 		}
 	} else {
-		fmt.Printf("get workflow context 6 %v\n", id)
 		if !isFullHistory {
 			// we are getting partial history task, but cached state was already evicted.
 			// we need to reset history so we get events from beginning to replay/rebuild the state
@@ -608,25 +596,21 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 				return
 			}
 		}
-		fmt.Printf("get workflow context 7 %v\n", id)
 
 		if workflowContext, err = wth.createWorkflowContext(task); err != nil {
 			return
 		}
-		fmt.Printf("get workflow context 8 %v\n", id)
 
 		if !wth.disableStickyExecution && task.Query == nil {
 			workflowContext, _ = putWorkflowContext(runID, workflowContext)
 		}
 		workflowContext.Lock()
 	}
-	fmt.Printf("get workflow context 9 %v\n", id)
 
 	err = workflowContext.resetStateIfDestroyed(task, historyIterator)
 	if err != nil {
 		workflowContext.Unlock(err)
 	}
-	fmt.Printf("get workflow context 10 %v\n", id)
 
 	return
 }
@@ -658,30 +642,21 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *s.PollForDeci
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
 ) (completeRequest interface{}, context WorkflowExecutionContext, errRet error) {
-	rand.Seed(time.Now().UTC().UnixNano())
-	id := rand.Int31()
-	defer func() {
-		fmt.Printf("process workflow task completed %v\n", id)
-	}()
-	fmt.Printf("process workflow task again %v\n", id)
 	startTime := time.Now()
 	if workflowTask == nil || workflowTask.task == nil {
 		fmt.Println("workflow task is nil")
 		return nil, nil, errors.New("nil workflow task provided")
 	}
-	fmt.Printf("process 1 - %v\n", id)
 	task := workflowTask.task
 	if task.History == nil || len(task.History.Events) == 0 {
 		task.History = &s.History{
 			Events: []*s.HistoryEvent{},
 		}
 	}
-	fmt.Printf("process 2 - %v\n", id)
 	if task.Query == nil && len(task.History.Events) == 0 {
 		return nil, nil, errors.New("nil or empty history")
 	}
 
-	fmt.Printf("process 3 - %v\n", id)
 	runID := task.WorkflowExecution.GetRunId()
 	workflowID := task.WorkflowExecution.GetWorkflowId()
 	traceLog(func() {
@@ -692,13 +667,10 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 			zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 	})
 
-	fmt.Printf("process 4 - %v\n", id)
 	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
 	if err != nil {
-		fmt.Printf("got error while creating context %v\n", err)
 		return nil, nil, err
 	}
-	fmt.Printf("process 5 - %v\n", id)
 
 	defer func() {
 		workflowContext.Unlock(errRet)
@@ -708,23 +680,18 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	if err == nil && response == nil {
 	wait_LocalActivity_Loop:
 		for {
-			fmt.Printf("process 6 - %v\n", id)
 			deadlineToTrigger := time.Duration(float32(ratioToForceCompleteDecisionTaskComplete) * float32(workflowContext.GetDecisionTimeout()))
 			delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
 			select {
 			case <-time.After(delayDuration):
 				// force complete
 				// return force decision task completed error
-				fmt.Printf("process 7 - %v\n", id)
 				return response, workflowContext, &localActivityTimedOutError{Message: "local activity did not complete within decision timeout"}
 
 			case lar := <-workflowTask.laResultCh:
-				//				fmt.Println("got result")
 				// local activity result ready
-				fmt.Printf("process 8 - %v\n", id)
 				response, err = workflowContext.ProcessLocalActivityResult(workflowTask, lar)
 				if err == nil && response == nil {
-					//					fmt.Println("not complete, continue")
 					// decision task is not done yet, still waiting for more local activities
 					continue wait_LocalActivity_Loop
 				}

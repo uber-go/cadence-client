@@ -460,7 +460,6 @@ func (w *workflowExecutionContextImpl) queueResetStickinessTask() {
 			RunId:      common.StringPtr(w.workflowInfo.WorkflowExecution.RunID),
 		},
 	}
-	debug.PrintStack()
 	// w.laTunnel could be nil for worker.ReplayHistory() because there is no worker started, in that case we don't
 	// care about resetStickinessTask.
 	if w.laTunnel != nil && w.laTunnel.resultCh != nil {
@@ -475,6 +474,8 @@ func (w *workflowExecutionContextImpl) clearState() {
 	w.err = nil
 	w.previousStartedEventID = 0
 	w.newDecisions = nil
+	fmt.Println("clearing state")
+	debug.PrintStack()
 	if w.eventHandler != nil {
 		// Set isReplay to true to prevent user code in defer guarded by !isReplaying() from running
 		w.eventHandler.isReplay = true
@@ -642,6 +643,7 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *s.PollForDeci
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
 ) (completeRequest interface{}, context WorkflowExecutionContext, errRet error) {
+	//	fmt.Println("process workflow task again")
 	startTime := time.Now()
 	if workflowTask == nil || workflowTask.task == nil {
 		return nil, nil, errors.New("nil workflow task provided")
@@ -683,17 +685,16 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 			delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
 			select {
 			case <-time.After(delayDuration):
-				fmt.Println("timed out force complete")
 				// force complete
 				// return force decision task completed error
 				return response, workflowContext, &localActivityTimedOutError{Message: "local activity did not complete within decision timeout"}
 
 			case lar := <-workflowTask.laResultCh:
-				fmt.Println("got result")
+				//				fmt.Println("got result")
 				// local activity result ready
 				response, err = workflowContext.ProcessLocalActivityResult(workflowTask, lar)
 				if err == nil && response == nil {
-					fmt.Println("not complete, continue")
+					//					fmt.Println("not complete, continue")
 					// decision task is not done yet, still waiting for more local activities
 					continue wait_LocalActivity_Loop
 				}

@@ -25,6 +25,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -253,34 +254,45 @@ func (wtp *workflowTaskPoller) processWorkflowTask(workflowTask *workflowTask) e
 	doneCh := make(chan struct{})
 	laResultCh := make(chan *localActivityResult)
 	// close doneCh so local activity worker won't get blocked forever when trying to send back result to laResultCh.
-	defer close(doneCh)
+	id := rand.Int31()
+	defer func() {
+		fmt.Println("closing stuff")
+		close(doneCh)
+	}()
 
 process_WorkflowTask_Loop:
 	for {
+		//		fmt.Printf("starting new loop %v\n", id)
 		startTime := time.Now()
 		workflowTask.doneCh = doneCh
 		workflowTask.laResultCh = laResultCh
+		//		fmt.Printf("going to process workflow task result %v\n", id)
 		completedRequest, wc, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
-		if _, ok := err.(*localActivityTimedOutError); ok {
-			// force complete
-			fmt.Println("force complete")
-			response, err := wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
-			if err != nil {
-				return err
-			}
-			if response == nil || response.DecisionTask == nil {
-				fmt.Println("response is nil")
-				return nil
-			}
+		if err != nil {
+			if _, ok := err.(*localActivityTimedOutError); ok {
+				// force complete
+				//				fmt.Printf("force complete %v\n", id)
+				response, err := wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
+				if err != nil {
+					fmt.Printf("force complete error %v\n", err)
+					return err
+				}
+				if response == nil || response.DecisionTask == nil {
+					fmt.Println("response is nil")
+					return nil
+				}
 
-			fmt.Println("got new decision")
-			// we are getting new decision task, so reset the workflowTask and continue process the new one
-			workflowTask = wtp.toWorkflowTask(response.DecisionTask)
-			continue process_WorkflowTask_Loop
+				fmt.Printf("got new decision %v\n", id)
+				// we are getting new decision task, so reset the workflowTask and continue process the new one
+				workflowTask = wtp.toWorkflowTask(response.DecisionTask)
+				continue process_WorkflowTask_Loop
+			}
 		}
 
+		//		fmt.Printf("respond task complete %v\n", id)
 		response, err := wtp.RespondTaskCompletedWithMetrics(completedRequest, err, workflowTask.task, startTime)
 		if err != nil {
+			//			fmt.Printf("respond task complete error %v\n", err)
 			return err
 		}
 		if response == nil || response.DecisionTask == nil {
@@ -291,6 +303,7 @@ process_WorkflowTask_Loop:
 		workflowTask = wtp.toWorkflowTask(response.DecisionTask)
 		continue process_WorkflowTask_Loop
 	}
+	return nil
 }
 
 func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTask) error {
@@ -474,8 +487,10 @@ func (latp *localActivityTaskPoller) ProcessTask(task interface{}) error {
 	// before returning from workflowTaskPoller.processWorkflowTask().
 	select {
 	case result.task.workflowTask.laResultCh <- result:
+		fmt.Println("send back result")
 		return nil
 	case <-result.task.workflowTask.doneCh:
+		fmt.Println("already done")
 		// processWorkflowTask() already returns, just drop this local activity result.
 		return nil
 	}

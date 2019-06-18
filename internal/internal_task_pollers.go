@@ -1063,6 +1063,17 @@ func convertActivityResultToRespondRequest(identity string, taskToken, result []
 			Identity:  common.StringPtr(identity)}
 	}
 
+	if timeoutErr, ok := err.(*TimeoutError); ok {
+		// this part is for test framework only
+		return &respondActivityTaskTimeout{
+			TaskToken:   taskToken,
+			Reason:      common.StringPtr(reason),
+			Details:     details,
+			TimeoutType: timeoutErr.TimeoutType(),
+			Identity:    common.StringPtr(identity),
+		}
+	}
+
 	return &s.RespondActivityTaskFailedRequest{
 		TaskToken: taskToken,
 		Reason:    common.StringPtr(reason),

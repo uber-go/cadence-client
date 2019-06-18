@@ -38,6 +38,7 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
+	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/metrics"
@@ -186,6 +187,14 @@ type (
 	testSessionEnvironmentImpl struct {
 		*sessionEnvironmentImpl
 		testWorkflowEnvironment *testWorkflowEnvironmentImpl
+	}
+
+	respondActivityTaskTimeout struct {
+		TaskToken   []byte
+		Reason      *string
+		TimeoutType s.TimeoutType
+		Details     []byte
+		Identity    *string
 	}
 )
 
@@ -525,6 +534,9 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 		return nil, constructError(request.GetReason(), request.Details, env.GetDataConverter())
 	case *shared.RespondActivityTaskCompletedRequest:
 		return newEncodedValue(request.Result, env.GetDataConverter()), nil
+	case *respondActivityTaskTimeout:
+		details := newEncodedValues(request.Details, env.GetDataConverter())
+		return nil, NewTimeoutError(request.TimeoutType, details)
 	default:
 		// will never happen
 		return nil, fmt.Errorf("unsupported respond type %T", result)
@@ -970,10 +982,18 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithRetryForTest(
 			panic(err)
 		}
 
+		var errReason *string
+		switch result := result.(type) {
+		case *respondActivityTaskTimeout:
+			errReason = result.Reason
+		case *shared.RespondActivityTaskFailedRequest:
+			errReason = result.Reason
+		}
+
 		// check if a retry is needed
-		if request, ok := result.(*shared.RespondActivityTaskFailedRequest); ok && parameters.RetryPolicy != nil {
+		if errReason != nil && parameters.RetryPolicy != nil {
 			p := fromThriftRetryPolicy(parameters.RetryPolicy)
-			backoff := getRetryBackoffWithNowTime(p, task.GetAttempt(), *request.Reason, env.Now(), expireTime)
+			backoff := getRetryBackoffWithNowTime(p, task.GetAttempt(), *errReason, env.Now(), expireTime)
 			if backoff > 0 {
 				// need a retry
 				waitCh := make(chan struct{})
@@ -1115,6 +1135,10 @@ func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, 
 	case *shared.RespondActivityTaskCompletedRequest:
 		blob = request.Result
 		activityHandle.callback(blob, nil)
+	case *respondActivityTaskTimeout:
+		details := newEncodedValues(request.Details, dataConverter)
+		err := NewTimeoutError(request.TimeoutType, details)
+		activityHandle.callback(nil, err)
 	default:
 		panic(fmt.Sprintf("unsupported respond type %T", result))
 	}

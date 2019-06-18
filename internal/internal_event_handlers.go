@@ -422,6 +422,7 @@ func (wc *workflowEnvironmentImpl) ExecuteLocalActivity(params executeLocalActiv
 	activityID := wc.GenerateSequenceID()
 	task := newLocalActivityTask(params, callback, activityID)
 
+	fmt.Printf("scheduling local activity %v\n", activityID)
 	wc.pendingLaTasks[activityID] = task
 	wc.unstartedLaTasks[activityID] = struct{}{}
 	return &localActivityInfo{activityID: activityID}

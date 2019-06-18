@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -459,6 +460,7 @@ func (w *workflowExecutionContextImpl) queueResetStickinessTask() {
 			RunId:      common.StringPtr(w.workflowInfo.WorkflowExecution.RunID),
 		},
 	}
+	debug.PrintStack()
 	// w.laTunnel could be nil for worker.ReplayHistory() because there is no worker started, in that case we don't
 	// care about resetStickinessTask.
 	if w.laTunnel != nil && w.laTunnel.resultCh != nil {

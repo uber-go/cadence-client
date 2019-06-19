@@ -81,7 +81,8 @@ func (t *tracingContextPropagator) Extract(
 ) (context.Context, error) {
 	spanContext, err := t.tracer.Extract(opentracing.TextMap, tracingReader{hr})
 	if err != nil {
-		return nil, err
+		// did not find a tracing span, just return the current context
+		return ctx, nil
 	}
 	return context.WithValue(ctx, activeSpanContextKey, spanContext), nil
 }
@@ -103,7 +104,8 @@ func (t *tracingContextPropagator) ExtractToWorkflow(
 ) (Context, error) {
 	spanContext, err := t.tracer.Extract(opentracing.TextMap, tracingReader{hr})
 	if err != nil {
-		return nil, err
+		// did not find a tracing span, just return the current context
+		return ctx, nil
 	}
 	return contextWithSpan(ctx, spanContext), nil
 }

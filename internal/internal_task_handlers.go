@@ -1247,7 +1247,7 @@ func checkIfDecisionDomainMatchEventDomain(eventDomainName, decisionDomainName s
 	if decisionDomainName == "" || IsReplayDomain(decisionDomainName) {
 		return true
 	}
-	return decisionDomainName == decisionDomainName
+	return eventDomainName == decisionDomainName
 }
 
 func (wth *workflowTaskHandlerImpl) completeWorkflow(

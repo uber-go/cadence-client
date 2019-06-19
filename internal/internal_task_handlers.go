@@ -1184,7 +1184,7 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 		eventAttributes := e.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes
 		decisionAttributes := d.RequestCancelExternalWorkflowExecutionDecisionAttributes
-		if eventAttributes.GetDomain() != decisionAttributes.GetDomain() ||
+		if (eventAttributes.GetDomain() != decisionAttributes.GetDomain() && !IsReplayDomain(decisionAttributes.GetDomain())) ||
 			eventAttributes.WorkflowExecution.GetWorkflowId() != decisionAttributes.GetWorkflowId() {
 			return false
 		}
@@ -1197,7 +1197,7 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 		eventAttributes := e.SignalExternalWorkflowExecutionInitiatedEventAttributes
 		decisionAttributes := d.SignalExternalWorkflowExecutionDecisionAttributes
-		if eventAttributes.GetDomain() != decisionAttributes.GetDomain() ||
+		if (eventAttributes.GetDomain() != decisionAttributes.GetDomain() && !IsReplayDomain(decisionAttributes.GetDomain())) ||
 			eventAttributes.GetSignalName() != decisionAttributes.GetSignalName() ||
 			eventAttributes.WorkflowExecution.GetWorkflowId() != decisionAttributes.Execution.GetWorkflowId() {
 			return false
@@ -1232,7 +1232,7 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		eventAttributes := e.StartChildWorkflowExecutionInitiatedEventAttributes
 		decisionAttributes := d.StartChildWorkflowExecutionDecisionAttributes
 		if lastPartOfName(eventAttributes.WorkflowType.GetName()) != lastPartOfName(decisionAttributes.WorkflowType.GetName()) ||
-			(strictMode && eventAttributes.GetDomain() != decisionAttributes.GetDomain()) ||
+			(strictMode && eventAttributes.GetDomain() != decisionAttributes.GetDomain() && !IsReplayDomain(decisionAttributes.GetDomain())) ||
 			(strictMode && eventAttributes.TaskList.GetName() != decisionAttributes.TaskList.GetName()) {
 			return false
 		}

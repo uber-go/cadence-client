@@ -71,7 +71,9 @@ func (t *tracingContextPropagator) Inject(
 ) error {
 	// retrieve span from context object
 	span := opentracing.SpanFromContext(ctx)
-
+	if span == nil {
+		return nil
+	}
 	return t.tracer.Inject(span.Context(), opentracing.TextMap, tracingWriter{hw})
 }
 
@@ -93,9 +95,10 @@ func (t *tracingContextPropagator) InjectFromWorkflow(
 ) error {
 	// retrieve span from context object
 	spanContext := spanFromContext(ctx)
-
-	t.tracer.Inject(spanContext, opentracing.HTTPHeaders, tracingWriter{hw})
-	return nil
+	if spanContext == nil {
+		return nil
+	}
+	return t.tracer.Inject(spanContext, opentracing.HTTPHeaders, tracingWriter{hw})
 }
 
 func (t *tracingContextPropagator) ExtractToWorkflow(

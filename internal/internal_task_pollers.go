@@ -254,31 +254,52 @@ func (wtp *workflowTaskPoller) processWorkflowTask(workflowTask *workflowTask) e
 	// close doneCh so local activity worker won't get blocked forever when trying to send back result to laResultCh.
 	defer close(doneCh)
 
+process_WorkflowTask_Loop:
 	for {
 		var response *s.RespondDecisionTaskCompletedResponse
 		startTime := time.Now()
 		workflowTask.doneCh = doneCh
 		workflowTask.laResultCh = laResultCh
+		// the workflow context returned is locked, so needs to be unlocked by this routine
 		completedRequest, wc, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
-		if _, ok := err.(*localActivityTimedOutError); ok {
-			// force complete
-			response, err = wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
-			if err != nil {
-				return err
+		if err == nil && completedRequest == nil {
+			// decision task cannot complete because it is waiting for local activity to finish
+			// we need a timer to force complete it to avoid the decision task timeout on server.
+		wait_LocalActivity_Loop:
+			for {
+				deadlineToTrigger := time.Duration(float32(ratioToForceCompleteDecisionTaskComplete) * float32(wc.GetDecisionTimeout()))
+				delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
+				select {
+				case <-time.After(delayDuration):
+					// force complete
+					response, err = wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
+					break wait_LocalActivity_Loop
+
+				case lar := <-laResultCh:
+					// local activity result ready
+					completedRequest, err := wc.ProcessLocalActivityResult(lar.task.workflowTask, lar)
+					if err == nil && completedRequest == nil {
+						// decision task is not done yet, still waiting for more local activities
+						continue wait_LocalActivity_Loop
+					}
+
+					response, err = wtp.RespondTaskCompletedWithMetrics(completedRequest, err, workflowTask.task, startTime)
+					break wait_LocalActivity_Loop
+				}
 			}
 		} else {
 			response, err = wtp.RespondTaskCompletedWithMetrics(completedRequest, err, workflowTask.task, startTime)
-			if err != nil {
-				return err
-			}
 		}
 
-		if response == nil || response.DecisionTask == nil {
-			return nil
+		if err != nil || response == nil || response.DecisionTask == nil {
+			wc.Unlock(err)
+			return err
 		}
+		wc.Unlock(err)
 
 		// we are getting new decision task, so reset the workflowTask and continue process the new one
 		workflowTask = wtp.toWorkflowTask(response.DecisionTask)
+		continue process_WorkflowTask_Loop
 	}
 }
 
@@ -298,13 +319,7 @@ func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTa
 }
 
 func (wtp *workflowTaskPoller) forceRespondDecisionTaskCompleted(wc WorkflowExecutionContext, workflowTask *workflowTask, startTime time.Time) (response *s.RespondDecisionTaskCompletedResponse, err error) {
-	wc.Lock()
-	defer wc.Unlock(nil)
-
-	if wc.IsDestroyed() {
-		return nil, &workflowContextAlreadyDestroyedError{Message: "workflow context already destroyed"}
-	}
-
+	// workflow context passed in must be locked to ensure the workflow still exists
 	currentTask := wc.GetCurrentDecisionTask()
 	if currentTask == nil || currentTask != workflowTask.task {
 		// decision task already completed
@@ -326,28 +341,6 @@ func (wtp *workflowTaskPoller) forceRespondDecisionTaskCompleted(wc WorkflowExec
 	wtp.metricsScope.Counter(metrics.DecisionTaskForceCompleted).Inc(1)
 
 	return wtp.RespondTaskCompletedWithMetrics(completeRequest, nil, workflowTask.task, startTime)
-}
-
-type workflowContextAlreadyDestroyedError struct {
-	Message string
-}
-
-func (e *workflowContextAlreadyDestroyedError) Error() string {
-	return e.Message
-}
-
-func (wtp *workflowTaskPoller) processLocalActivityResult(workflowTask *workflowTask, lar *localActivityResult) (interface{}, error) {
-	w := lar.task.wc
-	w.Lock()
-
-	defer w.Unlock(nil)
-
-	if w.IsDestroyed() {
-		// by the time local activity returns, the workflow context is already destroyed
-		return nil, &workflowContextAlreadyDestroyedError{Message: "workflow context already destroyed"}
-	}
-
-	return w.ProcessLocalActivityResult(workflowTask, lar)
 }
 
 func (wtp *workflowTaskPoller) RespondTaskCompletedWithMetrics(completedRequest interface{}, taskErr error, task *s.PollForDecisionTaskResponse, startTime time.Time) (response *s.RespondDecisionTaskCompletedResponse, err error) {

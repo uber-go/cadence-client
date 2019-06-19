@@ -400,10 +400,6 @@ func (w *workflowExecutionContextImpl) Lock() {
 }
 
 func (w *workflowExecutionContextImpl) Unlock(err error) {
-	if _, ok := err.(*localActivityTimedOutError); ok {
-		w.mutex.Unlock()
-		return
-	}
 	if err != nil || w.err != nil || w.isWorkflowCompleted || (w.wth.disableStickyExecution && !w.hasPendingLocalActivityWork()) {
 		// TODO: in case of closed, it asumes the close decision always succeed. need server side change to return
 		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
@@ -646,7 +642,6 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *s.PollForDeci
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
 ) (completeRequest interface{}, context WorkflowExecutionContext, errRet error) {
-	startTime := time.Now()
 	if workflowTask == nil || workflowTask.task == nil {
 		return nil, nil, errors.New("nil workflow task provided")
 	}
@@ -675,33 +670,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		return nil, nil, err
 	}
 
-	defer func() {
-		workflowContext.Unlock(errRet)
-	}()
-
 	response, err := workflowContext.ProcessWorkflowTask(workflowTask)
-	if err == nil && response == nil {
-	wait_LocalActivity_Loop:
-		for {
-			deadlineToTrigger := time.Duration(float32(ratioToForceCompleteDecisionTaskComplete) * float32(workflowContext.GetDecisionTimeout()))
-			delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
-			select {
-			case <-time.After(delayDuration):
-				// force complete
-				// return force decision task completed error
-				return response, workflowContext, &localActivityTimedOutError{Message: "local activity did not complete within decision timeout"}
-
-			case lar := <-workflowTask.laResultCh:
-				// local activity result ready
-				response, err = workflowContext.ProcessLocalActivityResult(workflowTask, lar)
-				if err == nil && response == nil {
-					// decision task is not done yet, still waiting for more local activities
-					continue wait_LocalActivity_Loop
-				}
-				break wait_LocalActivity_Loop
-			}
-		}
-	}
 	return response, workflowContext, err
 }
 

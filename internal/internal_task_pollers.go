@@ -261,7 +261,7 @@ process_WorkflowTask_Loop:
 		workflowTask.doneCh = doneCh
 		workflowTask.laResultCh = laResultCh
 		// the workflow context returned is locked, so needs to be unlocked by this routine
-		completedRequest, wc, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
+		completedRequest, wc, locked, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
 		if err == nil && completedRequest == nil {
 			// decision task cannot complete because it is waiting for local activity to finish
 			// we need a timer to force complete it to avoid the decision task timeout on server.
@@ -292,10 +292,14 @@ process_WorkflowTask_Loop:
 		}
 
 		if err != nil || response == nil || response.DecisionTask == nil {
-			wc.Unlock(err)
+			if locked {
+				wc.Unlock(err)
+			}
 			return err
 		}
-		wc.Unlock(err)
+		if locked {
+			wc.Unlock(err)
+		}
 
 		// we are getting new decision task, so reset the workflowTask and continue process the new one
 		workflowTask = wtp.toWorkflowTask(response.DecisionTask)

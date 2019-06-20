@@ -372,7 +372,12 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 		Logger:   logger,
 	}
 	taskHandler := newWorkflowTaskHandler(domain, params, nil, getHostEnvironment())
-	resp, _, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator})
+	resp, wc, locked, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator})
+	defer func() {
+		if locked {
+			wc.Unlock(err)
+		}
+	}()
 	if err != nil {
 		return err
 	}

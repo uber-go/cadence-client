@@ -332,20 +332,21 @@ func createSession(ctx Context, creationTasklist string, options *SessionOptions
 	//   2. When completing session, we need to cancel both creation activity and all user activities, but
 	//      we can't cancel the completionCtx.
 	sessionCtx, sessionCancelFunc := WithCancel(completionCtx)
-	creationFuture := ExecuteActivity(sessionCtx, sessionCreationActivityName, sessionID)
+	creationCtx := WithActivityOptions(sessionCtx, ao)
+	creationFuture := ExecuteActivity(creationCtx, sessionCreationActivityName, sessionID)
 
 	var creationErr error
 	var creationResponse sessionCreationResponse
-	s := NewSelector(sessionCtx)
+	s := NewSelector(creationCtx)
 	s.AddReceive(tasklistChan, func(c Channel, more bool) {
-		c.Receive(sessionCtx, &creationResponse)
+		c.Receive(creationCtx, &creationResponse)
 	})
 	s.AddFuture(creationFuture, func(f Future) {
 		// activity stoped before signal is received, must be creation timeout.
-		creationErr = f.Get(sessionCtx, nil)
-		GetLogger(sessionCtx).Debug("Failed to create session", zap.String("sessionID", sessionID), zap.Error(creationErr))
+		creationErr = f.Get(creationCtx, nil)
+		GetLogger(creationCtx).Debug("Failed to create session", zap.String("sessionID", sessionID), zap.Error(creationErr))
 	})
-	s.Select(sessionCtx)
+	s.Select(creationCtx)
 
 	if creationErr != nil {
 		sessionCancelFunc()
@@ -357,14 +358,14 @@ func createSession(ctx Context, creationTasklist string, options *SessionOptions
 	sessionInfo.HostName = creationResponse.HostName
 	sessionInfo.sessionCancelFunc = sessionCancelFunc
 
-	Go(sessionCtx, func(sessionCtx Context) {
-		err := creationFuture.Get(sessionCtx, nil)
+	Go(creationCtx, func(creationCtx Context) {
+		err := creationFuture.Get(creationCtx, nil)
 		if err == nil {
 			return
 		}
 		if _, ok := err.(*CanceledError); !ok {
-			getWorkflowEnvironment(sessionCtx).RemoveSession(sessionID)
-			GetLogger(sessionCtx).Debug("Session failed", zap.String("sessionID", sessionID), zap.Error(err))
+			getWorkflowEnvironment(creationCtx).RemoveSession(sessionID)
+			GetLogger(creationCtx).Debug("Session failed", zap.String("sessionID", sessionID), zap.Error(err))
 			sessionInfo.sessionState = sessionStateFailed
 			sessionCancelFunc()
 		}

@@ -74,7 +74,7 @@ type (
 		// - RespondDecisionTaskCompletedRequest
 		// - RespondDecisionTaskFailedRequest
 		// - RespondQueryTaskCompletedRequest
-		ProcessWorkflowTask(task *workflowTask) (response interface{}, w WorkflowExecutionContext, locked bool, err error)
+		ProcessWorkflowTask(task *workflowTask) (response interface{}, w WorkflowExecutionContext, err error)
 	}
 
 	// ActivityTaskHandler represents activity task handlers.

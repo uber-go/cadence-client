@@ -641,9 +641,9 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *s.PollForDeci
 // ProcessWorkflowTask processes all the events of the workflow task.
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
-) (completeRequest interface{}, context WorkflowExecutionContext, locked bool, errRet error) {
+) (completeRequest interface{}, context WorkflowExecutionContext, errRet error) {
 	if workflowTask == nil || workflowTask.task == nil {
-		return nil, nil, false, errors.New("nil workflow task provided")
+		return nil, nil, errors.New("nil workflow task provided")
 	}
 	task := workflowTask.task
 	if task.History == nil || len(task.History.Events) == 0 {
@@ -652,7 +652,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		}
 	}
 	if task.Query == nil && len(task.History.Events) == 0 {
-		return nil, nil, false, errors.New("nil or empty history")
+		return nil, nil, errors.New("nil or empty history")
 	}
 
 	runID := task.WorkflowExecution.GetRunId()
@@ -667,11 +667,11 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 
 	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 
 	response, err := workflowContext.ProcessWorkflowTask(workflowTask)
-	return response, workflowContext, true, err
+	return response, workflowContext, err
 }
 
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflowTask) (interface{}, error) {

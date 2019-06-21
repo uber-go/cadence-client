@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"go.uber.org/cadence/.gen/go/shared"
+	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/encoded"
 )
 
@@ -232,8 +233,20 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *C
 		workflowOptions: *options,
 		workflowType:    workflowType,
 		input:           input,
+		header:          getWorkflowHeader(ctx, options.contextPropagators),
 	}
 	return &ContinueAsNewError{wfn: wfn, args: args, params: params}
+}
+
+func getWorkflowHeader(ctx Context, ctxProps []ContextPropagator) *s.Header {
+	header := &s.Header{
+		Fields: make(map[string][]byte),
+	}
+	writer := NewHeaderWriter(header)
+	for _, ctxProp := range ctxProps {
+		ctxProp.InjectFromWorkflow(ctx, writer)
+	}
+	return header
 }
 
 // Error from error interface

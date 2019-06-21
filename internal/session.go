@@ -357,14 +357,14 @@ func createSession(ctx Context, creationTasklist string, options *SessionOptions
 	sessionInfo.HostName = creationResponse.HostName
 	sessionInfo.sessionCancelFunc = sessionCancelFunc
 
-	Go(ctx, func(ctx Context) {
-		err := creationFuture.Get(ctx, nil)
+	Go(sessionCtx, func(sessionCtx Context) {
+		err := creationFuture.Get(sessionCtx, nil)
 		if err == nil {
 			return
 		}
 		if _, ok := err.(*CanceledError); !ok {
-			getWorkflowEnvironment(ctx).RemoveSession(sessionID)
-			GetLogger(ctx).Debug("Session failed", zap.String("sessionID", sessionID), zap.Error(err))
+			getWorkflowEnvironment(sessionCtx).RemoveSession(sessionID)
+			GetLogger(sessionCtx).Debug("Session failed", zap.String("sessionID", sessionID), zap.Error(err))
 			sessionInfo.sessionState = sessionStateFailed
 			sessionCancelFunc()
 		}

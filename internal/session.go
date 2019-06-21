@@ -47,12 +47,13 @@ type (
 	// is called and can be used to uniquely identify a session.
 	// HostName specifies which host is executing the session
 	SessionInfo struct {
-		SessionID    string
-		HostName     string
-		resourceID   string // hide from user for now
-		tasklist     string // resource specific tasklist
-		sessionState sessionState
-		cancelFunc   CancelFunc
+		SessionID          string
+		HostName           string
+		resourceID         string // hide from user for now
+		tasklist           string // resource specific tasklist
+		sessionState       sessionState
+		creationCancelFunc CancelFunc // cancel func for the creation activity
+		sessionCancelFunc  CancelFunc // cancel func for the session context
 	}
 
 	// SessionOptions specifies metadata for a session.
@@ -153,6 +154,10 @@ var (
 // executing the session is down, that session will be marked as failed. Executing an activity
 // within a failed session will return ErrSessionFailed immediately without scheduling that activity.
 //
+// The returned session Context will be cancelled if the session fails (worker died) or CompleteSession()
+// is called. This means that in these two cases, all user activities scheduled using the returned session
+// Context will also be cancelled.
+//
 // If user wants to end a session since activity returns some error, use CompleteSession API below.
 // New session can be created if necessary to retry the whole session.
 //
@@ -224,12 +229,24 @@ func CompleteSession(ctx Context) {
 	}
 
 	// first cancel the creation activity context
-	sessionInfo.cancelFunc()
+	sessionInfo.creationCancelFunc()
 
 	// then execute then completion activity
 	completionCtx := WithActivityOptions(ctx, ao)
 	// the tasklist will be overrided to use the one stored in sessionInfo
-	ExecuteActivity(completionCtx, sessionCompletionActivityName, sessionInfo.SessionID)
+	Go(completionCtx, func(completionCtx Context) {
+		// even though the creation activity has been cancelled, the session worker doesn't know. The worker will wait until
+		// next heartbeat to figure out that the workflow is completed and then release the resource. We need to make sure the
+		// completion activity is executed before the workflow exits.
+		// also run the activity in another coroutine so it won't block user workflow.
+		err := ExecuteActivity(completionCtx, sessionCompletionActivityName, sessionInfo.SessionID).Get(completionCtx, nil)
+		if err != nil {
+			GetLogger(completionCtx).Error("Complete session activity failed", zap.Error(err))
+		}
+		// the session context can only be cancelled after the completion activity finishes, otherwise the completion activity
+		// will be cancelled as well.
+		sessionInfo.sessionCancelFunc()
+	})
 	sessionInfo.sessionState = sessionStateClosed
 	getWorkflowEnvironment(ctx).RemoveSession(sessionInfo.SessionID)
 	GetLogger(ctx).Debug("Completed session", zap.String("sessionID", sessionInfo.SessionID))
@@ -304,7 +321,7 @@ func createSession(ctx Context, creationTasklist string, options *SessionOptions
 	if retryable {
 		ao.RetryPolicy = retryPolicy
 	}
-	creationCtx, cancel := WithCancel(WithActivityOptions(ctx, ao))
+	creationCtx, creationCancelFunc := WithCancel(WithActivityOptions(ctx, ao))
 	creationFuture := ExecuteActivity(creationCtx, sessionCreationActivityName, sessionID)
 
 	var creationErr error
@@ -325,13 +342,15 @@ func createSession(ctx Context, creationTasklist string, options *SessionOptions
 	}
 
 	sessionInfo := &SessionInfo{
-		SessionID:    sessionID,
-		tasklist:     creationResponse.Tasklist,
-		resourceID:   creationResponse.ResourceID,
-		HostName:     creationResponse.HostName,
-		sessionState: sessionStateOpen,
-		cancelFunc:   cancel,
+		SessionID:          sessionID,
+		tasklist:           creationResponse.Tasklist,
+		resourceID:         creationResponse.ResourceID,
+		HostName:           creationResponse.HostName,
+		sessionState:       sessionStateOpen,
+		creationCancelFunc: creationCancelFunc,
 	}
+	sessionCtx, sessionCancelFunc := WithCancel(setSessionInfo(ctx, sessionInfo))
+	sessionInfo.sessionCancelFunc = sessionCancelFunc
 
 	Go(ctx, func(ctx Context) {
 		err := creationFuture.Get(ctx, nil)
@@ -342,12 +361,13 @@ func createSession(ctx Context, creationTasklist string, options *SessionOptions
 			getWorkflowEnvironment(ctx).RemoveSession(sessionID)
 			GetLogger(ctx).Debug("Session failed", zap.String("sessionID", sessionID), zap.Error(err))
 			sessionInfo.sessionState = sessionStateFailed
+			sessionCancelFunc()
 		}
 	})
 
 	logger.Debug("Created session", zap.String("sessionID", sessionID))
 	getWorkflowEnvironment(ctx).AddSession(sessionInfo)
-	return setSessionInfo(ctx, sessionInfo), nil
+	return sessionCtx, nil
 }
 
 func generateSessionID(ctx Context) (string, error) {

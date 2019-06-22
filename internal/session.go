@@ -232,7 +232,7 @@ func CompleteSession(ctx Context) {
 	// the tasklist will be overrided to use the one stored in sessionInfo.
 	err := ExecuteActivity(completionCtx, sessionCompletionActivityName, sessionInfo.SessionID).Get(completionCtx, nil)
 	if err != nil {
-		GetLogger(completionCtx).Error("Complete session activity failed", zap.Error(err))
+		GetLogger(completionCtx).Warn("Complete session activity failed", zap.Error(err))
 	}
 
 	sessionInfo.sessionState = sessionStateClosed

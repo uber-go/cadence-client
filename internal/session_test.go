@@ -539,9 +539,10 @@ func (s *SessionTestSuite) TestCompletionFailed() {
 
 	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.OnActivity(sessionCompletionActivityName, mock.Anything, mock.Anything).Return(errors.New("some random error"))
+	env.OnActivity(sessionCompletionActivityName, mock.Anything, mock.Anything).Return(errors.New("some random error")).Once()
 	env.ExecuteWorkflow(workflowFn)
 
+	env.AssertExpectations(s.T())
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 }

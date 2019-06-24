@@ -997,10 +997,6 @@ func (w *workflowExecutionContextImpl) skipReplayCheck() bool {
 	return w.currentDecisionTask.Query != nil || !isFullHistory(w.currentDecisionTask.History)
 }
 
-func (w *workflowExecutionContextImpl) GetCurrentDecisionTask() *s.PollForDecisionTaskResponse {
-	return w.currentDecisionTask
-}
-
 func (w *workflowExecutionContextImpl) SetCurrentTask(task *s.PollForDecisionTaskResponse) {
 	w.currentDecisionTask = task
 	// do not update the previousStartedEventID for query task
@@ -1032,13 +1028,6 @@ func (w *workflowExecutionContextImpl) ResetIfStale(task *s.PollForDecisionTaskR
 
 func (w *workflowExecutionContextImpl) GetDecisionTimeout() time.Duration {
 	return time.Second * time.Duration(w.workflowInfo.TaskStartToCloseTimeoutSeconds)
-}
-
-func (w *workflowExecutionContextImpl) StackTrace() string {
-	if w.eventHandler == nil {
-		return "eventHandler is closed"
-	}
-	return w.eventHandler.StackTrace()
 }
 
 func skipDeterministicCheckForDecision(d *s.Decision) bool {

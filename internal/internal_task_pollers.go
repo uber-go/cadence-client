@@ -262,6 +262,9 @@ func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
 		completedRequest, err := wtp.taskHandler.ProcessWorkflowTask(
 			task,
 			func(response interface{}, startTime time.Time) (*s.RespondDecisionTaskCompletedResponse, error) {
+				wtp.logger.Debug("Force RespondDecisionTaskCompleted.",
+					zap.Int64("TaskStartedEventID", task.task.GetStartedEventId()))
+				wtp.metricsScope.Counter(metrics.DecisionTaskForceCompleted).Inc(1)
 				return wtp.RespondTaskCompletedWithMetrics(response, nil, task.task, startTime)
 			},
 			func(response *s.RespondDecisionTaskCompletedResponse) *workflowTask {
@@ -301,41 +304,6 @@ func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTa
 	}
 
 	return nil
-}
-
-func (wtp *workflowTaskPoller) forceRespondDecisionTaskCompleted(
-	wc WorkflowExecutionContext,
-	workflowTask *workflowTask,
-	startTime time.Time,
-) (response *s.RespondDecisionTaskCompletedResponse, err error) {
-	completeRequest := wc.CompleteDecisionTask(workflowTask, false)
-	wtp.logger.Debug("Force RespondDecisionTaskCompleted.",
-		zap.Int64("TaskStartedEventID", workflowTask.task.GetStartedEventId()))
-	wtp.metricsScope.Counter(metrics.DecisionTaskForceCompleted).Inc(1)
-
-	return wtp.RespondTaskCompletedWithMetrics(completeRequest, nil, workflowTask.task, startTime)
-}
-
-type workflowContextAlreadyDestroyedError struct {
-	Message string
-}
-
-func (e *workflowContextAlreadyDestroyedError) Error() string {
-	return e.Message
-}
-
-func (wtp *workflowTaskPoller) processLocalActivityResult(workflowTask *workflowTask, lar *localActivityResult) (interface{}, error) {
-	w := lar.task.wc
-	w.Lock()
-
-	defer w.Unlock(nil)
-
-	if w.IsDestroyed() {
-		// by the time local activity returns, the workflow context is already destroyed
-		return nil, &workflowContextAlreadyDestroyedError{Message: "workflow context already destroyed"}
-	}
-
-	return w.ProcessLocalActivityResult(workflowTask, lar)
 }
 
 func (wtp *workflowTaskPoller) RespondTaskCompletedWithMetrics(completedRequest interface{}, taskErr error, task *s.PollForDecisionTaskResponse, startTime time.Time) (response *s.RespondDecisionTaskCompletedResponse, err error) {
@@ -1049,6 +1017,4 @@ func convertActivityResultToRespondRequestByID(identity, domain, workflowID, run
 		Reason:     common.StringPtr(reason),
 		Details:    details,
 		Identity:   common.StringPtr(identity)}
-
-	return nil
 }

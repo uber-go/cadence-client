@@ -148,10 +148,6 @@ type (
 		currentIndex  int
 		next          []*s.HistoryEvent
 	}
-
-	localActivityTimedOutError struct {
-		Message string
-	}
 )
 
 func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandlerImpl) *history {
@@ -163,10 +159,6 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 	}
 
 	return result
-}
-
-func (e *localActivityTimedOutError) Error() string {
-	return e.Message
 }
 
 // Get workflow start event.
@@ -400,10 +392,6 @@ func (w *workflowExecutionContextImpl) Lock() {
 }
 
 func (w *workflowExecutionContextImpl) Unlock(err error) {
-	if _, ok := err.(*localActivityTimedOutError); ok {
-		w.mutex.Unlock()
-		return
-	}
 	if err != nil || w.err != nil || w.isWorkflowCompleted || (w.wth.disableStickyExecution && !w.hasPendingLocalActivityWork()) {
 		// TODO: in case of closed, it asumes the close decision always succeed. need server side change to return
 		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
@@ -645,10 +633,11 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *s.PollForDeci
 // ProcessWorkflowTask processes all the events of the workflow task.
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
-) (completeRequest interface{}, context WorkflowExecutionContext, errRet error) {
-	startTime := time.Now()
+	heartbeatFunc decisionHeartBeatFunc,
+	workflowFunc workflowTaskFunc,
+) (completeRequest interface{}, errRet error) {
 	if workflowTask == nil || workflowTask.task == nil {
-		return nil, nil, errors.New("nil workflow task provided")
+		return nil, errors.New("nil workflow task provided")
 	}
 	task := workflowTask.task
 	if task.History == nil || len(task.History.Events) == 0 {
@@ -657,7 +646,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		}
 	}
 	if task.Query == nil && len(task.History.Events) == 0 {
-		return nil, nil, errors.New("nil or empty history")
+		return nil, errors.New("nil or empty history")
 	}
 
 	runID := task.WorkflowExecution.GetRunId()
@@ -672,37 +661,52 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 
 	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	defer func() {
 		workflowContext.Unlock(errRet)
 	}()
 
-	response, err := workflowContext.ProcessWorkflowTask(workflowTask)
-	if err == nil && response == nil {
-	wait_LocalActivity_Loop:
-		for {
-			deadlineToTrigger := time.Duration(float32(ratioToForceCompleteDecisionTaskComplete) * float32(workflowContext.GetDecisionTimeout()))
-			delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
-			select {
-			case <-time.After(delayDuration):
-				// force complete
-				// return force decision task completed error
-				return response, workflowContext, &localActivityTimedOutError{Message: "local activity did not complete within decision timeout"}
+	var response interface{}
+process_Workflow_Loop:
+	for {
+		startTime := time.Now()
+		response, err = workflowContext.ProcessWorkflowTask(workflowTask)
+		if err == nil && response == nil {
+		wait_LocalActivity_Loop:
+			for {
+				deadlineToTrigger := time.Duration(float32(ratioToForceCompleteDecisionTaskComplete) * float32(workflowContext.GetDecisionTimeout()))
+				delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
+				select {
+				case <-time.After(delayDuration):
+					// force complete, call the decision heartbeat function
+					heartbeatResponse, _ := heartbeatFunc(
+						workflowContext.CompleteDecisionTask(workflowTask, false),
+						startTime,
+					)
+					if heartbeatResponse == nil || heartbeatResponse.DecisionTask == nil {
+						return nil, nil
+					}
+					// we are getting new decision task, so reset the workflowTask and continue process the new one
+					workflowTask = workflowFunc(heartbeatResponse)
+					continue process_Workflow_Loop
 
-			case lar := <-workflowTask.laResultCh:
-				// local activity result ready
-				response, err = workflowContext.ProcessLocalActivityResult(workflowTask, lar)
-				if err == nil && response == nil {
-					// decision task is not done yet, still waiting for more local activities
-					continue wait_LocalActivity_Loop
+				case lar := <-workflowTask.laResultCh:
+					// local activity result ready
+					response, err = workflowContext.ProcessLocalActivityResult(workflowTask, lar)
+					if err == nil && response == nil {
+						// decision task is not done yet, still waiting for more local activities
+						continue wait_LocalActivity_Loop
+					}
+					break process_Workflow_Loop
 				}
-				break wait_LocalActivity_Loop
 			}
+		} else {
+			break process_Workflow_Loop
 		}
 	}
-	return response, workflowContext, err
+	return response, err
 }
 
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflowTask) (interface{}, error) {

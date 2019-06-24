@@ -240,8 +240,8 @@ func (wtp *workflowTaskPoller) ProcessTask(task interface{}) error {
 	}
 }
 
-func (wtp *workflowTaskPoller) processWorkflowTask(workflowTask *workflowTask) error {
-	if workflowTask.task == nil {
+func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
+	if task.task == nil {
 		// We didn't have task, poll might have time out.
 		traceLog(func() {
 			wtp.logger.Debug("Workflow task unavailable")
@@ -257,20 +257,26 @@ func (wtp *workflowTaskPoller) processWorkflowTask(workflowTask *workflowTask) e
 	for {
 		var response *s.RespondDecisionTaskCompletedResponse
 		startTime := time.Now()
-		workflowTask.doneCh = doneCh
-		workflowTask.laResultCh = laResultCh
-		completedRequest, wc, err := wtp.taskHandler.ProcessWorkflowTask(workflowTask)
-		if _, ok := err.(*localActivityTimedOutError); ok {
-			// force complete
-			response, err = wtp.forceRespondDecisionTaskCompleted(wc, workflowTask, startTime)
-			if err != nil {
-				return err
-			}
-		} else {
-			response, err = wtp.RespondTaskCompletedWithMetrics(completedRequest, err, workflowTask.task, startTime)
-			if err != nil {
-				return err
-			}
+		task.doneCh = doneCh
+		task.laResultCh = laResultCh
+		completedRequest, err := wtp.taskHandler.ProcessWorkflowTask(
+			task,
+			func(response interface{}, startTime time.Time) (*s.RespondDecisionTaskCompletedResponse, error) {
+				return wtp.RespondTaskCompletedWithMetrics(response, nil, task.task, startTime)
+			},
+			func(response *s.RespondDecisionTaskCompletedResponse) *workflowTask {
+				task := wtp.toWorkflowTask(response.DecisionTask)
+				task.doneCh = doneCh
+				task.laResultCh = laResultCh
+				return task
+			},
+		)
+		if completedRequest == nil && err == nil {
+			return nil
+		}
+		response, err = wtp.RespondTaskCompletedWithMetrics(completedRequest, err, task.task, startTime)
+		if err != nil {
+			return err
 		}
 
 		if response == nil || response.DecisionTask == nil {
@@ -278,7 +284,7 @@ func (wtp *workflowTaskPoller) processWorkflowTask(workflowTask *workflowTask) e
 		}
 
 		// we are getting new decision task, so reset the workflowTask and continue process the new one
-		workflowTask = wtp.toWorkflowTask(response.DecisionTask)
+		task = wtp.toWorkflowTask(response.DecisionTask)
 	}
 }
 
@@ -297,29 +303,11 @@ func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTa
 	return nil
 }
 
-func (wtp *workflowTaskPoller) forceRespondDecisionTaskCompleted(wc WorkflowExecutionContext, workflowTask *workflowTask, startTime time.Time) (response *s.RespondDecisionTaskCompletedResponse, err error) {
-	wc.Lock()
-	defer wc.Unlock(nil)
-
-	if wc.IsDestroyed() {
-		return nil, &workflowContextAlreadyDestroyedError{Message: "workflow context already destroyed"}
-	}
-
-	currentTask := wc.GetCurrentDecisionTask()
-	if currentTask == nil || currentTask != workflowTask.task {
-		// decision task already completed
-		var currentTaskStartedEventID int64
-		if currentTask != nil {
-			currentTaskStartedEventID = currentTask.GetStartedEventId()
-		}
-		wtp.logger.Debug("DecisionTask already completed when force responding timer fires.",
-			zap.String(tagWorkflowID, workflowTask.task.WorkflowExecution.GetWorkflowId()),
-			zap.String(tagRunID, workflowTask.task.WorkflowExecution.GetRunId()),
-			zap.Int64("TaskStartedEventID", workflowTask.task.GetStartedEventId()),
-			zap.Int64("CurrentStartedEventID", currentTaskStartedEventID))
-		return nil, nil
-	}
-
+func (wtp *workflowTaskPoller) forceRespondDecisionTaskCompleted(
+	wc WorkflowExecutionContext,
+	workflowTask *workflowTask,
+	startTime time.Time,
+) (response *s.RespondDecisionTaskCompletedResponse, err error) {
 	completeRequest := wc.CompleteDecisionTask(workflowTask, false)
 	wtp.logger.Debug("Force RespondDecisionTaskCompleted.",
 		zap.Int64("TaskStartedEventID", workflowTask.task.GetStartedEventId()))

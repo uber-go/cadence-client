@@ -34,6 +34,10 @@ import (
 )
 
 type (
+	decisionHeartBeatFunc func(response interface{}, startTime time.Time) (*s.RespondDecisionTaskCompletedResponse, error)
+
+	workflowTaskFunc func(*s.RespondDecisionTaskCompletedResponse) *workflowTask
+
 	// HistoryIterator iterator through history events
 	HistoryIterator interface {
 		// GetNextPage returns next page of history events
@@ -74,7 +78,11 @@ type (
 		// - RespondDecisionTaskCompletedRequest
 		// - RespondDecisionTaskFailedRequest
 		// - RespondQueryTaskCompletedRequest
-		ProcessWorkflowTask(task *workflowTask) (response interface{}, w WorkflowExecutionContext, err error)
+		ProcessWorkflowTask(
+			task *workflowTask,
+			f decisionHeartBeatFunc,
+			w workflowTaskFunc,
+		) (response interface{}, err error)
 	}
 
 	// ActivityTaskHandler represents activity task handlers.

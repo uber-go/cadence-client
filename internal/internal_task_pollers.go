@@ -261,21 +261,27 @@ func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
 		task.laResultCh = laResultCh
 		completedRequest, err := wtp.taskHandler.ProcessWorkflowTask(
 			task,
-			func(response interface{}, startTime time.Time) (*s.RespondDecisionTaskCompletedResponse, error) {
-				wtp.logger.Debug("Force RespondDecisionTaskCompleted.",
-					zap.Int64("TaskStartedEventID", task.task.GetStartedEventId()))
+			func(response interface{}, startTime time.Time) (*workflowTask, error) {
+				wtp.logger.Debug("Force RespondDecisionTaskCompleted.", zap.Int64("TaskStartedEventID", task.task.GetStartedEventId()))
 				wtp.metricsScope.Counter(metrics.DecisionTaskForceCompleted).Inc(1)
-				return wtp.RespondTaskCompletedWithMetrics(response, nil, task.task, startTime)
-			},
-			func(response *s.RespondDecisionTaskCompletedResponse) *workflowTask {
-				task := wtp.toWorkflowTask(response.DecisionTask)
+				heartbeatResponse, err := wtp.RespondTaskCompletedWithMetrics(response, nil, task.task, startTime)
+				if err != nil {
+					return nil, err
+				}
+				if heartbeatResponse == nil || heartbeatResponse.DecisionTask == nil {
+					return nil, nil
+				}
+				task := wtp.toWorkflowTask(heartbeatResponse.DecisionTask)
 				task.doneCh = doneCh
 				task.laResultCh = laResultCh
-				return task
+				return task, nil
 			},
 		)
 		if completedRequest == nil && err == nil {
 			return nil
+		}
+		if _, ok := err.(decisionHeartBeatError); ok {
+			return err
 		}
 		response, err = wtp.RespondTaskCompletedWithMetrics(completedRequest, err, task.task, startTime)
 		if err != nil {

@@ -34,9 +34,7 @@ import (
 )
 
 type (
-	decisionHeartBeatFunc func(response interface{}, startTime time.Time) (*s.RespondDecisionTaskCompletedResponse, error)
-
-	workflowTaskFunc func(*s.RespondDecisionTaskCompletedResponse) *workflowTask
+	decisionHeartBeatFunc func(response interface{}, startTime time.Time) (*workflowTask, error)
 
 	// HistoryIterator iterator through history events
 	HistoryIterator interface {
@@ -81,7 +79,6 @@ type (
 		ProcessWorkflowTask(
 			task *workflowTask,
 			f decisionHeartBeatFunc,
-			w workflowTaskFunc,
 		) (response interface{}, err error)
 	}
 

@@ -148,6 +148,10 @@ type (
 		currentIndex  int
 		next          []*s.HistoryEvent
 	}
+
+	decisionHeartBeatError struct {
+		Message string
+	}
 )
 
 func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandlerImpl) *history {
@@ -159,6 +163,10 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 	}
 
 	return result
+}
+
+func (e decisionHeartBeatError) Error() string {
+	return e.Message
 }
 
 // Get workflow start event.
@@ -634,7 +642,6 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *s.PollForDeci
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
 	heartbeatFunc decisionHeartBeatFunc,
-	workflowFunc workflowTaskFunc,
 ) (completeRequest interface{}, errRet error) {
 	if workflowTask == nil || workflowTask.task == nil {
 		return nil, errors.New("nil workflow task provided")
@@ -681,15 +688,16 @@ process_Workflow_Loop:
 				select {
 				case <-time.After(delayDuration):
 					// force complete, call the decision heartbeat function
-					heartbeatResponse, _ := heartbeatFunc(
+					workflowTask, err = heartbeatFunc(
 						workflowContext.CompleteDecisionTask(workflowTask, false),
 						startTime,
 					)
-					if heartbeatResponse == nil || heartbeatResponse.DecisionTask == nil {
+					if err != nil {
+						return nil, &decisionHeartBeatError{Message: fmt.Sprintf("error sending decision heartbeat %v", err)}
+					}
+					if workflowTask == nil {
 						return nil, nil
 					}
-					// we are getting new decision task, so reset the workflowTask and continue process the new one
-					workflowTask = workflowFunc(heartbeatResponse)
 					continue process_Workflow_Loop
 
 				case lar := <-workflowTask.laResultCh:

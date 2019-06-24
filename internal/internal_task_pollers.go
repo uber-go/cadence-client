@@ -280,7 +280,7 @@ func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
 		if completedRequest == nil && err == nil {
 			return nil
 		}
-		if _, ok := err.(decisionHeartBeatError); ok {
+		if _, ok := err.(decisionHeartbeatError); ok {
 			return err
 		}
 		response, err = wtp.RespondTaskCompletedWithMetrics(completedRequest, err, task.task, startTime)

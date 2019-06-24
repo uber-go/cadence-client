@@ -46,7 +46,7 @@ type sampleWorkflowTaskHandler struct {
 
 func (wth sampleWorkflowTaskHandler) ProcessWorkflowTask(
 	workflowTask *workflowTask,
-	d decisionHeartBeatFunc,
+	d decisionHeartbeatFunc,
 ) (interface{}, error) {
 	return &m.RespondDecisionTaskCompletedRequest{
 		TaskToken: workflowTask.task.TaskToken,

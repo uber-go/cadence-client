@@ -149,7 +149,7 @@ type (
 		next          []*s.HistoryEvent
 	}
 
-	decisionHeartBeatError struct {
+	decisionHeartbeatError struct {
 		Message string
 	}
 )
@@ -165,7 +165,7 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 	return result
 }
 
-func (e decisionHeartBeatError) Error() string {
+func (e decisionHeartbeatError) Error() string {
 	return e.Message
 }
 
@@ -641,7 +641,7 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *s.PollForDeci
 // ProcessWorkflowTask processes all the events of the workflow task.
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
-	heartbeatFunc decisionHeartBeatFunc,
+	heartbeatFunc decisionHeartbeatFunc,
 ) (completeRequest interface{}, errRet error) {
 	if workflowTask == nil || workflowTask.task == nil {
 		return nil, errors.New("nil workflow task provided")
@@ -693,7 +693,7 @@ process_Workflow_Loop:
 						startTime,
 					)
 					if err != nil {
-						return nil, &decisionHeartBeatError{Message: fmt.Sprintf("error sending decision heartbeat %v", err)}
+						return nil, &decisionHeartbeatError{Message: fmt.Sprintf("error sending decision heartbeat %v", err)}
 					}
 					if workflowTask == nil {
 						return nil, nil

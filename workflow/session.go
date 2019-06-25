@@ -47,7 +47,7 @@ var ErrSessionFailed = internal.ErrSessionFailed
 // Note: Worker should be configured to process session. To do this, set the following
 // fields in WorkerOptions:
 //     EnableSessionWorker: true
-//     MaxConCurrentSessionExecutionSize: the maximum number of concurrently sessions the resource
+//     MaxConcurrentSessionExecutionSize: the maximum number of concurrently sessions the resource
 //         support. By default, 1000 is used.
 
 // CreateSession creates a session and returns a new context which contains information
@@ -58,7 +58,7 @@ var ErrSessionFailed = internal.ErrSessionFailed
 //     1. The context passed in already contains a session which is still open
 //        (not closed and failed).
 //     2. All the workers are busy (number of sessions currently running on all the workers have reached
-//        MaxConCurrentSessionExecutionSize, which is specified when starting the workers) and session
+//        MaxConcurrentSessionExecutionSize, which is specified when starting the workers) and session
 //        cannot be created within a specified timeout.
 //
 // If an activity is executed using the returned context, it's regarded as part of the
@@ -67,6 +67,10 @@ var ErrSessionFailed = internal.ErrSessionFailed
 // not be marked as failed if an activity within it returns an error. Only when the worker
 // executing the session is down, that session will be marked as failed. Executing an activity
 // within a failed session will return ErrSessionFailed immediately without scheduling that activity.
+//
+// The returned session Context will be cancelled if the session fails (worker died) or CompleteSession()
+// is called. This means that in these two cases, all user activities scheduled using the returned session
+// Context will also be cancelled.
 //
 // If user wants to end a session since activity returns some error, use CompleteSession API below.
 // New session can be created if necessary to retry the whole session.

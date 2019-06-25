@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/encoded"
@@ -277,7 +279,7 @@ func (s *SessionTestSuite) TestRecreation() {
 }
 
 func (s *SessionTestSuite) TestMaxConcurrentSession_CreationOnly() {
-	maxConCurrentSessionExecutionSize := 3
+	maxConcurrentSessionExecutionSize := 3
 	workflowFn := func(ctx Context) error {
 		ao := ActivityOptions{
 			ScheduleToStartTimeout: time.Minute,
@@ -285,7 +287,7 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_CreationOnly() {
 			HeartbeatTimeout:       time.Second * 20,
 		}
 		ctx = WithActivityOptions(ctx, ao)
-		for i := 0; i != maxConCurrentSessionExecutionSize+1; i++ {
+		for i := 0; i != maxConcurrentSessionExecutionSize+1; i++ {
 			if _, err := s.createSessionWithoutRetry(ctx); err != nil {
 				return err
 			}
@@ -296,7 +298,7 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_CreationOnly() {
 	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
 	env.SetWorkerOptions(WorkerOptions{
-		MaxConCurrentSessionExecutionSize: maxConCurrentSessionExecutionSize,
+		MaxConcurrentSessionExecutionSize: maxConcurrentSessionExecutionSize,
 	})
 	env.ExecuteWorkflow(workflowFn)
 
@@ -305,7 +307,7 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_CreationOnly() {
 }
 
 func (s *SessionTestSuite) TestMaxConcurrentSession_WithRecreation() {
-	maxConCurrentSessionExecutionSize := 3
+	maxConcurrentSessionExecutionSize := 3
 	workflowFn := func(ctx Context) error {
 		ao := ActivityOptions{
 			ScheduleToStartTimeout: time.Minute,
@@ -322,7 +324,7 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_WithRecreation() {
 			return errors.New("Returned session info should not be nil")
 		}
 
-		for i := 0; i != maxConCurrentSessionExecutionSize; i++ {
+		for i := 0; i != maxConcurrentSessionExecutionSize; i++ {
 			if i%2 == 0 {
 				_, err = s.createSessionWithoutRetry(ctx)
 			} else {
@@ -338,7 +340,7 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_WithRecreation() {
 	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
 	env.SetWorkerOptions(WorkerOptions{
-		MaxConCurrentSessionExecutionSize: maxConCurrentSessionExecutionSize,
+		MaxConcurrentSessionExecutionSize: maxConcurrentSessionExecutionSize,
 	})
 	env.ExecuteWorkflow(workflowFn)
 
@@ -504,6 +506,45 @@ func (s *SessionTestSuite) TestSessionRecreateToken() {
 	params, err := deserializeRecreateToken(token)
 	s.NoError(err)
 	s.Equal(testTasklist, params.Tasklist)
+}
+
+func (s *SessionTestSuite) TestInvalidRecreateToken() {
+	token := []byte("some invalid token")
+	sessionCtx, err := RecreateSession(Background(), token, s.sessionOptions)
+	s.Error(err)
+	s.Nil(sessionCtx)
+}
+
+func (s *SessionTestSuite) TestCompletionFailed() {
+	workflowFn := func(ctx Context) error {
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    time.Minute,
+			HeartbeatTimeout:       time.Second * 20,
+		}
+		ctx = WithActivityOptions(ctx, ao)
+		sessionCtx, err := CreateSession(ctx, s.sessionOptions)
+		if err != nil {
+			return err
+		}
+
+		CompleteSession(sessionCtx)
+
+		info := GetSessionInfo(sessionCtx)
+		if info == nil || info.sessionState != sessionStateClosed {
+			return errors.New("session state should be closed after completion even when completion activity failed")
+		}
+		return nil
+	}
+
+	RegisterWorkflow(workflowFn)
+	env := s.NewTestWorkflowEnvironment()
+	env.OnActivity(sessionCompletionActivityName, mock.Anything, mock.Anything).Return(errors.New("some random error")).Once()
+	env.ExecuteWorkflow(workflowFn)
+
+	env.AssertExpectations(s.T())
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 }
 
 func (s *SessionTestSuite) createSessionWithoutRetry(ctx Context) (Context, error) {

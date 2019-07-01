@@ -181,6 +181,8 @@ type (
 
 		workerStopChannel  chan struct{}
 		sessionEnvironment *testSessionEnvironmentImpl
+
+		searchAttributes map[string]interface{}
 	}
 
 	testSessionEnvironmentImpl struct {
@@ -227,6 +229,8 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 
 		doneChannel:       make(chan struct{}),
 		workerStopChannel: make(chan struct{}),
+
+		searchAttributes: make(map[string]interface{}),
 	}
 
 	// move forward the mock clock to start time.
@@ -1719,6 +1723,10 @@ func (env *testWorkflowEnvironmentImpl) GetVersion(changeID string, minSupported
 	}
 	env.changeVersions[changeID] = maxSupported
 	return maxSupported
+}
+
+func (env *testWorkflowEnvironmentImpl) UpsertSearchAttributes(attributes *shared.SearchAttributes) {
+	// noop
 }
 
 func (env *testWorkflowEnvironmentImpl) getMockedVersion(mockedChangeID, changeID string, minSupported, maxSupported Version) (Version, bool) {

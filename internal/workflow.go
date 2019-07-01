@@ -39,6 +39,7 @@ var (
 	errLocalActivityParamsBadRequest = errors.New("missing local activity parameters through context, check LocalActivityOptions")
 	errActivityParamsBadRequest      = errors.New("missing activity parameters through context, check ActivityOptions")
 	errWorkflowOptionBadRequest      = errors.New("missing workflow options through context, check WorkflowOptions")
+	errSearchAttributesNotSet        = errors.New("search attributes is empty")
 )
 
 type (
@@ -803,6 +804,52 @@ func signalExternalWorkflow(ctx Context, workflowID, runID, signalName string, a
 	)
 
 	return future
+}
+
+// UpsertSearchAttributes is used to add or update workflow search attributes.
+// The search attributes can be used in query of List/Scan/Count workflow APIs.
+// The key and value type must be registered on cadence server side. The value has to deterministic when replay.
+// UpsertSearchAttributes will merge attributes to existing map in workflow, for example workflow code:
+//   func MyWorkflow(ctx workflow.Context, input string) error {
+//	   attr1 := map[string]interface{}{
+//		   "CustomIntField": 1,
+//         "CustomBoolField": true,
+//	   }
+//	   worklfow.UpsertSearchAttributes(ctx, attr1)
+//
+//	   attr2 := map[string]interface{}{
+//		   "CustomIntField": 2,
+//		   "CustomKeywordField": "seattle",
+//	   }
+//	   worklfow.UpsertSearchAttributes(ctx, attr2)
+//   }
+// will eventually have search attributes:
+//   map[string]interface{}{
+//   	"CustomIntField": 2,
+//   	"CustomBoolField": true,
+//   	"CustomKeywordField": "seattle",
+//   }
+// This is only supported when using ElasticSearch.
+func UpsertSearchAttributes(ctx Context, attributes map[string]interface{}) error {
+	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
+	options := getWorkflowEnvOptions(ctx1)
+
+	if options.domain == nil || *options.domain == "" {
+		return errDomainNotSet
+	}
+
+	if attributes == nil || len(attributes) == 0 {
+		return errSearchAttributesNotSet
+	}
+
+	attr, err := serializeSearchAttributes(attributes)
+	if err != nil {
+		return err
+	}
+
+	getWorkflowEnvironment(ctx).UpsertSearchAttributes(attr)
+
+	return nil
 }
 
 // WithChildWorkflowOptions adds all workflow options to the context.

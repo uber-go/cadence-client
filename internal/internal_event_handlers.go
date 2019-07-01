@@ -288,6 +288,11 @@ func (wc *workflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID
 	decision.setData(&scheduledSignal{callback: callback})
 }
 
+func (wc *workflowEnvironmentImpl) UpsertSearchAttributes(attributes *shared.SearchAttributes) {
+	upsertID := wc.GenerateSequenceID()
+	wc.decisionsHelper.upsertSearchAttributes(upsertID, attributes)
+}
+
 func (wc *workflowEnvironmentImpl) RegisterCancelHandler(handler func()) {
 	wc.cancelHandler = handler
 }
@@ -797,6 +802,9 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 
 	case m.EventTypeChildWorkflowExecutionTerminated:
 		err = weh.handleChildWorkflowExecutionTerminated(event)
+
+	case m.EventTypeUpsertWorkflowSearchAttributes:
+		// No Operation.
 
 	default:
 		weh.logger.Error("unknown event type",

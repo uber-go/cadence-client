@@ -227,8 +227,6 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironme
 
 		doneChannel:       make(chan struct{}),
 		workerStopChannel: make(chan struct{}),
-
-		searchAttributes: make(map[string]interface{}),
 	}
 
 	// move forward the mock clock to start time.

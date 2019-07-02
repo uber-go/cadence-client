@@ -160,3 +160,14 @@ func Test_ValidateAndSerializeSearchAttributes(t *testing.T) {
 	json.Unmarshal(searchAttr.IndexedFields["key"], &resp)
 	require.Equal(t, 1, resp)
 }
+
+func Test_UpsertSearchAttributes(t *testing.T) {
+	env := &workflowEnvironmentImpl{
+		decisionsHelper: newDecisionsHelper(),
+	}
+	err := env.UpsertSearchAttributes(nil)
+	require.Error(t, err)
+
+	err = env.UpsertSearchAttributes(map[string]interface{}{"key": 1})
+	require.NoError(t, err)
+}

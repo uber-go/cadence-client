@@ -989,3 +989,30 @@ func Test_NonDeterministicCheck(t *testing.T) {
 	require.Equal(t, len(decisionTypes)+1, decisionEventTypeCount, "Every decision type must have one matching event type. "+
 		"If you add new decision type, you need to update isDecisionEvent() method to include that new event type as well.")
 }
+
+func Test_IsDecisionMatchEvent_UpsertWorkflowSearchAttributes(t *testing.T) {
+	diType := s.DecisionTypeUpsertWorkflowSearchAttributes
+	searchAttr := &s.SearchAttributes{}
+	decision := &s.Decision{
+		DecisionType: &diType,
+		UpsertWorkflowSearchAttributesDecisionAttributes: &s.UpsertWorkflowSearchAttributesDecisionAttributes{
+			SearchAttributes: searchAttr,
+		},
+	}
+	historyEvent := &s.HistoryEvent{}
+	ok := isDecisionMatchEvent(decision, historyEvent, false)
+
+	eType := s.EventTypeUpsertWorkflowSearchAttributes
+	historyEvent = &s.HistoryEvent{
+		EventType: &eType,
+		UpsertWorkflowSearchAttributesEventAttributes: &s.UpsertWorkflowSearchAttributesEventAttributes{},
+	}
+	ok = isDecisionMatchEvent(decision, historyEvent, false)
+	require.False(t, ok)
+
+	historyEvent.UpsertWorkflowSearchAttributesEventAttributes = &s.UpsertWorkflowSearchAttributesEventAttributes{
+		SearchAttributes: searchAttr,
+	}
+	ok = isDecisionMatchEvent(decision, historyEvent, false)
+	require.True(t, ok)
+}

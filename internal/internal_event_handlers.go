@@ -289,6 +289,7 @@ func (wc *workflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID
 }
 
 func (wc *workflowEnvironmentImpl) UpsertSearchAttributes(attributes map[string]interface{}) error {
+	// This has to be used in workflowEnvironment implementations instead of in Workflow for testsuite mock purpose.
 	attr, err := validateAndSerializeSearchAttributes(attributes)
 	if err != nil {
 		return err
@@ -299,7 +300,6 @@ func (wc *workflowEnvironmentImpl) UpsertSearchAttributes(attributes map[string]
 	return nil
 }
 
-// This has to be used in workflowEnvironment implementations instead of in Workflow for testsuite mock purpose.
 func validateAndSerializeSearchAttributes(attributes map[string]interface{}) (*shared.SearchAttributes, error) {
 	if len(attributes) == 0 {
 		return nil, errSearchAttributesNotSet

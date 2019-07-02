@@ -815,7 +815,7 @@ func signalExternalWorkflow(ctx Context, workflowID, runID, signalName string, a
 //   func MyWorkflow(ctx workflow.Context, input string) error {
 //	   attr1 := map[string]interface{}{
 //		   "CustomIntField": 1,
-//         "CustomBoolField": true,
+//		   "CustomBoolField": true,
 //	   }
 //	   worklfow.UpsertSearchAttributes(ctx, attr1)
 //
@@ -833,13 +833,6 @@ func signalExternalWorkflow(ctx Context, workflowID, runID, signalName string, a
 //   }
 // This is only supported when using ElasticSearch.
 func UpsertSearchAttributes(ctx Context, attributes map[string]interface{}) error {
-	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
-	options := getWorkflowEnvOptions(ctx1)
-
-	if options.domain == nil || *options.domain == "" {
-		return errDomainNotSet
-	}
-
 	return getWorkflowEnvironment(ctx).UpsertSearchAttributes(attributes)
 }
 

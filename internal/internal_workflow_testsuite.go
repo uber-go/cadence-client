@@ -181,8 +181,6 @@ type (
 
 		workerStopChannel  chan struct{}
 		sessionEnvironment *testSessionEnvironmentImpl
-
-		searchAttributes map[string]interface{}
 	}
 
 	testSessionEnvironmentImpl struct {

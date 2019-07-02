@@ -1725,10 +1725,6 @@ func (env *testWorkflowEnvironmentImpl) GetVersion(changeID string, minSupported
 	return maxSupported
 }
 
-func (env *testWorkflowEnvironmentImpl) UpsertSearchAttributes(attributes *shared.SearchAttributes) {
-	// noop
-}
-
 func (env *testWorkflowEnvironmentImpl) getMockedVersion(mockedChangeID, changeID string, minSupported, maxSupported Version) (Version, bool) {
 	mockMethod := getMockMethodForGetVersion(mockedChangeID)
 	if _, ok := env.expectedMockCalls[mockMethod]; !ok {
@@ -1759,6 +1755,21 @@ func (env *testWorkflowEnvironmentImpl) getMockedVersion(mockedChangeID, changeI
 
 func getMockMethodForGetVersion(changeID string) string {
 	return fmt.Sprintf("%v_%v", mockMethodForGetVersion, changeID)
+}
+
+func (env *testWorkflowEnvironmentImpl) UpsertSearchAttributes(attributes map[string]interface{}) error {
+	_, err := validateAndSerializeSearchAttributes(attributes)
+
+	mockMethod := mockMethodForUpsertSearchAttributes
+	if _, ok := env.expectedMockCalls[mockMethod]; !ok {
+		// mock not found
+		return err
+	}
+
+	args := []interface{}{attributes}
+	env.mock.MethodCalled(mockMethod, args...)
+
+	return err
 }
 
 func (env *testWorkflowEnvironmentImpl) MutableSideEffect(id string, f func() interface{}, equals func(a, b interface{}) bool) encoded.Value {

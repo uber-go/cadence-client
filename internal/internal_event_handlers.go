@@ -288,9 +288,27 @@ func (wc *workflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID
 	decision.setData(&scheduledSignal{callback: callback})
 }
 
-func (wc *workflowEnvironmentImpl) UpsertSearchAttributes(attributes *shared.SearchAttributes) {
+func (wc *workflowEnvironmentImpl) UpsertSearchAttributes(attributes map[string]interface{}) error {
+	attr, err := validateAndSerializeSearchAttributes(attributes)
+	if err != nil {
+		return err
+	}
+
 	upsertID := wc.GenerateSequenceID()
-	wc.decisionsHelper.upsertSearchAttributes(upsertID, attributes)
+	wc.decisionsHelper.upsertSearchAttributes(upsertID, attr)
+	return nil
+}
+
+// This has to be used in workflowEnvironment implementations instead of in Workflow for testsuite mock purpose.
+func validateAndSerializeSearchAttributes(attributes map[string]interface{}) (*shared.SearchAttributes, error) {
+	if len(attributes) == 0 {
+		return nil, errSearchAttributesNotSet
+	}
+	attr, err := serializeSearchAttributes(attributes)
+	if err != nil {
+		return nil, err
+	}
+	return attr, nil
 }
 
 func (wc *workflowEnvironmentImpl) RegisterCancelHandler(handler func()) {

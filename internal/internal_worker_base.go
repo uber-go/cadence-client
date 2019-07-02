@@ -87,7 +87,7 @@ type (
 		AddSession(sessionInfo *SessionInfo)
 		RemoveSession(sessionID string)
 		GetContextPropagators() []ContextPropagator
-		UpsertSearchAttributes(attributes *shared.SearchAttributes)
+		UpsertSearchAttributes(attributes map[string]interface{}) error
 	}
 
 	// WorkflowDefinition wraps the code that can execute a workflow.

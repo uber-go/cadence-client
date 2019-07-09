@@ -297,7 +297,20 @@ func (wc *workflowEnvironmentImpl) UpsertSearchAttributes(attributes map[string]
 
 	upsertID := wc.GenerateSequenceID()
 	wc.decisionsHelper.upsertSearchAttributes(upsertID, attr)
+	wc.workflowInfo.SearchAttributes = mergeSearchAttributes(wc.workflowInfo.SearchAttributes, attr)
 	return nil
+}
+
+func mergeSearchAttributes(current, upsert *shared.SearchAttributes) *shared.SearchAttributes {
+	if current == nil || len(current.IndexedFields) == 0 {
+		return upsert
+	}
+
+	fields := current.IndexedFields
+	for k, v := range upsert.IndexedFields {
+		fields[k] = v
+	}
+	return current
 }
 
 func validateAndSerializeSearchAttributes(attributes map[string]interface{}) (*shared.SearchAttributes, error) {

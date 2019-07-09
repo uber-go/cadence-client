@@ -175,34 +175,52 @@ func Test_UpsertSearchAttributes(t *testing.T) {
 }
 
 func Test_MergeSearchAttributes(t *testing.T) {
-	var current *s.SearchAttributes
-	upsert := &s.SearchAttributes{}
-	result := mergeSearchAttributes(current, upsert)
-	require.Equal(t, upsert, result)
+	tests := []struct {
+		name     string
+		current  *s.SearchAttributes
+		upsert   *s.SearchAttributes
+		expected *s.SearchAttributes
+	}{
+		{
+			name:     "currentIsNil",
+			current:  nil,
+			upsert:   &s.SearchAttributes{},
+			expected: &s.SearchAttributes{},
+		},
+		{
+			name:     "currentIsEmpty",
+			current:  &s.SearchAttributes{IndexedFields: make(map[string][]byte)},
+			upsert:   &s.SearchAttributes{},
+			expected: &s.SearchAttributes{},
+		},
+		{
+			name: "normalMerge",
+			current: &s.SearchAttributes{
+				IndexedFields: map[string][]byte{
+					"CustomIntField":     []byte(`1`),
+					"CustomKeywordField": []byte(`keyword`),
+				},
+			},
+			upsert: &s.SearchAttributes{
+				IndexedFields: map[string][]byte{
+					"CustomIntField":  []byte(`2`),
+					"CustomBoolField": []byte(`true`),
+				},
+			},
+			expected: &s.SearchAttributes{
+				IndexedFields: map[string][]byte{
+					"CustomIntField":     []byte(`2`),
+					"CustomKeywordField": []byte(`keyword`),
+					"CustomBoolField":    []byte(`true`),
+				},
+			},
+		},
+	}
 
-	current = &s.SearchAttributes{IndexedFields: make(map[string][]byte)}
-	result = mergeSearchAttributes(current, upsert)
-	require.Equal(t, upsert, result)
-
-	current = &s.SearchAttributes{
-		IndexedFields: map[string][]byte{
-			"CustomIntField":     []byte(`1`),
-			"CustomKeywordField": []byte(`keyword`),
-		},
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := mergeSearchAttributes(test.current, test.upsert)
+			require.Equal(t, test.expected, result)
+		})
 	}
-	upsert = &s.SearchAttributes{
-		IndexedFields: map[string][]byte{
-			"CustomIntField":  []byte(`2`),
-			"CustomBoolField": []byte(`true`),
-		},
-	}
-	result = mergeSearchAttributes(current, upsert)
-	expected := &s.SearchAttributes{
-		IndexedFields: map[string][]byte{
-			"CustomIntField":     []byte(`2`),
-			"CustomKeywordField": []byte(`keyword`),
-			"CustomBoolField":    []byte(`true`),
-		},
-	}
-	require.Equal(t, expected, result)
 }

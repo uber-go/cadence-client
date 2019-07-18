@@ -21,9 +21,7 @@
 package internal
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"os"
@@ -1193,101 +1191,4 @@ func testEncodeFunctionArgs(dataConverter encoded.DataConverter, workflowFunc in
 		panic("Failed to encode arguments")
 	}
 	return input
-}
-
-func testDataConverterFunction(t *testing.T, dc encoded.DataConverter, f interface{}, args ...interface{}) string {
-	input, err := dc.ToData(args...)
-	require.NoError(t, err, err)
-
-	var result []interface{}
-	for _, v := range args {
-		arg := reflect.New(reflect.TypeOf(v)).Interface()
-		result = append(result, arg)
-	}
-	err = dc.FromData(input, result...)
-	require.NoError(t, err, err)
-
-	targetArgs := []reflect.Value{}
-	for _, arg := range result {
-		targetArgs = append(targetArgs, reflect.ValueOf(arg).Elem())
-	}
-	fnValue := reflect.ValueOf(f)
-	retValues := fnValue.Call(targetArgs)
-	return retValues[0].Interface().(string)
-}
-
-func testDataConverterHelper(t *testing.T, dc encoded.DataConverter) {
-	f1 := func(ctx Context, r []byte) string {
-		return "result"
-	}
-	r1 := testDataConverterFunction(t, dc, f1, new(emptyCtx), []byte("test"))
-	require.Equal(t, r1, "result")
-	// No parameters.
-	f2 := func() string {
-		return "empty-result"
-	}
-	r2 := testDataConverterFunction(t, dc, f2)
-	require.Equal(t, r2, "empty-result")
-	// Nil parameter.
-	f3 := func(r []byte) string {
-		return "nil-result"
-	}
-	r3 := testDataConverterFunction(t, dc, f3, []byte(""))
-	require.Equal(t, r3, "nil-result")
-}
-
-func TestDefaultDataConverter(t *testing.T) {
-	dc := getDefaultDataConverter()
-	testDataConverterHelper(t, dc)
-}
-
-// testDataConverter implements encoded.DataConverter using gob
-type testDataConverter struct{}
-
-func newTestDataConverter() encoded.DataConverter {
-	return &testDataConverter{}
-}
-
-func (tdc *testDataConverter) ToData(value ...interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	for i, obj := range value {
-		if err := enc.Encode(obj); err != nil {
-			return nil, fmt.Errorf(
-				"unable to encode argument: %d, %v, with gob error: %v", i, reflect.TypeOf(obj), err)
-		}
-	}
-	return buf.Bytes(), nil
-}
-
-func (tdc *testDataConverter) FromData(input []byte, valuePtr ...interface{}) error {
-	dec := gob.NewDecoder(bytes.NewBuffer(input))
-	for i, obj := range valuePtr {
-		if err := dec.Decode(obj); err != nil {
-			return fmt.Errorf(
-				"unable to decode argument: %d, %v, with gob error: %v", i, reflect.TypeOf(obj), err)
-		}
-	}
-	return nil
-}
-
-func TestTestDataConverter(t *testing.T) {
-	dc := newTestDataConverter()
-	testDataConverterHelper(t, dc)
-}
-
-func TestDecodeArg(t *testing.T) {
-	dc := getDefaultDataConverter()
-
-	b, err := encodeArg(dc, testErrorDetails3)
-	require.NoError(t, err)
-	var r testStruct
-	err = decodeArg(dc, b, &r)
-	require.NoError(t, err)
-	require.Equal(t, testErrorDetails3, r)
-
-	// test mismatch of multi arguments
-	b, err = encodeArgs(dc, []interface{}{testErrorDetails1, testErrorDetails2})
-	require.NoError(t, err)
-	require.Error(t, decodeArg(dc, b, &r))
 }

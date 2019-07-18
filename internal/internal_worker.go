@@ -190,9 +190,6 @@ type (
 
 		Tracer opentracing.Tracer
 	}
-
-	// defaultDataConverter uses thrift encoder/decoder when possible, for everything else use json.
-	defaultDataConverter struct{}
 )
 
 // newWorkflowWorker returns an instance of the workflow worker.
@@ -1415,45 +1412,4 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 		}
 	}
 	return nil
-}
-
-var defaultJSONDataConverter encoded.DataConverter = &defaultDataConverter{}
-
-func getDefaultDataConverter() encoded.DataConverter {
-	return defaultJSONDataConverter
-}
-
-func (dc *defaultDataConverter) ToData(r ...interface{}) ([]byte, error) {
-	if len(r) == 1 && isTypeByteSlice(reflect.TypeOf(r[0])) {
-		return r[0].([]byte), nil
-	}
-
-	var encoder encoding
-	if isUseThriftEncoding(r) {
-		encoder = &thriftEncoding{}
-	} else {
-		encoder = &jsonEncoding{}
-	}
-
-	data, err := encoder.Marshal(r)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func (dc *defaultDataConverter) FromData(data []byte, to ...interface{}) error {
-	if len(to) == 1 && isTypeByteSlice(reflect.TypeOf(to[0])) {
-		reflect.ValueOf(to[0]).Elem().SetBytes(data)
-		return nil
-	}
-
-	var encoder encoding
-	if isUseThriftDecoding(to) {
-		encoder = &thriftEncoding{}
-	} else {
-		encoder = &jsonEncoding{}
-	}
-
-	return encoder.Unmarshal(data, to)
 }

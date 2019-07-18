@@ -22,7 +22,6 @@
 package testsuite
 
 import (
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal"
 )
 
@@ -42,8 +41,3 @@ type (
 
 // ErrMockStartChildWorkflowFailed is special error used to indicate the mocked child workflow should fail to start.
 var ErrMockStartChildWorkflowFailed = internal.ErrMockStartChildWorkflowFailed
-
-// GetDefaultDataConverter return default data converter used by Cadence worker
-func GetDefaultDataConverter() encoded.DataConverter {
-	return internal.DefaultDataConverter
-}

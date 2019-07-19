@@ -25,12 +25,11 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/cadence/encoded"
 	"reflect"
 	"testing"
 )
 
-func testDataConverterFunction(t *testing.T, dc encoded.DataConverter, f interface{}, args ...interface{}) string {
+func testDataConverterFunction(t *testing.T, dc DataConverter, f interface{}, args ...interface{}) string {
 	input, err := dc.ToData(args...)
 	require.NoError(t, err, err)
 
@@ -51,7 +50,7 @@ func testDataConverterFunction(t *testing.T, dc encoded.DataConverter, f interfa
 	return retValues[0].Interface().(string)
 }
 
-func testDataConverterHelper(t *testing.T, dc encoded.DataConverter) {
+func testDataConverterHelper(t *testing.T, dc DataConverter) {
 	f1 := func(ctx Context, r []byte) string {
 		return "result"
 	}
@@ -79,7 +78,7 @@ func TestDefaultDataConverter(t *testing.T) {
 // testDataConverter implements encoded.DataConverter using gob
 type testDataConverter struct{}
 
-func newTestDataConverter() encoded.DataConverter {
+func newTestDataConverter() DataConverter {
 	return &testDataConverter{}
 }
 

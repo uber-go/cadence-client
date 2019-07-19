@@ -36,7 +36,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
@@ -492,7 +491,7 @@ func createWorker(service *workflowservicetest.MockClient) Worker {
 }
 
 func createWorkerWithThrottle(
-	service *workflowservicetest.MockClient, activitiesPerSecond float64, dc encoded.DataConverter,
+	service *workflowservicetest.MockClient, activitiesPerSecond float64, dc DataConverter,
 ) Worker {
 	domain := "testDomain"
 	domainStatus := shared.DomainStatusRegistered
@@ -913,7 +912,7 @@ type testErrorDetails struct {
 	T string
 }
 
-func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataConverter encoded.DataConverter) {
+func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataConverter DataConverter) {
 	a1 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (err error) {
@@ -989,7 +988,7 @@ func TestActivityErrorWithDetails_WithDataConverter(t *testing.T) {
 	testActivityErrorWithDetailsHelper(ctx, t, dc)
 }
 
-func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataConverter encoded.DataConverter) {
+func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataConverter DataConverter) {
 	a1 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (err error) {
@@ -1060,7 +1059,7 @@ func TestActivityCancelledError_WithDataConverter(t *testing.T) {
 	testActivityCancelledErrorHelper(ctx, t, dc)
 }
 
-func testActivityExecutionVariousTypesHelper(ctx context.Context, t *testing.T, dataConverter encoded.DataConverter) {
+func testActivityExecutionVariousTypesHelper(ctx context.Context, t *testing.T, dataConverter DataConverter) {
 	a1 := activityExecutor{
 		fn: func(ctx context.Context, arg1 string) (*testWorkflowResult, error) {
 			return &testWorkflowResult{V: 1}, nil
@@ -1184,7 +1183,7 @@ func _TestThriftEncoding(t *testing.T) {
 */
 
 // Encode function args
-func testEncodeFunctionArgs(dataConverter encoded.DataConverter, workflowFunc interface{}, args ...interface{}) []byte {
+func testEncodeFunctionArgs(dataConverter DataConverter, workflowFunc interface{}, args ...interface{}) []byte {
 	input, err := encodeArgs(dataConverter, args)
 	if err != nil {
 		fmt.Println(err)

@@ -1356,8 +1356,7 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 }
 
 // Add increments the WaitGroup counter indicating that
-// a coroutine has been added to the WaitGroup and will be
-// waited on.
+// a coroutine has been added to the WaitGroup.
 //
 // param ctx Context -> workflow context
 //

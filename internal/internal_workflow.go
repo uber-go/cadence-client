@@ -130,6 +130,15 @@ type (
 		defaultFunc *func()       // default case
 	}
 
+	// Implements WaitGroup interface
+	waitGroupImpl struct {
+		n        int           // the number of coroutines to wait on
+		index    int           // the index of the future in the Selector to set in WaitGroup.Done()
+		ready    bool          // indicates that all coroutines have completed and WaitGroup.Wait() is ready to unblock
+		mu       sync.Mutex    // mutex lock used to safely increment index and n
+		selector *selectorImpl // selector to house the futures that will block waiting for coroutine completion
+	}
+
 	// unblockFunc is passed evaluated by a coroutine yield. When it returns false the yield returns to a caller.
 	// stackDepth is the depth of stack from the last blocking call relevant to user.
 	// Used to truncate internal stack frames from thread stack.
@@ -1344,4 +1353,63 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 		return nil, fmt.Errorf("failed to parse error result as it is not of error interface: %v", errValue)
 	}
 	return result, err
+}
+
+// Add increments the WaitGroup counter indicating that
+// a coroutine has been added to the WaitGroup and will be
+// waited on.
+//
+// param ctx Context -> workflow context
+//
+// param delta int -> the value to increment the WaitGroup counter by
+//
+// returns WaitGroup
+func (wg *waitGroupImpl) Add(ctx Context, delta int) WaitGroup {
+	if delta < 0 {
+		panic("cannot add negative value %d to WaitGroup")
+	}
+
+	for i := 0; i < delta; i++ {
+		f, _ := NewFuture(ctx)
+		wg.selector = wg.selector.AddFuture(f, func(future Future) {
+			wg.mu.Lock()
+			defer wg.mu.Unlock()
+			wg.n = wg.n - 1
+			if wg.n == 0 {
+				wg.ready = true
+			}
+		}).(*selectorImpl)
+	}
+
+	// increment
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+	wg.n = wg.n + delta
+
+	return wg
+}
+
+// Done decrements the WaitGroup counter, indicating
+// that a coroutine in the WaitGroup has completed
+func (wg *waitGroupImpl) Done() {
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+	wg.selector.cases[wg.index].future.Set(true, nil)
+	wg.index = wg.index + 1
+}
+
+// Wait blocks and waits for specified number of couritines to
+// finish executing and then unblocks once the counter has reached 0
+//
+// param ctx Context -> workflow context
+func (wg *waitGroupImpl) Wait(ctx Context) {
+	if wg.n == 0 {
+		return
+	}
+	for {
+		wg.selector.Select(ctx)
+		if wg.ready {
+			return
+		}
+	}
 }

@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/uber-go/tally"
@@ -79,6 +80,15 @@ type (
 		AddFuture(future Future, f func(f Future)) Selector
 		AddDefault(f func())
 		Select(ctx Context)
+	}
+
+	// WaitGroup must be used instead of native go sync.WaitGroup by
+	// workflow code.  Use workflow.NewWaitGroup(ctx) method to create
+	// a new WaitGroup instance
+	WaitGroup interface {
+		Add(ctx Context, delta int) WaitGroup
+		Done()
+		Wait(ctx Context)
 	}
 
 	// Future represents the result of an asynchronous computation.
@@ -294,6 +304,14 @@ func NewSelector(ctx Context) Selector {
 // Name appears in stack traces that are blocked on this Selector.
 func NewNamedSelector(ctx Context, name string) Selector {
 	return &selectorImpl{name: name}
+}
+
+// NewWaitGroup creates a new WaitGroup instance.
+func NewWaitGroup(ctx Context) WaitGroup {
+	return &waitGroupImpl{
+		mu:       sync.Mutex{},
+		selector: NewSelector(ctx).(*selectorImpl),
+	}
 }
 
 // Go creates a new coroutine. It has similar semantic to goroutine in a context of the workflow.

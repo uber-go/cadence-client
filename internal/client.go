@@ -358,7 +358,7 @@ type (
 		// * * * * *
 		CronSchedule string
 
-		// Memo - Optional non-indexed info that will be showed in list workflow.
+		// Memo - Optional non-indexed info that will be shown in list workflow.
 		Memo map[string]interface{}
 
 		// SearchAttributes - Optional indexed info that can be used in query of List/Scan/Count workflow APIs (only

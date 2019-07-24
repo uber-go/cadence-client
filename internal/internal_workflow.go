@@ -69,6 +69,13 @@ type (
 		chained []asyncFuture // Futures that are chained to this one
 	}
 
+	// Implements WaitGroup interface
+	waitGroupImpl struct {
+		n       int32       // the number of coroutines to wait on
+		waiting bool        // indicates whether WaitGroup.Wait() has been called yet for the WaitGroup
+		future  *futureImpl // future to signal that all awaited members of the WaitGroup have completed.
+	}
+
 	// Dispatcher is a container of a set of coroutines.
 	dispatcher interface {
 		// ExecuteUntilAllBlocked executes coroutines one by one in deterministic order
@@ -128,15 +135,6 @@ type (
 		name        string
 		cases       []*selectCase // cases that this select is comprised from
 		defaultFunc *func()       // default case
-	}
-
-	// Implements WaitGroup interface
-	waitGroupImpl struct {
-		n        int           // the number of coroutines to wait on
-		index    int           // the index of the future in the Selector to set in WaitGroup.Done()
-		ready    bool          // indicates that all coroutines have completed and WaitGroup.Wait() is ready to unblock
-		mu       sync.Mutex    // mutex lock used to safely increment index and n
-		selector *selectorImpl // selector to house the futures that will block waiting for coroutine completion
 	}
 
 	// unblockFunc is passed evaluated by a coroutine yield. When it returns false the yield returns to a caller.
@@ -242,6 +240,7 @@ const (
 // Assert that structs do indeed implement the interfaces
 var _ Channel = (*channelImpl)(nil)
 var _ Selector = (*selectorImpl)(nil)
+var _ WaitGroup = (*waitGroupImpl)(nil)
 var _ dispatcher = (*dispatcherImpl)(nil)
 
 var stackBuf [100000]byte
@@ -1356,46 +1355,33 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 }
 
 // Add increments the WaitGroup counter indicating that
-// a coroutine has been added to the WaitGroup and will be
-// waited on.
+// a coroutine has been added to the WaitGroup.
 //
-// param ctx Context -> workflow context
-//
-// param delta int -> the value to increment the WaitGroup counter by
-//
-// returns WaitGroup
-func (wg *waitGroupImpl) Add(ctx Context, delta int) WaitGroup {
-	if delta < 0 {
-		panic("cannot add negative value %d to WaitGroup")
-	}
-
-	for i := 0; i < delta; i++ {
-		f, _ := NewFuture(ctx)
-		wg.selector = wg.selector.AddFuture(f, func(future Future) {
-			wg.mu.Lock()
-			defer wg.mu.Unlock()
-			wg.n = wg.n - 1
-			if wg.n == 0 {
-				wg.ready = true
-			}
-		}).(*selectorImpl)
-	}
-
-	// increment
-	wg.mu.Lock()
-	defer wg.mu.Unlock()
+// param delta int32 -> the value to increment the WaitGroup counter by
+func (wg *waitGroupImpl) Add(delta int32) {
+	state := wg.waiting
 	wg.n = wg.n + delta
-
-	return wg
+	if wg.n < 0 {
+		panic("negative WaitGroup counter")
+	}
+	if (wg.waiting && delta > 0) && (wg.n == delta) {
+		panic("WaitGroup misuse: Add called concurrently with Wait")
+	}
+	if (wg.n > 0) || (!wg.waiting) {
+		return
+	}
+	if wg.waiting != state {
+		panic("WaitGroup misuse: Add called concurrently with Wait")
+	}
+	if wg.n == 0 {
+		wg.future.Set(false, nil)
+	}
 }
 
 // Done decrements the WaitGroup counter, indicating
 // that a coroutine in the WaitGroup has completed
 func (wg *waitGroupImpl) Done() {
-	wg.mu.Lock()
-	defer wg.mu.Unlock()
-	wg.selector.cases[wg.index].future.Set(true, nil)
-	wg.index = wg.index + 1
+	wg.Add(-1)
 }
 
 // Wait blocks and waits for specified number of couritines to
@@ -1403,13 +1389,18 @@ func (wg *waitGroupImpl) Done() {
 //
 // param ctx Context -> workflow context
 func (wg *waitGroupImpl) Wait(ctx Context) {
-	if wg.n == 0 {
+	if wg.n <= 0 {
 		return
 	}
-	for {
-		wg.selector.Select(ctx)
-		if wg.ready {
-			return
-		}
+	if wg.waiting {
+		panic("WaitGroup is reused before previous Wait has returned")
+	}
+
+	wg.waiting = true
+	if err := wg.future.Get(ctx, &wg.waiting); err != nil {
+		panic(err)
+	}
+	if !wg.waiting {
+		wg.future = &futureImpl{channel: NewChannel(ctx).(*channelImpl)}
 	}
 }

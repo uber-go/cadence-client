@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/uber-go/tally"
@@ -86,7 +85,7 @@ type (
 	// workflow code.  Use workflow.NewWaitGroup(ctx) method to create
 	// a new WaitGroup instance
 	WaitGroup interface {
-		Add(ctx Context, delta int) WaitGroup
+		Add(delta int32)
 		Done()
 		Wait(ctx Context)
 	}
@@ -308,10 +307,7 @@ func NewNamedSelector(ctx Context, name string) Selector {
 
 // NewWaitGroup creates a new WaitGroup instance.
 func NewWaitGroup(ctx Context) WaitGroup {
-	return &waitGroupImpl{
-		mu:       sync.Mutex{},
-		selector: NewSelector(ctx).(*selectorImpl),
-	}
+	return &waitGroupImpl{future: &futureImpl{channel: NewChannel(ctx).(*channelImpl)}}
 }
 
 // Go creates a new coroutine. It has similar semantic to goroutine in a context of the workflow.

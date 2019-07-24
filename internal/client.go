@@ -362,7 +362,7 @@ type (
 		Memo map[string]interface{}
 
 		// SearchAttributes - Optional indexed info that can be used in query of List/Scan/Count workflow APIs (only
-		// supported when using ElasticSearch). The key and value type must be registered on cadence server side.
+		// supported when Cadence server is using ElasticSearch). The key and value type must be registered on Cadence server side.
 		// Use GetSearchAttributes API to get valid key and corresponding value type.
 		SearchAttributes map[string]interface{}
 	}

@@ -257,7 +257,7 @@ func (w *Workflows) ChildWorkflowSuccess(ctx workflow.Context) (result string, e
 		TaskStartToCloseTimeout:      5 * time.Second,
 		ExecutionStartToCloseTimeout: 10 * time.Second,
 		Memo:                         map[string]interface{}{"memoKey": "memoVal"},
-		SearchAttributes:             map[string]interface{}{"searchAttrKey": "searchAttrVal"},
+		SearchAttributes:             map[string]interface{}{"CustomKeywordField": "searchAttrVal"},
 	}
 	ctx = workflow.WithChildOptions(ctx, opts)
 	err = workflow.ExecuteChildWorkflow(ctx, w.childForMemoAndSearchAttr).Get(ctx, &result)
@@ -281,7 +281,7 @@ func (w *Workflows) childForMemoAndSearchAttr(ctx workflow.Context) (result stri
 	if err != nil {
 		return
 	}
-	err = client.NewValue(info.SearchAttributes.IndexedFields["searchAttrKey"]).Get(&searchAttr)
+	err = client.NewValue(info.SearchAttributes.IndexedFields["CustomKeywordField"]).Get(&searchAttr)
 	if err != nil {
 		return
 	}

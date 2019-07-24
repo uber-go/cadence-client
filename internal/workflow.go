@@ -307,7 +307,8 @@ func NewNamedSelector(ctx Context, name string) Selector {
 
 // NewWaitGroup creates a new WaitGroup instance.
 func NewWaitGroup(ctx Context) WaitGroup {
-	return &waitGroupImpl{future: &futureImpl{channel: NewChannel(ctx).(*channelImpl)}}
+	f, s := NewFuture(ctx)
+	return &waitGroupImpl{future: f, settable: s}
 }
 
 // Go creates a new coroutine. It has similar semantic to goroutine in a context of the workflow.

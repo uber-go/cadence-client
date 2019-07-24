@@ -71,9 +71,10 @@ type (
 
 	// Implements WaitGroup interface
 	waitGroupImpl struct {
-		n       int32       // the number of coroutines to wait on
-		waiting bool        // indicates whether WaitGroup.Wait() has been called yet for the WaitGroup
-		future  *futureImpl // future to signal that all awaited members of the WaitGroup have completed.
+		n        int32       // the number of coroutines to wait on
+		waiting  bool        // indicates whether WaitGroup.Wait() has been called yet for the WaitGroup
+		future   Future	     // future to signal that all awaited members of the WaitGroup have completed
+		settable Settable    // used to unblock the future when all coroutines have completed
 	}
 
 	// Dispatcher is a container of a set of coroutines.
@@ -1374,7 +1375,7 @@ func (wg *waitGroupImpl) Add(delta int32) {
 		panic("WaitGroup misuse: Add called concurrently with Wait")
 	}
 	if wg.n == 0 {
-		wg.future.Set(false, nil)
+		wg.settable.set(false, nil)
 	}
 }
 
@@ -1400,7 +1401,8 @@ func (wg *waitGroupImpl) Wait(ctx Context) {
 	if err := wg.future.Get(ctx, &wg.waiting); err != nil {
 		panic(err)
 	}
-	if !wg.waiting {
-		wg.future = &futureImpl{channel: NewChannel(ctx).(*channelImpl)}
-	}
+	
+	f, s := NewFuture(ctx)
+	wg.future = f
+	wg.settalbe = s
 }

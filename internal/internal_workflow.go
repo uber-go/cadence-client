@@ -71,9 +71,10 @@ type (
 
 	// Implements WaitGroup interface
 	waitGroupImpl struct {
-		n       int32       // the number of coroutines to wait on
-		waiting bool        // indicates whether WaitGroup.Wait() has been called yet for the WaitGroup
-		future  *futureImpl // future to signal that all awaited members of the WaitGroup have completed.
+		n        int32    // the number of coroutines to wait on
+		waiting  bool     // indicates whether WaitGroup.Wait() has been called yet for the WaitGroup
+		future   Future   // future to signal that all awaited members of the WaitGroup have completed
+		settable Settable // used to unblock the future when all coroutines have completed
 	}
 
 	// Dispatcher is a container of a set of coroutines.
@@ -1354,38 +1355,45 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 	return result, err
 }
 
-// Add increments the WaitGroup counter indicating that
-// a coroutine has been added to the WaitGroup.
+// Add adds delta, which may be negative, to the WaitGroup counter.
+// If the counter becomes zero, all goroutines blocked on Wait are released.
+// If the counter goes negative, Add panics.
+//
+// Note that calls with a positive delta that occur when the counter is zero
+// must happen before a Wait. Calls with a negative delta, or calls with a
+// positive delta that start when the counter is greater than zero, may happen
+// at any time.
+// Typically this means the calls to Add should execute before the statement
+// creating the goroutine or other event to be waited for.
+// If a WaitGroup is reused to wait for several independent sets of events,
+// new Add calls must happen after all previous Wait calls have returned.
 //
 // param delta int32 -> the value to increment the WaitGroup counter by
 func (wg *waitGroupImpl) Add(delta int32) {
-	state := wg.waiting
+	if (wg.waiting && delta > 0) && (wg.n == 0) {
+		panic("WaitGroup misuse: Add called concurrently with Wait")
+	}
+
 	wg.n = wg.n + delta
 	if wg.n < 0 {
 		panic("negative WaitGroup counter")
 	}
-	if (wg.waiting && delta > 0) && (wg.n == delta) {
-		panic("WaitGroup misuse: Add called concurrently with Wait")
-	}
 	if (wg.n > 0) || (!wg.waiting) {
 		return
 	}
-	if wg.waiting != state {
-		panic("WaitGroup misuse: Add called concurrently with Wait")
-	}
 	if wg.n == 0 {
-		wg.future.Set(false, nil)
+		wg.settable.Set(false, nil)
 	}
 }
 
-// Done decrements the WaitGroup counter, indicating
+// Done decrements the WaitGroup counter by 1, indicating
 // that a coroutine in the WaitGroup has completed
 func (wg *waitGroupImpl) Done() {
 	wg.Add(-1)
 }
 
 // Wait blocks and waits for specified number of couritines to
-// finish executing and then unblocks once the counter has reached 0
+// finish executing and then unblocks once the counter has reached 0.
 //
 // param ctx Context -> workflow context
 func (wg *waitGroupImpl) Wait(ctx Context) {
@@ -1400,7 +1408,5 @@ func (wg *waitGroupImpl) Wait(ctx Context) {
 	if err := wg.future.Get(ctx, &wg.waiting); err != nil {
 		panic(err)
 	}
-	if !wg.waiting {
-		wg.future = &futureImpl{channel: NewChannel(ctx).(*channelImpl)}
-	}
+	wg.future, wg.settable = NewFuture(ctx)
 }

@@ -1113,42 +1113,6 @@ func waitGroupNegativeCounterPanicsWorkflowTest(ctx Context) (int, error) {
 	return result, nil
 }
 
-func waitGroupWaitConcurrentAddPanicsWorkflowTest(ctx Context) (int, error) {
-	ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
-		ExecutionStartToCloseTimeout: time.Second * 30,
-	})
-
-	var err error
-	var result int
-
-	waitGroup := NewWaitGroup(ctx).(*waitGroupImpl)
-	waitGroup.waiting = true
-	waitGroup.Add(1)
-
-	Go(ctx, func(ctx Context) {
-		err = ExecuteChildWorkflow(ctx, sleepWorkflow, time.Second*5).Get(ctx, &result)
-		waitGroup.Done()
-	})
-
-	waitGroup.Wait(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	return result, nil
-}
-
-func (s *WorkflowUnitTest) Test_waitGroupWaitConcurrentAddPanicsWorkflowTest() {
-	env := s.NewTestWorkflowEnvironment()
-	RegisterWorkflow(waitGroupWaitConcurrentAddPanicsWorkflowTest)
-	env.ExecuteWorkflow(waitGroupWaitConcurrentAddPanicsWorkflowTest)
-	s.True(env.IsWorkflowCompleted())
-
-	resultErr := env.GetWorkflowError().(*PanicError)
-	s.EqualValues("WaitGroup misuse: Add called concurrently with Wait", resultErr.Error())
-	s.Contains(resultErr.StackTrace(), "cadence/internal.waitGroupWaitConcurrentAddPanicsWorkflowTest")
-}
-
 func (s *WorkflowUnitTest) Test_waitGroupNegativeCounterPanicsWorkflowTest() {
 	env := s.NewTestWorkflowEnvironment()
 	RegisterWorkflow(waitGroupNegativeCounterPanicsWorkflowTest)

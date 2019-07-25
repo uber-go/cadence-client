@@ -1370,10 +1370,6 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 //
 // param delta int32 -> the value to increment the WaitGroup counter by
 func (wg *waitGroupImpl) Add(delta int32) {
-	if (wg.waiting && delta > 0) && (wg.n == 0) {
-		panic("WaitGroup misuse: Add called concurrently with Wait")
-	}
-
 	wg.n = wg.n + delta
 	if wg.n < 0 {
 		panic("negative WaitGroup counter")

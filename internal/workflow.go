@@ -85,7 +85,7 @@ type (
 	// workflow code.  Use workflow.NewWaitGroup(ctx) method to create
 	// a new WaitGroup instance
 	WaitGroup interface {
-		Add(delta int32)
+		Add(delta int)
 		Done()
 		Wait(ctx Context)
 	}

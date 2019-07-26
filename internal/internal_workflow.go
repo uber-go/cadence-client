@@ -71,7 +71,7 @@ type (
 
 	// Implements WaitGroup interface
 	waitGroupImpl struct {
-		n        int32    // the number of coroutines to wait on
+		n        int      // the number of coroutines to wait on
 		waiting  bool     // indicates whether WaitGroup.Wait() has been called yet for the WaitGroup
 		future   Future   // future to signal that all awaited members of the WaitGroup have completed
 		settable Settable // used to unblock the future when all coroutines have completed
@@ -1370,8 +1370,8 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 // If a WaitGroup is reused to wait for several independent sets of events,
 // new Add calls must happen after all previous Wait calls have returned.
 //
-// param delta int32 -> the value to increment the WaitGroup counter by
-func (wg *waitGroupImpl) Add(delta int32) {
+// param delta int -> the value to increment the WaitGroup counter by
+func (wg *waitGroupImpl) Add(delta int) {
 	wg.n = wg.n + delta
 	if wg.n < 0 {
 		panic("negative WaitGroup counter")

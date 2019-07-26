@@ -990,7 +990,7 @@ func waitGroupWorkflowTest(ctx Context, n int) (int, error) {
 	return sum, nil
 }
 
-func waitGroupWaitForMWorkflowTest(ctx Context, n int, m int32) (int, error) {
+func waitGroupWaitForMWorkflowTest(ctx Context, n int, m int) (int, error) {
 	ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
 		ExecutionStartToCloseTimeout: time.Second * 30,
 	})
@@ -1031,7 +1031,7 @@ func waitGroupMultipleWaitsWorkflowTest(ctx Context) (int, error) {
 	var err error
 	results := make([]int, 0, n)
 	waitGroup := NewWaitGroup(ctx)
-	waitGroup.Add(int32(4))
+	waitGroup.Add(4)
 	for i := 0; i < n; i++ {
 		t := time.Second * time.Duration(i+1)
 		Go(ctx, func(ctx Context) {
@@ -1047,7 +1047,7 @@ func waitGroupMultipleWaitsWorkflowTest(ctx Context) (int, error) {
 		return 0, err
 	}
 
-	waitGroup.Add(int32(6))
+	waitGroup.Add(6)
 	waitGroup.Wait(ctx)
 	if err != nil {
 		return 0, err
@@ -1152,12 +1152,12 @@ func (s *WorkflowUnitTest) Test_WaitGroupWaitForMWorkflowTest() {
 	RegisterWorkflow(waitGroupWaitForMWorkflowTest)
 
 	n := 10
-	m := int32(5)
+	m := 5
 	env.ExecuteWorkflow(waitGroupWaitForMWorkflowTest, n, m)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 
-	var total int32
+	var total int
 	env.GetWorkflowResult(&total)
 	s.Equal(m, total)
 }

@@ -544,13 +544,9 @@ func (env *sessionEnvironmentImpl) GetTokenBucket() *sessionTokenBucket {
 // The following two implemention is for testsuite only. The only difference is that
 // the creation activity is not long running, otherwise it will block timers from auto firing.
 func sessionCreationActivityForTest(ctx context.Context, sessionID string) error {
-	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(sessionEnvironment)
-	if !ok {
-		panic("no session environment in context")
-	}
+	sessionEnv := ctx.Value(sessionEnvironmentContextKey).(sessionEnvironment)
 
-	_, err := sessionEnv.CreateSession(ctx, sessionID)
-	if err != nil {
+	if _, err := sessionEnv.CreateSession(ctx, sessionID); err != nil {
 		return err
 	}
 
@@ -558,10 +554,8 @@ func sessionCreationActivityForTest(ctx context.Context, sessionID string) error
 }
 
 func sessionCompletionActivityForTest(ctx context.Context, sessionID string) error {
-	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(sessionEnvironment)
-	if !ok {
-		panic("no session environment in context")
-	}
+	sessionEnv := ctx.Value(sessionEnvironmentContextKey).(sessionEnvironment)
+
 	sessionEnv.CompleteSession(sessionID)
 
 	// Add session token in the completion activity.

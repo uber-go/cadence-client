@@ -314,12 +314,10 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_CreationOnly() {
 	env.SetWorkerOptions(WorkerOptions{
 		MaxConcurrentSessionExecutionSize: maxConcurrentSessionExecutionSize,
 	})
-	env.OnActivity(sessionCreationActivityName, mock.Anything, mock.Anything).Return(sessionCreationActivity)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
 	s.Equal(errTooManySessionsMsg, env.GetWorkflowError().Error())
-	env.AssertExpectations(s.T())
 }
 
 func (s *SessionTestSuite) TestMaxConcurrentSession_WithRecreation() {

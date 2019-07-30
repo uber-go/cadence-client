@@ -540,3 +540,31 @@ func (env *sessionEnvironmentImpl) GetResourceSpecificTasklist() string {
 func (env *sessionEnvironmentImpl) GetTokenBucket() *sessionTokenBucket {
 	return env.sessionTokenBucket
 }
+
+// The following two implemention is for testsuite only. The only difference is that
+// the creation activity is not long running, otherwise it will block timers from auto firing.
+func sessionCreationActivityForTest(ctx context.Context, sessionID string) error {
+	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(sessionEnvironment)
+	if !ok {
+		panic("no session environment in context")
+	}
+
+	_, err := sessionEnv.CreateSession(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	return sessionEnv.SignalCreationResponse(ctx, sessionID)
+}
+
+func sessionCompletionActivityForTest(ctx context.Context, sessionID string) error {
+	sessionEnv, ok := ctx.Value(sessionEnvironmentContextKey).(sessionEnvironment)
+	if !ok {
+		panic("no session environment in context")
+	}
+	sessionEnv.CompleteSession(sessionID)
+
+	// Add session token in the completion activity.
+	sessionEnv.AddSessionToken()
+	return nil
+}

@@ -28,7 +28,6 @@ import (
 
 	"github.com/uber-go/tally"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
 )
@@ -80,6 +79,15 @@ type (
 		AddFuture(future Future, f func(f Future)) Selector
 		AddDefault(f func())
 		Select(ctx Context)
+	}
+
+	// WaitGroup must be used instead of native go sync.WaitGroup by
+	// workflow code.  Use workflow.NewWaitGroup(ctx) method to create
+	// a new WaitGroup instance
+	WaitGroup interface {
+		Add(delta int)
+		Done()
+		Wait(ctx Context)
 	}
 
 	// Future represents the result of an asynchronous computation.
@@ -137,7 +145,7 @@ type (
 	// EncodedValue is type alias used to encapsulate/extract encoded result from workflow/activity.
 	EncodedValue struct {
 		value         []byte
-		dataConverter encoded.DataConverter
+		dataConverter DataConverter
 	}
 	// Version represents a change version. See GetVersion call.
 	Version int
@@ -199,6 +207,14 @@ type (
 		// │ │ │ │ │
 		// * * * * *
 		CronSchedule string
+
+		// Memo - Optional non-indexed info that will be shown in list workflow.
+		Memo map[string]interface{}
+
+		// SearchAttributes - Optional indexed info that can be used in query of List/Scan/Count workflow APIs (only
+		// supported when Cadence server is using ElasticSearch). The key and value type must be registered on Cadence server side.
+		// Use GetSearchAttributes API to get valid key and corresponding value type.
+		SearchAttributes map[string]interface{}
 	}
 
 	// ChildWorkflowPolicy defines child workflow behavior when parent workflow is terminated.
@@ -295,6 +311,12 @@ func NewSelector(ctx Context) Selector {
 // Name appears in stack traces that are blocked on this Selector.
 func NewNamedSelector(ctx Context, name string) Selector {
 	return &selectorImpl{name: name}
+}
+
+// NewWaitGroup creates a new WaitGroup instance.
+func NewWaitGroup(ctx Context) WaitGroup {
+	f, s := NewFuture(ctx)
+	return &waitGroupImpl{future: f, settable: s}
 }
 
 // Go creates a new coroutine. It has similar semantic to goroutine in a context of the workflow.
@@ -554,7 +576,8 @@ func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interf
 		decodeFutureImpl: mainFuture.(*decodeFutureImpl),
 		executionFuture:  executionFuture.(*futureImpl),
 	}
-	dc := getWorkflowEnvOptions(ctx).dataConverter
+	workflowOptionsFromCtx := getWorkflowEnvOptions(ctx)
+	dc := workflowOptionsFromCtx.dataConverter
 	wfType, input, err := getValidatedWorkflowFunction(childWorkflow, args, dc)
 	if err != nil {
 		executionSettable.Set(nil, err)
@@ -568,7 +591,9 @@ func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interf
 		return result
 	}
 	options.dataConverter = dc
-	options.contextPropagators = getWorkflowEnvOptions(ctx).contextPropagators
+	options.contextPropagators = workflowOptionsFromCtx.contextPropagators
+	options.memo = workflowOptionsFromCtx.memo
+	options.searchAttributes = workflowOptionsFromCtx.searchAttributes
 
 	params := executeWorkflowParams{
 		workflowOptions: *options,
@@ -643,6 +668,8 @@ type WorkflowInfo struct {
 	ContinuedExecutionRunID             *string
 	ParentWorkflowDomain                *string
 	ParentWorkflowExecution             *WorkflowExecution
+	Memo                                *s.Memo
+	SearchAttributes                    *s.SearchAttributes
 }
 
 // GetWorkflowInfo extracts info of a current workflow from a context.
@@ -852,6 +879,8 @@ func WithChildWorkflowOptions(ctx Context, cwo ChildWorkflowOptions) Context {
 	wfOptions.workflowIDReusePolicy = cwo.WorkflowIDReusePolicy
 	wfOptions.retryPolicy = convertRetryPolicy(cwo.RetryPolicy)
 	wfOptions.cronSchedule = cwo.CronSchedule
+	wfOptions.memo = cwo.Memo
+	wfOptions.searchAttributes = cwo.SearchAttributes
 
 	return ctx1
 }
@@ -903,7 +932,7 @@ func WithWorkflowTaskStartToCloseTimeout(ctx Context, d time.Duration) Context {
 }
 
 // WithDataConverter adds DataConverter to the context.
-func WithDataConverter(ctx Context, dc encoded.DataConverter) Context {
+func WithDataConverter(ctx Context, dc DataConverter) Context {
 	if dc == nil {
 		panic("data converter is nil for WithDataConverter")
 	}
@@ -924,7 +953,7 @@ func GetSignalChannel(ctx Context, signalName string) Channel {
 	return getWorkflowEnvOptions(ctx).getSignalChannel(ctx, signalName)
 }
 
-func newEncodedValue(value []byte, dc encoded.DataConverter) encoded.Value {
+func newEncodedValue(value []byte, dc DataConverter) Value {
 	if dc == nil {
 		dc = getDefaultDataConverter()
 	}
@@ -939,7 +968,7 @@ func (b EncodedValue) Get(valuePtr interface{}) error {
 	return decodeArg(b.dataConverter, b.value, valuePtr)
 }
 
-// HasValue return whether there is value encoded.
+// HasValue return whether there is value
 func (b EncodedValue) HasValue() bool {
 	return b.value != nil
 }
@@ -980,7 +1009,7 @@ func (b EncodedValue) HasValue() bool {
 //  } else {
 //         ....
 //  }
-func SideEffect(ctx Context, f func(ctx Context) interface{}) encoded.Value {
+func SideEffect(ctx Context, f func(ctx Context) interface{}) Value {
 	dc := getDataConverterFromWorkflowContext(ctx)
 	future, settable := NewFuture(ctx)
 	wrapperFunc := func() ([]byte, error) {
@@ -1013,7 +1042,7 @@ func SideEffect(ctx Context, f func(ctx Context) interface{}) encoded.Value {
 // value as it was returning during the non-replay run.
 //
 // One good use case of MutableSideEffect() is to access dynamically changing config without breaking determinism.
-func MutableSideEffect(ctx Context, id string, f func(ctx Context) interface{}, equals func(a, b interface{}) bool) encoded.Value {
+func MutableSideEffect(ctx Context, id string, f func(ctx Context) interface{}, equals func(a, b interface{}) bool) Value {
 	wrapperFunc := func() interface{} {
 		return f(ctx)
 	}
@@ -1167,6 +1196,6 @@ func GetLastCompletionResult(ctx Context, d ...interface{}) error {
 		return ErrNoData
 	}
 
-	encoded := newEncodedValues(info.lastCompletionResult, getDataConverterFromWorkflowContext(ctx))
-	return encoded.Get(d...)
+	encodedVal := newEncodedValues(info.lastCompletionResult, getDataConverterFromWorkflowContext(ctx))
+	return encodedVal.Get(d...)
 }

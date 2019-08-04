@@ -423,6 +423,8 @@ struct ContinueAsNewWorkflowExecutionDecisionAttributes {
   110: optional binary lastCompletionResult
   120: optional string cronSchedule
   130: optional Header header
+  140: optional Memo memo
+  150: optional SearchAttributes searchAttributes
 }
 
 struct StartChildWorkflowExecutionDecisionAttributes {
@@ -439,6 +441,8 @@ struct StartChildWorkflowExecutionDecisionAttributes {
   110: optional RetryPolicy retryPolicy
   120: optional string cronSchedule
   130: optional Header header
+  140: optional Memo memo
+  150: optional SearchAttributes searchAttributes
 }
 
 struct Decision {
@@ -535,6 +539,8 @@ struct WorkflowExecutionContinuedAsNewEventAttributes {
   110: optional binary failureDetails
   120: optional binary lastCompletionResult
   130: optional Header header
+  140: optional Memo memo
+  150: optional SearchAttributes searchAttributes
 }
 
 struct DecisionTaskScheduledEventAttributes {
@@ -764,6 +770,8 @@ struct StartChildWorkflowExecutionInitiatedEventAttributes {
   120: optional RetryPolicy retryPolicy
   130: optional string cronSchedule
   140: optional Header header
+  150: optional Memo memo
+  160: optional SearchAttributes searchAttributes
 }
 
 struct StartChildWorkflowExecutionFailedEventAttributes {

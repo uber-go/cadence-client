@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/encoded"
 )
 
 type SessionTestSuite struct {
@@ -391,7 +390,7 @@ func (s *SessionTestSuite) TestSessionTaskList() {
 	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
 	taskListUsed := []string{}
-	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values) {
+	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		taskListUsed = append(taskListUsed, activityInfo.TaskList)
 	})
 	resourceID := "testResourceID"
@@ -444,7 +443,7 @@ func (s *SessionTestSuite) TestSessionRecreationTaskList() {
 	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
 	taskListUsed := []string{}
-	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values) {
+	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		taskListUsed = append(taskListUsed, activityInfo.TaskList)
 	})
 	env.OnActivity(sessionCreationActivityName, mock.Anything, mock.Anything).Return(sessionCreationActivity).Once()
@@ -504,7 +503,7 @@ func (s *SessionTestSuite) TestExecuteActivityInClosedSession() {
 	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
 	var taskListUsed string
-	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values) {
+	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		taskListUsed = activityInfo.TaskList
 	})
 	env.ExecuteWorkflow(workflowFn)

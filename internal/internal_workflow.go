@@ -37,7 +37,6 @@ import (
 	"go.uber.org/atomic"
 	"go.uber.org/cadence/.gen/go/shared"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
@@ -68,6 +67,14 @@ type (
 		ready   bool
 		channel *channelImpl
 		chained []asyncFuture // Futures that are chained to this one
+	}
+
+	// Implements WaitGroup interface
+	waitGroupImpl struct {
+		n        int      // the number of coroutines to wait on
+		waiting  bool     // indicates whether WaitGroup.Wait() has been called yet for the WaitGroup
+		future   Future   // future to signal that all awaited members of the WaitGroup have completed
+		settable Settable // used to unblock the future when all coroutines have completed
 	}
 
 	// Dispatcher is a container of a set of coroutines.
@@ -101,15 +108,15 @@ type (
 	}
 
 	channelImpl struct {
-		name            string                // human readable channel name
-		size            int                   // Channel buffer size. 0 for non buffered.
-		buffer          []interface{}         // buffered messages
-		blockedSends    []*sendCallback       // puts waiting when buffer is full.
-		blockedReceives []*receiveCallback    // receives waiting when no messages are available.
-		closed          bool                  // true if channel is closed.
-		recValue        *interface{}          // Used only while receiving value, this is used as pre-fetch buffer value from the channel.
-		dataConverter   encoded.DataConverter // for decode data
-		scope           tally.Scope           // Used to send metrics
+		name            string             // human readable channel name
+		size            int                // Channel buffer size. 0 for non buffered.
+		buffer          []interface{}      // buffered messages
+		blockedSends    []*sendCallback    // puts waiting when buffer is full.
+		blockedReceives []*receiveCallback // receives waiting when no messages are available.
+		closed          bool               // true if channel is closed.
+		recValue        *interface{}       // Used only while receiving value, this is used as pre-fetch buffer value from the channel.
+		dataConverter   DataConverter      // for decode data
+		scope           tally.Scope        // Used to send metrics
 		logger          *zap.Logger
 	}
 
@@ -170,10 +177,12 @@ type (
 		signalChannels                      map[string]Channel
 		queryHandlers                       map[string]func([]byte) ([]byte, error)
 		workflowIDReusePolicy               WorkflowIDReusePolicy
-		dataConverter                       encoded.DataConverter
+		dataConverter                       DataConverter
 		retryPolicy                         *shared.RetryPolicy
 		cronSchedule                        string
 		contextPropagators                  []ContextPropagator
+		memo                                map[string]interface{}
+		searchAttributes                    map[string]interface{}
 	}
 
 	executeWorkflowParams struct {
@@ -220,7 +229,7 @@ type (
 	queryHandler struct {
 		fn            interface{}
 		queryType     string
-		dataConverter encoded.DataConverter
+		dataConverter DataConverter
 	}
 )
 
@@ -234,6 +243,7 @@ const (
 // Assert that structs do indeed implement the interfaces
 var _ Channel = (*channelImpl)(nil)
 var _ Selector = (*selectorImpl)(nil)
+var _ WaitGroup = (*waitGroupImpl)(nil)
 var _ dispatcher = (*dispatcherImpl)(nil)
 
 var stackBuf [100000]byte
@@ -1065,7 +1075,7 @@ func newWorkflowDefinition(workflow workflow) workflowDefinition {
 	return &syncWorkflowDefinition{workflow: workflow}
 }
 
-func getValidatedWorkflowFunction(workflowFunc interface{}, args []interface{}, dataConverter encoded.DataConverter) (*WorkflowType, []byte, error) {
+func getValidatedWorkflowFunction(workflowFunc interface{}, args []interface{}, dataConverter DataConverter) (*WorkflowType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(workflowFunc)
 	switch getKind(fType) {
@@ -1163,7 +1173,7 @@ func setWorkflowEnvOptionsIfNotExist(ctx Context) Context {
 	return WithValue(ctx, workflowEnvOptionsContextKey, &newOptions)
 }
 
-func getDataConverterFromWorkflowContext(ctx Context) encoded.DataConverter {
+func getDataConverterFromWorkflowContext(ctx Context) DataConverter {
 	options := getWorkflowEnvOptions(ctx)
 	if options == nil || options.dataConverter == nil {
 		return getDefaultDataConverter()
@@ -1345,4 +1355,56 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 		return nil, fmt.Errorf("failed to parse error result as it is not of error interface: %v", errValue)
 	}
 	return result, err
+}
+
+// Add adds delta, which may be negative, to the WaitGroup counter.
+// If the counter becomes zero, all goroutines blocked on Wait are released.
+// If the counter goes negative, Add panics.
+//
+// Note that calls with a positive delta that occur when the counter is zero
+// must happen before a Wait. Calls with a negative delta, or calls with a
+// positive delta that start when the counter is greater than zero, may happen
+// at any time.
+// Typically this means the calls to Add should execute before the statement
+// creating the goroutine or other event to be waited for.
+// If a WaitGroup is reused to wait for several independent sets of events,
+// new Add calls must happen after all previous Wait calls have returned.
+//
+// param delta int -> the value to increment the WaitGroup counter by
+func (wg *waitGroupImpl) Add(delta int) {
+	wg.n = wg.n + delta
+	if wg.n < 0 {
+		panic("negative WaitGroup counter")
+	}
+	if (wg.n > 0) || (!wg.waiting) {
+		return
+	}
+	if wg.n == 0 {
+		wg.settable.Set(false, nil)
+	}
+}
+
+// Done decrements the WaitGroup counter by 1, indicating
+// that a coroutine in the WaitGroup has completed
+func (wg *waitGroupImpl) Done() {
+	wg.Add(-1)
+}
+
+// Wait blocks and waits for specified number of couritines to
+// finish executing and then unblocks once the counter has reached 0.
+//
+// param ctx Context -> workflow context
+func (wg *waitGroupImpl) Wait(ctx Context) {
+	if wg.n <= 0 {
+		return
+	}
+	if wg.waiting {
+		panic("WaitGroup is reused before previous Wait has returned")
+	}
+
+	wg.waiting = true
+	if err := wg.future.Get(ctx, &wg.waiting); err != nil {
+		panic(err)
+	}
+	wg.future, wg.settable = NewFuture(ctx)
 }

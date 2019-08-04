@@ -36,7 +36,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/cache"
@@ -118,7 +117,7 @@ type (
 		hostEnv                        *hostEnvImpl
 		laTunnel                       *localActivityTunnel
 		nonDeterministicWorkflowPolicy NonDeterministicWorkflowPolicy
-		dataConverter                  encoded.DataConverter
+		dataConverter                  DataConverter
 		contextPropagators             []ContextPropagator
 		tracer                         opentracing.Tracer
 	}
@@ -134,7 +133,7 @@ type (
 		userContext        context.Context
 		hostEnv            *hostEnvImpl
 		activityProvider   activityProvider
-		dataConverter      encoded.DataConverter
+		dataConverter      DataConverter
 		workerStopCh       <-chan struct{}
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
@@ -530,21 +529,23 @@ func (wth *workflowTaskHandlerImpl) createWorkflowContext(task *s.PollForDecisio
 		}
 	}
 	workflowInfo := &WorkflowInfo{
-		WorkflowType: flowWorkflowTypeFrom(*task.WorkflowType),
-		TaskListName: taskList.GetName(),
 		WorkflowExecution: WorkflowExecution{
 			ID:    workflowID,
 			RunID: runID,
 		},
+		WorkflowType:                        flowWorkflowTypeFrom(*task.WorkflowType),
+		TaskListName:                        taskList.GetName(),
 		ExecutionStartToCloseTimeoutSeconds: attributes.GetExecutionStartToCloseTimeoutSeconds(),
 		TaskStartToCloseTimeoutSeconds:      attributes.GetTaskStartToCloseTimeoutSeconds(),
 		Domain:                              wth.domain,
 		Attempt:                             attributes.GetAttempt(),
+		lastCompletionResult:                attributes.LastCompletionResult,
 		CronSchedule:                        attributes.CronSchedule,
 		ContinuedExecutionRunID:             attributes.ContinuedExecutionRunId,
 		ParentWorkflowDomain:                attributes.ParentWorkflowDomain,
 		ParentWorkflowExecution:             parentWorkflowExecution,
-		lastCompletionResult:                attributes.LastCompletionResult,
+		Memo:                                attributes.Memo,
+		SearchAttributes:                    attributes.SearchAttributes,
 	}
 
 	wfStartTime := time.Unix(0, h.Events[0].GetTimestamp())
@@ -875,13 +876,6 @@ func (w *workflowExecutionContextImpl) retryLocalActivity(lar *localActivityResu
 	if backoff > 0 && backoff <= w.GetDecisionTimeout() {
 		// we need a local retry
 		time.AfterFunc(backoff, func() {
-			w.Lock()
-			defer w.Unlock(nil)
-
-			// after backoff, check if it is still relevant
-			if w.IsDestroyed() {
-				return
-			}
 			if _, ok := w.eventHandler.pendingLaTasks[lar.task.activityID]; !ok {
 				return
 			}
@@ -1367,6 +1361,8 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			ExecutionStartToCloseTimeoutSeconds: contErr.params.executionStartToCloseTimeoutSeconds,
 			TaskStartToCloseTimeoutSeconds:      contErr.params.taskStartToCloseTimeoutSeconds,
 			Header:                              contErr.params.header,
+			Memo:                                workflowContext.workflowInfo.Memo,
+			SearchAttributes:                    workflowContext.workflowInfo.SearchAttributes,
 		}
 	} else if workflowContext.err != nil {
 		// Workflow failures

@@ -33,69 +33,6 @@ import (
 
 type Workflows struct{}
 
-func (w *Workflows) ActivityCancelRepro(ctx workflow.Context) ([]string, error) {
-	ctx, cancelFunc := workflow.WithCancel(ctx)
-
-	// First go-routine which triggers cancellation on completion of first activity
-	workflow.Go(ctx, func(ctx1 workflow.Context) {
-		activityCtx := workflow.WithActivityOptions(ctx1, workflow.ActivityOptions{
-			ScheduleToStartTimeout: 10 * time.Second,
-			ScheduleToCloseTimeout: 10 * time.Second,
-			StartToCloseTimeout:    9 * time.Second,
-		})
-
-		activityF := workflow.ExecuteActivity(activityCtx, "toUpperWithDelay", "hello", 1 * time.Second)
-		var ans string
-		err := activityF.Get(activityCtx, &ans)
-		if err != nil {
-			workflow.GetLogger(activityCtx).Sugar().Infof("Activity Failed: Err: %v", err)
-			return
-		}
-
-		// Trigger cancellation of root context
-		cancelFunc()
-	})
-
-	// Second go-routine which get blocked on ActivitySchedule and not started
-	workflow.Go(ctx, func(ctx1 workflow.Context) {
-		activityCtx := workflow.WithActivityOptions(ctx1, workflow.ActivityOptions{
-			ScheduleToStartTimeout: 10 * time.Second,
-			ScheduleToCloseTimeout: 10 * time.Second,
-			StartToCloseTimeout:    1 * time.Second,
-			TaskList:               "bad_tl",
-		})
-
-		activityF := workflow.ExecuteActivity(activityCtx, "toUpper", "hello")
-		var ans string
-		err := activityF.Get(activityCtx, &ans)
-		if err != nil {
-			workflow.GetLogger(activityCtx).Sugar().Infof("Activity Failed: Err: %v", err)
-		}
-	})
-
-	// Third go-routine which get blocked on ActivitySchedule and not started
-	workflow.Go(ctx, func(ctx1 workflow.Context) {
-		activityCtx := workflow.WithActivityOptions(ctx1, workflow.ActivityOptions{
-			ScheduleToStartTimeout: 10 * time.Second,
-			ScheduleToCloseTimeout: 10 * time.Second,
-			StartToCloseTimeout:    1 * time.Second,
-			TaskList:               "bad_tl",
-		})
-
-		activityF := workflow.ExecuteActivity(activityCtx, "toUpper", "hello")
-		var ans string
-		err := activityF.Get(activityCtx, &ans)
-		if err != nil {
-			workflow.GetLogger(activityCtx).Sugar().Infof("Activity Failed: Err: %v", err)
-		}
-	})
-
-	// Cause the workflow to block on sleep
-	workflow.Sleep(ctx, 10 * time.Second)
-
-	return []string{"toUpperWithDelay"}, nil
-}
-
 func (w *Workflows) Basic(ctx workflow.Context) ([]string, error) {
 	ctx = workflow.WithActivityOptions(ctx, w.defaultActivityOptions())
 	var ans1 string
@@ -354,6 +291,69 @@ func (w *Workflows) ChildWorkflowSuccess(ctx workflow.Context) (result string, e
 	ctx = workflow.WithChildOptions(ctx, opts)
 	err = workflow.ExecuteChildWorkflow(ctx, w.childForMemoAndSearchAttr).Get(ctx, &result)
 	return
+}
+
+func (w *Workflows) ActivityCancelRepro(ctx workflow.Context) ([]string, error) {
+	ctx, cancelFunc := workflow.WithCancel(ctx)
+
+	// First go-routine which triggers cancellation on completion of first activity
+	workflow.Go(ctx, func(ctx1 workflow.Context) {
+		activityCtx := workflow.WithActivityOptions(ctx1, workflow.ActivityOptions{
+			ScheduleToStartTimeout: 10 * time.Second,
+			ScheduleToCloseTimeout: 10 * time.Second,
+			StartToCloseTimeout:    9 * time.Second,
+		})
+
+		activityF := workflow.ExecuteActivity(activityCtx, "toUpperWithDelay", "hello", 1 * time.Second)
+		var ans string
+		err := activityF.Get(activityCtx, &ans)
+		if err != nil {
+			workflow.GetLogger(activityCtx).Sugar().Infof("Activity Failed: Err: %v", err)
+			return
+		}
+
+		// Trigger cancellation of root context
+		cancelFunc()
+	})
+
+	// Second go-routine which get blocked on ActivitySchedule and not started
+	workflow.Go(ctx, func(ctx1 workflow.Context) {
+		activityCtx := workflow.WithActivityOptions(ctx1, workflow.ActivityOptions{
+			ScheduleToStartTimeout: 10 * time.Second,
+			ScheduleToCloseTimeout: 10 * time.Second,
+			StartToCloseTimeout:    1 * time.Second,
+			TaskList:               "bad_tl",
+		})
+
+		activityF := workflow.ExecuteActivity(activityCtx, "toUpper", "hello")
+		var ans string
+		err := activityF.Get(activityCtx, &ans)
+		if err != nil {
+			workflow.GetLogger(activityCtx).Sugar().Infof("Activity Failed: Err: %v", err)
+		}
+	})
+
+	// Third go-routine which get blocked on ActivitySchedule and not started
+	workflow.Go(ctx, func(ctx1 workflow.Context) {
+		activityCtx := workflow.WithActivityOptions(ctx1, workflow.ActivityOptions{
+			ScheduleToStartTimeout: 10 * time.Second,
+			ScheduleToCloseTimeout: 10 * time.Second,
+			StartToCloseTimeout:    1 * time.Second,
+			TaskList:               "bad_tl",
+		})
+
+		activityF := workflow.ExecuteActivity(activityCtx, "toUpper", "hello")
+		var ans string
+		err := activityF.Get(activityCtx, &ans)
+		if err != nil {
+			workflow.GetLogger(activityCtx).Sugar().Infof("Activity Failed: Err: %v", err)
+		}
+	})
+
+	// Cause the workflow to block on sleep
+	workflow.Sleep(ctx, 10 * time.Second)
+
+	return []string{"toUpperWithDelay"}, nil
 }
 
 func (w *Workflows) child(ctx workflow.Context, arg string, mustFail bool) (string, error) {

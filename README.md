@@ -15,7 +15,7 @@ git clone git@github.com:uber-go/cadence-client.git $GOPATH/src/go.uber.org/cade
 or
 
 ```bash
-go get go.uber.org/cadence
+Use DEP.
 ```
 
 See [samples](https://github.com/uber-common/cadence-samples) to get started. 

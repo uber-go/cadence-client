@@ -94,7 +94,7 @@ $(BUILD)/dummy: vendor/dep.updated $(ALL_SRC)
 	go build -i -o $@ internal/cmd/dummy/dummy.go
 
 
-bins: $(ALL_SRC) $(BUILD)/copyright lint $(BUILD)/dummy
+bins: $(ALL_SRC) $(BUILD)/copyright lint $(BUILD)/dummy gomod
 
 unit_test: $(BUILD)/dummy
 	@mkdir -p $(COVER_ROOT)
@@ -126,6 +126,11 @@ cover: $(COVER_ROOT)/cover.out
 
 cover_ci: $(COVER_ROOT)/cover.out
 	goveralls -coverprofile=$(COVER_ROOT)/cover.out -service=buildkite || echo -e "\x1b[31mCoveralls failed\x1b[m";
+
+gomod: vendor/dep.updated
+	rm -f go.mod go.sum
+	GO111MODULE=on go mod init go.uber.org/cadence
+	GO111MODULE=on go mod tidy
 
 # golint fails to report many lint failures if it is only given a single file
 # to work on at a time, and it can't handle multiple packages at once, *and*

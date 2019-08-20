@@ -748,7 +748,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	case m.EventTypeDecisionTaskFailed:
 		// No Operation
 	case m.EventTypeDecisionTaskCompleted:
-		err = weh.handleDecisionTaskCompleted(event.DecisionTaskCompletedEventAttributes)
+		// No Operation
 	case m.EventTypeActivityTaskScheduled:
 		weh.decisionsHelper.handleActivityTaskScheduled(
 			event.GetEventId(), event.ActivityTaskScheduledEventAttributes.GetActivityId())
@@ -903,12 +903,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionStarted(
 
 	// Invoke the workflow.
 	weh.workflowDefinition.Execute(weh, attributes.Header, attributes.Input)
-	return nil
-}
-
-func (weh *workflowExecutionEventHandlerImpl) handleDecisionTaskCompleted(
-	attributes *m.DecisionTaskCompletedEventAttributes) error {
-	weh.WorkflowInfo().BinaryChecksum = attributes.BinaryChecksum
 	return nil
 }
 

@@ -210,7 +210,8 @@ func (eh *history) loadMoreEvents() error {
 
 func isDecisionEvent(eventType s.EventType) bool {
 	switch eventType {
-	case s.EventTypeWorkflowExecutionCompleted,
+	case s.EventTypeDecisionTaskCompleted,
+		s.EventTypeWorkflowExecutionCompleted,
 		s.EventTypeWorkflowExecutionFailed,
 		s.EventTypeWorkflowExecutionCanceled,
 		s.EventTypeWorkflowExecutionContinuedAsNew,
@@ -743,6 +744,9 @@ ProcessEvents:
 
 		if len(reorderedEvents) == 0 {
 			break ProcessEvents
+		}
+		if reorderedEvents[0].GetEventType() == s.EventTypeDecisionTaskCompleted {
+			w.workflowInfo.BinaryChecksum = reorderedEvents[0].DecisionTaskCompletedEventAttributes.BinaryChecksum
 		}
 		// Markers are from the events that are produced from the current decision
 		for _, m := range markers {

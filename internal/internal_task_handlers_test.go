@@ -22,6 +22,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -292,47 +293,47 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted_WithDa
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_BinaryChecksum() {
-	// Schedule an activity and see if we complete workflow.
-	//taskList := "tl1"
-	//testEvents := []*s.HistoryEvent{
-	//	createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
-	//	createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
-	//	createTestEventDecisionTaskStarted(3),
-	//	createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
-	//	createTestEventTimerStarted(5, 0),
-	//	createTestEventTimerFired(6, 0),
-	//	createTestEventDecisionTaskScheduled(7, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
-	//	createTestEventDecisionTaskStarted(8),
-	//	createTestEventDecisionTaskCompleted(9, &s.DecisionTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
-	//	createTestEventTimerStarted(10, 1),
-	//	createTestEventTimerFired(11, 1),
-	//	createTestEventDecisionTaskScheduled(12, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
-	//	createTestEventDecisionTaskStarted(13),
-	//}
-	//task := createWorkflowTask(testEvents[0:3], 0, "BinaryChecksumWorkflow")
-	//params := workerExecutionParameters{
-	//	TaskList: taskList,
-	//	Identity: "test-id-1",
-	//	Logger:   t.logger,
-	//}
-	//taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
-	//request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
-	//response := request.(*s.RespondDecisionTaskCompletedRequest)
-	//
-	//t.NoError(err)
-	//t.NotNil(response)
-	//t.Equal(1, len(response.Decisions))
-	//t.Equal(s.DecisionTypeStartTimer, response.Decisions[0].GetDecisionType())
-	//t.NotNil(response.Decisions[0].StartTimerDecisionAttributes)
-	//
-	//task = createWorkflowTask(testEvents, 3, "BinaryChecksumWorkflow")
-	//request, err = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
-	//response = request.(*s.RespondDecisionTaskCompletedRequest)
-	//t.NoError(err)
-	//t.NotNil(response)
-	//t.Equal(1, len(response.Decisions))
-	//t.Equal(s.DecisionTypeStartTimer, response.Decisions[0].GetDecisionType())
-	//t.NotNil(response.Decisions[0].CompleteWorkflowExecutionDecisionAttributes)
+	taskList := "tl1"
+	checksum1 := "chck1"
+	checksum2 := "chck2"
+	testEvents := []*s.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{
+			ScheduledEventId: common.Int64Ptr(2), BinaryChecksum: common.StringPtr(checksum1)}),
+		createTestEventTimerStarted(5, 0),
+		createTestEventTimerFired(6, 0),
+		createTestEventDecisionTaskScheduled(7, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(8),
+		createTestEventDecisionTaskCompleted(9, &s.DecisionTaskCompletedEventAttributes{
+			ScheduledEventId: common.Int64Ptr(7), BinaryChecksum: common.StringPtr(checksum2)}),
+		createTestEventTimerStarted(10, 1),
+		createTestEventTimerFired(11, 1),
+		createTestEventDecisionTaskScheduled(12, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(13),
+	}
+	task := createWorkflowTask(testEvents, 8, "BinaryChecksumWorkflow")
+	params := workerExecutionParameters{
+		TaskList: taskList,
+		Identity: "test-id-1",
+		Logger:   t.logger,
+	}
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
+	response := request.(*s.RespondDecisionTaskCompletedRequest)
+
+	t.NoError(err)
+	t.NotNil(response)
+	t.Equal(1, len(response.Decisions))
+	t.Equal(s.DecisionTypeCompleteWorkflowExecution, response.Decisions[0].GetDecisionType())
+	checksumsJson := string(response.Decisions[0].CompleteWorkflowExecutionDecisionAttributes.Result)
+	var checksums []string
+	json.Unmarshal([]byte(checksumsJson), &checksums)
+	t.Equal(3, len(checksums))
+	t.Equal("chck1", checksums[0])
+	t.Equal("chck2", checksums[1])
+	t.Equal(getBinaryChecksum(), checksums[2])
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
@@ -1058,8 +1059,8 @@ func Test_NonDeterministicCheck(t *testing.T) {
 			decisionEventTypeCount++
 		}
 	}
-	// CancelTimer has 2 corresponding events + DecisionTaskCompleted.
-	require.Equal(t, len(decisionTypes)+2, decisionEventTypeCount, "Every decision type must have one matching event type. "+
+	// CancelTimer has 2 corresponding events.
+	require.Equal(t, len(decisionTypes)+1, decisionEventTypeCount, "Every decision type must have one matching event type. "+
 		"If you add new decision type, you need to update isDecisionEvent() method to include that new event type as well.")
 }
 

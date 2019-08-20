@@ -803,6 +803,8 @@ ProcessEvents:
 			if len(eventDecisions) > 0 && !skipReplayCheck {
 				replayDecisions = append(replayDecisions, eventDecisions...)
 			}
+		} else {
+			w.workflowInfo.BinaryChecksum = common.StringPtr(getBinaryChecksum())
 		}
 	}
 

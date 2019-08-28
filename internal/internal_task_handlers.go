@@ -1296,13 +1296,10 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 }
 
 func isSearchAttributesMatched(attrFromEvent, attrFromDecision *s.SearchAttributes) bool {
-	if attrFromEvent == nil && attrFromDecision == nil {
-		return true
-	}
 	if attrFromEvent != nil && attrFromDecision != nil {
 		return reflect.DeepEqual(attrFromEvent.IndexedFields, attrFromDecision.IndexedFields)
 	}
-	return false
+	return attrFromEvent == nil && attrFromDecision == nil
 }
 
 // return true if the check fails:

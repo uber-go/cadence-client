@@ -1093,31 +1093,62 @@ func Test_IsDecisionMatchEvent_UpsertWorkflowSearchAttributes(t *testing.T) {
 }
 
 func Test_IsSearchAttributesMatched(t *testing.T) {
-	ok := isSearchAttributesMatched(nil, nil)
-	require.True(t, ok)
-
-	attr1 := &s.SearchAttributes{}
-	ok = isSearchAttributesMatched(attr1, nil)
-	require.False(t, ok)
-
-	attr2 := &s.SearchAttributes{}
-	ok = isSearchAttributesMatched(nil, attr2)
-	require.False(t, ok)
-
-	ok = isSearchAttributesMatched(attr1, attr2)
-	require.True(t, ok)
-
-	attr1.IndexedFields = map[string][]byte{
-		"key1": []byte("1"),
-		"key2": []byte("abc"),
+	testCases := []struct {
+		name     string
+		lhs      *s.SearchAttributes
+		rhs      *s.SearchAttributes
+		expected bool
+	}{
+		{
+			name:     "both nil",
+			lhs:      nil,
+			rhs:      nil,
+			expected: true,
+		},
+		{
+			name:     "left nil",
+			lhs:      nil,
+			rhs:      &s.SearchAttributes{},
+			expected: false,
+		},
+		{
+			name:     "right nil",
+			lhs:      &s.SearchAttributes{},
+			rhs:      nil,
+			expected: false,
+		},
+		{
+			name: "not match",
+			lhs: &s.SearchAttributes{
+				IndexedFields: map[string][]byte{
+					"key1": []byte("1"),
+					"key2": []byte("abc"),
+				},
+			},
+			rhs:      &s.SearchAttributes{},
+			expected: false,
+		},
+		{
+			name: "match",
+			lhs: &s.SearchAttributes{
+				IndexedFields: map[string][]byte{
+					"key1": []byte("1"),
+					"key2": []byte("abc"),
+				},
+			},
+			rhs: &s.SearchAttributes{
+				IndexedFields: map[string][]byte{
+					"key2": []byte("abc"),
+					"key1": []byte("1"),
+				},
+			},
+			expected: true,
+		},
 	}
-	ok = isSearchAttributesMatched(attr1, attr2)
-	require.False(t, ok)
 
-	attr2.IndexedFields = map[string][]byte{
-		"key2": []byte("abc"),
-		"key1": []byte("1"),
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			require.Equal(t, testCase.expected, isSearchAttributesMatched(testCase.lhs, testCase.rhs))
+		})
 	}
-	ok = isSearchAttributesMatched(attr1, attr2)
-	require.True(t, ok)
 }

@@ -1075,6 +1075,7 @@ func Test_IsDecisionMatchEvent_UpsertWorkflowSearchAttributes(t *testing.T) {
 	}
 	historyEvent := &s.HistoryEvent{}
 	ok := isDecisionMatchEvent(decision, historyEvent, false)
+	require.False(t, ok)
 
 	eType := s.EventTypeUpsertWorkflowSearchAttributes
 	historyEvent = &s.HistoryEvent{
@@ -1085,8 +1086,38 @@ func Test_IsDecisionMatchEvent_UpsertWorkflowSearchAttributes(t *testing.T) {
 	require.False(t, ok)
 
 	historyEvent.UpsertWorkflowSearchAttributesEventAttributes = &s.UpsertWorkflowSearchAttributesEventAttributes{
-		SearchAttributes: searchAttr,
+		SearchAttributes: &s.SearchAttributes{},
 	}
 	ok = isDecisionMatchEvent(decision, historyEvent, false)
+	require.True(t, ok)
+}
+
+func Test_IsSearchAttributesMatched(t *testing.T) {
+	ok := isSearchAttributesMatched(nil, nil)
+	require.True(t, ok)
+
+	attr1 := &s.SearchAttributes{}
+	ok = isSearchAttributesMatched(attr1, nil)
+	require.False(t, ok)
+
+	attr2 := &s.SearchAttributes{}
+	ok = isSearchAttributesMatched(nil, attr2)
+	require.False(t, ok)
+
+	ok = isSearchAttributesMatched(attr1, attr2)
+	require.True(t, ok)
+
+	attr1.IndexedFields = map[string][]byte{
+		"key1": []byte("1"),
+		"key2": []byte("abc"),
+	}
+	ok = isSearchAttributesMatched(attr1, attr2)
+	require.False(t, ok)
+
+	attr2.IndexedFields = map[string][]byte{
+		"key2": []byte("abc"),
+		"key1": []byte("1"),
+	}
+	ok = isSearchAttributesMatched(attr1, attr2)
 	require.True(t, ok)
 }

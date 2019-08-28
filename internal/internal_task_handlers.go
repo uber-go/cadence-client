@@ -876,11 +876,12 @@ func (w *workflowExecutionContextImpl) retryLocalActivity(lar *localActivityResu
 	if backoff > 0 && backoff <= w.GetDecisionTimeout() {
 		// we need a local retry
 		time.AfterFunc(backoff, func() {
-			if w.eventHandler == nil || w.eventHandler.pendingLaTasks == nil {
+			if w.eventHandler == nil || w.eventHandler.pendingLaTasks == nil || lar == nil || lar.task == nil {
 				w.wth.logger.Error("Encountering nil pointer",
-					zap.String(tagWorkflowID, lar.task.workflowTask.task.WorkflowExecution.GetWorkflowId()),
-					zap.String(tagRunID, lar.task.workflowTask.task.WorkflowExecution.GetRunId()),
+					zap.String(tagWorkflowID, w.workflowInfo.WorkflowExecution.ID),
+					zap.String(tagRunID, w.workflowInfo.WorkflowExecution.RunID),
 				)
+				return
 			}
 			if _, ok := w.eventHandler.pendingLaTasks[lar.task.activityID]; !ok {
 				return

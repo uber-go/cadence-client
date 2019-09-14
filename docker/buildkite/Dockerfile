@@ -1,4 +1,4 @@
-FROM golang:1.12.1
+FROM golang:1.13
 
 RUN go get -u github.com/golang/dep/cmd/dep \
   && go get -u github.com/Masterminds/glide \

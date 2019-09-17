@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/cadence/internal"
+
 	"go.uber.org/cadence"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/client"
@@ -293,6 +295,23 @@ func (w *Workflows) ChildWorkflowSuccess(ctx workflow.Context) (result string, e
 	return
 }
 
+func (w *Workflows) ChildWorkflowSuccessWithParentClosePolicy(ctx workflow.Context) (result string, err error) {
+	opts := workflow.ChildWorkflowOptions{
+		TaskStartToCloseTimeout:      5 * time.Second,
+		ExecutionStartToCloseTimeout: 10 * time.Second,
+		ParentClosePolicy:            client.ParentClosePolicyTerminate(),
+	}
+	ctx = workflow.WithChildOptions(ctx, opts)
+	ft := workflow.ExecuteChildWorkflow(ctx, w.sleep, 2*time.Minute)
+	err = workflow.Sleep(ctx, 5*time.Second)
+	if err != nil {
+		return "", err
+	}
+	var childWE internal.WorkflowExecution
+	err = ft.GetChildWorkflowExecution().Get(ctx, &childWE)
+	return childWE.ID, err
+}
+
 func (w *Workflows) ActivityCancelRepro(ctx workflow.Context) ([]string, error) {
 	ctx, cancelFunc := workflow.WithCancel(ctx)
 
@@ -399,6 +418,7 @@ func (w *Workflows) register() {
 	workflow.Register(w.ChildWorkflowRetryOnError)
 	workflow.Register(w.ChildWorkflowRetryOnTimeout)
 	workflow.Register(w.ChildWorkflowSuccess)
+	workflow.Register(w.ChildWorkflowSuccessWithParentClosePolicy)
 	workflow.Register(w.sleep)
 	workflow.Register(w.child)
 	workflow.Register(w.childForMemoAndSearchAttr)

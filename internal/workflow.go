@@ -210,6 +210,11 @@ type (
 		// supported when Cadence server is using ElasticSearch). The key and value type must be registered on Cadence server side.
 		// Use GetSearchAttributes API to get valid key and corresponding value type.
 		SearchAttributes map[string]interface{}
+
+		// ParentClosePolicy - Optional policy to decide what to do for the child, if its parent is closed(any closing status).
+		// The default behavior is defined by Cadence server. For now it is Abandon for backward compatibility.
+		// In future the default behavior may become Terminate for simplicity. So it's better not rely on the default behavior.
+		ParentClosePolicy *ParentClosePolicy
 	}
 )
 
@@ -860,6 +865,7 @@ func WithChildWorkflowOptions(ctx Context, cwo ChildWorkflowOptions) Context {
 	wfOptions.cronSchedule = cwo.CronSchedule
 	wfOptions.memo = cwo.Memo
 	wfOptions.searchAttributes = cwo.SearchAttributes
+	wfOptions.parentClosePolicy = cwo.ParentClosePolicy
 
 	return ctx1
 }

@@ -453,6 +453,18 @@ type (
 
 	// WorkflowIDReusePolicy defines workflow ID reuse behavior.
 	WorkflowIDReusePolicy int
+
+	// ParentClosePolicy defines the action on children when parent is closed
+	ParentClosePolicy int
+)
+
+const (
+	// Abandon means not doing anything on the child workflow
+	ParentClosePolicyAbandon = iota
+	// RequestCancel means requesting cancellation on the child workflow
+	ParentClosePolicyRequestCancel
+	// Terminate means terminating the child workflow
+	ParentClosePolicyTerminate
 )
 
 const (
@@ -541,6 +553,24 @@ func (p WorkflowIDReusePolicy) toThriftPtr() *s.WorkflowIdReusePolicy {
 		policy = s.WorkflowIdReusePolicyRejectDuplicate
 	default:
 		panic(fmt.Sprintf("unknown workflow reuse policy %v", p))
+	}
+	return &policy
+}
+
+func (p *ParentClosePolicy) toThriftPtr() *s.ParentClosePolicy {
+	if p == nil {
+		return nil
+	}
+	var policy s.ParentClosePolicy
+	switch *p {
+	case ParentClosePolicyAbandon:
+		policy = s.ParentClosePolicyAbandon
+	case ParentClosePolicyRequestCancel:
+		policy = s.ParentClosePolicyRequestCancel
+	case ParentClosePolicyTerminate:
+		policy = s.ParentClosePolicyTerminate
+	default:
+		panic(fmt.Sprintf("unknown workflow parent close policy %v", p))
 	}
 	return &policy
 }

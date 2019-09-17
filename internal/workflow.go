@@ -212,9 +212,9 @@ type (
 		SearchAttributes map[string]interface{}
 
 		// ParentClosePolicy - Optional policy to decide what to do for the child, if its parent is closed(any closing status).
-		// The default behavior is defined by Cadence server. For now it is Abandon for backward compatibility.
+		// The default behavior(ParentClosePolicyDefault) is defined by Cadence server. For now it is Abandon for backward compatibility.
 		// In future the default behavior may become Terminate for simplicity. So it's better not rely on the default behavior.
-		ParentClosePolicy *ParentClosePolicy
+		ParentClosePolicy ParentClosePolicy
 	}
 )
 

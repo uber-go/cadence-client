@@ -182,7 +182,7 @@ type (
 		contextPropagators                  []ContextPropagator
 		memo                                map[string]interface{}
 		searchAttributes                    map[string]interface{}
-		parentClosePolicy                   *ParentClosePolicy
+		parentClosePolicy                   ParentClosePolicy
 	}
 
 	executeWorkflowParams struct {

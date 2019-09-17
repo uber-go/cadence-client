@@ -387,23 +387,16 @@ const (
 	WorkflowIDReusePolicyRejectDuplicate WorkflowIDReusePolicy = internal.WorkflowIDReusePolicyRejectDuplicate
 )
 
-// ParentClosePolicyAbandon means not doing anything on the child workflow
-func ParentClosePolicyAbandon() *internal.ParentClosePolicy {
-	p := internal.ParentClosePolicyAbandon
-	return &p
-}
-
-// ParentClosePolicyRequestCancel means requesting cancellation on the child workflow
-func ParentClosePolicyRequestCancel() *internal.ParentClosePolicy {
-	p := internal.ParentClosePolicyRequestCancel
-	return &p
-}
-
-// ParentClosePolicyTerminate means terminating the child workflow
-func ParentClosePolicyTerminate() *internal.ParentClosePolicy {
-	p := internal.ParentClosePolicyTerminate
-	return &p
-}
+const (
+	// Default subject to change in the server config
+	ParentClosePolicyDefault ParentClosePolicy = internal.ParentClosePolicyDefault
+	// Abandon means not doing anything on the child workflow
+	ParentClosePolicyAbandon = internal.ParentClosePolicyAbandon
+	// RequestCancel means requesting cancellation on the child workflow
+	ParentClosePolicyRequestCancel = internal.ParentClosePolicyRequestCancel
+	// Terminate means terminating the child workflow
+	ParentClosePolicyTerminate = internal.ParentClosePolicyTerminate
+)
 
 // NewClient creates an instance of a workflow client
 func NewClient(service workflowserviceclient.Interface, domain string, options *Options) Client {

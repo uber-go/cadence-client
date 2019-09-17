@@ -298,7 +298,7 @@ func (w *Workflows) ChildWorkflowSuccessWithParentClosePolicy(ctx workflow.Conte
 	opts := workflow.ChildWorkflowOptions{
 		TaskStartToCloseTimeout:      5 * time.Second,
 		ExecutionStartToCloseTimeout: 10 * time.Second,
-		ParentClosePolicy:            client.ParentClosePolicyTerminate(),
+		ParentClosePolicy:            client.ParentClosePolicyTerminate,
 	}
 	ctx = workflow.WithChildOptions(ctx, opts)
 	ft := workflow.ExecuteChildWorkflow(ctx, w.sleep, 2*time.Minute)

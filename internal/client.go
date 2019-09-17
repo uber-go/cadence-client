@@ -460,7 +460,7 @@ type (
 
 const (
 	// Abandon means not doing anything on the child workflow
-	ParentClosePolicyAbandon = iota
+	ParentClosePolicyAbandon ParentClosePolicy = iota
 	// RequestCancel means requesting cancellation on the child workflow
 	ParentClosePolicyRequestCancel
 	// Terminate means terminating the child workflow

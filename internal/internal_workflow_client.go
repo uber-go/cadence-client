@@ -776,39 +776,17 @@ func (wc *workflowClient) DescribeWorkflowExecution(ctx context.Context, workflo
 //  - EntityNotExistError
 //  - QueryFailError
 func (wc *workflowClient) QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (Value, error) {
-	var input []byte
-	if len(args) > 0 {
-		var err error
-		if input, err = encodeArgs(wc.dataConverter, args); err != nil {
-			return nil, err
-		}
+	queryWorkflowWithOptionsRequest := &QueryWorkflowWithOptionsRequest{
+		WorkflowID: workflowID,
+		RunID: runID,
+		QueryType: queryType,
+		Args: args,
 	}
-	request := &s.QueryWorkflowRequest{
-		Domain: common.StringPtr(wc.domain),
-		Execution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      getRunID(runID),
-		},
-		Query: &s.WorkflowQuery{
-			QueryType: common.StringPtr(queryType),
-			QueryArgs: input,
-		},
-	}
-
-	var resp *s.QueryWorkflowResponse
-	err := backoff.Retry(ctx,
-		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
-			defer cancel()
-			var err error
-			resp, err = wc.workflowService.QueryWorkflow(tchCtx, request, opt...)
-			return err
-		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+	result, err := wc.QueryWorkflowWithOptions(ctx, queryWorkflowWithOptionsRequest)
 	if err != nil {
 		return nil, err
 	}
-
-	return newEncodedValue(resp.QueryResult, wc.dataConverter), nil
+	return result.QueryResult, nil
 }
 
 // QueryWorkflowWithOptionsRequest is the request to QueryWorkflowWithOptions

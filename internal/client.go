@@ -291,13 +291,14 @@ type (
 		//  - QueryFailError
 		QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (Value, error)
 
-		// QueryWorkflowV2 queries a given workflow execution and returns the query result synchronously.
+		// QueryWorkflowWithOptions queries a given workflow execution and returns the query result synchronously.
+		// See QueryWorkflowWithOptionsRequest and QueryWorkflowWithOptionsResponse for more information.
 		// The errors it can return:
 		//  - BadRequestError
 		//  - InternalServiceError
 		//  - EntityNotExistError
 		//  - QueryFailError
-		QueryWorkflowV2(ctx context.Context, request *QueryWorkflowV2Request) (*QueryWorkflowV2Response, error)
+		QueryWorkflowWithOptions(ctx context.Context, request *QueryWorkflowWithOptionsRequest) (*QueryWorkflowWithOptionsResponse, error)
 
 		// DescribeWorkflowExecution returns information about the specified workflow execution.
 		// The errors it can return:

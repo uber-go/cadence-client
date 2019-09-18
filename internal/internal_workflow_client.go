@@ -811,8 +811,8 @@ func (wc *workflowClient) QueryWorkflow(ctx context.Context, workflowID string, 
 	return newEncodedValue(resp.QueryResult, wc.dataConverter), nil
 }
 
-// QueryWorkflowV2Request is the request to QueryWorkflowV2
-type QueryWorkflowV2Request struct {
+// QueryWorkflowWithOptionsRequest is the request to QueryWorkflowWithOptions
+type QueryWorkflowWithOptionsRequest struct {
 	// WorkflowID is a required field indicating the workflow which should be queried.
 	WorkflowID string
 
@@ -835,8 +835,8 @@ type QueryWorkflowV2Request struct {
 	QueryRejectCondition *s.QueryRejectCondition
 }
 
-// QueryWorkflowV2Response is the response to QueryWorkflowV2
-type QueryWorkflowV2Response struct {
+// QueryWorkflowWithOptionsResponse is the response to QueryWorkflowWithOptions
+type QueryWorkflowWithOptionsResponse struct {
 	// QueryResult contains the result of executing the query.
 	// This will only be set if the query was completed successfully and not rejected.
 	QueryResult Value
@@ -845,14 +845,14 @@ type QueryWorkflowV2Response struct {
 	QueryRejected *s.QueryRejected
 }
 
-// QueryWorkflowV2 queries a given workflow execution and returns the query result synchronously.
+// QueryWorkflowWithOptions queries a given workflow execution and returns the query result synchronously.
 // See QueryWorkflowV2Request and QueryWorkflowV2Response for more information.
 // The errors it can return:
 //  - BadRequestError
 //  - InternalServiceError
 //  - EntityNotExistError
 //  - QueryFailError
-func (wc *workflowClient) QueryWorkflowV2(ctx context.Context, request *QueryWorkflowV2Request) (*QueryWorkflowV2Response, error) {
+func (wc *workflowClient) QueryWorkflowWithOptions(ctx context.Context, request *QueryWorkflowWithOptionsRequest) (*QueryWorkflowWithOptionsResponse, error) {
 	var input []byte
 	if len(request.Args) > 0 {
 		var err error
@@ -887,12 +887,12 @@ func (wc *workflowClient) QueryWorkflowV2(ctx context.Context, request *QueryWor
 	}
 
 	if resp.QueryRejected != nil {
-		return &QueryWorkflowV2Response{
+		return &QueryWorkflowWithOptionsResponse{
 			QueryRejected: resp.QueryRejected,
 			QueryResult: nil,
 		}, nil
 	}
-	return &QueryWorkflowV2Response{
+	return &QueryWorkflowWithOptionsResponse{
 		QueryRejected: nil,
 		QueryResult: newEncodedValue(resp.QueryResult, wc.dataConverter),
 	}, nil

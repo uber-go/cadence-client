@@ -59,6 +59,12 @@ type (
 	// WorkflowIDReusePolicy defines workflow ID reuse behavior.
 	WorkflowIDReusePolicy = internal.WorkflowIDReusePolicy
 
+	// QueryWorkflowV2Request defines the request to QueryWorkflowV2
+	QueryWorkflowV2Request = internal.QueryWorkflowV2Request
+
+	// QueryWorkflowV2Response defines the response to QueryWorkflowV2
+	QueryWorkflowV2Response = internal.QueryWorkflowV2Response
+
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.
 	Client interface {
@@ -308,7 +314,15 @@ type (
 		//  - QueryFailError
 		QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (encoded.Value, error)
 
-		QueryWorkflowV2(ctx context.Context, request *internal.QueryWorkflowV2Request) (*internal.QueryWorkflowV2Response, error)
+		// QueryWorkflowV2 queries a given workflow execution and returns the query result synchronously.
+		// See QueryWorkflowV2Request and QueryWorkflowV2Response for more information.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		//  - EntityNotExistError
+		//  - QueryFailError
+		QueryWorkflowV2(ctx context.Context, request QueryWorkflowV2Request) (QueryWorkflowV2Response, error)
+
 		// DescribeWorkflowExecution returns information about the specified workflow execution.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
 		//

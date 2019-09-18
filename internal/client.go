@@ -298,6 +298,7 @@ type (
 		//  - EntityNotExistError
 		//  - QueryFailError
 		QueryWorkflowV2(ctx context.Context, request *QueryWorkflowV2Request) (*QueryWorkflowV2Response, error)
+
 		// DescribeWorkflowExecution returns information about the specified workflow execution.
 		// The errors it can return:
 		//  - BadRequestError

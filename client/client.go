@@ -308,6 +308,7 @@ type (
 		//  - QueryFailError
 		QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (encoded.Value, error)
 
+		QueryWorkflowV2(ctx context.Context, request *internal.QueryWorkflowV2Request) (*internal.QueryWorkflowV2Response, error)
 		// DescribeWorkflowExecution returns information about the specified workflow execution.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
 		//

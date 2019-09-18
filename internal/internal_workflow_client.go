@@ -811,6 +811,93 @@ func (wc *workflowClient) QueryWorkflow(ctx context.Context, workflowID string, 
 	return newEncodedValue(resp.QueryResult, wc.dataConverter), nil
 }
 
+// QueryWorkflowV2Request is the request to QueryWorkflowV2
+type QueryWorkflowV2Request struct {
+	// WorkflowID is a required field indicating the workflow which should be queried.
+	WorkflowID string
+
+	// RunID is an optional field used to identify a specific run of the queried workflow.
+	// If RunID is not provided the latest run will be used.
+	RunID string
+
+	// QueryType is a required field which specifies the query you want to run.
+	// By default, cadence supports "__stack_trace" as a standard query type, which will return string value
+	// representing the call stack of the target workflow. The target workflow could also setup different query handler to handle custom query types.
+	// See comments at workflow.SetQueryHandler(ctx Context, queryType string, handler interface{}) for more details on how to setup query handler within the target workflow.
+	QueryType string
+
+	// Args is an optional field used to identify the arguments passed to the query.
+	Args []interface{}
+
+	// QueryRejectCondition is an optional field used to reject queries based on workflow state.
+	// QueryRejectConditionNotOpen will reject queries to workflows which are not open
+	// QueryRejectConditionNotCompletedCleanly will reject queries to workflows which completed in any state other than completed (e.g. terminated, canceled timeout etc...)
+	QueryRejectCondition *s.QueryRejectCondition
+}
+
+// QueryWorkflowV2Response is the response to QueryWorkflowV2
+type QueryWorkflowV2Response struct {
+	// QueryResult contains the result of executing the query.
+	// This will only be set if the query was completed successfully and not rejected.
+	QueryResult Value
+
+	// QueryRejected contains information about the query rejection.
+	QueryRejected *s.QueryRejected
+}
+
+// QueryWorkflowV2 queries a given workflow execution and returns the query result synchronously.
+// See QueryWorkflowV2Request and QueryWorkflowV2Response for more information.
+// The errors it can return:
+//  - BadRequestError
+//  - InternalServiceError
+//  - EntityNotExistError
+//  - QueryFailError
+func (wc *workflowClient) QueryWorkflowV2(ctx context.Context, request *QueryWorkflowV2Request) (*QueryWorkflowV2Response, error) {
+	var input []byte
+	if len(request.Args) > 0 {
+		var err error
+		if input, err = encodeArgs(wc.dataConverter, request.Args); err != nil {
+			return nil, err
+		}
+	}
+	req := &s.QueryWorkflowRequest{
+		Domain: common.StringPtr(wc.domain),
+		Execution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(request.WorkflowID),
+			RunId:      getRunID(request.RunID),
+		},
+		Query: &s.WorkflowQuery{
+			QueryType: common.StringPtr(request.QueryType),
+			QueryArgs: input,
+		},
+		QueryRejectCondition: request.QueryRejectCondition,
+	}
+
+	var resp *s.QueryWorkflowResponse
+	err := backoff.Retry(ctx,
+		func() error {
+			tchCtx, cancel, opt := newChannelContext(ctx)
+			defer cancel()
+			var err error
+			resp, err = wc.workflowService.QueryWorkflow(tchCtx, req, opt...)
+			return err
+		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.QueryRejected != nil {
+		return &QueryWorkflowV2Response{
+			QueryRejected: resp.QueryRejected,
+			QueryResult: nil,
+		}, nil
+	}
+	return &QueryWorkflowV2Response{
+		QueryRejected: nil,
+		QueryResult: newEncodedValue(resp.QueryResult, wc.dataConverter),
+	}, nil
+}
+
 // DescribeTaskList returns information about the target tasklist, right now this API returns the
 // pollers which polled this tasklist in last few minutes.
 // - tasklist name of tasklist

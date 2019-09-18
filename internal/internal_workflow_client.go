@@ -846,7 +846,7 @@ type QueryWorkflowWithOptionsResponse struct {
 }
 
 // QueryWorkflowWithOptions queries a given workflow execution and returns the query result synchronously.
-// See QueryWorkflowV2Request and QueryWorkflowV2Response for more information.
+// See QueryWorkflowWithOptionsRequest and QueryWorkflowWithOptionsResult for more information.
 // The errors it can return:
 //  - BadRequestError
 //  - InternalServiceError

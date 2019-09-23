@@ -73,6 +73,8 @@ const (
 	defaultMaxConcurrentSessionExecutionSize = 1000 // Large concurrent session execution size (1k)
 
 	testTagsContextKey = "cadence-testTags"
+
+	binaryChecksumEnvName = "CADENCE-CLIENT-WORKER-BINARY-CHECKSUM"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -1036,11 +1038,22 @@ func (aw *aggregatedWorker) Start() error {
 var binaryChecksum string
 var binaryChecksumLock sync.Mutex
 
+func SetBinaryChecksum(checksum string) {
+	binaryChecksumLock.Lock()
+	defer binaryChecksumLock.Unlock()
+	binaryChecksum = checksum
+}
+
 func initBinaryChecksum() error {
 	binaryChecksumLock.Lock()
 	defer binaryChecksumLock.Unlock()
 
 	if len(binaryChecksum) > 0 {
+		return nil
+	}
+
+	if len(os.Getenv(binaryChecksumEnvName)) > 0 {
+		binaryChecksum = os.Getenv(binaryChecksumEnvName)
 		return nil
 	}
 

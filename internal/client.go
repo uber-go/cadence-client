@@ -459,14 +459,12 @@ type (
 )
 
 const (
-	// Default subject to change in the server config
-	ParentClosePolicyDefault ParentClosePolicy = iota
-	// Abandon means not doing anything on the child workflow
-	ParentClosePolicyAbandon
+	// Terminate means terminating the child workflow
+	ParentClosePolicyTerminate ParentClosePolicy = iota
 	// RequestCancel means requesting cancellation on the child workflow
 	ParentClosePolicyRequestCancel
-	// Terminate means terminating the child workflow
-	ParentClosePolicyTerminate
+	// Abandon means not doing anything on the child workflow
+	ParentClosePolicyAbandon
 )
 
 const (
@@ -562,8 +560,6 @@ func (p WorkflowIDReusePolicy) toThriftPtr() *s.WorkflowIdReusePolicy {
 func (p ParentClosePolicy) toThriftPtr() *s.ParentClosePolicy {
 	var policy s.ParentClosePolicy
 	switch p {
-	case ParentClosePolicyDefault:
-		return nil
 	case ParentClosePolicyAbandon:
 		policy = s.ParentClosePolicyAbandon
 	case ParentClosePolicyRequestCancel:

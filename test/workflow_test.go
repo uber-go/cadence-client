@@ -294,11 +294,27 @@ func (w *Workflows) ChildWorkflowSuccess(ctx workflow.Context) (result string, e
 	return
 }
 
-func (w *Workflows) ChildWorkflowSuccessWithParentClosePolicy(ctx workflow.Context) (result string, err error) {
+func (w *Workflows) ChildWorkflowSuccessWithParentClosePolicyTerminate(ctx workflow.Context) (result string, err error) {
 	opts := workflow.ChildWorkflowOptions{
 		TaskStartToCloseTimeout:      5 * time.Second,
 		ExecutionStartToCloseTimeout: 10 * time.Second,
-		ParentClosePolicy:            client.ParentClosePolicyTerminate,
+	}
+	ctx = workflow.WithChildOptions(ctx, opts)
+	ft := workflow.ExecuteChildWorkflow(ctx, w.sleep, 2*time.Minute)
+	err = workflow.Sleep(ctx, 5*time.Second)
+	if err != nil {
+		return "", err
+	}
+	var childWE internal.WorkflowExecution
+	err = ft.GetChildWorkflowExecution().Get(ctx, &childWE)
+	return childWE.ID, err
+}
+
+func (w *Workflows) ChildWorkflowSuccessWithParentClosePolicyAbandon(ctx workflow.Context) (result string, err error) {
+	opts := workflow.ChildWorkflowOptions{
+		TaskStartToCloseTimeout:      5 * time.Second,
+		ExecutionStartToCloseTimeout: 10 * time.Second,
+		ParentClosePolicy:            client.ParentClosePolicyAbandon,
 	}
 	ctx = workflow.WithChildOptions(ctx, opts)
 	ft := workflow.ExecuteChildWorkflow(ctx, w.sleep, 2*time.Minute)
@@ -417,7 +433,8 @@ func (w *Workflows) register() {
 	workflow.Register(w.ChildWorkflowRetryOnError)
 	workflow.Register(w.ChildWorkflowRetryOnTimeout)
 	workflow.Register(w.ChildWorkflowSuccess)
-	workflow.Register(w.ChildWorkflowSuccessWithParentClosePolicy)
+	workflow.Register(w.ChildWorkflowSuccessWithParentClosePolicyTerminate)
+	workflow.Register(w.ChildWorkflowSuccessWithParentClosePolicyAbandon)
 	workflow.Register(w.sleep)
 	workflow.Register(w.child)
 	workflow.Register(w.childForMemoAndSearchAttr)

@@ -388,14 +388,12 @@ const (
 )
 
 const (
-	// Default subject to change in the server config
-	ParentClosePolicyDefault ParentClosePolicy = internal.ParentClosePolicyDefault
-	// Abandon means not doing anything on the child workflow
-	ParentClosePolicyAbandon = internal.ParentClosePolicyAbandon
-	// RequestCancel means requesting cancellation on the child workflow
-	ParentClosePolicyRequestCancel = internal.ParentClosePolicyRequestCancel
 	// Terminate means terminating the child workflow
 	ParentClosePolicyTerminate = internal.ParentClosePolicyTerminate
+	// RequestCancel means requesting cancellation on the child workflow
+	ParentClosePolicyRequestCancel = internal.ParentClosePolicyRequestCancel
+	// Abandon means not doing anything on the child workflow
+	ParentClosePolicyAbandon = internal.ParentClosePolicyAbandon
 )
 
 // NewClient creates an instance of a workflow client

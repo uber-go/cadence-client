@@ -297,13 +297,22 @@ func (ts *IntegrationTestSuite) TestChildWFWithMemoAndSearchAttributes() {
 	ts.Equal("memoVal, searchAttrVal", result)
 }
 
-func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicy() {
+func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	var childWorkflowID string
-	err := ts.executeWorkflow("test-childwf-parent-close-policy", ts.workflows.ChildWorkflowSuccessWithParentClosePolicy, &childWorkflowID)
+	err := ts.executeWorkflow("test-childwf-parent-close-policy", ts.workflows.ChildWorkflowSuccessWithParentClosePolicyTerminate, &childWorkflowID)
 	ts.NoError(err)
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
+}
+
+func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
+	var childWorkflowID string
+	err := ts.executeWorkflow("test-childwf-parent-close-policy", ts.workflows.ChildWorkflowSuccessWithParentClosePolicyAbandon, &childWorkflowID)
+	ts.NoError(err)
+	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
+	ts.NoError(err)
+	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() == 0)
 }
 
 func (ts *IntegrationTestSuite) TestActivityCancelUsingReplay() {
@@ -326,7 +335,7 @@ func (ts *IntegrationTestSuite) registerDomain() {
 	name := domainName
 	retention := int32(1)
 	err := client.Register(ctx, &shared.RegisterDomainRequest{
-		Name:                                   &name,
+		Name: &name,
 		WorkflowExecutionRetentionPeriodInDays: &retention,
 	})
 	if err != nil {

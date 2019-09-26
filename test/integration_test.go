@@ -56,7 +56,7 @@ type IntegrationTestSuite struct {
 const (
 	ctxTimeout                 = 15 * time.Second
 	domainName                 = "integration-test-domain"
-	domainCacheRefreshInterval = 11 * time.Second
+	domainCacheRefreshInterval = 15 * time.Second
 )
 
 func TestIntegrationSuite(t *testing.T) {
@@ -89,11 +89,17 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 	ts.config = newConfig()
 	ts.activities = &Activities{}
 	ts.workflows = &Workflows{}
-	ts.register()
+	ts.registerWorkflowsAndActivities()
 	ts.Nil(waitForTCP(time.Minute, ts.config.ServiceAddr))
+	rpcClient, err := newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
+	ts.Nil(err)
+	ts.rpcClient = rpcClient
+	ts.libClient = client.NewClient(ts.rpcClient.Interface, domainName, &client.Options{})
+	ts.registerDomain()
 }
 
 func (ts *IntegrationTestSuite) TearDownSuite() {
+	ts.rpcClient.Close()
 	// sleep for a while to allow the pollers to shutdown
 	// then assert that there are no lingering go routines
 	time.Sleep(1 * time.Minute)
@@ -105,14 +111,9 @@ func (ts *IntegrationTestSuite) SetupTest() {
 	ts.seq++
 	ts.activities.clearInvoked()
 	ts.taskListName = fmt.Sprintf("tl-%v", ts.seq)
-	rpcClient, err := newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
-	ts.Nil(err)
-	ts.rpcClient = rpcClient
-	ts.libClient = client.NewClient(ts.rpcClient.Interface, domainName, &client.Options{})
-	ts.registerDomain()
 	logger, err := zap.NewDevelopment()
 	ts.Nil(err)
-	ts.worker = worker.New(rpcClient.Interface, domainName, ts.taskListName, worker.Options{
+	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, worker.Options{
 		DisableStickyExecution: ts.config.IsStickyOff,
 		Logger:                 logger,
 	})
@@ -121,7 +122,6 @@ func (ts *IntegrationTestSuite) SetupTest() {
 
 func (ts *IntegrationTestSuite) TearDownTest() {
 	ts.worker.Stop()
-	ts.rpcClient.Close()
 }
 
 func (ts *IntegrationTestSuite) TestBasic() {
@@ -335,7 +335,7 @@ func (ts *IntegrationTestSuite) registerDomain() {
 	name := domainName
 	retention := int32(1)
 	err := client.Register(ctx, &shared.RegisterDomainRequest{
-		Name: &name,
+		Name:                                   &name,
 		WorkflowExecutionRetentionPeriodInDays: &retention,
 	})
 	if err != nil {
@@ -386,7 +386,7 @@ func (ts *IntegrationTestSuite) startWorkflowOptions(wfID string) client.StartWo
 	}
 }
 
-func (ts *IntegrationTestSuite) register() {
+func (ts *IntegrationTestSuite) registerWorkflowsAndActivities() {
 	ts.workflows.register()
 	ts.activities.register()
 }

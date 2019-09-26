@@ -96,7 +96,7 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 func (ts *IntegrationTestSuite) TearDownSuite() {
 	// sleep for a while to allow the pollers to shutdown
 	// then assert that there are no lingering go routines
-	time.Sleep(30 * time.Second)
+	time.Sleep(1 * time.Minute)
 	// https://github.com/uber-go/cadence-client/issues/739
 	goleak.VerifyNoLeaks(ts.T(), goleak.IgnoreTopFunction("go.uber.org/cadence/internal.(*coroutineState).initialYield"))
 }
@@ -297,7 +297,6 @@ func (ts *IntegrationTestSuite) TestChildWFWithMemoAndSearchAttributes() {
 	ts.Equal("memoVal, searchAttrVal", result)
 }
 
-/*
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	var childWorkflowID string
 	err := ts.executeWorkflow("test-childwf-parent-close-policy", ts.workflows.ChildWorkflowSuccessWithParentClosePolicyTerminate, &childWorkflowID)
@@ -306,7 +305,6 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
 }
-*/
 
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 	var childWorkflowID string

@@ -297,7 +297,6 @@ func (ts *IntegrationTestSuite) TestChildWFWithMemoAndSearchAttributes() {
 	ts.Equal("memoVal, searchAttrVal", result)
 }
 
-/*
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	var childWorkflowID string
 	err := ts.executeWorkflow("test-childwf-parent-close-policy", ts.workflows.ChildWorkflowSuccessWithParentClosePolicyTerminate, &childWorkflowID)
@@ -306,9 +305,7 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
 }
-*/
 
-/*
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 	var childWorkflowID string
 	err := ts.executeWorkflow("test-childwf-parent-close-policy", ts.workflows.ChildWorkflowSuccessWithParentClosePolicyAbandon, &childWorkflowID)
@@ -317,7 +314,6 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() == 0)
 }
-*/
 
 func (ts *IntegrationTestSuite) TestActivityCancelUsingReplay() {
 	logger, err := zap.NewDevelopment()

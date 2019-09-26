@@ -297,10 +297,10 @@ func (w *Workflows) ChildWorkflowSuccess(ctx workflow.Context) (result string, e
 func (w *Workflows) ChildWorkflowSuccessWithParentClosePolicyTerminate(ctx workflow.Context) (result string, err error) {
 	opts := workflow.ChildWorkflowOptions{
 		TaskStartToCloseTimeout:      5 * time.Second,
-		ExecutionStartToCloseTimeout: 10 * time.Second,
+		ExecutionStartToCloseTimeout: 30 * time.Second,
 	}
 	ctx = workflow.WithChildOptions(ctx, opts)
-	ft := workflow.ExecuteChildWorkflow(ctx, w.sleep, 2*time.Minute)
+	ft := workflow.ExecuteChildWorkflow(ctx, w.sleep, 20*time.Second)
 	err = workflow.Sleep(ctx, 5*time.Second)
 	if err != nil {
 		return "", err
@@ -313,11 +313,11 @@ func (w *Workflows) ChildWorkflowSuccessWithParentClosePolicyTerminate(ctx workf
 func (w *Workflows) ChildWorkflowSuccessWithParentClosePolicyAbandon(ctx workflow.Context) (result string, err error) {
 	opts := workflow.ChildWorkflowOptions{
 		TaskStartToCloseTimeout:      5 * time.Second,
-		ExecutionStartToCloseTimeout: 10 * time.Second,
+		ExecutionStartToCloseTimeout: 30 * time.Second,
 		ParentClosePolicy:            client.ParentClosePolicyAbandon,
 	}
 	ctx = workflow.WithChildOptions(ctx, opts)
-	ft := workflow.ExecuteChildWorkflow(ctx, w.sleep, 2*time.Minute)
+	ft := workflow.ExecuteChildWorkflow(ctx, w.sleep, 20*time.Second)
 	err = workflow.Sleep(ctx, 5*time.Second)
 	if err != nil {
 		return "", err

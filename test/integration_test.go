@@ -56,7 +56,7 @@ type IntegrationTestSuite struct {
 const (
 	ctxTimeout                 = 15 * time.Second
 	domainName                 = "integration-test-domain"
-	domainCacheRefreshInterval = 15 * time.Second
+	domainCacheRefreshInterval = 20 * time.Second
 )
 
 func TestIntegrationSuite(t *testing.T) {

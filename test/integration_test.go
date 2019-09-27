@@ -348,7 +348,7 @@ func (ts *IntegrationTestSuite) registerDomain() {
 	// bellow is used to guarantee domain is ready
 	var dummyReturn string
 	err = ts.executeWorkflow("test-domain-exist", ts.workflows.SimplestWorkflow, &dummyReturn)
-	numOfRetry := 10
+	numOfRetry := 20
 	for err != nil && numOfRetry >= 0 {
 		if _, ok := err.(*shared.EntityNotExistsError); ok {
 			time.Sleep(domainCacheRefreshInterval)

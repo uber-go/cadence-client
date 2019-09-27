@@ -345,6 +345,19 @@ func (ts *IntegrationTestSuite) registerDomain() {
 	}
 	ts.Nil(err)
 	time.Sleep(domainCacheRefreshInterval) // wait for domain cache refresh on cadence-server
+	// bellow is used to guarantee domain is ready
+	var dummyReturn string
+	err = ts.executeWorkflow("test-domain-exist", ts.workflows.SimplestWorkflow, &dummyReturn)
+	numOfRetry := 10
+	for err != nil && numOfRetry >= 0 {
+		if _, ok := err.(*shared.EntityNotExistsError); ok {
+			time.Sleep(domainCacheRefreshInterval)
+			err = ts.executeWorkflow("test-domain-exist", ts.workflows.SimplestWorkflow, &dummyReturn)
+		} else {
+			break
+		}
+		numOfRetry--
+	}
 }
 
 // executeWorkflow executes a given workflow and waits for the result

@@ -390,6 +390,10 @@ func (w *Workflows) ActivityCancelRepro(ctx workflow.Context) ([]string, error) 
 	return []string{"toUpperWithDelay"}, nil
 }
 
+func (w *Workflows) SimplestWorkflow(ctx workflow.Context) (string, error) {
+	return "hello", nil
+}
+
 func (w *Workflows) child(ctx workflow.Context, arg string, mustFail bool) (string, error) {
 	var result string
 	ctx = workflow.WithActivityOptions(ctx, w.defaultActivityOptions())
@@ -439,6 +443,7 @@ func (w *Workflows) register() {
 	workflow.Register(w.child)
 	workflow.Register(w.childForMemoAndSearchAttr)
 	workflow.Register(w.ActivityCancelRepro)
+	workflow.Register(w.SimplestWorkflow)
 }
 
 func (w *Workflows) defaultActivityOptions() workflow.ActivityOptions {

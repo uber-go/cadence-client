@@ -229,7 +229,10 @@ func constructError(reason string, details []byte, dataConverter DataConverter) 
 		details := newEncodedValues(details, dataConverter)
 		timeoutType, err := getTimeoutTypeFromErrReason(reason)
 		if err != nil {
-			details.Get(&timeoutType)
+			// prior client version uses details to indicate timeoutType
+			if err := details.Get(&timeoutType); err != nil {
+				panic(err)
+			}
 			return NewTimeoutError(timeoutType)
 		}
 		return NewTimeoutError(timeoutType, details)
@@ -294,7 +297,7 @@ func getTimeoutTypeFromErrReason(reason string) (s.TimeoutType, error) {
 	timeoutTypeStr := reason[strings.Index(reason, " ")+1:]
 	var timeoutType s.TimeoutType
 	if err := timeoutType.UnmarshalText([]byte(timeoutTypeStr)); err != nil {
-		// this happens when the timeout error is constructed by an old client
+		// this happens when the timeout error reason is constructed by an prior constructed by prior client version
 		return 0, err
 	}
 	return timeoutType, nil

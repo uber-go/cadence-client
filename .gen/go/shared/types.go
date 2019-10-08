@@ -21623,6 +21623,257 @@ func (v *QueryFailedError) Error() string {
 	return v.String()
 }
 
+type QueryRejectCondition int32
+
+const (
+	QueryRejectConditionNotOpen             QueryRejectCondition = 0
+	QueryRejectConditionNotCompletedCleanly QueryRejectCondition = 1
+)
+
+// QueryRejectCondition_Values returns all recognized values of QueryRejectCondition.
+func QueryRejectCondition_Values() []QueryRejectCondition {
+	return []QueryRejectCondition{
+		QueryRejectConditionNotOpen,
+		QueryRejectConditionNotCompletedCleanly,
+	}
+}
+
+// UnmarshalText tries to decode QueryRejectCondition from a byte slice
+// containing its name.
+//
+//   var v QueryRejectCondition
+//   err := v.UnmarshalText([]byte("NOT_OPEN"))
+func (v *QueryRejectCondition) UnmarshalText(value []byte) error {
+	switch string(value) {
+	case "NOT_OPEN":
+		*v = QueryRejectConditionNotOpen
+		return nil
+	case "NOT_COMPLETED_CLEANLY":
+		*v = QueryRejectConditionNotCompletedCleanly
+		return nil
+	default:
+		return fmt.Errorf("unknown enum value %q for %q", value, "QueryRejectCondition")
+	}
+}
+
+// Ptr returns a pointer to this enum value.
+func (v QueryRejectCondition) Ptr() *QueryRejectCondition {
+	return &v
+}
+
+// ToWire translates QueryRejectCondition into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// Enums are represented as 32-bit integers over the wire.
+func (v QueryRejectCondition) ToWire() (wire.Value, error) {
+	return wire.NewValueI32(int32(v)), nil
+}
+
+// FromWire deserializes QueryRejectCondition from its Thrift-level
+// representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TI32)
+//   if err != nil {
+//     return QueryRejectCondition(0), err
+//   }
+//
+//   var v QueryRejectCondition
+//   if err := v.FromWire(x); err != nil {
+//     return QueryRejectCondition(0), err
+//   }
+//   return v, nil
+func (v *QueryRejectCondition) FromWire(w wire.Value) error {
+	*v = (QueryRejectCondition)(w.GetI32())
+	return nil
+}
+
+// String returns a readable string representation of QueryRejectCondition.
+func (v QueryRejectCondition) String() string {
+	w := int32(v)
+	switch w {
+	case 0:
+		return "NOT_OPEN"
+	case 1:
+		return "NOT_COMPLETED_CLEANLY"
+	}
+	return fmt.Sprintf("QueryRejectCondition(%d)", w)
+}
+
+// Equals returns true if this QueryRejectCondition value matches the provided
+// value.
+func (v QueryRejectCondition) Equals(rhs QueryRejectCondition) bool {
+	return v == rhs
+}
+
+// MarshalJSON serializes QueryRejectCondition into JSON.
+//
+// If the enum value is recognized, its name is returned. Otherwise,
+// its integer value is returned.
+//
+// This implements json.Marshaler.
+func (v QueryRejectCondition) MarshalJSON() ([]byte, error) {
+	switch int32(v) {
+	case 0:
+		return ([]byte)("\"NOT_OPEN\""), nil
+	case 1:
+		return ([]byte)("\"NOT_COMPLETED_CLEANLY\""), nil
+	}
+	return ([]byte)(strconv.FormatInt(int64(v), 10)), nil
+}
+
+// UnmarshalJSON attempts to decode QueryRejectCondition from its JSON
+// representation.
+//
+// This implementation supports both, numeric and string inputs. If a
+// string is provided, it must be a known enum name.
+//
+// This implements json.Unmarshaler.
+func (v *QueryRejectCondition) UnmarshalJSON(text []byte) error {
+	d := json.NewDecoder(bytes.NewReader(text))
+	d.UseNumber()
+	t, err := d.Token()
+	if err != nil {
+		return err
+	}
+
+	switch w := t.(type) {
+	case json.Number:
+		x, err := w.Int64()
+		if err != nil {
+			return err
+		}
+		if x > math.MaxInt32 {
+			return fmt.Errorf("enum overflow from JSON %q for %q", text, "QueryRejectCondition")
+		}
+		if x < math.MinInt32 {
+			return fmt.Errorf("enum underflow from JSON %q for %q", text, "QueryRejectCondition")
+		}
+		*v = (QueryRejectCondition)(x)
+		return nil
+	case string:
+		return v.UnmarshalText([]byte(w))
+	default:
+		return fmt.Errorf("invalid JSON value %q (%T) to unmarshal into %q", t, t, "QueryRejectCondition")
+	}
+}
+
+type QueryRejected struct {
+	CloseStatus *WorkflowExecutionCloseStatus `json:"closeStatus,omitempty"`
+}
+
+// ToWire translates a QueryRejected struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *QueryRejected) ToWire() (wire.Value, error) {
+	var (
+		fields [1]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.CloseStatus != nil {
+		w, err = v.CloseStatus.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+// FromWire deserializes a QueryRejected struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a QueryRejected struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v QueryRejected
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *QueryRejected) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TI32 {
+				var x WorkflowExecutionCloseStatus
+				x, err = _WorkflowExecutionCloseStatus_Read(field.Value)
+				v.CloseStatus = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a QueryRejected
+// struct.
+func (v *QueryRejected) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [1]string
+	i := 0
+	if v.CloseStatus != nil {
+		fields[i] = fmt.Sprintf("CloseStatus: %v", *(v.CloseStatus))
+		i++
+	}
+
+	return fmt.Sprintf("QueryRejected{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this QueryRejected match the
+// provided QueryRejected.
+//
+// This function performs a deep comparison.
+func (v *QueryRejected) Equals(rhs *QueryRejected) bool {
+	if !_WorkflowExecutionCloseStatus_EqualsPtr(v.CloseStatus, rhs.CloseStatus) {
+		return false
+	}
+
+	return true
+}
+
+// GetCloseStatus returns the value of CloseStatus if it is set or its
+// zero value if it is unset.
+func (v *QueryRejected) GetCloseStatus() (o WorkflowExecutionCloseStatus) {
+	if v.CloseStatus != nil {
+		return *v.CloseStatus
+	}
+
+	return
+}
+
 type QueryTaskCompletedType int32
 
 const (
@@ -21759,9 +22010,10 @@ func (v *QueryTaskCompletedType) UnmarshalJSON(text []byte) error {
 }
 
 type QueryWorkflowRequest struct {
-	Domain    *string            `json:"domain,omitempty"`
-	Execution *WorkflowExecution `json:"execution,omitempty"`
-	Query     *WorkflowQuery     `json:"query,omitempty"`
+	Domain               *string               `json:"domain,omitempty"`
+	Execution            *WorkflowExecution    `json:"execution,omitempty"`
+	Query                *WorkflowQuery        `json:"query,omitempty"`
+	QueryRejectCondition *QueryRejectCondition `json:"queryRejectCondition,omitempty"`
 }
 
 // ToWire translates a QueryWorkflowRequest struct into a Thrift-level intermediate
@@ -21781,7 +22033,7 @@ type QueryWorkflowRequest struct {
 //   }
 func (v *QueryWorkflowRequest) ToWire() (wire.Value, error) {
 	var (
-		fields [3]wire.Field
+		fields [4]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -21811,8 +22063,22 @@ func (v *QueryWorkflowRequest) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 30, Value: w}
 		i++
 	}
+	if v.QueryRejectCondition != nil {
+		w, err = v.QueryRejectCondition.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
 
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _QueryRejectCondition_Read(w wire.Value) (QueryRejectCondition, error) {
+	var v QueryRejectCondition
+	err := v.FromWire(w)
+	return v, err
 }
 
 // FromWire deserializes a QueryWorkflowRequest struct from its Thrift-level
@@ -21863,6 +22129,16 @@ func (v *QueryWorkflowRequest) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 40:
+			if field.Value.Type() == wire.TI32 {
+				var x QueryRejectCondition
+				x, err = _QueryRejectCondition_Read(field.Value)
+				v.QueryRejectCondition = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -21876,7 +22152,7 @@ func (v *QueryWorkflowRequest) String() string {
 		return "<nil>"
 	}
 
-	var fields [3]string
+	var fields [4]string
 	i := 0
 	if v.Domain != nil {
 		fields[i] = fmt.Sprintf("Domain: %v", *(v.Domain))
@@ -21890,8 +22166,22 @@ func (v *QueryWorkflowRequest) String() string {
 		fields[i] = fmt.Sprintf("Query: %v", v.Query)
 		i++
 	}
+	if v.QueryRejectCondition != nil {
+		fields[i] = fmt.Sprintf("QueryRejectCondition: %v", *(v.QueryRejectCondition))
+		i++
+	}
 
 	return fmt.Sprintf("QueryWorkflowRequest{%v}", strings.Join(fields[:i], ", "))
+}
+
+func _QueryRejectCondition_EqualsPtr(lhs, rhs *QueryRejectCondition) bool {
+	if lhs != nil && rhs != nil {
+
+		x := *lhs
+		y := *rhs
+		return x.Equals(y)
+	}
+	return lhs == nil && rhs == nil
 }
 
 // Equals returns true if all the fields of this QueryWorkflowRequest match the
@@ -21908,6 +22198,9 @@ func (v *QueryWorkflowRequest) Equals(rhs *QueryWorkflowRequest) bool {
 	if !((v.Query == nil && rhs.Query == nil) || (v.Query != nil && rhs.Query != nil && v.Query.Equals(rhs.Query))) {
 		return false
 	}
+	if !_QueryRejectCondition_EqualsPtr(v.QueryRejectCondition, rhs.QueryRejectCondition) {
+		return false
+	}
 
 	return true
 }
@@ -21922,8 +22215,19 @@ func (v *QueryWorkflowRequest) GetDomain() (o string) {
 	return
 }
 
+// GetQueryRejectCondition returns the value of QueryRejectCondition if it is set or its
+// zero value if it is unset.
+func (v *QueryWorkflowRequest) GetQueryRejectCondition() (o QueryRejectCondition) {
+	if v.QueryRejectCondition != nil {
+		return *v.QueryRejectCondition
+	}
+
+	return
+}
+
 type QueryWorkflowResponse struct {
-	QueryResult []byte `json:"queryResult,omitempty"`
+	QueryResult   []byte         `json:"queryResult,omitempty"`
+	QueryRejected *QueryRejected `json:"queryRejected,omitempty"`
 }
 
 // ToWire translates a QueryWorkflowResponse struct into a Thrift-level intermediate
@@ -21943,7 +22247,7 @@ type QueryWorkflowResponse struct {
 //   }
 func (v *QueryWorkflowResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [1]wire.Field
+		fields [2]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -21957,8 +22261,22 @@ func (v *QueryWorkflowResponse) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 10, Value: w}
 		i++
 	}
+	if v.QueryRejected != nil {
+		w, err = v.QueryRejected.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
 
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _QueryRejected_Read(w wire.Value) (*QueryRejected, error) {
+	var v QueryRejected
+	err := v.FromWire(w)
+	return &v, err
 }
 
 // FromWire deserializes a QueryWorkflowResponse struct from its Thrift-level
@@ -21991,6 +22309,14 @@ func (v *QueryWorkflowResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 20:
+			if field.Value.Type() == wire.TStruct {
+				v.QueryRejected, err = _QueryRejected_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -22004,10 +22330,14 @@ func (v *QueryWorkflowResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [1]string
+	var fields [2]string
 	i := 0
 	if v.QueryResult != nil {
 		fields[i] = fmt.Sprintf("QueryResult: %v", v.QueryResult)
+		i++
+	}
+	if v.QueryRejected != nil {
+		fields[i] = fmt.Sprintf("QueryRejected: %v", v.QueryRejected)
 		i++
 	}
 
@@ -22020,6 +22350,9 @@ func (v *QueryWorkflowResponse) String() string {
 // This function performs a deep comparison.
 func (v *QueryWorkflowResponse) Equals(rhs *QueryWorkflowResponse) bool {
 	if !((v.QueryResult == nil && rhs.QueryResult == nil) || (v.QueryResult != nil && rhs.QueryResult != nil && bytes.Equal(v.QueryResult, rhs.QueryResult))) {
+		return false
+	}
+	if !((v.QueryRejected == nil && rhs.QueryRejected == nil) || (v.QueryRejected != nil && rhs.QueryRejected != nil && v.QueryRejected.Equals(rhs.QueryRejected))) {
 		return false
 	}
 

@@ -103,13 +103,11 @@ It is also possible to heartbeat an activity from an external source:
     client.Client client = client.NewClient(...)
 
     // record heartbeat
-    err := client.RecordHeartbeat(taskToken, details)
+    err := client.RecordActivityHeartbeat(ctx, taskToken, details)
 
-The parameters of the RecordHeartbeat function are:
-
-  - taskToken: This is the value of the binary “TaskToken” field of the
-    “ActivityInfo” struct retrieved inside the activity
-  - details: This is the serializable payload containing progress information
+It expects an additional parameter, "taskToken", which is the value of the binary "TaskToken" field of the
+"ActivityInfo" struct retrieved inside the activity (GetActivityInfo(ctx).TaskToken). "details" is the serializable
+payload containing progress information.
 
 Activity Cancellation
 

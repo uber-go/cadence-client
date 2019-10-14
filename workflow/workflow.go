@@ -110,12 +110,18 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 
 // ExecuteLocalActivity requests to run a local activity. A local activity is like a regular activity with some key
 // differences:
-// * Local activity is scheduled and run by the workflow worker locally.
-// * Local activity does not need Cadence server to schedule activity task and does not rely on activity worker.
-// * No need to register local activity.
-// * The parameter activity to ExecuteLocalActivity() must be a function.
-// * Local activity is for short living activities (usually finishes within seconds).
-// * Local activity cannot heartbeat.
+//
+// • Local activity is scheduled and run by the workflow worker locally.
+//
+// • Local activity does not need Cadence server to schedule activity task and does not rely on activity worker.
+//
+// • No need to register local activity.
+//
+// • The parameter activity to ExecuteLocalActivity() must be a function.
+//
+// • Local activity is for short living activities (usually finishes within seconds).
+//
+// • Local activity cannot heartbeat.
 //
 // Context can be used to pass the settings for this local activity.
 // For now there is only one setting for timeout to be set:

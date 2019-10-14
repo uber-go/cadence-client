@@ -425,13 +425,13 @@ func GetLastCompletionResult(ctx Context, d ...interface{}) error {
 //		   "CustomIntField": 1,
 //		   "CustomBoolField": true,
 //	   }
-//	   worklfow.UpsertSearchAttributes(ctx, attr1)
+//	   workflow.UpsertSearchAttributes(ctx, attr1)
 //
 //	   attr2 := map[string]interface{}{
 //		   "CustomIntField": 2,
 //		   "CustomKeywordField": "seattle",
 //	   }
-//	   worklfow.UpsertSearchAttributes(ctx, attr2)
+//	   workflow.UpsertSearchAttributes(ctx, attr2)
 //   }
 // will eventually have search attributes:
 //   map[string]interface{}{

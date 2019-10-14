@@ -126,9 +126,9 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 // Context can be used to pass the settings for this local activity.
 // For now there is only one setting for timeout to be set:
 //  lao := LocalActivityOptions{
-// 	    ScheduleToCloseTimeout: 5 * time.Second,
-// 	}
-//	ctx := WithLocalActivityOptions(ctx, lao)
+//  	ScheduleToCloseTimeout: 5 * time.Second,
+//  }
+//  ctx := WithLocalActivityOptions(ctx, lao)
 // The timeout here should be relative shorter than the DecisionTaskStartToCloseTimeout of the workflow. If you need a
 // longer timeout, you probably should not use local activity and instead should use regular activity. Local activity is
 // designed to be used for short living activities (usually finishes within seconds).

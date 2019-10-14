@@ -117,7 +117,7 @@ When an activity is cancelled (or its workflow execution is completed or failed)
 is cancelled which sets its Done channel’s closed state. So an activity can use that to perform any necessary cleanup
 and abort its execution. Currently cancellation is delivered only to activities that call RecordActivityHeartbeat.
 
-Async/“Manual” Activity Completion
+Async/Manual Activity Completion
 
 In certain scenarios completing an activity upon completion of its function is not possible or desirable.
 

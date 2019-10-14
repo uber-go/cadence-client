@@ -88,7 +88,7 @@ the Cadence managed service.
     progress := 0
     for hasWork {
         // send heartbeat message to the server
-        activity.RecordActivityHeartbeat(ctx, progress)
+        activity.RecordHeartbeat(ctx, progress)
         // do some work
         ...
         progress++
@@ -103,9 +103,9 @@ It is also possible to heartbeat an activity from an external source:
     client.Client client = client.NewClient(...)
 
     // record heartbeat
-    err := client.RecordActivityHeartbeat(taskToken, details)
+    err := client.RecordHeartbeat(taskToken, details)
 
-The parameters of the RecordActivityHeartbeat function are:
+The parameters of the RecordHeartbeat function are:
 
   - taskToken: This is the value of the binary “TaskToken” field of the
     “ActivityInfo” struct retrieved inside the activity
@@ -115,7 +115,7 @@ Activity Cancellation
 
 When an activity is cancelled (or its workflow execution is completed or failed) the context passed into its function
 is cancelled which sets its Done channel’s closed state. So an activity can use that to perform any necessary cleanup
-and abort its execution. Currently cancellation is delivered only to activities that call RecordActivityHeartbeat.
+and abort its execution. Currently cancellation is delivered only to activities that call RecordHeartbeat.
 
 Async/Manual Activity Completion
 

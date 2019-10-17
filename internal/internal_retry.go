@@ -24,10 +24,13 @@ package internal
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"time"
 
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/backoff"
+	"go.uber.org/yarpc/yarpcerrors"
 )
 
 const (
@@ -72,6 +75,12 @@ func isServiceTransientError(err error) bool {
 		*s.DomainNotActiveError,
 		*s.CancellationAlreadyRequestedError:
 		return false
+	}
+
+	if errStatus, ok := err.(*yarpcerrors.Status); ok {
+		if yarpcerrors.IsUnknown(errStatus) {
+			return false
+		}
 	}
 
 	if err == errShutdown {

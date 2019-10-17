@@ -24,8 +24,6 @@ package internal
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 	"time"
 
 	s "go.uber.org/cadence/.gen/go/shared"

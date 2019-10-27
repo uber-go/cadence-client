@@ -664,6 +664,10 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		return nil, errors.New("nil or empty history")
 	}
 
+	if task.Query != nil && len(task.Queries) != 0 {
+		return nil, errors.New("invalid query decision task")
+	}
+
 	runID := task.WorkflowExecution.GetRunId()
 	workflowID := task.WorkflowExecution.GetWorkflowId()
 	traceLog(func() {
@@ -1403,6 +1407,38 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		forceNewDecision = false
 	}
 
+	/**
+	// for query task
+	if task.Query != nil {
+		queryCompletedRequest := &s.RespondQueryTaskCompletedRequest{TaskToken: task.TaskToken}
+
+		result, err := eventHandler.ProcessQuery(task.Query.GetQueryType(), task.Query.QueryArgs)
+		if err != nil {
+			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
+			queryCompletedRequest.ErrorMessage = common.StringPtr(err.Error())
+		} else {
+			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeCompleted)
+			queryCompletedRequest.QueryResult = result
+		}
+		return queryCompletedRequest
+	}
+	 */
+
+	// handle piggybacked queries
+	var queryResults map[string]*s.WorkflowQueryResult
+	if len(task.Queries) != 0 {
+		queryResults = make(map[string]*s.WorkflowQueryResult)
+		for queryID, query := range task.Queries {
+			result, err := eventHandler.ProcessQuery(query.GetQueryType(), query.QueryArgs)
+			if err != nil {
+				queryResults[queryID] = &s.WorkflowQueryResult{
+					ResultType: common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed),
+
+				}
+			}
+		}
+	}
+
 	return &s.RespondDecisionTaskCompletedRequest{
 		TaskToken:                  task.TaskToken,
 		Decisions:                  decisions,
@@ -1410,6 +1446,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		ReturnNewDecisionTask:      common.BoolPtr(true),
 		ForceCreateNewDecisionTask: common.BoolPtr(forceNewDecision),
 		BinaryChecksum:             common.StringPtr(getBinaryChecksum()),
+		QueryResults:               queryResults,
 	}
 }
 

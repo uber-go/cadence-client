@@ -1407,23 +1407,6 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		forceNewDecision = false
 	}
 
-	/**
-	// for query task
-	if task.Query != nil {
-		queryCompletedRequest := &s.RespondQueryTaskCompletedRequest{TaskToken: task.TaskToken}
-
-		result, err := eventHandler.ProcessQuery(task.Query.GetQueryType(), task.Query.QueryArgs)
-		if err != nil {
-			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
-			queryCompletedRequest.ErrorMessage = common.StringPtr(err.Error())
-		} else {
-			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeCompleted)
-			queryCompletedRequest.QueryResult = result
-		}
-		return queryCompletedRequest
-	}
-	 */
-
 	// handle piggybacked queries
 	var queryResults map[string]*s.WorkflowQueryResult
 	if len(task.Queries) != 0 {
@@ -1432,8 +1415,14 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			result, err := eventHandler.ProcessQuery(query.GetQueryType(), query.QueryArgs)
 			if err != nil {
 				queryResults[queryID] = &s.WorkflowQueryResult{
-					ResultType: common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed),
-
+					ResultType:   common.QueryResultTypePtr(s.QueryResultTypeFailed),
+					ErrorReason:  common.StringPtr("failed to run query"),
+					ErrorDetails: []byte(err.Error()),
+				}
+			} else {
+				queryResults[queryID] = &s.WorkflowQueryResult{
+					ResultType: common.QueryResultTypePtr(s.QueryResultTypeAnswered),
+					Answer:     result,
 				}
 			}
 		}

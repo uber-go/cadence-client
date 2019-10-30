@@ -615,7 +615,7 @@ func (t *TaskHandlersTestSuite) testSideEffectDeferHelper(disableSticky bool) {
 	t.Equal(expectedValue, value)
 
 	// There should be nothing in the cache.
-	t.EqualValues(getWorkflowCache().Size(), 0)
+	t.EqualValues(0, getWorkflowCache().Size())
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {

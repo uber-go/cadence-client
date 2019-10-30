@@ -22,6 +22,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -70,6 +71,22 @@ func helloWorldWorkflowFunc(ctx Context, input []byte) error {
 
 	queryResult = "error:" + err.Error()
 	return err
+}
+
+func querySignalWorkflowFunc(ctx Context, numSignals int) error {
+	var queryResult string
+	SetQueryHandler(ctx, "test-query", func() (string, error) {
+		return queryResult, nil
+	})
+
+	fmt.Println("got signal channel: ", numSignals)
+	ch := GetSignalChannel(ctx, "signal_chan")
+	for i := 0; i < numSignals; i++ {
+		fmt.Println("and handling signal")
+		ch.Receive(ctx, &queryResult)
+		fmt.Println("handled signal: ", queryResult)
+	}
+	return nil
 }
 
 func binaryChecksumWorkflowFunc(ctx Context) ([]*string, error) {

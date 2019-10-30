@@ -155,6 +155,7 @@ type (
 )
 
 func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandlerImpl) *history {
+	fmt.Println("constructing new history: ", len(task.task.History.Events))
 	result := &history{
 		workflowTask:  task,
 		eventsHandler: eventsHandler,
@@ -239,22 +240,28 @@ func isDecisionEvent(eventType s.EventType) bool {
 // TODO(maxim): Refactor to return a struct instead of multiple parameters
 func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent, binaryChecksum *string, err error) {
 	if eh.next == nil {
+		fmt.Println("NextDecisionEvents 1: should get here")
 		eh.next, _, err = eh.nextDecisionEvents()
 		if err != nil {
+			fmt.Println("should not get this error")
 			return result, markers, eh.binaryChecksum, err
 		}
 	}
 
+	fmt.Println("successfully called nextDecisionEvents")
 	result = eh.next
 	checksum := eh.binaryChecksum
 	if len(result) > 0 {
+		fmt.Println("result is greater than 0 no idea what this means")
 		eh.next, markers, err = eh.nextDecisionEvents()
 	}
+	fmt.Println("result length: ", len(result))
 	return result, markers, checksum, err
 }
 
 func (eh *history) hasMoreEvents() bool {
 	historyIterator := eh.workflowTask.historyIterator
+	fmt.Println("historyIterator nil: ", historyIterator == nil)
 	return historyIterator != nil && historyIterator.HasNextPage()
 }
 
@@ -264,15 +271,24 @@ func (eh *history) getMoreEvents() (*s.History, error) {
 
 func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
 	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMoreEvents() {
+		fmt.Println("should not get here this means we have no more events")
+		fmt.Println("currentIndex: ", eh.currentIndex)
+		fmt.Println("length of loaded events: ", len(eh.loadedEvents))
 		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, nil
 	}
 
 	// Process events
 
+	fmt.Println("we also handle events")
+	for _, e := range eh.loadedEvents {
+		fmt.Println(e.EventType)
+	}
+
 OrderEvents:
 	for {
 		// load more history events if needed
 		for eh.currentIndex == len(eh.loadedEvents) {
+			fmt.Println("buffer is not empty should not get here")
 			if !eh.hasMoreEvents() {
 				break OrderEvents
 			}
@@ -313,6 +329,10 @@ OrderEvents:
 	eh.loadedEvents = eh.loadedEvents[eh.currentIndex:]
 	eh.currentIndex = 0
 
+	fmt.Println("got next events: ", len(nextEvents))
+	for _, e := range nextEvents {
+		fmt.Println(e.EventType)
+	}
 	return nextEvents, markers, nil
 }
 
@@ -584,6 +604,7 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	}
 
 	if workflowContext != nil {
+		fmt.Println("workflow is in cache this should not happen")
 		workflowContext.Lock()
 		if task.Query != nil && !isFullHistory {
 			// query task and we have a valid cached state
@@ -596,6 +617,7 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 			workflowContext.ResetIfStale(task, historyIterator)
 		}
 	} else {
+		fmt.Println("workflow is not in cache this should happen")
 		if !isFullHistory {
 			// we are getting partial history task, but cached state was already evicted.
 			// we need to reset history so we get events from beginning to replay/rebuild the state
@@ -606,10 +628,12 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 		}
 
 		if workflowContext, err = wth.createWorkflowContext(task); err != nil {
+			fmt.Println("should not get error here")
 			return
 		}
 
 		if !wth.disableStickyExecution && task.Query == nil {
+			fmt.Println("putting workflow in cache")
 			workflowContext, _ = putWorkflowContext(runID, workflowContext)
 		}
 		workflowContext.Lock()
@@ -619,6 +643,8 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	if err != nil {
 		workflowContext.Unlock(err)
 	}
+
+	fmt.Println("returning workflow context: ", workflowContext == nil)
 
 	return
 }
@@ -651,6 +677,10 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
 	heartbeatFunc decisionHeartbeatFunc,
 ) (completeRequest interface{}, errRet error) {
+	fmt.Println("andrew ProcessWorkflowTask 1: ", len(workflowTask.task.History.Events))
+	for _, e := range workflowTask.task.History.Events {
+		fmt.Println(e.EventType.String())
+	}
 	if workflowTask == nil || workflowTask.task == nil {
 		return nil, errors.New("nil workflow task provided")
 	}
@@ -678,10 +708,12 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 			zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 	})
 
+	fmt.Println("andrew ProcessWorkflowTask 2")
 	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("andrew ProcessWorkflowTask 3")
 
 	defer func() {
 		workflowContext.Unlock(errRet)
@@ -730,6 +762,11 @@ process_Workflow_Loop:
 }
 
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflowTask) (interface{}, error) {
+	fmt.Println("andrew ProcessWorkflowTask 4: ", len(workflowTask.task.History.Events))
+	for _, e := range workflowTask.task.History.Events {
+		fmt.Println(e.EventType.String())
+	}
+	// at this point you have the signal
 	task := workflowTask.task
 	historyIterator := workflowTask.historyIterator
 	if err := w.ResetIfStale(task, historyIterator); err != nil {
@@ -738,6 +775,7 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	w.SetCurrentTask(task)
 
 	eventHandler := w.eventHandler
+	// when you construct a new history you have loaded events
 	reorderedHistory := newHistory(workflowTask, eventHandler)
 	var replayDecisions []*s.Decision
 	var respondEvents []*s.HistoryEvent
@@ -746,9 +784,14 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	// Process events
 ProcessEvents:
 	for {
+		fmt.Println("why: ", len(reorderedHistory.loadedEvents))
 		reorderedEvents, markers, binaryChecksum, err := reorderedHistory.NextDecisionEvents()
 		if err != nil {
 			return nil, err
+		}
+		fmt.Println("reorderedEvents length: ", len(reorderedEvents))
+		for _, e := range reorderedEvents {
+			fmt.Println(e.EventType.String())
 		}
 
 		if len(reorderedEvents) == 0 {
@@ -774,6 +817,7 @@ ProcessEvents:
 		}
 
 		for i, event := range reorderedEvents {
+			fmt.Println("going over reorderedEvents: ", event.EventType)
 			isInReplay := reorderedHistory.IsReplayEvent(event)
 			isLast := !isInReplay && i == len(reorderedEvents)-1
 			if !skipReplayCheck && isDecisionEvent(event.GetEventType()) {
@@ -820,6 +864,9 @@ ProcessEvents:
 			}
 		}
 	}
+
+	// before this point I expect events to have been applied to the workflow
+	fmt.Println("andrew ProcessWorkflowTask 5")
 
 	// Non-deterministic error could happen in 2 different places:
 	//   1) the replay decisions does not match to history events. This is usually due to non backwards compatible code
@@ -1025,7 +1072,9 @@ func (w *workflowExecutionContextImpl) SetCurrentTask(task *s.PollForDecisionTas
 }
 
 func (w *workflowExecutionContextImpl) ResetIfStale(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) error {
+	fmt.Println("ResetIfStale called 1")
 	if len(task.History.Events) > 0 && task.History.Events[0].GetEventId() != w.previousStartedEventID+1 {
+		fmt.Println("ResetIfStale called 2")
 		w.wth.logger.Debug("Cached state staled, new task has unexpected events",
 			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
 			zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
@@ -1408,16 +1457,17 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	}
 
 	// handle piggybacked queries
+	fmt.Println("going over piggybacked queries")
 	var queryResults map[string]*s.WorkflowQueryResult
 	if len(task.Queries) != 0 {
 		queryResults = make(map[string]*s.WorkflowQueryResult)
 		for queryID, query := range task.Queries {
+			fmt.Println("calling process query")
 			result, err := eventHandler.ProcessQuery(query.GetQueryType(), query.QueryArgs)
 			if err != nil {
 				queryResults[queryID] = &s.WorkflowQueryResult{
 					ResultType:   common.QueryResultTypePtr(s.QueryResultTypeFailed),
-					ErrorReason:  common.StringPtr("failed to run query"),
-					ErrorDetails: []byte(err.Error()),
+					ErrorMessage: common.StringPtr(err.Error()),
 				}
 			} else {
 				queryResults[queryID] = &s.WorkflowQueryResult{

@@ -93,6 +93,7 @@ func querySignalWorkflowFunc(ctx Context, numSignals int) error {
 		return "", errors.New(queryErr)
 	})
 
+	futures := make([]Future, numSignals, numSignals)
 	ch := GetSignalChannel(ctx, signalCh)
 	for i := 0; i < numSignals; i++ {
 		// update queryResult when signal is received
@@ -106,7 +107,7 @@ func querySignalWorkflowFunc(ctx Context, numSignals int) error {
 			StartToCloseTimeout:    time.Minute,
 			HeartbeatTimeout:       20 * time.Second,
 		}
-		ExecuteActivity(WithActivityOptions(ctx, ao), "Greeter_Activity")
+		futures[i] = ExecuteActivity(WithActivityOptions(ctx, ao), "Greeter_Activity")
 	}
 	return nil
 }

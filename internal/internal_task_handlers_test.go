@@ -835,9 +835,12 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_InvalidQueryTask() {
 	t.EqualValues(getWorkflowCache().Size(), 0)
 }
 
-func (t *TaskHandlersTestSuite) TestConsistentQuery_Nonsticky_NoEvents() {
+func (t *TaskHandlersTestSuite) TestConsistentQuery_Success() {
 	taskList := "tl1"
-	numberOfSignalsToComplete, err := getDefaultDataConverter().ToData(5)
+	checksum1 := "chck1"
+	numberOfSignalsToComplete, err := getDefaultDataConverter().ToData(2)
+	t.NoError(err)
+	signal, err := getDefaultDataConverter().ToData("signal data")
 	t.NoError(err)
 	testEvents := []*s.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
@@ -846,12 +849,18 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_Nonsticky_NoEvents() {
 		}),
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{
+			ScheduledEventId: common.Int64Ptr(2), BinaryChecksum: common.StringPtr(checksum1)}),
+		createTestEventWorkflowExecutionSignaledWithPayload(5, signalCh, signal),
+		createTestEventDecisionTaskScheduled(6, &s.DecisionTaskScheduledEventAttributes{}),
+		createTestEventDecisionTaskStarted(7),
 	}
+
 	queries := map[string]*s.WorkflowQuery{
 		"id1": {QueryType: common.StringPtr(queryType)},
 		"id2": {QueryType: common.StringPtr(errQueryType)},
 	}
-	task := createWorkflowTaskWithQueries(testEvents, 0, "QuerySignalWorkflow", queries)
+	task := createWorkflowTaskWithQueries(testEvents[0:3], 0, "QuerySignalWorkflow", queries)
 
 	params := workerExecutionParameters{
 		TaskList: taskList,
@@ -877,49 +886,14 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_Nonsticky_NoEvents() {
 	}
 	t.assertQueryResultsEqual(expectedQueryResults, response.QueryResults)
 
-	// clean up workflow left in cache
-	getWorkflowCache().Delete(*task.WorkflowExecution.RunId)
-}
-
-func (t *TaskHandlersTestSuite) TestConsistentQuery_Nonsticky_OneSignal() {
-	taskList := "tl1"
-	checksum1 := "chck1"
-	numberOfSignalsToComplete, err := getDefaultDataConverter().ToData(5)
-	t.NoError(err)
-	signal, err := getDefaultDataConverter().ToData("signal data")
-	t.NoError(err)
-	testEvents := []*s.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
-			TaskList: &s.TaskList{Name: &taskList},
-			Input: numberOfSignalsToComplete,
-		}),
-		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
-		createTestEventDecisionTaskStarted(3),
-		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{
-			ScheduledEventId: common.Int64Ptr(2), BinaryChecksum: common.StringPtr(checksum1)}),
-		createTestEventWorkflowExecutionSignaledWithPayload(5, signalCh, signal),
-		createTestEventDecisionTaskScheduled(6, &s.DecisionTaskScheduledEventAttributes{}),
-		createTestEventDecisionTaskStarted(7),
-	}
-	queries := map[string]*s.WorkflowQuery{
-		"id1": {QueryType: common.StringPtr(queryType)},
-		"id2": {QueryType: common.StringPtr(errQueryType)},
-	}
-	task := createWorkflowTaskWithQueries(testEvents, 0, "QuerySignalWorkflow", queries)
-
-	params := workerExecutionParameters{
-		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
-	}
-
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
-	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
-	response := request.(*s.RespondDecisionTaskCompletedRequest)
+	secondTask := createWorkflowTaskWithQueries(testEvents, 3, "QuerySignalWorkflow", queries)
+	secondTask.WorkflowExecution.RunId = task.WorkflowExecution.RunId
+	request, err = taskHandler.ProcessWorkflowTask(&workflowTask{task: secondTask}, nil)
+	response = request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
 	t.NotNil(response)
 	t.Len(response.Decisions, 1)
-	expectedQueryResults := map[string]*s.WorkflowQueryResult{
+	expectedQueryResults = map[string]*s.WorkflowQueryResult{
 		"id1": {
 			ResultType: common.QueryResultTypePtr(s.QueryResultTypeAnswered),
 			Answer: []byte(fmt.Sprintf("\"%v\"\n", "signal data")),

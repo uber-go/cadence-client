@@ -179,14 +179,7 @@ func createTestEventDecisionTaskStarted(eventID int64) *s.HistoryEvent {
 }
 
 func createTestEventWorkflowExecutionSignaled(eventID int64, signalName string) *s.HistoryEvent {
-	return &s.HistoryEvent{
-		EventId:   common.Int64Ptr(eventID),
-		EventType: common.EventTypePtr(s.EventTypeWorkflowExecutionSignaled),
-		WorkflowExecutionSignaledEventAttributes: &s.WorkflowExecutionSignaledEventAttributes{
-			SignalName: common.StringPtr(signalName),
-			Identity:   common.StringPtr("test-identity"),
-		},
-	}
+	return createTestEventWorkflowExecutionSignaledWithPayload(eventID, signalName, nil)
 }
 
 func createTestEventWorkflowExecutionSignaledWithPayload(eventID int64, signalName string, payload []byte) *s.HistoryEvent {
@@ -837,34 +830,21 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_InvalidQueryTask() {
 	t.EqualValues(getWorkflowCache().Size(), 0)
 }
 
-// test consistent query before signal is sent
-// 
-
-func (t *TaskHandlersTestSuite) TestConsistentQuery_PiggybackQueries_Nonsticky() {
+func (t *TaskHandlersTestSuite) TestConsistentQuery_Nonsticky_NoEvents() {
 	taskList := "tl1"
-	checksum1 := "chck1"
-	numSignals := 5
-	input, err := getDefaultDataConverter().ToData(numSignals)
-	t.NoError(err)
-	signal, err := getDefaultDataConverter().ToData("s1")
+	numberOfSignalsToComplete, err := getDefaultDataConverter().ToData(5)
 	t.NoError(err)
 	testEvents := []*s.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
 			TaskList: &s.TaskList{Name: &taskList},
-			Input: input,
+			Input: numberOfSignalsToComplete,
 		}),
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
-		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{
-			ScheduledEventId: common.Int64Ptr(2), BinaryChecksum: common.StringPtr(checksum1)}),
-		createTestEventWorkflowExecutionSignaledWithPayload(5, "signal_chan", signal),
-		createTestEventDecisionTaskScheduled(6, &s.DecisionTaskScheduledEventAttributes{}),
-		createTestEventDecisionTaskStarted(7),
 	}
-
 	queries := map[string]*s.WorkflowQuery{
 		"id1": {QueryType: common.StringPtr(queryType)},
-		"id2": {QueryType: common.StringPtr(queryType)},
+		"id2": {QueryType: common.StringPtr(errQueryType)},
 	}
 	task := createWorkflowTaskWithQueries(testEvents, 0, "QuerySignalWorkflow", queries)
 
@@ -873,15 +853,83 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_PiggybackQueries_Nonsticky()
 		Identity: "test-id-1",
 		Logger:   t.logger,
 	}
+
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
 	t.NotNil(response)
-	t.Equal(0, len(response.Decisions))
-	t.NotNil(response.QueryResults)
-	t.Len(response.QueryResults, 2)
-	// TODO: add tests to assert query results
+	t.Len(response.Decisions, 0)
+	expectedQueryResults := map[string]*s.WorkflowQueryResult{
+		"id1": {
+			ResultType: common.QueryResultTypePtr(s.QueryResultTypeAnswered),
+			Answer: []byte(fmt.Sprintf("\"%v\"\n", startingQueryValue)),
+		},
+		"id2": {
+			ResultType: common.QueryResultTypePtr(s.QueryResultTypeFailed),
+			ErrorMessage: common.StringPtr(queryErr),
+		},
+	}
+	t.assertQueryResultsEqual(expectedQueryResults, response.QueryResults)
+}
+
+func (t *TaskHandlersTestSuite) TestConsistentQuery_Nonsticky_OneSignal() {
+	taskList := "tl1"
+	checksum1 := "chck1"
+	numberOfSignalsToComplete, err := getDefaultDataConverter().ToData(5)
+	t.NoError(err)
+	signal, err := getDefaultDataConverter().ToData("signal data")
+	t.NoError(err)
+	testEvents := []*s.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
+			TaskList: &s.TaskList{Name: &taskList},
+			Input: numberOfSignalsToComplete,
+		}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{
+			ScheduledEventId: common.Int64Ptr(2), BinaryChecksum: common.StringPtr(checksum1)}),
+		createTestEventWorkflowExecutionSignaledWithPayload(5, signalCh, signal),
+		createTestEventDecisionTaskScheduled(6, &s.DecisionTaskScheduledEventAttributes{}),
+		createTestEventDecisionTaskStarted(7),
+	}
+	queries := map[string]*s.WorkflowQuery{
+		"id1": {QueryType: common.StringPtr(queryType)},
+		"id2": {QueryType: common.StringPtr(errQueryType)},
+	}
+	task := createWorkflowTaskWithQueries(testEvents, 0, "QuerySignalWorkflow", queries)
+
+	params := workerExecutionParameters{
+		TaskList: taskList,
+		Identity: "test-id-1",
+		Logger:   t.logger,
+	}
+
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
+	response := request.(*s.RespondDecisionTaskCompletedRequest)
+	t.NoError(err)
+	t.NotNil(response)
+	t.Len(response.Decisions, 1)
+	expectedQueryResults := map[string]*s.WorkflowQueryResult{
+		"id1": {
+			ResultType: common.QueryResultTypePtr(s.QueryResultTypeAnswered),
+			Answer: []byte(fmt.Sprintf("\"%v\"\n", "signal data")),
+		},
+		"id2": {
+			ResultType: common.QueryResultTypePtr(s.QueryResultTypeFailed),
+			ErrorMessage: common.StringPtr(queryErr),
+		},
+	}
+	t.assertQueryResultsEqual(expectedQueryResults, response.QueryResults)
+}
+
+func (t *TaskHandlersTestSuite) assertQueryResultsEqual(expected map[string]*s.WorkflowQueryResult, actual map[string]*s.WorkflowQueryResult) {
+	t.Equal(len(expected), len(actual))
+	for expectedID, expectedResult := range expected {
+		t.Contains(actual, expectedID)
+		t.True(expectedResult.Equals(actual[expectedID]))
+	}
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {

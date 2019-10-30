@@ -733,7 +733,6 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	isReplay bool,
 	isLast bool,
 ) (err error) {
-	fmt.Println("processing event: ", event.EventType)
 	if event == nil {
 		return errors.New("nil event provided")
 	}
@@ -838,7 +837,6 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		// No Operation.
 
 	case m.EventTypeWorkflowExecutionSignaled:
-		fmt.Println("andrew EventTypeWorkflowExecutionSignaled")
 		weh.handleWorkflowExecutionSignaled(event.WorkflowExecutionSignaledEventAttributes)
 
 	case m.EventTypeSignalExternalWorkflowExecutionInitiated:
@@ -849,7 +847,6 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		weh.handleSignalExternalWorkflowExecutionFailed(event)
 
 	case m.EventTypeExternalWorkflowExecutionSignaled:
-		fmt.Println("external workflow execution signaled")
 		weh.handleSignalExternalWorkflowExecutionCompleted(event)
 
 	case m.EventTypeMarkerRecorded:
@@ -1118,9 +1115,6 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessLocalActivityResult(lar *lo
 
 func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionSignaled(
 	attributes *m.WorkflowExecutionSignaledEventAttributes) {
-
-	fmt.Println("attributes.GetSignalName(): ", attributes.GetSignalName())
-	fmt.Println("attributes.Input: ", string(attributes.Input))
 	weh.signalHandler(attributes.GetSignalName(), attributes.Input)
 }
 

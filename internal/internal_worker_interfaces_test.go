@@ -41,6 +41,7 @@ const (
 
 	startingQueryValue = ""
 	finishedQueryValue = "done"
+	queryErr = "error handling query"
 )
 
 type (
@@ -89,14 +90,24 @@ func querySignalWorkflowFunc(ctx Context, numSignals int) error {
 	})
 
 	SetQueryHandler(ctx, errQueryType, func() (string, error) {
-		return "", errors.New("error handling query")
+		return "", errors.New(queryErr)
 	})
 
 	ch := GetSignalChannel(ctx, signalCh)
 	for i := 0; i < numSignals; i++ {
+		// update queryResult when signal is received
 		ch.Receive(ctx, &queryResult)
+
+		// schedule activity to verify decisions are produced
+		ao := ActivityOptions{
+			TaskList:               "taskList",
+			ActivityID:             "0",
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    time.Minute,
+			HeartbeatTimeout:       20 * time.Second,
+		}
+		ExecuteActivity(WithActivityOptions(ctx, ao), "Greeter_Activity")
 	}
-	queryResult = finishedQueryValue
 	return nil
 }
 

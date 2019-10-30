@@ -22,7 +22,7 @@ package internal
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -32,6 +32,15 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	m "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/zap"
+)
+
+const (
+	queryType = "test-query"
+	errQueryType = "test-err-query"
+	signalCh = "signal-chan"
+
+	startingQueryValue = ""
+	finishedQueryValue = "done"
 )
 
 type (
@@ -47,8 +56,8 @@ type (
 )
 
 func helloWorldWorkflowFunc(ctx Context, input []byte) error {
-	var queryResult string
-	SetQueryHandler(ctx, "test-query", func() (string, error) {
+	queryResult := startingQueryValue
+	SetQueryHandler(ctx, queryType, func() (string, error) {
 		return queryResult, nil
 	})
 
@@ -65,7 +74,7 @@ func helloWorldWorkflowFunc(ctx Context, input []byte) error {
 	queryResult = "waiting-activity-result"
 	err := ExecuteActivity(ctx, activityName).Get(ctx, &result)
 	if err == nil {
-		queryResult = "done"
+		queryResult = finishedQueryValue
 		return nil
 	}
 
@@ -74,18 +83,20 @@ func helloWorldWorkflowFunc(ctx Context, input []byte) error {
 }
 
 func querySignalWorkflowFunc(ctx Context, numSignals int) error {
-	var queryResult string
-	SetQueryHandler(ctx, "test-query", func() (string, error) {
+	queryResult := startingQueryValue
+	SetQueryHandler(ctx, queryType, func() (string, error) {
 		return queryResult, nil
 	})
 
-	fmt.Println("got signal channel: ", numSignals)
-	ch := GetSignalChannel(ctx, "signal_chan")
+	SetQueryHandler(ctx, errQueryType, func() (string, error) {
+		return "", errors.New("error handling query")
+	})
+
+	ch := GetSignalChannel(ctx, signalCh)
 	for i := 0; i < numSignals; i++ {
-		fmt.Println("and handling signal")
 		ch.Receive(ctx, &queryResult)
-		fmt.Println("handled signal: ", queryResult)
 	}
+	queryResult = finishedQueryValue
 	return nil
 }
 

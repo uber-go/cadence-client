@@ -446,7 +446,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_QueryWorkflow_Sticky() {
 	t.NotNil(response.Decisions[0].ScheduleActivityTaskDecisionAttributes)
 
 	// then check the current state using query task
-	task = createQueryTask([]*s.HistoryEvent{}, 6, "HelloWorld_Workflow", "test-query")
+	task = createQueryTask([]*s.HistoryEvent{}, 6, "HelloWorld_Workflow", queryType)
 	task.WorkflowExecution = execution
 	queryResp, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.NoError(err)
@@ -478,25 +478,25 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_QueryWorkflow_NonSticky() {
 	}
 
 	// query after first decision task (notice the previousStartEventID is always the last eventID for query task)
-	task := createQueryTask(testEvents[0:3], 3, "HelloWorld_Workflow", "test-query")
+	task := createQueryTask(testEvents[0:3], 3, "HelloWorld_Workflow", queryType)
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	response, _ := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.verifyQueryResult(response, "waiting-activity-result")
 
 	// query after activity task complete but before second decision task started
-	task = createQueryTask(testEvents[0:7], 7, "HelloWorld_Workflow", "test-query")
+	task = createQueryTask(testEvents[0:7], 7, "HelloWorld_Workflow", queryType)
 	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	response, _ = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.verifyQueryResult(response, "waiting-activity-result")
 
 	// query after second decision task
-	task = createQueryTask(testEvents[0:8], 8, "HelloWorld_Workflow", "test-query")
+	task = createQueryTask(testEvents[0:8], 8, "HelloWorld_Workflow", queryType)
 	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	response, _ = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.verifyQueryResult(response, "done")
 
 	// query after second decision task with extra events
-	task = createQueryTask(testEvents[0:9], 9, "HelloWorld_Workflow", "test-query")
+	task = createQueryTask(testEvents[0:9], 9, "HelloWorld_Workflow", queryType)
 	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	response, _ = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.verifyQueryResult(response, "done")
@@ -522,31 +522,6 @@ func (t *TaskHandlersTestSuite) verifyQueryResult(response interface{}, expected
 	err := encodedValue.Get(&queryResult)
 	t.NoError(err)
 	t.Equal(expectedResult, queryResult)
-}
-
-func (t *TaskHandlersTestSuite) TestInvalidQueryTask() {
-	taskList := "taskList"
-	params := workerExecutionParameters{
-		TaskList:                       taskList,
-		Identity:                       "test-id-1",
-		Logger:                         zap.NewNop(),
-		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
-	}
-
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
-	task := createWorkflowTask(nil, 3, "HelloWorld_Workflow")
-	task.Query = &s.WorkflowQuery{}
-	task.Queries = map[string]*s.WorkflowQuery{"query_id": {}}
-	newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}))
-	// query and queries are both specified so this is an invalid task
-	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
-
-	t.Error(err)
-	t.Nil(request)
-	t.Contains(err.Error(), "invalid query decision task")
-
-	// There should be nothing in the cache.
-	t.EqualValues(getWorkflowCache().Size(), 0)
 }
 
 func (t *TaskHandlersTestSuite) TestCacheEvictionWhenErrorOccurs() {
@@ -837,14 +812,41 @@ func (t *TaskHandlersTestSuite) TestGetWorkflowInfo() {
 	t.EqualValues(testDomain, result.Domain)
 }
 
-func (t *TaskHandlersTestSuite) TestPiggybackedQueries_Nonsticky() {
+func (t *TaskHandlersTestSuite) TestConsistentQuery_InvalidQueryTask() {
+	taskList := "taskList"
+	params := workerExecutionParameters{
+		TaskList:                       taskList,
+		Identity:                       "test-id-1",
+		Logger:                         zap.NewNop(),
+		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+	}
+
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	task := createWorkflowTask(nil, 3, "HelloWorld_Workflow")
+	task.Query = &s.WorkflowQuery{}
+	task.Queries = map[string]*s.WorkflowQuery{"query_id": {}}
+	newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}))
+	// query and queries are both specified so this is an invalid task
+	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
+
+	t.Error(err)
+	t.Nil(request)
+	t.Contains(err.Error(), "invalid query decision task")
+
+	// There should be nothing in the cache.
+	t.EqualValues(getWorkflowCache().Size(), 0)
+}
+
+// test consistent query before signal is sent
+// 
+
+func (t *TaskHandlersTestSuite) TestConsistentQuery_PiggybackQueries_Nonsticky() {
 	taskList := "tl1"
 	checksum1 := "chck1"
 	numSignals := 5
 	input, err := getDefaultDataConverter().ToData(numSignals)
 	t.NoError(err)
-
-	signal, err := getDefaultDataConverter().ToData("andrew got this")
+	signal, err := getDefaultDataConverter().ToData("s1")
 	t.NoError(err)
 	testEvents := []*s.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
@@ -861,8 +863,8 @@ func (t *TaskHandlersTestSuite) TestPiggybackedQueries_Nonsticky() {
 	}
 
 	queries := map[string]*s.WorkflowQuery{
-		"id1": {QueryType: common.StringPtr("test-query")},
-		"id2": {QueryType: common.StringPtr("test-query")},
+		"id1": {QueryType: common.StringPtr(queryType)},
+		"id2": {QueryType: common.StringPtr(queryType)},
 	}
 	task := createWorkflowTaskWithQueries(testEvents, 0, "QuerySignalWorkflow", queries)
 
@@ -879,10 +881,7 @@ func (t *TaskHandlersTestSuite) TestPiggybackedQueries_Nonsticky() {
 	t.Equal(0, len(response.Decisions))
 	t.NotNil(response.QueryResults)
 	t.Len(response.QueryResults, 2)
-	fmt.Println("did it work: ", response.QueryResults)
-	for _, qr := range response.QueryResults {
-		fmt.Println(string(qr.Answer))
-	}
+	// TODO: add tests to assert query results
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {

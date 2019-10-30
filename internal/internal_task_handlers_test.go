@@ -600,6 +600,7 @@ func (t *TaskHandlersTestSuite) testSideEffectDeferHelper(disableSticky bool) {
 
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
 	task := createWorkflowTask(testEvents, 0, workflowName)
+	fmt.Printf("task.WorkflowExecution: %+v\n", *task.WorkflowExecution)
 	_, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.Nil(err)
 
@@ -615,6 +616,10 @@ func (t *TaskHandlersTestSuite) testSideEffectDeferHelper(disableSticky bool) {
 	t.Equal(expectedValue, value)
 
 	// There should be nothing in the cache.
+
+
+	wfCache := getWorkflowCache()
+	fmt.Println("does the key even exist: ", wfCache.Exist(*task.WorkflowExecution.RunId))
 	t.EqualValues(0, getWorkflowCache().Size())
 }
 
@@ -871,6 +876,9 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_Nonsticky_NoEvents() {
 		},
 	}
 	t.assertQueryResultsEqual(expectedQueryResults, response.QueryResults)
+
+	// clean up workflow left in cache
+	getWorkflowCache().Delete(*task.WorkflowExecution.RunId)
 }
 
 func (t *TaskHandlersTestSuite) TestConsistentQuery_Nonsticky_OneSignal() {
@@ -922,6 +930,9 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_Nonsticky_OneSignal() {
 		},
 	}
 	t.assertQueryResultsEqual(expectedQueryResults, response.QueryResults)
+
+	// clean up workflow left in cache
+	getWorkflowCache().Delete(*task.WorkflowExecution.RunId)
 }
 
 func (t *TaskHandlersTestSuite) assertQueryResultsEqual(expected map[string]*s.WorkflowQueryResult, actual map[string]*s.WorkflowQueryResult) {

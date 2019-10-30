@@ -508,7 +508,6 @@ func scheduleLocalActivity(ctx Context, params *executeLocalActivityParams) Futu
 	f := &futureImpl{channel: NewChannel(ctx).(*channelImpl)}
 	ctxDone, cancellable := ctx.Done().(*channelImpl)
 	cancellationCallback := &receiveCallback{}
-
 	la := getWorkflowEnvironment(ctx).ExecuteLocalActivity(*params, func(lar *localActivityResultWrapper) {
 		if cancellable {
 			// future is done, we don't need cancellation anymore

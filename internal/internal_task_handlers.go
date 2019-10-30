@@ -312,6 +312,7 @@ OrderEvents:
 	// shrink loaded events so it can be GCed
 	eh.loadedEvents = eh.loadedEvents[eh.currentIndex:]
 	eh.currentIndex = 0
+
 	return nextEvents, markers, nil
 }
 
@@ -737,7 +738,6 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	w.SetCurrentTask(task)
 
 	eventHandler := w.eventHandler
-	// when you construct a new history you have loaded events
 	reorderedHistory := newHistory(workflowTask, eventHandler)
 	var replayDecisions []*s.Decision
 	var respondEvents []*s.HistoryEvent
@@ -1407,7 +1407,6 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		forceNewDecision = false
 	}
 
-	// handle piggybacked queries
 	var queryResults map[string]*s.WorkflowQueryResult
 	if len(task.Queries) != 0 {
 		queryResults = make(map[string]*s.WorkflowQueryResult)

@@ -118,7 +118,7 @@ type (
 		identity                       string
 		enableLoggingInReplay          bool
 		disableStickyExecution         bool
-		hostEnv                        *hostEnvImpl
+		registry                       *registry
 		laTunnel                       *localActivityTunnel
 		nonDeterministicWorkflowPolicy NonDeterministicWorkflowPolicy
 		dataConverter                  DataConverter
@@ -136,7 +136,7 @@ type (
 		metricsScope       *metrics.TaggedScope
 		logger             *zap.Logger
 		userContext        context.Context
-		hostEnv            *hostEnvImpl
+		registry           *registry
 		activityProvider   activityProvider
 		dataConverter      DataConverter
 		workerStopCh       <-chan struct{}
@@ -369,7 +369,7 @@ func newWorkflowTaskHandler(
 	domain string,
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
-	hostEnv *hostEnvImpl,
+	registry *registry,
 ) WorkflowTaskHandler {
 	ensureRequiredParams(&params)
 	return &workflowTaskHandlerImpl{
@@ -380,7 +380,7 @@ func newWorkflowTaskHandler(
 		identity:                       params.Identity,
 		enableLoggingInReplay:          params.EnableLoggingInReplay,
 		disableStickyExecution:         params.DisableStickyExecution,
-		hostEnv:                        hostEnv,
+		registry:                       registry,
 		nonDeterministicWorkflowPolicy: params.NonDeterministicWorkflowPolicy,
 		dataConverter:                  params.DataConverter,
 		contextPropagators:             params.ContextPropagators,
@@ -567,7 +567,7 @@ func (w *workflowExecutionContextImpl) createEventHandler() {
 		w.wth.logger,
 		w.wth.enableLoggingInReplay,
 		w.wth.metricsScope,
-		w.wth.hostEnv,
+		w.wth.registry,
 		w.wth.dataConverter,
 		w.wth.contextPropagators,
 		w.wth.tracer,
@@ -1580,15 +1580,15 @@ func (wth *workflowTaskHandlerImpl) executeAnyPressurePoints(event *s.HistoryEve
 func newActivityTaskHandler(
 	service workflowserviceclient.Interface,
 	params workerExecutionParameters,
-	env *hostEnvImpl,
+	registry *registry,
 ) ActivityTaskHandler {
-	return newActivityTaskHandlerWithCustomProvider(service, params, env, nil)
+	return newActivityTaskHandlerWithCustomProvider(service, params, registry, nil)
 }
 
 func newActivityTaskHandlerWithCustomProvider(
 	service workflowserviceclient.Interface,
 	params workerExecutionParameters,
-	env *hostEnvImpl,
+	registry *registry,
 	activityProvider activityProvider,
 ) ActivityTaskHandler {
 	return &activityTaskHandlerImpl{
@@ -1598,7 +1598,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		logger:             params.Logger,
 		metricsScope:       metrics.NewTaggedScope(params.MetricsScope),
 		userContext:        params.UserContext,
-		hostEnv:            env,
+		registry:           registry,
 		activityProvider:   activityProvider,
 		dataConverter:      params.DataConverter,
 		workerStopCh:       params.WorkerStopChannel,
@@ -1828,7 +1828,7 @@ func (ath *activityTaskHandlerImpl) getActivity(name string) activity {
 		return ath.activityProvider(name)
 	}
 
-	if a, ok := ath.hostEnv.getActivity(name); ok {
+	if a, ok := ath.registry.getActivity(name); ok {
 		return a
 	}
 
@@ -1836,7 +1836,7 @@ func (ath *activityTaskHandlerImpl) getActivity(name string) activity {
 }
 
 func (ath *activityTaskHandlerImpl) getRegisteredActivityNames() (activityNames []string) {
-	for _, a := range ath.hostEnv.getRegisteredActivities() {
+	for _, a := range ath.registry.getRegisteredActivities() {
 		activityNames = append(activityNames, a.ActivityType().Name)
 	}
 	return

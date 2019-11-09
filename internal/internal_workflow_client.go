@@ -58,6 +58,7 @@ type (
 	workflowClient struct {
 		workflowService    workflowserviceclient.Interface
 		domain             string
+		registry           *registry
 		metricsScope       *metrics.TaggedScope
 		identity           string
 		dataConverter      DataConverter
@@ -102,6 +103,7 @@ type (
 		currentRunID  string
 		iterFn        func(ctx context.Context, runID string) HistoryEventIterator
 		dataConverter DataConverter
+		registry      *registry
 	}
 
 	// HistoryEventIterator represents the interface for
@@ -170,7 +172,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	// Validate type and its arguments.
-	workflowType, input, err := getValidatedWorkflowFunction(workflowFunc, args, wc.dataConverter)
+	workflowType, input, err := getValidatedWorkflowFunction(workflowFunc, args, wc.dataConverter, wc.registry)
 	if err != nil {
 		return nil, err
 	}
@@ -286,6 +288,7 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 		currentRunID:  runID,
 		iterFn:        iterFn,
 		dataConverter: wc.dataConverter,
+		registry:      wc.registry,
 	}, nil
 }
 
@@ -305,6 +308,7 @@ func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, ru
 		currentRunID:  runID,
 		iterFn:        iterFn,
 		dataConverter: wc.dataConverter,
+		registry:      wc.registry,
 	}
 }
 
@@ -366,7 +370,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 	}
 
 	// Validate type and its arguments.
-	workflowType, input, err := getValidatedWorkflowFunction(workflowFunc, workflowArgs, wc.dataConverter)
+	workflowType, input, err := getValidatedWorkflowFunction(workflowFunc, workflowArgs, wc.dataConverter, wc.registry)
 	if err != nil {
 		return nil, err
 	}
@@ -1094,7 +1098,7 @@ func (workflowRun *workflowRunImpl) Get(ctx context.Context, valuePtr interface{
 		if rf.Type().Kind() != reflect.Ptr {
 			return errors.New("value parameter is not a pointer")
 		}
-		err = deSerializeFunctionResult(workflowRun.workflowFn, attributes.Result, valuePtr, workflowRun.dataConverter)
+		err = deSerializeFunctionResult(workflowRun.workflowFn, attributes.Result, valuePtr, workflowRun.dataConverter, workflowRun.registry)
 	case s.EventTypeWorkflowExecutionFailed:
 		attributes := closeEvent.WorkflowExecutionFailedEventAttributes
 		err = constructError(attributes.GetReason(), attributes.Details, workflowRun.dataConverter)

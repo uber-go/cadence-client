@@ -972,11 +972,11 @@ func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskTimedOut(event *
 
 	var err error
 	attributes := event.ActivityTaskTimedOutEventAttributes
-	if len(attributes.GetLastFailuireReason()) > 0 {
+	if len(attributes.GetLastFailureReason()) > 0 {
 		// When retry activity timeout, it is possible that previous attempts got other customer timeout errors.
 		// To stabilize the error type, we always return the customer error.
 		// See more details of background: https://github.com/uber/cadence/issues/2627
-		err = constructError(attributes.GetLastFailuireReason(), attributes.LastFailuireDetails, weh.GetDataConverter())
+		err = constructError(attributes.GetLastFailureReason(), attributes.LastFailureDetails, weh.GetDataConverter())
 	} else {
 		details := newEncodedValues(attributes.Details, weh.GetDataConverter())
 		err = NewTimeoutError(attributes.GetTimeoutType(), details)

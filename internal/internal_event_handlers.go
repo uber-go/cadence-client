@@ -977,7 +977,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskTimedOut(event *
 		// To stabilize the error type, we always return the customer error.
 		// See more details of background: https://github.com/uber/cadence/issues/2627
 		err = constructError(attributes.GetLastFailuireReason(), attributes.LastFailuireDetails, weh.GetDataConverter())
-		fmt.Println("debug handleActivityTaskTimedOut", err)
 	} else {
 		details := newEncodedValues(attributes.Details, weh.GetDataConverter())
 		err = NewTimeoutError(attributes.GetTimeoutType(), details)

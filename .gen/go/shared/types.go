@@ -1735,10 +1735,12 @@ func (v *ActivityTaskStartedEventAttributes) GetAttempt() (o int32) {
 }
 
 type ActivityTaskTimedOutEventAttributes struct {
-	Details          []byte       `json:"details,omitempty"`
-	ScheduledEventId *int64       `json:"scheduledEventId,omitempty"`
-	StartedEventId   *int64       `json:"startedEventId,omitempty"`
-	TimeoutType      *TimeoutType `json:"timeoutType,omitempty"`
+	Details             []byte       `json:"details,omitempty"`
+	ScheduledEventId    *int64       `json:"scheduledEventId,omitempty"`
+	StartedEventId      *int64       `json:"startedEventId,omitempty"`
+	TimeoutType         *TimeoutType `json:"timeoutType,omitempty"`
+	LastFailuireReason  *string      `json:"lastFailuireReason,omitempty"`
+	LastFailuireDetails []byte       `json:"lastFailuireDetails,omitempty"`
 }
 
 // ToWire translates a ActivityTaskTimedOutEventAttributes struct into a Thrift-level intermediate
@@ -1758,7 +1760,7 @@ type ActivityTaskTimedOutEventAttributes struct {
 //   }
 func (v *ActivityTaskTimedOutEventAttributes) ToWire() (wire.Value, error) {
 	var (
-		fields [4]wire.Field
+		fields [6]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -1794,6 +1796,22 @@ func (v *ActivityTaskTimedOutEventAttributes) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+	if v.LastFailuireReason != nil {
+		w, err = wire.NewValueString(*(v.LastFailuireReason)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.LastFailuireDetails != nil {
+		w, err = wire.NewValueBinary(v.LastFailuireDetails), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
 
@@ -1866,6 +1884,24 @@ func (v *ActivityTaskTimedOutEventAttributes) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 40:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.LastFailuireReason = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 50:
+			if field.Value.Type() == wire.TBinary {
+				v.LastFailuireDetails, err = field.Value.GetBinary(), error(nil)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -1879,7 +1915,7 @@ func (v *ActivityTaskTimedOutEventAttributes) String() string {
 		return "<nil>"
 	}
 
-	var fields [4]string
+	var fields [6]string
 	i := 0
 	if v.Details != nil {
 		fields[i] = fmt.Sprintf("Details: %v", v.Details)
@@ -1895,6 +1931,14 @@ func (v *ActivityTaskTimedOutEventAttributes) String() string {
 	}
 	if v.TimeoutType != nil {
 		fields[i] = fmt.Sprintf("TimeoutType: %v", *(v.TimeoutType))
+		i++
+	}
+	if v.LastFailuireReason != nil {
+		fields[i] = fmt.Sprintf("LastFailuireReason: %v", *(v.LastFailuireReason))
+		i++
+	}
+	if v.LastFailuireDetails != nil {
+		fields[i] = fmt.Sprintf("LastFailuireDetails: %v", v.LastFailuireDetails)
 		i++
 	}
 
@@ -1928,6 +1972,12 @@ func (v *ActivityTaskTimedOutEventAttributes) Equals(rhs *ActivityTaskTimedOutEv
 	if !_TimeoutType_EqualsPtr(v.TimeoutType, rhs.TimeoutType) {
 		return false
 	}
+	if !_String_EqualsPtr(v.LastFailuireReason, rhs.LastFailuireReason) {
+		return false
+	}
+	if !((v.LastFailuireDetails == nil && rhs.LastFailuireDetails == nil) || (v.LastFailuireDetails != nil && rhs.LastFailuireDetails != nil && bytes.Equal(v.LastFailuireDetails, rhs.LastFailuireDetails))) {
+		return false
+	}
 
 	return true
 }
@@ -1957,6 +2007,16 @@ func (v *ActivityTaskTimedOutEventAttributes) GetStartedEventId() (o int64) {
 func (v *ActivityTaskTimedOutEventAttributes) GetTimeoutType() (o TimeoutType) {
 	if v.TimeoutType != nil {
 		return *v.TimeoutType
+	}
+
+	return
+}
+
+// GetLastFailuireReason returns the value of LastFailuireReason if it is set or its
+// zero value if it is unset.
+func (v *ActivityTaskTimedOutEventAttributes) GetLastFailuireReason() (o string) {
+	if v.LastFailuireReason != nil {
+		return *v.LastFailuireReason
 	}
 
 	return

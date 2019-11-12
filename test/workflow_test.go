@@ -394,21 +394,20 @@ func (w *Workflows) SimplestWorkflow(ctx workflow.Context) (string, error) {
 	return "hello", nil
 }
 
-func (w *Workflows) RetryTimeoutStableErrorWorkflow(ctx workflow.Context, input string) (result string, err error) {
+func (w *Workflows) RetryTimeoutStableErrorWorkflow(ctx workflow.Context) (result string, err error) {
 	ao := workflow.ActivityOptions{
-		ScheduleToStartTimeout: time.Second,
-		StartToCloseTimeout:    time.Second * 10,
-		HeartbeatTimeout:       time.Second * 10,
+		ScheduleToStartTimeout: time.Second * 2,
+		StartToCloseTimeout:    time.Second * 8,
 		RetryPolicy: &cadence.RetryPolicy{
 			InitialInterval:    time.Second,
 			BackoffCoefficient: 1.0,
 			MaximumInterval:    time.Second,
-			ExpirationInterval: time.Second * 10,
+			ExpirationInterval: time.Second * 6,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
-	err = workflow.ExecuteActivity(ctx, retryTimeoutStableErrorActivity).Get(ctx, nil)
+	err = workflow.ExecuteActivity(ctx, "retryTimeoutStableErrorActivity").Get(ctx, nil)
 
 	cerr, ok := err.(*cadence.CustomError)
 	if !ok {

@@ -138,9 +138,9 @@ func (ts *IntegrationTestSuite) TestActivityRetryOnError() {
 	ts.EqualValues(expected, ts.activities.invoked())
 }
 
-func (ts *IntegrationTestSuite) TestActivityRetryOnTimeoutError() {
+func (ts *IntegrationTestSuite) TestActivityRetryOnTimeoutStableError() {
 	var expected []string
-	err := ts.executeWorkflow("test-activity-retry-on-timeout-error", ts.workflows.RetryTimeoutStableErrorWorkflow, &expected)
+	err := ts.executeWorkflow("test-activity-retry-on-timeout-stable-error", ts.workflows.RetryTimeoutStableErrorWorkflow, &expected)
 	ts.Nil(err)
 }
 

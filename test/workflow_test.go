@@ -397,12 +397,12 @@ func (w *Workflows) SimplestWorkflow(ctx workflow.Context) (string, error) {
 func (w *Workflows) RetryTimeoutStableErrorWorkflow(ctx workflow.Context) ([]string, error) {
 	ao := workflow.ActivityOptions{
 		ScheduleToStartTimeout: time.Second * 2,
-		StartToCloseTimeout:    time.Second * 8,
+		StartToCloseTimeout:    time.Second * 5,
 		RetryPolicy: &cadence.RetryPolicy{
 			InitialInterval:    time.Second,
 			BackoffCoefficient: 1.0,
 			MaximumInterval:    time.Second,
-			ExpirationInterval: time.Second * 6,
+			ExpirationInterval: time.Second * 5,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)

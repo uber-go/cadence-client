@@ -98,6 +98,10 @@ type (
 		//  if err := f.Get(ctx, &v); err != nil {
 		//      return err
 		//  }
+		//
+		// The valuePtr parameter can be nil when the encoded result value is not needed.
+		// Example:
+		//  err = f.Get(ctx, nil) 
 		Get(ctx Context, valuePtr interface{}) error
 
 		// When true Get is guaranteed to not block
@@ -828,13 +832,13 @@ func signalExternalWorkflow(ctx Context, workflowID, runID, signalName string, a
 //		   "CustomIntField": 1,
 //		   "CustomBoolField": true,
 //	   }
-//	   worklfow.UpsertSearchAttributes(ctx, attr1)
+//	   workflow.UpsertSearchAttributes(ctx, attr1)
 //
 //	   attr2 := map[string]interface{}{
 //		   "CustomIntField": 2,
 //		   "CustomKeywordField": "seattle",
 //	   }
-//	   worklfow.UpsertSearchAttributes(ctx, attr2)
+//	   workflow.UpsertSearchAttributes(ctx, attr2)
 //   }
 // will eventually have search attributes:
 //   map[string]interface{}{

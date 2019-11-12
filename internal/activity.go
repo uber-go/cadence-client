@@ -224,7 +224,7 @@ func GetWorkerStopChannel(ctx context.Context) <-chan struct{} {
 //  context doesn't support overriding value of ctx.Error.
 //  TODO: Implement automatic heartbeating with cancellation through ctx.
 // details - the details that you provided here can be seen in the worflow when it receives TimeoutError, you
-// can check error TimeOutType()/Details().
+// can check error TimeoutType()/Details().
 func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 	env := getActivityEnv(ctx)
 	if env.isLocalActivity {
@@ -285,7 +285,7 @@ func WithActivityTask(
 		deadline = startToCloseDeadline
 	}
 
-	logger.With(
+	logger = logger.With(
 		zapcore.Field{Key: tagActivityID, Type: zapcore.StringType, String: *task.ActivityId},
 		zapcore.Field{Key: tagActivityType, Type: zapcore.StringType, String: *task.ActivityType.Name},
 		zapcore.Field{Key: tagWorkflowType, Type: zapcore.StringType, String: *task.WorkflowType.Name},

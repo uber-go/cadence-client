@@ -37,6 +37,11 @@ type Activities struct {
 
 var errFailOnPurpose = cadence.NewCustomError("failing-on-purpose")
 
+func retryTimeoutStableErrorActivity(ctx context.Context) (string, error) {
+	time.Sleep(time.Second * 6)
+	return "Hello world", errFailOnPurpose
+}
+
 func (a *Activities) Sleep(ctx context.Context, delay time.Duration) error {
 	a.append("sleep")
 	time.Sleep(delay)

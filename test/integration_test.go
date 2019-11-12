@@ -138,6 +138,12 @@ func (ts *IntegrationTestSuite) TestActivityRetryOnError() {
 	ts.EqualValues(expected, ts.activities.invoked())
 }
 
+func (ts *IntegrationTestSuite) TestActivityRetryOnTimeoutError() {
+	var expected []string
+	err := ts.executeWorkflow("test-activity-retry-on-timeout-error", ts.workflows.RetryTimeoutStableErrorWorkflow, &expected)
+	ts.Nil(err)
+}
+
 func (ts *IntegrationTestSuite) TestActivityRetryOptionsChange() {
 	var expected []string
 	err := ts.executeWorkflow("test-activity-retry-options-change", ts.workflows.ActivityRetryOptionsChange, &expected)

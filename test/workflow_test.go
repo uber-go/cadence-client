@@ -394,7 +394,7 @@ func (w *Workflows) SimplestWorkflow(ctx workflow.Context) (string, error) {
 	return "hello", nil
 }
 
-func (w *Workflows) RetryTimeoutStableErrorWorkflow(ctx workflow.Context) (result string, err error) {
+func (w *Workflows) RetryTimeoutStableErrorWorkflow(ctx workflow.Context) ([]string, error) {
 	ao := workflow.ActivityOptions{
 		ScheduleToStartTimeout: time.Second * 2,
 		StartToCloseTimeout:    time.Second * 8,
@@ -407,16 +407,16 @@ func (w *Workflows) RetryTimeoutStableErrorWorkflow(ctx workflow.Context) (resul
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
-	err = workflow.ExecuteActivity(ctx, "retryTimeoutStableErrorActivity").Get(ctx, nil)
+	err := workflow.ExecuteActivity(ctx, "retryTimeoutStableErrorActivity").Get(ctx, nil)
 
 	cerr, ok := err.(*cadence.CustomError)
 	if !ok {
-		return "", fmt.Errorf("activity failed with unexpected error: %v", err)
+		return []string{}, fmt.Errorf("activity failed with unexpected error: %v", err)
 	}
 	if cerr.Reason() != errFailOnPurpose.Reason() {
-		return "", fmt.Errorf("activity failed with unexpected error reason: %v", cerr.Reason())
+		return []string{}, fmt.Errorf("activity failed with unexpected error reason: %v", cerr.Reason())
 	}
-	return "succ", nil
+	return []string{}, nil
 }
 
 func (w *Workflows) child(ctx workflow.Context, arg string, mustFail bool) (string, error) {

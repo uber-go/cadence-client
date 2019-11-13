@@ -28,7 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,18 +36,11 @@ func createRootTestContext() (ctx Context) {
 	return newWorkflowContext(env.impl)
 }
 
-func requireNoExecuteErr(t *testing.T, err error) {
-	if err != nil {
-		require.IsType(t, (*workflowPanicError)(nil), err)
-		require.NoError(t, err, err.(*workflowPanicError).StackTrace())
-	}
-}
-
 func TestDispatcher(t *testing.T) {
 	value := "foo"
 	d, _ := newDispatcher(createRootTestContext(), func(ctx Context) { value = "bar" })
 	require.Equal(t, "foo", value)
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone())
 	require.Equal(t, "bar", value)
 }
@@ -65,7 +57,7 @@ func TestNonBlockingChildren(t *testing.T) {
 		history = append(history, "root")
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone())
 
 	require.EqualValues(t, 11, len(history))
@@ -79,7 +71,7 @@ func TestNonbufferedChannel(t *testing.T) {
 			history = append(history, "child-start")
 			var v string
 			more := c1.Receive(ctx, &v)
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("child-end-%v", v))
 		})
 		history = append(history, "root-before-channel-put")
@@ -88,7 +80,7 @@ func TestNonbufferedChannel(t *testing.T) {
 
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -110,20 +102,20 @@ func TestNonbufferedChannelBlockedReceive(t *testing.T) {
 		Go(ctx, func(ctx Context) {
 			var v string
 			more := c1.Receive(ctx, &v)
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("child1-end1-%v", v))
 			more = c1.Receive(ctx, &v)
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("child1-end2-%v", v))
 		})
 		Go(ctx, func(ctx Context) {
 			var v string
 			history = append(history, "child2-start")
 			more := c2.Receive(ctx, &v)
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("child2-end1-%v", v))
 			more = c2.Receive(ctx, &v)
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("child2-end2-%v", v))
 		})
 
@@ -134,11 +126,11 @@ func TestNonbufferedChannelBlockedReceive(t *testing.T) {
 
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	c2.SendAsync("value21")
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	c2.SendAsync("value22")
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 
 	require.True(t, d.IsDone(), d.StackTrace())
 }
@@ -151,7 +143,7 @@ func TestBufferedChannelPut(t *testing.T) {
 			history = append(history, "child-start")
 			var v1, v2 string
 			more := c1.Receive(ctx, &v1)
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("child-end-%v", v1))
 			c1.Receive(ctx, &v2)
 			history = append(history, fmt.Sprintf("child-end-%v", v2))
@@ -164,7 +156,7 @@ func TestBufferedChannelPut(t *testing.T) {
 		history = append(history, "root-after-channel-put2")
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -190,7 +182,7 @@ func TestBufferedChannelGet(t *testing.T) {
 			history = append(history, "child1-get")
 			var v1 string
 			more := c1.Receive(ctx, &v1)
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("child1-end-%v", v1))
 
 		})
@@ -200,7 +192,7 @@ func TestBufferedChannelGet(t *testing.T) {
 			history = append(history, "child2-get")
 			var v1 string
 			more := c1.Receive(ctx, &v1)
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("child2-end-%v", v1))
 		})
 		history = append(history, "root-before-channel-get1")
@@ -214,7 +206,7 @@ func TestBufferedChannelGet(t *testing.T) {
 		history = append(history, "root-after-channel-put2")
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone(), strings.Join(history, "\n")+"\n\n"+d.StackTrace())
 
 	expected := []string{
@@ -241,13 +233,13 @@ func TestNotBlockingSelect(t *testing.T) {
 		s := NewSelector(ctx)
 		s.
 			AddReceive(c1, func(c Channel, more bool) {
-				assert.True(t, more)
+				require.True(t, more)
 				var v string
 				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c1-%v", v))
 			}).
 			AddReceive(c2, func(c Channel, more bool) {
-				assert.True(t, more)
+				require.True(t, more)
 				var v string
 				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c2-%v", v))
@@ -259,7 +251,7 @@ func TestNotBlockingSelect(t *testing.T) {
 		s.Select(ctx)
 		s.Select(ctx)
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -290,7 +282,7 @@ func TestBlockingSelect(t *testing.T) {
 		s := NewSelector(ctx)
 		s.
 			AddReceive(c1, func(c Channel, more bool) {
-				assert.True(t, more)
+				require.True(t, more)
 				var v string
 				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c1-%v", v))
@@ -306,7 +298,7 @@ func TestBlockingSelect(t *testing.T) {
 		s.Select(ctx)
 		history = append(history, "done")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone(), strings.Join(history, "\n"))
 
 	expected := []string{
@@ -331,7 +323,7 @@ func TestBlockingSelectAsyncSend(t *testing.T) {
 		s := NewSelector(ctx)
 		s.
 			AddReceive(c1, func(c Channel, more bool) {
-				assert.True(t, more)
+				require.True(t, more)
 				var v int
 				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c1-%v", v))
@@ -347,7 +339,7 @@ func TestBlockingSelectAsyncSend(t *testing.T) {
 		}
 		history = append(history, "done")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone(), strings.Join(history, "\n"))
 
 	expected := []string{
@@ -395,7 +387,7 @@ func TestSelectOnClosedChannel(t *testing.T) {
 		selector.Select(ctx)
 		selector.Select(ctx)
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone(), strings.Join(history, "\n"))
 
 	expected := []string{
@@ -415,13 +407,13 @@ func TestBlockingSelectAsyncSend2(t *testing.T) {
 		s := NewSelector(ctx)
 		s.
 			AddReceive(c1, func(c Channel, more bool) {
-				assert.True(t, more)
+				require.True(t, more)
 				var v string
 				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c1-%v", v))
 			}).
 			AddReceive(c2, func(c Channel, more bool) {
-				assert.True(t, more)
+				require.True(t, more)
 				var v string
 				c.Receive(ctx, &v)
 				history = append(history, fmt.Sprintf("c2-%v", v))
@@ -437,7 +429,7 @@ func TestBlockingSelectAsyncSend2(t *testing.T) {
 		s.Select(ctx)
 		history = append(history, "done")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone(), strings.Join(history, "\n"))
 
 	expected := []string{
@@ -461,11 +453,11 @@ func TestSendSelect(t *testing.T) {
 			history = append(history, "receiver")
 			var v string
 			more := c2.Receive(ctx, &v)
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("c2-%v", v))
 			more = c1.Receive(ctx, &v)
 
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("c1-%v", v))
 		})
 		s := NewSelector(ctx)
@@ -477,7 +469,7 @@ func TestSendSelect(t *testing.T) {
 		s.Select(ctx)
 		history = append(history, "done")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -502,12 +494,12 @@ func TestSendSelectWithAsyncReceive(t *testing.T) {
 			history = append(history, "receiver")
 			var v string
 			ok, more := c2.ReceiveAsyncWithMoreFlag(&v)
-			assert.True(t, ok)
-			assert.True(t, more)
+			require.True(t, ok)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("c2-%v", v))
 			more = c1.Receive(ctx, &v)
 
-			assert.True(t, more)
+			require.True(t, more)
 			history = append(history, fmt.Sprintf("c1-%v", v))
 		})
 		s := NewSelector(ctx)
@@ -519,7 +511,7 @@ func TestSendSelectWithAsyncReceive(t *testing.T) {
 		s.Select(ctx)
 		history = append(history, "done")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone(), strings.Join(history, "\n"))
 
 	expected := []string{
@@ -565,7 +557,7 @@ func TestChannelClose(t *testing.T) {
 
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone(), d.StackTrace())
 
 	expected := []string{
@@ -585,7 +577,7 @@ func TestChannelClose(t *testing.T) {
 func TestSendClosedChannel(t *testing.T) {
 	d, _ := newDispatcher(createRootTestContext(), func(ctx Context) {
 		defer func() {
-			assert.NotNil(t, recover(), "panic expected")
+			require.NotNil(t, recover(), "panic expected")
 		}()
 		c := NewChannel(ctx)
 		Go(ctx, func(ctx Context) {
@@ -593,35 +585,35 @@ func TestSendClosedChannel(t *testing.T) {
 		})
 		c.Send(ctx, "baz")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone())
 }
 
 func TestBlockedSendClosedChannel(t *testing.T) {
 	d, _ := newDispatcher(createRootTestContext(), func(ctx Context) {
 		defer func() {
-			assert.NotNil(t, recover(), "panic expected")
+			require.NotNil(t, recover(), "panic expected")
 		}()
 		c := NewBufferedChannel(ctx, 5)
 		c.Send(ctx, "bar")
 		c.Close()
 		c.Send(ctx, "baz")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone())
 }
 
 func TestAsyncSendClosedChannel(t *testing.T) {
 	d, _ := newDispatcher(createRootTestContext(), func(ctx Context) {
 		defer func() {
-			assert.NotNil(t, recover(), "panic expected")
+			require.NotNil(t, recover(), "panic expected")
 		}()
 		c := NewBufferedChannel(ctx, 5)
 		c.Send(ctx, "bar")
 		c.Close()
 		_ = c.SendAsync("baz")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	d.ExecuteUntilAllBlocked()
 	require.True(t, d.IsDone())
 }
 
@@ -640,7 +632,8 @@ func TestDispatchClose(t *testing.T) {
 		c.Receive(ctx, nil) // blocked forever
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	err := d.ExecuteUntilAllBlocked()
+	require.NoError(t, err)
 	require.False(t, d.IsDone())
 	stack := d.StackTrace()
 	// 11 coroutines (3 lines each) + 10 nl
@@ -679,12 +672,49 @@ func TestPanic(t *testing.T) {
 	})
 	require.EqualValues(t, 0, len(history))
 	err := d.ExecuteUntilAllBlocked()
-	require.NotNil(t, err)
+	require.Error(t, err)
 	value := err.Error()
 	require.EqualValues(t, "simulated failure", value)
 	require.EqualValues(t, "simulated failure", err.Error())
+	panicError, ok := err.(*workflowPanicError)
+	require.True(t, ok)
+	require.Contains(t, panicError.StackTrace(), "temporal/internal.TestPanic")
+}
 
-	require.Contains(t, err.(*workflowPanicError).StackTrace(), "cadence/internal.TestPanic")
+func TestAwait(t *testing.T) {
+	flag := false
+	d, _ := newDispatcher(createRootTestContext(), func(ctx Context) {
+		Await(ctx, func() bool { return flag })
+	})
+	err := d.ExecuteUntilAllBlocked()
+	require.NoError(t, err)
+	require.False(t, d.IsDone())
+	err = d.ExecuteUntilAllBlocked()
+	require.NoError(t, err)
+	require.False(t, d.IsDone())
+	flag = true
+	err = d.ExecuteUntilAllBlocked()
+	require.NoError(t, err)
+	require.True(t, d.IsDone())
+}
+
+func TestAwaitCancellation(t *testing.T) {
+	var awaitError error
+	ctx := createRootTestContext()
+	ctx, cancelHandler := WithCancel(ctx)
+	d, _ := newDispatcher(ctx, func(ctx Context) {
+		awaitError = Await(ctx, func() bool { return false })
+	})
+	err := d.ExecuteUntilAllBlocked()
+	require.NoError(t, err)
+	require.False(t, d.IsDone())
+	cancelHandler()
+	err = d.ExecuteUntilAllBlocked()
+	require.NoError(t, err)
+	require.True(t, d.IsDone())
+	require.Error(t, awaitError)
+	_, ok := awaitError.(*CanceledError)
+	require.True(t, ok)
 }
 
 func TestFutureSetValue(t *testing.T) {
@@ -695,29 +725,35 @@ func TestFutureSetValue(t *testing.T) {
 		f, s = NewFuture(ctx)
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
-			assert.False(t, f.IsReady())
+			require.False(t, f.IsReady())
 			var v string
 			err := f.Get(ctx, &v)
-			assert.Nil(t, err)
-			assert.True(t, f.IsReady())
+			require.NoError(t, err)
+			require.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("future-get-%v", v))
 			// test second get of the ready future
 			err = f.Get(ctx, &v)
-			assert.Nil(t, err)
-			assert.True(t, f.IsReady())
+			require.NoError(t, err)
+			require.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("child-end-%v", v))
 		})
 		history = append(history, "root-end")
 
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	err := d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
 	history = append(history, "future-set")
-	assert.False(t, f.IsReady())
+	require.False(t, f.IsReady())
 	s.SetValue("value1")
-	assert.True(t, f.IsReady())
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	require.True(t, f.IsReady())
+	err = d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -739,29 +775,35 @@ func TestFutureFail(t *testing.T) {
 		f, s = NewFuture(ctx)
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
-			assert.False(t, f.IsReady())
+			require.False(t, f.IsReady())
 			var v string
 			err := f.Get(ctx, &v)
-			assert.NotNil(t, err)
-			assert.True(t, f.IsReady())
+			require.Error(t, err)
+			require.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("future-get-%v", err))
 			// test second get of the ready future
 			err = f.Get(ctx, &v)
-			assert.NotNil(t, err)
-			assert.True(t, f.IsReady())
+			require.Error(t, err)
+			require.True(t, f.IsReady())
 			history = append(history, fmt.Sprintf("child-end-%v", err))
 		})
 		history = append(history, "root-end")
 
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	err := d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
 	history = append(history, "future-set")
-	assert.False(t, f.IsReady())
+	require.False(t, f.IsReady())
 	s.SetError(errors.New("value1"))
-	assert.True(t, f.IsReady())
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	require.True(t, f.IsReady())
+	err = d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -783,28 +825,28 @@ func TestFutureSet(t *testing.T) {
 		f2, s2 = NewFuture(ctx)
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
-			assert.False(t, f1.IsReady())
+			require.False(t, f1.IsReady())
 			var v string
 			err := f1.Get(ctx, &v)
-			assert.NotNil(t, err)
-			assert.NotNil(t, v)
-			assert.True(t, f1.IsReady())
+			require.Error(t, err)
+			require.NotNil(t, v)
+			require.True(t, f1.IsReady())
 			history = append(history, fmt.Sprintf("f1-get-%v-%v", v, err))
 			// test second get of the ready future
 			err = f1.Get(ctx, &v)
-			assert.NotNil(t, err)
-			assert.True(t, f1.IsReady())
+			require.Error(t, err)
+			require.True(t, f1.IsReady())
 			history = append(history, fmt.Sprintf("f1-get2-%v-%v", v, err))
 
 			err = f2.Get(ctx, &v)
-			assert.NoError(t, err)
-			assert.True(t, f2.IsReady())
+			require.NoError(t, err)
+			require.True(t, f2.IsReady())
 			history = append(history, fmt.Sprintf("f2-get-%v-%v", v, err))
 
 			// test second get of the ready future
 			err = f2.Get(ctx, &v)
-			assert.NoError(t, err)
-			assert.True(t, f1.IsReady())
+			require.NoError(t, err)
+			require.True(t, f1.IsReady())
 			history = append(history, fmt.Sprintf("f2-get2-%v-%v", v, err))
 
 			history = append(history, fmt.Sprintf("child-end"))
@@ -813,20 +855,29 @@ func TestFutureSet(t *testing.T) {
 	})
 
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	err := d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
 	history = append(history, "f1-set")
-	assert.False(t, f1.IsReady())
+	require.False(t, f1.IsReady())
 	s1.Set("value-will-be-ignored", errors.New("error1"))
-	assert.True(t, f1.IsReady())
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	require.True(t, f1.IsReady())
+	err = d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 
 	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
 	history = append(history, "f2-set")
-	assert.False(t, f2.IsReady())
+	require.False(t, f2.IsReady())
 	s2.Set("value2", nil)
-	assert.True(t, f2.IsReady())
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	require.True(t, f2.IsReady())
+	err = d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -857,48 +908,57 @@ func TestFutureChain(t *testing.T) {
 		s2.Chain(cf2)
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
-			assert.False(t, f1.IsReady())
+			require.False(t, f1.IsReady())
 			var v string
 			err := f1.Get(ctx, &v)
-			assert.NotNil(t, err)
-			assert.True(t, f1.IsReady())
+			require.Error(t, err)
+			require.True(t, f1.IsReady())
 			history = append(history, fmt.Sprintf("f1-get-%v-%v", v, err))
 			// test second get of the ready future
 			err = f1.Get(ctx, &v)
-			assert.NotNil(t, err)
-			assert.True(t, f1.IsReady())
+			require.Error(t, err)
+			require.True(t, f1.IsReady())
 			history = append(history, fmt.Sprintf("f1-get2-%v-%v", v, err))
 
 			err = f2.Get(ctx, &v)
-			assert.NoError(t, err)
-			assert.Equal(t, "value2", v)
-			assert.True(t, f2.IsReady())
+			require.NoError(t, err)
+			require.Equal(t, "value2", v)
+			require.True(t, f2.IsReady())
 			history = append(history, fmt.Sprintf("f2-get-%v-%v", v, err))
 			// test second get of the ready future
 			err = f2.Get(ctx, &v)
-			assert.NoError(t, err)
-			assert.Equal(t, "value2", v)
-			assert.True(t, f2.IsReady())
+			require.NoError(t, err)
+			require.Equal(t, "value2", v)
+			require.True(t, f2.IsReady())
 			history = append(history, fmt.Sprintf("f2-get2-%v-%v", v, err))
 		})
 		history = append(history, "root-end")
 
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	err := d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
 	history = append(history, "f1-set")
-	assert.False(t, f1.IsReady())
+	require.False(t, f1.IsReady())
 	cs1.Set("value1-will-be-ignored", errors.New("error1"))
-	assert.True(t, f1.IsReady())
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	require.True(t, f1.IsReady())
+	err = d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 
 	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
 	history = append(history, "f2-set")
-	assert.False(t, f2.IsReady())
+	require.False(t, f2.IsReady())
 	cs2.Set("value2", nil)
-	assert.True(t, f2.IsReady())
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	require.True(t, f2.IsReady())
+	err = d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 
 	require.True(t, d.IsDone())
 
@@ -934,13 +994,13 @@ func TestSelectFuture(t *testing.T) {
 			AddFuture(future1, func(f Future) {
 				var v string
 				err := f.Get(ctx, &v)
-				assert.Nil(t, err)
+				require.NoError(t, err)
 				history = append(history, fmt.Sprintf("c1-%v", v))
 			}).
 			AddFuture(future2, func(f Future) {
 				var v string
 				err := f.Get(ctx, &v)
-				assert.Nil(t, err)
+				require.NoError(t, err)
 				history = append(history, fmt.Sprintf("c2-%v", v))
 			})
 		history = append(history, "select1")
@@ -949,7 +1009,10 @@ func TestSelectFuture(t *testing.T) {
 		s.Select(ctx)
 		history = append(history, "done")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	err := d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -983,13 +1046,13 @@ func TestSelectDecodeFuture(t *testing.T) {
 			AddFuture(future1, func(f Future) {
 				var v []byte
 				err := f.Get(ctx, &v)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				history = append(history, fmt.Sprintf("c1-%s", v))
 			}).
 			AddFuture(future2, func(f Future) {
 				var v []byte
 				err := f.Get(ctx, &v)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				history = append(history, fmt.Sprintf("c2-%s", v))
 			})
 		history = append(history, "select1")
@@ -998,7 +1061,10 @@ func TestSelectDecodeFuture(t *testing.T) {
 		s.Select(ctx)
 		history = append(history, "done")
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	err := d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -1027,52 +1093,61 @@ func TestDecodeFutureChain(t *testing.T) {
 		s2.Chain(cf2)
 		Go(ctx, func(ctx Context) {
 			history = append(history, "child-start")
-			assert.False(t, f1.IsReady())
+			require.False(t, f1.IsReady())
 			var v []byte
 			err := f1.Get(ctx, &v)
-			assert.NotNil(t, err)
-			assert.Nil(t, v)
-			assert.True(t, f1.IsReady())
+			require.Error(t, err)
+			require.Nil(t, v)
+			require.True(t, f1.IsReady())
 			history = append(history, fmt.Sprintf("f1-get-%s-%v", v, err))
 			// test second get of the ready future
 			err = f1.Get(ctx, &v)
-			assert.NotNil(t, err)
-			assert.Nil(t, v)
-			assert.True(t, f1.IsReady())
+			require.Error(t, err)
+			require.Nil(t, v)
+			require.True(t, f1.IsReady())
 			history = append(history, fmt.Sprintf("f1-get2-%s-%v", v, err))
 
 			// for f2
 			err = f2.Get(ctx, &v)
-			assert.NoError(t, err)
-			assert.NotNil(t, v)
-			assert.True(t, f1.IsReady())
+			require.NoError(t, err)
+			require.NotNil(t, v)
+			require.True(t, f1.IsReady())
 			history = append(history, fmt.Sprintf("f2-get-%s-%v", v, err))
 			// test second get of the ready future
 			err = f2.Get(ctx, &v)
-			assert.NoError(t, err)
-			assert.NotNil(t, v)
-			assert.True(t, f2.IsReady())
+			require.NoError(t, err)
+			require.NotNil(t, v)
+			require.True(t, f2.IsReady())
 			history = append(history, fmt.Sprintf("f2-get2-%s-%v", v, err))
 		})
 		history = append(history, "root-end")
 	})
 	require.EqualValues(t, 0, len(history))
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	err := d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	// set f1
 	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
 	history = append(history, "f1-set")
-	assert.False(t, f1.IsReady())
+	require.False(t, f1.IsReady())
 	cs1.Set([]byte("value-will-be-ignored"), errors.New("error1"))
-	assert.True(t, f1.IsReady())
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	require.True(t, f1.IsReady())
+	err = d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 
 	// set f2
 	require.False(t, d.IsDone(), fmt.Sprintf("%v", d.StackTrace()))
 	history = append(history, "f2-set")
-	assert.False(t, f2.IsReady())
+	require.False(t, f2.IsReady())
 	cs2.Set([]byte("value2"), nil)
-	assert.True(t, f2.IsReady())
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	require.True(t, f2.IsReady())
+	err = d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 
 	require.True(t, d.IsDone())
 
@@ -1101,19 +1176,19 @@ func TestSelectFuture_WithBatchSets(t *testing.T) {
 			AddFuture(future1, func(f Future) {
 				var v string
 				err := f.Get(ctx, &v)
-				assert.Nil(t, err)
+				require.NoError(t, err)
 				history = append(history, fmt.Sprintf("c1-%v", v))
 			}).
 			AddFuture(future2, func(f Future) {
 				var v string
 				err := f.Get(ctx, &v)
-				assert.Nil(t, err)
+				require.NoError(t, err)
 				history = append(history, fmt.Sprintf("c2-%v", v))
 			}).
 			AddFuture(future3, func(f Future) {
 				var v string
 				err := f.Get(ctx, &v)
-				assert.Nil(t, err)
+				require.NoError(t, err)
 				history = append(history, fmt.Sprintf("c3-%v", v))
 			})
 
@@ -1124,7 +1199,10 @@ func TestSelectFuture_WithBatchSets(t *testing.T) {
 		s.Select(ctx)
 		s.Select(ctx)
 	})
-	requireNoExecuteErr(t, d.ExecuteUntilAllBlocked())
+	err := d.ExecuteUntilAllBlocked()
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.True(t, d.IsDone())
 
 	expected := []string{
@@ -1148,7 +1226,7 @@ func TestChainedFuture(t *testing.T) {
 		var out int
 		fut, set := NewFuture(ctx)
 		set.Chain(f)
-		require.NoError(t, fut.Get(ctx, &out))
+		fut.Get(ctx, &out)
 		return out, nil
 	}
 	RegisterWorkflow(workflowFn)

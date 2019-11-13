@@ -673,12 +673,14 @@ func (wc *workflowClient) ListArchivedWorkflow(ctx context.Context, request *s.L
 			var err1 error
 			timeout := maxListArchivedWorkflowTimeout
 			now := time.Now()
-			if expiration, ok := ctx.Deadline(); ok && expiration.After(now) {
-				timeout = expiration.Sub(now)
-				if timeout > maxListArchivedWorkflowTimeout {
-					timeout = maxListArchivedWorkflowTimeout
-				} else if timeout < minRPCTimeout {
-					timeout = minRPCTimeout
+			if ctx != nil {
+				if expiration, ok := ctx.Deadline(); ok && expiration.After(now) {
+					timeout = expiration.Sub(now)
+					if timeout > maxListArchivedWorkflowTimeout {
+						timeout = maxListArchivedWorkflowTimeout
+					} else if timeout < minRPCTimeout {
+						timeout = minRPCTimeout
+					}
 				}
 			}
 			tchCtx, cancel, opt := newChannelContext(ctx, chanTimeout(timeout))

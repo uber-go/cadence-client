@@ -1735,10 +1735,12 @@ func (v *ActivityTaskStartedEventAttributes) GetAttempt() (o int32) {
 }
 
 type ActivityTaskTimedOutEventAttributes struct {
-	Details          []byte       `json:"details,omitempty"`
-	ScheduledEventId *int64       `json:"scheduledEventId,omitempty"`
-	StartedEventId   *int64       `json:"startedEventId,omitempty"`
-	TimeoutType      *TimeoutType `json:"timeoutType,omitempty"`
+	Details            []byte       `json:"details,omitempty"`
+	ScheduledEventId   *int64       `json:"scheduledEventId,omitempty"`
+	StartedEventId     *int64       `json:"startedEventId,omitempty"`
+	TimeoutType        *TimeoutType `json:"timeoutType,omitempty"`
+	LastFailureReason  *string      `json:"lastFailureReason,omitempty"`
+	LastFailureDetails []byte       `json:"lastFailureDetails,omitempty"`
 }
 
 // ToWire translates a ActivityTaskTimedOutEventAttributes struct into a Thrift-level intermediate
@@ -1758,7 +1760,7 @@ type ActivityTaskTimedOutEventAttributes struct {
 //   }
 func (v *ActivityTaskTimedOutEventAttributes) ToWire() (wire.Value, error) {
 	var (
-		fields [4]wire.Field
+		fields [6]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -1794,6 +1796,22 @@ func (v *ActivityTaskTimedOutEventAttributes) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+	if v.LastFailureReason != nil {
+		w, err = wire.NewValueString(*(v.LastFailureReason)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.LastFailureDetails != nil {
+		w, err = wire.NewValueBinary(v.LastFailureDetails), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
 
@@ -1866,6 +1884,24 @@ func (v *ActivityTaskTimedOutEventAttributes) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 40:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.LastFailureReason = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 50:
+			if field.Value.Type() == wire.TBinary {
+				v.LastFailureDetails, err = field.Value.GetBinary(), error(nil)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -1879,7 +1915,7 @@ func (v *ActivityTaskTimedOutEventAttributes) String() string {
 		return "<nil>"
 	}
 
-	var fields [4]string
+	var fields [6]string
 	i := 0
 	if v.Details != nil {
 		fields[i] = fmt.Sprintf("Details: %v", v.Details)
@@ -1895,6 +1931,14 @@ func (v *ActivityTaskTimedOutEventAttributes) String() string {
 	}
 	if v.TimeoutType != nil {
 		fields[i] = fmt.Sprintf("TimeoutType: %v", *(v.TimeoutType))
+		i++
+	}
+	if v.LastFailureReason != nil {
+		fields[i] = fmt.Sprintf("LastFailureReason: %v", *(v.LastFailureReason))
+		i++
+	}
+	if v.LastFailureDetails != nil {
+		fields[i] = fmt.Sprintf("LastFailureDetails: %v", v.LastFailureDetails)
 		i++
 	}
 
@@ -1928,6 +1972,12 @@ func (v *ActivityTaskTimedOutEventAttributes) Equals(rhs *ActivityTaskTimedOutEv
 	if !_TimeoutType_EqualsPtr(v.TimeoutType, rhs.TimeoutType) {
 		return false
 	}
+	if !_String_EqualsPtr(v.LastFailureReason, rhs.LastFailureReason) {
+		return false
+	}
+	if !((v.LastFailureDetails == nil && rhs.LastFailureDetails == nil) || (v.LastFailureDetails != nil && rhs.LastFailureDetails != nil && bytes.Equal(v.LastFailureDetails, rhs.LastFailureDetails))) {
+		return false
+	}
 
 	return true
 }
@@ -1957,6 +2007,16 @@ func (v *ActivityTaskTimedOutEventAttributes) GetStartedEventId() (o int64) {
 func (v *ActivityTaskTimedOutEventAttributes) GetTimeoutType() (o TimeoutType) {
 	if v.TimeoutType != nil {
 		return *v.TimeoutType
+	}
+
+	return
+}
+
+// GetLastFailureReason returns the value of LastFailureReason if it is set or its
+// zero value if it is unset.
+func (v *ActivityTaskTimedOutEventAttributes) GetLastFailureReason() (o string) {
+	if v.LastFailureReason != nil {
+		return *v.LastFailureReason
 	}
 
 	return
@@ -42473,8 +42533,7 @@ func (v *WorkflowQuery) GetQueryType() (o string) {
 type WorkflowQueryResult struct {
 	ResultType   *QueryResultType `json:"resultType,omitempty"`
 	Answer       []byte           `json:"answer,omitempty"`
-	ErrorReason  *string          `json:"errorReason,omitempty"`
-	ErrorDetails []byte           `json:"errorDetails,omitempty"`
+	ErrorMessage *string          `json:"errorMessage,omitempty"`
 }
 
 // ToWire translates a WorkflowQueryResult struct into a Thrift-level intermediate
@@ -42494,7 +42553,7 @@ type WorkflowQueryResult struct {
 //   }
 func (v *WorkflowQueryResult) ToWire() (wire.Value, error) {
 	var (
-		fields [4]wire.Field
+		fields [3]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -42516,20 +42575,12 @@ func (v *WorkflowQueryResult) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 20, Value: w}
 		i++
 	}
-	if v.ErrorReason != nil {
-		w, err = wire.NewValueString(*(v.ErrorReason)), error(nil)
+	if v.ErrorMessage != nil {
+		w, err = wire.NewValueString(*(v.ErrorMessage)), error(nil)
 		if err != nil {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 30, Value: w}
-		i++
-	}
-	if v.ErrorDetails != nil {
-		w, err = wire.NewValueBinary(v.ErrorDetails), error(nil)
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 40, Value: w}
 		i++
 	}
 
@@ -42586,15 +42637,7 @@ func (v *WorkflowQueryResult) FromWire(w wire.Value) error {
 			if field.Value.Type() == wire.TBinary {
 				var x string
 				x, err = field.Value.GetString(), error(nil)
-				v.ErrorReason = &x
-				if err != nil {
-					return err
-				}
-
-			}
-		case 40:
-			if field.Value.Type() == wire.TBinary {
-				v.ErrorDetails, err = field.Value.GetBinary(), error(nil)
+				v.ErrorMessage = &x
 				if err != nil {
 					return err
 				}
@@ -42613,7 +42656,7 @@ func (v *WorkflowQueryResult) String() string {
 		return "<nil>"
 	}
 
-	var fields [4]string
+	var fields [3]string
 	i := 0
 	if v.ResultType != nil {
 		fields[i] = fmt.Sprintf("ResultType: %v", *(v.ResultType))
@@ -42623,12 +42666,8 @@ func (v *WorkflowQueryResult) String() string {
 		fields[i] = fmt.Sprintf("Answer: %v", v.Answer)
 		i++
 	}
-	if v.ErrorReason != nil {
-		fields[i] = fmt.Sprintf("ErrorReason: %v", *(v.ErrorReason))
-		i++
-	}
-	if v.ErrorDetails != nil {
-		fields[i] = fmt.Sprintf("ErrorDetails: %v", v.ErrorDetails)
+	if v.ErrorMessage != nil {
+		fields[i] = fmt.Sprintf("ErrorMessage: %v", *(v.ErrorMessage))
 		i++
 	}
 
@@ -42656,10 +42695,7 @@ func (v *WorkflowQueryResult) Equals(rhs *WorkflowQueryResult) bool {
 	if !((v.Answer == nil && rhs.Answer == nil) || (v.Answer != nil && rhs.Answer != nil && bytes.Equal(v.Answer, rhs.Answer))) {
 		return false
 	}
-	if !_String_EqualsPtr(v.ErrorReason, rhs.ErrorReason) {
-		return false
-	}
-	if !((v.ErrorDetails == nil && rhs.ErrorDetails == nil) || (v.ErrorDetails != nil && rhs.ErrorDetails != nil && bytes.Equal(v.ErrorDetails, rhs.ErrorDetails))) {
+	if !_String_EqualsPtr(v.ErrorMessage, rhs.ErrorMessage) {
 		return false
 	}
 
@@ -42676,11 +42712,11 @@ func (v *WorkflowQueryResult) GetResultType() (o QueryResultType) {
 	return
 }
 
-// GetErrorReason returns the value of ErrorReason if it is set or its
+// GetErrorMessage returns the value of ErrorMessage if it is set or its
 // zero value if it is unset.
-func (v *WorkflowQueryResult) GetErrorReason() (o string) {
-	if v.ErrorReason != nil {
-		return *v.ErrorReason
+func (v *WorkflowQueryResult) GetErrorMessage() (o string) {
+	if v.ErrorMessage != nil {
+		return *v.ErrorMessage
 	}
 
 	return

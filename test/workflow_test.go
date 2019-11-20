@@ -23,6 +23,7 @@ package test
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"go.uber.org/cadence"
@@ -394,6 +395,45 @@ func (w *Workflows) SimplestWorkflow(ctx workflow.Context) (string, error) {
 	return "hello", nil
 }
 
+func (w *Workflows) LargeQueryResultWorkflow(ctx workflow.Context) (string, error) {
+	err := workflow.SetQueryHandler(ctx, "large_query", func() ([]byte, error) {
+		result := make([]byte, 20000000)
+		rand.Read(result)
+		return result, nil
+	})
+
+	if err != nil {
+		return "", errors.New("failed to register query handler")
+	}
+
+	return "hello", nil
+}
+
+func (w *Workflows) RetryTimeoutStableErrorWorkflow(ctx workflow.Context) ([]string, error) {
+	ao := workflow.ActivityOptions{
+		ScheduleToStartTimeout: time.Second * 2,
+		StartToCloseTimeout:    time.Second * 6,
+		RetryPolicy: &cadence.RetryPolicy{
+			InitialInterval:    time.Second,
+			BackoffCoefficient: 1.0,
+			MaximumInterval:    time.Second,
+			ExpirationInterval: time.Second * 5,
+		},
+	}
+	ctx = workflow.WithActivityOptions(ctx, ao)
+
+	err := workflow.ExecuteActivity(ctx, "retryTimeoutStableErrorActivity").Get(ctx, nil)
+
+	cerr, ok := err.(*cadence.CustomError)
+	if !ok {
+		return []string{}, fmt.Errorf("activity failed with unexpected error: %v", err)
+	}
+	if cerr.Reason() != errFailOnPurpose.Reason() {
+		return []string{}, fmt.Errorf("activity failed with unexpected error reason: %v", cerr.Reason())
+	}
+	return []string{}, nil
+}
+
 func (w *Workflows) child(ctx workflow.Context, arg string, mustFail bool) (string, error) {
 	var result string
 	ctx = workflow.WithActivityOptions(ctx, w.defaultActivityOptions())
@@ -444,6 +484,8 @@ func (w *Workflows) register() {
 	workflow.Register(w.childForMemoAndSearchAttr)
 	workflow.Register(w.ActivityCancelRepro)
 	workflow.Register(w.SimplestWorkflow)
+	workflow.Register(w.LargeQueryResultWorkflow)
+	workflow.Register(w.RetryTimeoutStableErrorWorkflow)
 }
 
 func (w *Workflows) defaultActivityOptions() workflow.ActivityOptions {

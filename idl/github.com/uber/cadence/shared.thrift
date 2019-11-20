@@ -77,10 +77,26 @@ exception RetryTaskError {
   5: optional i64 (js.type = "Long") nextEventId
 }
 
+exception RetryTaskV2Error {
+  1: required string message
+  2: optional string domainId
+  3: optional string workflowId
+  4: optional string runId
+  5: optional i64 (js.type = "Long") startEventId
+  6: optional i64 (js.type = "Long") startEventVersion
+  7: optional i64 (js.type = "Long") endEventId
+  8: optional i64 (js.type = "Long") endEventVersion
+}
+
 exception ClientVersionNotSupportedError {
   1: required string featureVersion
   2: required string clientImpl
   3: required string supportedVersions
+}
+
+exception CurrentBranchChangedError {
+  10: required string message
+  20: required binary currentBranchToken
 }
 
 enum WorkflowIdReusePolicy {
@@ -295,6 +311,7 @@ struct TaskList {
 
 enum EncodingType {
   ThriftRW,
+  JSON,
 }
 
 enum QueryRejectCondition {
@@ -336,6 +353,11 @@ struct Memo {
 
 struct SearchAttributes {
   10: optional map<string,binary> indexedFields
+}
+
+struct WorkerVersionInfo {
+  10: optional string impl
+  20: optional string featureVersion
 }
 
 struct WorkflowExecutionInfo {
@@ -1387,6 +1409,7 @@ struct RespondQueryTaskCompletedRequest {
   20: optional QueryTaskCompletedType completedType
   30: optional binary queryResult
   40: optional string errorMessage
+  50: optional WorkerVersionInfo workerVersionInfo
 }
 
 struct WorkflowQueryResult {
@@ -1542,5 +1565,42 @@ struct HistoryBranchRange{
 struct HistoryBranch{
   10: optional string treeID
   20: optional string branchID
-  30: optional list<HistoryBranchRange>  ancestors
+  30: optional list<HistoryBranchRange> ancestors
+}
+
+// VersionHistoryItem contains signal eventID and the corresponding version
+struct VersionHistoryItem{
+  10: optional i64 (js.type = "Long") eventID
+  20: optional i64 (js.type = "Long") version
+}
+
+// VersionHistory contains the version history of a branch
+struct VersionHistory{
+  10: optional binary branchToken
+  20: optional list<VersionHistoryItem> items
+}
+
+// VersionHistories contains all version histories from all branches
+struct VersionHistories{
+  10: optional i32 currentVersionHistoryIndex
+  20: optional list<VersionHistory> histories
+}
+
+// ReapplyEventsRequest is the request for reapply events API
+struct ReapplyEventsRequest{
+  10: optional string domainName
+  20: optional WorkflowExecution workflowExecution
+  30: optional DataBlob events
+}
+
+// SupportedClientVersions contains the support versions for client library
+struct SupportedClientVersions{
+  10: optional string gosdk
+  20: optional string javasdk
+  30: optional string cli
+}
+
+// DeploymentInfo contains information about cadence deployment
+struct DeploymentInfo{
+  10: optional SupportedClientVersions supportedClientVersions
 }

@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	queryResultSizeLimit = 10000000 // 10M
+	queryResultSizeLimit = 2*1024*1024
 )
 
 // Assert that structs do indeed implement the interfaces

@@ -65,6 +65,7 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 	RegisterActivityWithOptions(testActivityHello, RegisterActivityOptions{Name: "testActivityHello"})
 	RegisterActivity(testActivityContext)
 	RegisterActivity(testActivityHeartbeat)
+	RegisterActivity(testActivityCanceled)
 }
 
 func TestUnitTestSuite(t *testing.T) {
@@ -492,6 +493,14 @@ func testActivityContext(ctx context.Context) (string, error) {
 		return string(val), nil
 	}
 	return "", fmt.Errorf("context did not propagate to workflow")
+}
+
+func testActivityCanceled(ctx context.Context) (int32, error) {
+	info := GetActivityInfo(ctx)
+	if info.Attempt < 2 {
+		return int32(-1), NewCanceledError("details")
+	}
+	return info.Attempt, nil
 }
 
 func testWorkflowHeartbeat(ctx Context, msg string, waitTime time.Duration) (string, error) {
@@ -2296,6 +2305,39 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetryOnCancel() {
 	s.Error(env.GetWorkflowError())
 	s.True(IsCanceledError(env.GetWorkflowError()))
 	s.Equal(1, attempts)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetryOnCancel() {
+	workflowFn := func(ctx Context) (int32, error) {
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    time.Minute,
+			RetryPolicy: &RetryPolicy{
+				MaximumAttempts:          3,
+				InitialInterval:          time.Second,
+				MaximumInterval:          time.Second * 10,
+				BackoffCoefficient:       2,
+				NonRetriableErrorReasons: []string{"bad-bug"},
+				ExpirationInterval:       time.Minute,
+			},
+		}
+		ctx = WithActivityOptions(ctx, ao)
+
+		var result int32
+		err := ExecuteActivity(ctx, testActivityCanceled).Get(ctx, &result)
+		if err != nil {
+			return int32(-1), err
+		}
+		return result, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	RegisterWorkflow(workflowFn)
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
+	s.True(IsCanceledError(env.GetWorkflowError()))
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowRetry() {

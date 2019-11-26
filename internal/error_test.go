@@ -370,10 +370,6 @@ func Test_IsCanceledError(t *testing.T) {
 	for _, test := range tests {
 		require.Equal(t, test.expected, IsCanceledError(test.err))
 	}
-
-	if NewCanceledError() == NewCanceledError() {
-		fmt.Println(true)
-	}
 }
 
 func TestErrorDetailsValues(t *testing.T) {

@@ -1311,7 +1311,10 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 		eventAttributes := e.UpsertWorkflowSearchAttributesEventAttributes
 		decisionAttributes := d.UpsertWorkflowSearchAttributesDecisionAttributes
-		return isSearchAttributesMatched(eventAttributes.SearchAttributes, decisionAttributes.SearchAttributes)
+		if strictMode && !isSearchAttributesMatched(eventAttributes.SearchAttributes, decisionAttributes.SearchAttributes) {
+			return false
+		}
+		return true
 	}
 
 	return false

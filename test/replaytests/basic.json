@@ -1,13 +1,13 @@
 [
   {
     "eventId":1,
-    "timestamp":1574707009824799000,
+    "timestamp":1574668217480891000,
     "eventType":"WorkflowExecutionStarted",
     "version":-24,
-    "taskId":22020168,
+    "taskId":22037765,
     "workflowExecutionStartedEventAttributes":{
       "workflowType":{
-        "name":"go.uber.org/cadence/test/replay_tests.Workflow"
+        "name":"go.uber.org/cadence/test/replaytests.Workflow"
       },
       "taskList":{
         "name":"helloWorldGroup"
@@ -15,9 +15,9 @@
       "input":"IkNhZGVuY2UiCg==",
       "executionStartToCloseTimeoutSeconds":60,
       "taskStartToCloseTimeoutSeconds":60,
-      "originalExecutionRunId":"4ee79b48-c947-4cf2-9902-e9ab01596c6d",
-      "identity":"2314@boweixu-C02V61JZHTDG@",
-      "firstExecutionRunId":"4ee79b48-c947-4cf2-9902-e9ab01596c6d",
+      "originalExecutionRunId":"b08ce5f0-920b-43f8-a90d-44d12476297e",
+      "identity":"87832@boweixu-C02V61JZHTDG@",
+      "firstExecutionRunId":"b08ce5f0-920b-43f8-a90d-44d12476297e",
       "attempt":0,
       "cronSchedule":"",
       "firstDecisionTaskBackoffSeconds":0,
@@ -28,10 +28,10 @@
   },
   {
     "eventId":2,
-    "timestamp":1574707009824818000,
+    "timestamp":1574668217480902000,
     "eventType":"DecisionTaskScheduled",
     "version":-24,
-    "taskId":22020169,
+    "taskId":22037766,
     "decisionTaskScheduledEventAttributes":{
       "taskList":{
         "name":"helloWorldGroup"
@@ -42,35 +42,35 @@
   },
   {
     "eventId":3,
-    "timestamp":1574707009840344000,
+    "timestamp":1574668217487857000,
     "eventType":"DecisionTaskStarted",
     "version":-24,
-    "taskId":22020174,
+    "taskId":22037771,
     "decisionTaskStartedEventAttributes":{
       "scheduledEventId":2,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup",
-      "requestId":"60acabaf-0d2c-427a-a2dc-3d44d76ab8cd"
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup",
+      "requestId":"9c59b447-8e7a-4147-98d5-a3097aed993d"
     }
   },
   {
     "eventId":4,
-    "timestamp":1574707009853172000,
+    "timestamp":1574668217494708000,
     "eventType":"DecisionTaskCompleted",
     "version":-24,
-    "taskId":22020177,
+    "taskId":22037774,
     "decisionTaskCompletedEventAttributes":{
       "scheduledEventId":2,
       "startedEventId":3,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup",
-      "binaryChecksum":"b59e7d41ab8b472fc639097ef38f3faa"
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup",
+      "binaryChecksum":"06e5b3f52bd27301078e9ddd8fe9df35"
     }
   },
   {
     "eventId":5,
-    "timestamp":1574707009853211000,
+    "timestamp":1574668217494738000,
     "eventType":"MarkerRecorded",
     "version":-24,
-    "taskId":22020178,
+    "taskId":22037775,
     "markerRecordedEventAttributes":{
       "markerName":"Version",
       "details":"InRlc3QtY2hhbmdlIgoxCg==",
@@ -79,25 +79,10 @@
   },
   {
     "eventId":6,
-    "timestamp":1574707009854466000,
-    "eventType":"UpsertWorkflowSearchAttributes",
-    "version":-24,
-    "taskId":22020179,
-    "upsertWorkflowSearchAttributesEventAttributes":{
-      "decisionTaskCompletedEventId":4,
-      "searchAttributes":{
-        "indexedFields":{
-          "CadenceChangeVersion":"WyJ0ZXN0LWNoYW5nZS0xIl0="
-        }
-      }
-    }
-  },
-  {
-    "eventId":7,
-    "timestamp":1574707009854484000,
+    "timestamp":1574668217494746000,
     "eventType":"ActivityTaskScheduled",
     "version":-24,
-    "taskId":22020180,
+    "taskId":22037776,
     "activityTaskScheduledEventAttributes":{
       "activityId":"0",
       "activityType":{
@@ -118,76 +103,76 @@
     }
   },
   {
-    "eventId":8,
-    "timestamp":1574707009877864000,
+    "eventId":7,
+    "timestamp":1574668217499019000,
     "eventType":"ActivityTaskStarted",
     "version":-24,
-    "taskId":22020185,
+    "taskId":22037780,
     "activityTaskStartedEventAttributes":{
-      "scheduledEventId":7,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup",
-      "requestId":"6063795c-3e3f-4f81-8aad-2591effabd11",
+      "scheduledEventId":6,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup",
+      "requestId":"c1653f8b-e3e8-4532-8f2c-0a8e9f1a60ca",
       "attempt":0
     }
   },
   {
-    "eventId":9,
-    "timestamp":1574707009884588000,
+    "eventId":8,
+    "timestamp":1574668217506323000,
     "eventType":"ActivityTaskCompleted",
     "version":-24,
-    "taskId":22020188,
+    "taskId":22037783,
     "activityTaskCompletedEventAttributes":{
       "result":"IkhlbGxvIENhZGVuY2UhIgo=",
-      "scheduledEventId":7,
-      "startedEventId":8,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup"
+      "scheduledEventId":6,
+      "startedEventId":7,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup"
     }
   },
   {
-    "eventId":10,
-    "timestamp":1574707009884599000,
+    "eventId":9,
+    "timestamp":1574668217506339000,
     "eventType":"DecisionTaskScheduled",
     "version":-24,
-    "taskId":22020190,
+    "taskId":22037785,
     "decisionTaskScheduledEventAttributes":{
       "taskList":{
-        "name":"boweixu-C02V61JZHTDG:1f4224d7-29ba-4bc4-b9dc-181ad7258052"
+        "name":"boweixu-C02V61JZHTDG:54a0ace3-bd7b-4521-b9c2-24ba52bef845"
       },
       "startToCloseTimeoutSeconds":60,
       "attempt":0
     }
   },
   {
-    "eventId":11,
-    "timestamp":1574707009897517000,
+    "eventId":10,
+    "timestamp":1574668217511740000,
     "eventType":"DecisionTaskStarted",
     "version":-24,
-    "taskId":22020194,
+    "taskId":22037789,
     "decisionTaskStartedEventAttributes":{
-      "scheduledEventId":10,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup",
-      "requestId":"bad19785-c0e4-4f51-998f-463b5b00b604"
+      "scheduledEventId":9,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup",
+      "requestId":"efeabd58-4374-4b16-adb6-897f954aed61"
+    }
+  },
+  {
+    "eventId":11,
+    "timestamp":1574668217517648000,
+    "eventType":"DecisionTaskCompleted",
+    "version":-24,
+    "taskId":22037792,
+    "decisionTaskCompletedEventAttributes":{
+      "scheduledEventId":9,
+      "startedEventId":10,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup",
+      "binaryChecksum":"06e5b3f52bd27301078e9ddd8fe9df35"
     }
   },
   {
     "eventId":12,
-    "timestamp":1574707009908087000,
-    "eventType":"DecisionTaskCompleted",
-    "version":-24,
-    "taskId":22020197,
-    "decisionTaskCompletedEventAttributes":{
-      "scheduledEventId":10,
-      "startedEventId":11,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup",
-      "binaryChecksum":"b59e7d41ab8b472fc639097ef38f3faa"
-    }
-  },
-  {
-    "eventId":13,
-    "timestamp":1574707009908103000,
+    "timestamp":1574668217517674000,
     "eventType":"ActivityTaskScheduled",
     "version":-24,
-    "taskId":22020198,
+    "taskId":22037793,
     "activityTaskScheduledEventAttributes":{
       "activityId":"1",
       "activityType":{
@@ -201,83 +186,83 @@
       "scheduleToStartTimeoutSeconds":60,
       "startToCloseTimeoutSeconds":60,
       "heartbeatTimeoutSeconds":20,
-      "decisionTaskCompletedEventId":12,
+      "decisionTaskCompletedEventId":11,
       "header":{
 
       }
     }
   },
   {
-    "eventId":14,
-    "timestamp":1574707009917360000,
+    "eventId":13,
+    "timestamp":1574668217522350000,
     "eventType":"ActivityTaskStarted",
     "version":-24,
-    "taskId":22020202,
+    "taskId":22037797,
     "activityTaskStartedEventAttributes":{
-      "scheduledEventId":13,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup",
-      "requestId":"100d24d4-96b8-486a-85a9-2d647f7e8862",
+      "scheduledEventId":12,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup",
+      "requestId":"6688f2fa-5c15-45b5-81ff-8417e4cb81cc",
       "attempt":0
     }
   },
   {
-    "eventId":15,
-    "timestamp":1574707009924659000,
+    "eventId":14,
+    "timestamp":1574668217526033000,
     "eventType":"ActivityTaskCompleted",
     "version":-24,
-    "taskId":22020205,
+    "taskId":22037800,
     "activityTaskCompletedEventAttributes":{
       "result":"IkhlbGxvIENhZGVuY2UhIgo=",
-      "scheduledEventId":13,
-      "startedEventId":14,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup"
+      "scheduledEventId":12,
+      "startedEventId":13,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup"
     }
   },
   {
-    "eventId":16,
-    "timestamp":1574707009924683000,
+    "eventId":15,
+    "timestamp":1574668217526044000,
     "eventType":"DecisionTaskScheduled",
     "version":-24,
-    "taskId":22020207,
+    "taskId":22037802,
     "decisionTaskScheduledEventAttributes":{
       "taskList":{
-        "name":"boweixu-C02V61JZHTDG:1f4224d7-29ba-4bc4-b9dc-181ad7258052"
+        "name":"boweixu-C02V61JZHTDG:54a0ace3-bd7b-4521-b9c2-24ba52bef845"
       },
       "startToCloseTimeoutSeconds":60,
       "attempt":0
     }
   },
   {
-    "eventId":17,
-    "timestamp":1574707009928226000,
+    "eventId":16,
+    "timestamp":1574668217532466000,
     "eventType":"DecisionTaskStarted",
     "version":-24,
-    "taskId":22020211,
+    "taskId":22037806,
     "decisionTaskStartedEventAttributes":{
-      "scheduledEventId":16,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup",
-      "requestId":"b44f5e49-d78c-4d5c-b165-f4c1399c5cda"
+      "scheduledEventId":15,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup",
+      "requestId":"29e9a21f-d893-4676-a80d-08068fca595c"
+    }
+  },
+  {
+    "eventId":17,
+    "timestamp":1574668217537539000,
+    "eventType":"DecisionTaskCompleted",
+    "version":-24,
+    "taskId":22037809,
+    "decisionTaskCompletedEventAttributes":{
+      "scheduledEventId":15,
+      "startedEventId":16,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup",
+      "binaryChecksum":"06e5b3f52bd27301078e9ddd8fe9df35"
     }
   },
   {
     "eventId":18,
-    "timestamp":1574707009940571000,
-    "eventType":"DecisionTaskCompleted",
-    "version":-24,
-    "taskId":22020214,
-    "decisionTaskCompletedEventAttributes":{
-      "scheduledEventId":16,
-      "startedEventId":17,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup",
-      "binaryChecksum":"b59e7d41ab8b472fc639097ef38f3faa"
-    }
-  },
-  {
-    "eventId":19,
-    "timestamp":1574707009940590000,
+    "timestamp":1574668217537563000,
     "eventType":"ActivityTaskScheduled",
     "version":-24,
-    "taskId":22020215,
+    "taskId":22037810,
     "activityTaskScheduledEventAttributes":{
       "activityId":"2",
       "activityType":{
@@ -291,47 +276,47 @@
       "scheduleToStartTimeoutSeconds":60,
       "startToCloseTimeoutSeconds":60,
       "heartbeatTimeoutSeconds":20,
-      "decisionTaskCompletedEventId":18,
+      "decisionTaskCompletedEventId":17,
       "header":{
 
       }
     }
   },
   {
-    "eventId":20,
-    "timestamp":1574707009945292000,
+    "eventId":19,
+    "timestamp":1574668217541289000,
     "eventType":"ActivityTaskStarted",
     "version":-24,
-    "taskId":22020219,
+    "taskId":22037814,
     "activityTaskStartedEventAttributes":{
-      "scheduledEventId":19,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup",
-      "requestId":"57c6ecb5-1ec2-46dd-a2a2-ac7e3f27f4cb",
+      "scheduledEventId":18,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup",
+      "requestId":"c042f1a9-508b-4ab6-85a0-51aa6c0a8037",
       "attempt":0
     }
   },
   {
-    "eventId":21,
-    "timestamp":1574707009949236000,
+    "eventId":20,
+    "timestamp":1574668217546721000,
     "eventType":"ActivityTaskCompleted",
     "version":-24,
-    "taskId":22020222,
+    "taskId":22037817,
     "activityTaskCompletedEventAttributes":{
       "result":"IkhlbGxvIENhZGVuY2UhIgo=",
-      "scheduledEventId":19,
-      "startedEventId":20,
-      "identity":"2310@boweixu-C02V61JZHTDG@helloWorldGroup"
+      "scheduledEventId":18,
+      "startedEventId":19,
+      "identity":"87829@boweixu-C02V61JZHTDG@helloWorldGroup"
     }
   },
   {
-    "eventId":22,
-    "timestamp":1574707009949246000,
+    "eventId":21,
+    "timestamp":1574668217546746000,
     "eventType":"DecisionTaskScheduled",
     "version":-24,
-    "taskId":22020224,
+    "taskId":22037819,
     "decisionTaskScheduledEventAttributes":{
       "taskList":{
-        "name":"boweixu-C02V61JZHTDG:1f4224d7-29ba-4bc4-b9dc-181ad7258052"
+        "name":"boweixu-C02V61JZHTDG:54a0ace3-bd7b-4521-b9c2-24ba52bef845"
       },
       "startToCloseTimeoutSeconds":60,
       "attempt":0

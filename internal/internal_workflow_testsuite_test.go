@@ -2214,15 +2214,15 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityHeartbeatRetry() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
 
-	localActivityFn := func(ctx context.Context) (string, error) {
+	localActivityFn := func(ctx context.Context) (int32, error) {
 		info := GetActivityInfo(ctx)
 		if info.Attempt < 2 {
-			return "", NewCustomError("bad-luck")
+			return int32(-1), NewCustomError("bad-luck")
 		}
-		return "retry-done", nil
+		return info.Attempt, nil
 	}
 
-	workflowFn := func(ctx Context) (string, error) {
+	workflowFn := func(ctx Context) (int32, error) {
 		lao := LocalActivityOptions{
 			ScheduleToCloseTimeout: time.Minute,
 			RetryPolicy: &RetryPolicy{
@@ -2236,10 +2236,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
 		}
 		ctx = WithLocalActivityOptions(ctx, lao)
 
-		var result string
+		var result int32
 		err := ExecuteLocalActivity(ctx, localActivityFn).Get(ctx, &result)
 		if err != nil {
-			return "", err
+			return int32(-1), err
 		}
 		return result, nil
 	}
@@ -2250,9 +2250,52 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
 
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
-	var result string
+	var result int32
 	s.NoError(env.GetWorkflowResult(&result))
-	s.Equal("retry-done", result)
+	s.Equal(int32(2), result)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetryOnCancel() {
+	attempts := 0
+	localActivityFn := func(ctx context.Context) (int32, error) {
+		attempts++
+		info := GetActivityInfo(ctx)
+		if info.Attempt < 2 {
+			return int32(-1), NewCanceledError("details")
+		}
+		return info.Attempt, nil
+	}
+
+	workflowFn := func(ctx Context) (int32, error) {
+		lao := LocalActivityOptions{
+			ScheduleToCloseTimeout: time.Minute,
+			RetryPolicy: &RetryPolicy{
+				MaximumAttempts:          3,
+				InitialInterval:          time.Second,
+				MaximumInterval:          time.Second * 10,
+				BackoffCoefficient:       2,
+				NonRetriableErrorReasons: []string{"bad-bug"},
+				ExpirationInterval:       time.Minute,
+			},
+		}
+		ctx = WithLocalActivityOptions(ctx, lao)
+
+		var result int32
+		err := ExecuteLocalActivity(ctx, localActivityFn).Get(ctx, &result)
+		if err != nil {
+			return int32(-1), err
+		}
+		return result, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	RegisterWorkflow(workflowFn)
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
+	s.True(IsCanceledError(env.GetWorkflowError()))
+	s.Equal(1, attempts)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowRetry() {

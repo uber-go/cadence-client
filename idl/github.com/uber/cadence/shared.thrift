@@ -1138,6 +1138,7 @@ struct RespondDecisionTaskFailedRequest {
   20: optional DecisionTaskFailedCause cause
   30: optional binary details
   40: optional string identity
+  50: optional string binaryChecksum
 }
 
 struct PollForActivityTaskRequest {

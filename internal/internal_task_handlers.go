@@ -1725,7 +1725,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
 			zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
 			zap.String(tagActivityType, activityType),
-			zap.String("Error", err.Error()),
+			zap.Error(err),
 		)
 	}
 	return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, output, err, ath.dataConverter), nil

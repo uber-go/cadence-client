@@ -26,17 +26,16 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	jaeger_config "github.com/uber/jaeger-client-go/config"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/zap"
 )
 
 func TestTracingContextPropagator(t *testing.T) {
-	config := jaeger_config.Configuration{}
-	closer, err := config.InitGlobalTracer("test-service")
-	assert.NoError(t, err)
+	tracer, closer, err := jaeger_config.Configuration{ServiceName:"test-service"}.NewTracer()
+	require.NoError(t, err)
 	defer closer.Close()
-	tracer := opentracing.GlobalTracer()
 	ctxProp := NewTracingContextPropagator(zap.NewNop(), tracer)
 
 	span := tracer.StartSpan("test-operation")
@@ -47,11 +46,11 @@ func TestTracingContextPropagator(t *testing.T) {
 	}
 
 	err = ctxProp.Inject(ctx, NewHeaderWriter(header))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	returnCtx := context.Background()
 	returnCtx, err = ctxProp.Extract(returnCtx, NewHeaderReader(header))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	spanCtx := returnCtx.Value(activeSpanContextKey)
 	assert.NotNil(t, spanCtx)
@@ -64,7 +63,7 @@ func TestTracingContextPropagatorNoSpan(t *testing.T) {
 		Fields: map[string][]byte{},
 	}
 	err := ctxProp.Inject(context.Background(), NewHeaderWriter(header))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	returnCtx := context.Background()
 	returnCtx, err = ctxProp.Extract(returnCtx, NewHeaderReader(header))
@@ -72,11 +71,9 @@ func TestTracingContextPropagatorNoSpan(t *testing.T) {
 }
 
 func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
-	config := jaeger_config.Configuration{}
-	closer, err := config.InitGlobalTracer("test-service")
-	assert.NoError(t, err)
+	tracer, closer, err := jaeger_config.Configuration{ServiceName:"test-service"}.NewTracer()
+	require.NoError(t, err)
 	defer closer.Close()
-	tracer := opentracing.GlobalTracer()
 	ctxProp := NewTracingContextPropagator(zap.NewNop(), tracer)
 
 	span := tracer.StartSpan("test-operation")
@@ -86,11 +83,11 @@ func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
 	}
 
 	err = ctxProp.InjectFromWorkflow(ctx, NewHeaderWriter(header))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	returnCtx := Background()
 	returnCtx, err = ctxProp.ExtractToWorkflow(returnCtx, NewHeaderReader(header))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	newSpanContext := spanFromContext(returnCtx)
 	assert.NotNil(t, newSpanContext)
@@ -104,7 +101,7 @@ func TestTracingContextPropagatorWorkflowContextNoSpan(t *testing.T) {
 		Fields: map[string][]byte{},
 	}
 	err := ctxProp.InjectFromWorkflow(Background(), NewHeaderWriter(header))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	returnCtx := Background()
 	returnCtx, err = ctxProp.ExtractToWorkflow(returnCtx, NewHeaderReader(header))

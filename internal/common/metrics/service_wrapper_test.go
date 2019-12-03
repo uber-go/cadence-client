@@ -178,7 +178,7 @@ func runTest(
 		inputs = append(inputs, reflect.ValueOf(callOption))
 		method := reflect.ValueOf(wrapperService).MethodByName(test.serviceMethod)
 		method.Call(inputs)
-		closer.Close()
+		require.NoError(t, closer.Close())
 		validationFunc(t, reporter, test.serviceMethod, test.expectedCounters)
 	})
 }

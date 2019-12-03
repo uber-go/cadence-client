@@ -33,7 +33,8 @@ import (
 )
 
 func TestTracingContextPropagator(t *testing.T) {
-	tracer, closer, err := jaeger_config.Configuration{ServiceName:"test-service"}.NewTracer()
+	t.Parallel()
+	tracer, closer, err := jaeger_config.Configuration{ServiceName: "test-service"}.NewTracer()
 	require.NoError(t, err)
 	defer closer.Close()
 	ctxProp := NewTracingContextPropagator(zap.NewNop(), tracer)
@@ -57,6 +58,7 @@ func TestTracingContextPropagator(t *testing.T) {
 }
 
 func TestTracingContextPropagatorNoSpan(t *testing.T) {
+	t.Parallel()
 	ctxProp := NewTracingContextPropagator(zap.NewNop(), opentracing.NoopTracer{})
 
 	header := &shared.Header{
@@ -71,7 +73,8 @@ func TestTracingContextPropagatorNoSpan(t *testing.T) {
 }
 
 func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
-	tracer, closer, err := jaeger_config.Configuration{ServiceName:"test-service"}.NewTracer()
+	t.Parallel()
+	tracer, closer, err := jaeger_config.Configuration{ServiceName: "test-service"}.NewTracer()
 	require.NoError(t, err)
 	defer closer.Close()
 	ctxProp := NewTracingContextPropagator(zap.NewNop(), tracer)
@@ -95,6 +98,7 @@ func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
 }
 
 func TestTracingContextPropagatorWorkflowContextNoSpan(t *testing.T) {
+	t.Parallel()
 	ctxProp := NewTracingContextPropagator(zap.NewNop(), opentracing.NoopTracer{})
 
 	header := &shared.Header{

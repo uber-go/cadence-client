@@ -37,6 +37,7 @@ LINT_SRC := $(filter-out ./mock% $(THRIFTRW_OUT),$(ALL_SRC))
 THRIFTRW_VERSION := v1.11.0
 YARPC_VERSION := v1.29.1
 GOLINT_VERSION := 470b6b0bb3005eda157f0275e2e4895055396a81
+STATICCHECK_VERSION := 2019.2.3
 
 # versioned tools.  just change the version vars above, it'll automatically trigger a rebuild.
 $(BINS)/versions/thriftrw-$(THRIFTRW_VERSION):
@@ -48,6 +49,9 @@ $(BINS)/versions/yarpc-$(YARPC_VERSION):
 $(BINS)/versions/golint-$(GOLINT_VERSION):
 	./versioned_go_build.sh golang.org/x/lint $(GOLINT_VERSION) golint $@
 
+$(BINS)/versions/staticcheck-$(STATICCHECK_VERSION):
+	./versioned_go_build.sh honnef.co/go/tools $(STATICCHECK_VERSION) cmd/staticcheck $@
+
 # stable tool targets.  depend on / execute these instead of the versioned ones.
 # this versioned-to-nice-name thing is mostly because thriftrw depends on the yarpc
 # bin to be named "thriftrw-plugin-yarpc".
@@ -58,6 +62,9 @@ $(BINS)/thriftrw-plugin-yarpc: $(BINS)/versions/yarpc-$(YARPC_VERSION)
 	@ln -fs $(CURDIR)/$< $@
 
 $(BINS)/golint: $(BINS)/versions/golint-$(GOLINT_VERSION)
+	@ln -fs $(CURDIR)/$< $@
+
+$(BINS)/staticcheck: $(BINS)/versions/staticcheck-$(STATICCHECK_VERSION)
 	@ln -fs $(CURDIR)/$< $@
 
 $(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
@@ -143,6 +150,9 @@ lint: $(BINS)/golint $(ALL_SRC)
 		echo "$$OUTPUT"; \
 		exit 1; \
 	fi
+
+staticcheck: $(BINS)/staticcheck $(ALL_SRC)
+	$(BINS)/staticcheck ./...
 
 fmt:
 	@gofmt -w $(ALL_SRC)

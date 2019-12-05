@@ -883,7 +883,7 @@ func (w *workflowExecutionContextImpl) ProcessLocalActivityResult(workflowTask *
 }
 
 func (w *workflowExecutionContextImpl) retryLocalActivity(lar *localActivityResult) bool {
-	if lar.task.retryPolicy == nil || lar.err == nil || lar.err == ErrCanceled {
+	if lar.task.retryPolicy == nil || lar.err == nil || IsCanceledError(lar.err) {
 		return false
 	}
 
@@ -1068,6 +1068,20 @@ func skipDeterministicCheckForEvent(e *s.HistoryEvent) bool {
 	return false
 }
 
+// special check for upsert change version event
+func skipDeterministicCheckForUpsertChangeVersion(events []*s.HistoryEvent, idx int) bool {
+	e := events[idx]
+	if e.GetEventType() == s.EventTypeMarkerRecorded &&
+		e.MarkerRecordedEventAttributes.GetMarkerName() == versionMarkerName &&
+		idx < len(events)-1 &&
+		events[idx+1].GetEventType() == s.EventTypeUpsertWorkflowSearchAttributes {
+		if _, ok := events[idx+1].UpsertWorkflowSearchAttributesEventAttributes.SearchAttributes.IndexedFields[CadenceChangeVersion]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func matchReplayWithHistory(replayDecisions []*s.Decision, historyEvents []*s.HistoryEvent) error {
 	di := 0
 	hi := 0
@@ -1078,6 +1092,10 @@ matchLoop:
 		var e *s.HistoryEvent
 		if hi < hSize {
 			e = historyEvents[hi]
+			if skipDeterministicCheckForUpsertChangeVersion(historyEvents, hi) {
+				hi += 2
+				continue matchLoop
+			}
 			if skipDeterministicCheckForEvent(e) {
 				hi++
 				continue matchLoop
@@ -1293,7 +1311,10 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 		eventAttributes := e.UpsertWorkflowSearchAttributesEventAttributes
 		decisionAttributes := d.UpsertWorkflowSearchAttributesDecisionAttributes
-		return isSearchAttributesMatched(eventAttributes.SearchAttributes, decisionAttributes.SearchAttributes)
+		if strictMode && !isSearchAttributesMatched(eventAttributes.SearchAttributes, decisionAttributes.SearchAttributes) {
+			return false
+		}
+		return true
 	}
 
 	return false
@@ -1700,7 +1721,14 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	if <-ctx.Done(); ctx.Err() == context.DeadlineExceeded {
 		return nil, ctx.Err()
 	}
-
+	if err != nil {
+		ath.logger.Error("Activity error.",
+			zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
+			zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
+			zap.String(tagActivityType, activityType),
+			zap.Error(err),
+		)
+	}
 	return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, output, err, ath.dataConverter), nil
 }
 

@@ -22,27 +22,22 @@ package internal
 
 import (
 	"encoding/json"
-	"io/ioutil"
-	"os"
-	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestReplayAwareLogger(t *testing.T) {
-	temp, err := ioutil.TempFile("", "cadence-client-test")
-	require.NoError(t, err, "Failed to create temp file.")
-	defer os.Remove(temp.Name())
-	config := zap.NewProductionConfig()
-	config.OutputPaths = []string{temp.Name()}
-	config.EncoderConfig.TimeKey = "" // no timestamps in tests
+	t.Parallel()
+	core, observed := observer.New(zapcore.InfoLevel)
+	logger := zap.New(core, zap.Development())
 
 	isReplay, enableLoggingInReplay := false, false
-	logger, err := config.Build()
-	require.NoError(t, err, "Failed to create logger.")
 	logger = logger.WithOptions(zap.WrapCore(wrapLogger(&isReplay, &enableLoggingInReplay)))
 
 	logger.Info("normal info")
@@ -56,16 +51,15 @@ func TestReplayAwareLogger(t *testing.T) {
 	isReplay = true
 	logger.Info("replay2 info")
 
-	logger.Sync()
-
-	byteContents, err := ioutil.ReadAll(temp)
-	require.NoError(t, err, "Couldn't read log contents from temp file.")
-	logs := string(byteContents)
-
-	require.True(t, strings.Contains(logs, "normal info"), "normal info should show")
-	require.False(t, strings.Contains(logs, "replay info"), "replay info should not show")
-	require.True(t, strings.Contains(logs, "normal2 info"), "normal2 info should show")
-	require.True(t, strings.Contains(logs, "replay2 info"), "replay2 info should show")
+	var messages []string
+	for _, log := range observed.AllUntimed() {
+		messages = append(messages, log.Message)
+	}
+	assert.Len(t, messages, 3) // ensures "replay info" wasn't just misspelled
+	assert.Contains(t, messages, "normal info")
+	assert.NotContains(t, messages, "replay info")
+	assert.Contains(t, messages, "normal2 info")
+	assert.Contains(t, messages, "replay2 info")
 }
 
 func testDecodeValueHelper(t *testing.T, env *workflowEnvironmentImpl) {

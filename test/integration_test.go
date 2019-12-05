@@ -99,6 +99,7 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 }
 
 func (ts *IntegrationTestSuite) TearDownSuite() {
+	ts.Assertions = require.New(ts.T())
 	ts.rpcClient.Close()
 
 	// allow the pollers to shut down, and ensure there are no goroutine leaks.

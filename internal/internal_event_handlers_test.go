@@ -79,6 +79,7 @@ func testDecodeValueHelper(t *testing.T, env *workflowEnvironmentImpl) {
 }
 
 func TestDecodedValue(t *testing.T) {
+	t.Parallel()
 	env := &workflowEnvironmentImpl{
 		dataConverter: getDefaultDataConverter(),
 	}
@@ -86,6 +87,7 @@ func TestDecodedValue(t *testing.T) {
 }
 
 func TestDecodedValue_WithDataConverter(t *testing.T) {
+	t.Parallel()
 	env := &workflowEnvironmentImpl{
 		dataConverter: newTestDataConverter(),
 	}
@@ -93,6 +95,7 @@ func TestDecodedValue_WithDataConverter(t *testing.T) {
 }
 
 func Test_DecodedValuePtr(t *testing.T) {
+	t.Parallel()
 	env := &workflowEnvironmentImpl{
 		dataConverter: getDefaultDataConverter(),
 	}
@@ -112,6 +115,7 @@ func Test_DecodedValuePtr(t *testing.T) {
 }
 
 func Test_DecodedValueNil(t *testing.T) {
+	t.Parallel()
 	env := &workflowEnvironmentImpl{
 		dataConverter: getDefaultDataConverter(),
 	}
@@ -136,6 +140,7 @@ func Test_DecodedValueNil(t *testing.T) {
 }
 
 func Test_ValidateAndSerializeSearchAttributes(t *testing.T) {
+	t.Parallel()
 	_, err := validateAndSerializeSearchAttributes(nil)
 	require.EqualError(t, err, "search attributes is empty")
 
@@ -157,6 +162,7 @@ func Test_ValidateAndSerializeSearchAttributes(t *testing.T) {
 }
 
 func Test_UpsertSearchAttributes(t *testing.T) {
+	t.Parallel()
 	env := &workflowEnvironmentImpl{
 		decisionsHelper: newDecisionsHelper(),
 		workflowInfo:    GetWorkflowInfo(createRootTestContext()),
@@ -178,6 +184,7 @@ func Test_UpsertSearchAttributes(t *testing.T) {
 }
 
 func Test_MergeSearchAttributes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		current  *s.SearchAttributes
@@ -221,7 +228,9 @@ func Test_MergeSearchAttributes(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			result := mergeSearchAttributes(test.current, test.upsert)
 			require.Equal(t, test.expected, result)
 		})
@@ -229,6 +238,7 @@ func Test_MergeSearchAttributes(t *testing.T) {
 }
 
 func Test_GetChangeVersion(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		changeID string
@@ -249,7 +259,9 @@ func Test_GetChangeVersion(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			result := getChangeVersion(test.changeID, test.version)
 			require.Equal(t, test.expected, result)
 		})
@@ -257,6 +269,7 @@ func Test_GetChangeVersion(t *testing.T) {
 }
 
 func Test_GetChangeVersions(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                   string
 		changeID               string
@@ -282,7 +295,9 @@ func Test_GetChangeVersions(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			result := getChangeVersions(test.changeID, test.version, test.existingChangeVersions)
 			require.Equal(t, test.expected, result)
 		})
@@ -290,6 +305,7 @@ func Test_GetChangeVersions(t *testing.T) {
 }
 
 func Test_CreateSearchAttributesForChangeVersion(t *testing.T) {
+	t.Parallel()
 	result := createSearchAttributesForChangeVersion("cid", 1, map[string]Version{})
 	val, ok := result["CadenceChangeVersion"]
 	require.True(t, ok, "Remember to update related key on server side")

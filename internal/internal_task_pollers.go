@@ -361,7 +361,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 			case *s.RespondDecisionTaskCompletedRequest:
 				if request.StickyAttributes == nil && !wtp.disableStickyExecution {
 					request.StickyAttributes = &s.StickyExecutionAttributes{
-						WorkerTaskList:                &s.TaskList{Name: common.StringPtr(getWorkerTaskList())},
+						WorkerTaskList:                &s.TaskList{Name: common.StringPtr(getWorkerTaskList(wtp.taskListName))},
 						ScheduleToStartTimeoutSeconds: common.Int32Ptr(common.Int32Ceil(wtp.StickyScheduleToStartTimeout.Seconds())),
 					}
 				}
@@ -582,7 +582,7 @@ func (wtp *workflowTaskPoller) getNextPollRequest() (request *s.PollForDecisionT
 		wtp.requestLock.Lock()
 		if wtp.stickyBacklog > 0 || wtp.pendingStickyPollCount <= wtp.pendingRegularPollCount {
 			wtp.pendingStickyPollCount++
-			taskListName = getWorkerTaskList()
+			taskListName = getWorkerTaskList(wtp.taskListName)
 			taskListKind = s.TaskListKindSticky
 		} else {
 			wtp.pendingRegularPollCount++

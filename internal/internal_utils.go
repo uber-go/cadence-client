@@ -144,9 +144,9 @@ func getHostName() string {
 // worker uuid per process
 var workerUUID = uuid.New()
 
-func getWorkerTaskList() string {
-	// includes hostname for debuggability, workerUUID guarantees the uniqueness
-	return fmt.Sprintf("%s:%s", getHostName(), workerUUID)
+func getWorkerTaskList(taskListName string) string {
+	// includes hostname and taskListName for debuggability, workerUUID guarantees the uniqueness
+	return fmt.Sprintf("%s:%s:%s", getHostName(), workerUUID, taskListName)
 }
 
 // ActivityTypePtr makes a copy and returns the pointer to a ActivityType.

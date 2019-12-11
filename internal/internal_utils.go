@@ -32,7 +32,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
@@ -141,12 +140,9 @@ func getHostName() string {
 	return hostName
 }
 
-// worker uuid per process
-var workerUUID = uuid.New()
-
-func getWorkerTaskList(taskListName string) string {
-	// includes hostname and taskListName for debuggability, workerUUID guarantees the uniqueness
-	return fmt.Sprintf("%s:%s:%s", getHostName(), workerUUID, taskListName)
+func getWorkerTaskList(stickyUUID string) string {
+	// includes hostname for debuggability, stickyUUID guarantees the uniqueness
+	return fmt.Sprintf("%s:%s", getHostName(), stickyUUID)
 }
 
 // ActivityTypePtr makes a copy and returns the pointer to a ActivityType.

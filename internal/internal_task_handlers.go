@@ -876,6 +876,12 @@ func (w *workflowExecutionContextImpl) retryLocalActivity(lar *localActivityResu
 	if backoff > 0 && backoff <= w.GetDecisionTimeout() {
 		// we need a local retry
 		time.AfterFunc(backoff, func() {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Println("Recovered in f", r)
+					fmt.Println("debug info:", w.workflowInfo.WorkflowExecution.ID, w.workflowInfo.WorkflowExecution.RunID)
+				}
+			}()
 			if _, ok := w.eventHandler.pendingLaTasks[lar.task.activityID]; !ok {
 				return
 			}

@@ -37,7 +37,7 @@ import (
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
-)s
+)
 
 const (
 	pollTaskServiceTimeOut = 3 * time.Minute // Server long poll is 1 * Minutes + delta

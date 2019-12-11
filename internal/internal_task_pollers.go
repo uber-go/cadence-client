@@ -212,7 +212,6 @@ func newWorkflowTaskPoller(
 		stickyUUID:                   uuid.New(),
 		disableStickyExecution:       params.DisableStickyExecution,
 		StickyScheduleToStartTimeout: params.StickyScheduleToStartTimeout,
-
 	}
 }
 

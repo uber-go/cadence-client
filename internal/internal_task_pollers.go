@@ -195,6 +195,7 @@ func (bp *basePoller) doPoll(pollFunc func(ctx context.Context) (interface{}, er
 	}
 }
 
+// newWorkflowTaskPoller creates a new workflow task poller which must have a one to one relationship to workflow worker
 func newWorkflowTaskPoller(
 	taskHandler WorkflowTaskHandler,
 	service workflowserviceclient.Interface,

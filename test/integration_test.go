@@ -239,6 +239,31 @@ func (ts *IntegrationTestSuite) TestStackTraceQuery() {
 	ts.True(strings.Contains(trace, "go.uber.org/cadence/test.(*Workflows).Basic"))
 }
 
+func (ts *IntegrationTestSuite) TestConsistentQuery() {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	run, err := ts.libClient.ExecuteWorkflow(ctx,
+		ts.startWorkflowOptions("test-consistent-query"), ts.workflows.ConsistentQueryWorkflow)
+	ts.Nil(err)
+	err = ts.libClient.SignalWorkflow(ctx, "test-consistent-query", run.GetRunID(), consistentQuerySignalCh, "signal-input")
+	ts.NoError(err)
+	// wait to ensure decision task has a time to become outstanding
+	<-time.After(100 * time.Millisecond)
+	value, err := ts.libClient.QueryWorkflowWithOptions(ctx, &client.QueryWorkflowWithOptionsRequest{
+		WorkflowID: "test-consistent-query",
+		RunID: run.GetRunID(),
+		QueryType: "consistent_query",
+		QueryConsistencyLevel: shared.QueryConsistencyLevelStrong.Ptr(),
+	})
+	ts.Nil(err)
+	ts.NotNil(value)
+	ts.NotNil(value.QueryResult)
+	ts.Nil(value.QueryRejected)
+	var queryResult string
+	ts.Nil(value.QueryResult.Get(&queryResult))
+	ts.Equal("signal-input", queryResult)
+}
+
 func (ts *IntegrationTestSuite) TestWorkflowIDReuseRejectDuplicate() {
 	var result string
 	err := ts.executeWorkflow(

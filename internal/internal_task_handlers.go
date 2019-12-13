@@ -891,9 +891,18 @@ func (w *workflowExecutionContextImpl) retryLocalActivity(lar *localActivityResu
 	if backoff > 0 && backoff <= w.GetDecisionTimeout() {
 		// we need a local retry
 		time.AfterFunc(backoff, func() {
-			if _, ok := w.eventHandler.pendingLaTasks[lar.task.activityID]; !ok {
+			w.mutex.Lock()
+			// if decision heartbeat failed, the workflow execution context will be cleared
+			if w.IsDestroyed() {
+				w.mutex.Unlock()
 				return
 			}
+
+			if _, ok := w.eventHandler.pendingLaTasks[lar.task.activityID]; !ok {
+				w.mutex.Unlock()
+				return
+			}
+			w.mutex.Unlock()
 
 			lar.task.attempt++
 			w.laTunnel.sendTask(lar.task)

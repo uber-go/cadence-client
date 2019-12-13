@@ -1125,7 +1125,7 @@ func (t *TaskHandlersTestSuite) TestLocalActivityRetry_DecisionHeartbeatFail() {
 	laTaskPoller := newLocalActivityPoller(params, laTunnel)
 	doneCh := make(chan struct{})
 	go func() {
-		// laTaskPoll need to poll the local activity and process it
+		// laTaskPoller needs to poll the local activity and process it
 		task, err := laTaskPoller.PollTask()
 		t.NoError(err)
 		err = laTaskPoller.ProcessTask(task)
@@ -1150,7 +1150,7 @@ func (t *TaskHandlersTestSuite) TestLocalActivityRetry_DecisionHeartbeatFail() {
 	t.Nil(response)
 	t.Error(err)
 
-	// wait the for the retry timer to fire
+	// wait for the retry timer to fire
 	time.Sleep(backoffDuration)
 	t.False(workflowComplete)
 	<-doneCh

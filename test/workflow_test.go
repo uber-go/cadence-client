@@ -397,7 +397,7 @@ func (w *Workflows) SimplestWorkflow(ctx workflow.Context) (string, error) {
 
 func (w *Workflows) LargeQueryResultWorkflow(ctx workflow.Context) (string, error) {
 	err := workflow.SetQueryHandler(ctx, "large_query", func() ([]byte, error) {
-		result := make([]byte, 20000000)
+		result := make([]byte, 3000000)
 		rand.Read(result)
 		return result, nil
 	})
@@ -507,14 +507,5 @@ func (w *Workflows) defaultActivityOptionsWithRetry() workflow.ActivityOptions {
 			ExpirationInterval: 100 * time.Second,
 			MaximumAttempts:    3,
 		},
-	}
-}
-
-func (w *Workflows) activityOptions(
-	startTimeout time.Duration, scheduleToCloseTimeout time.Duration, startToCloseTimeout time.Duration) workflow.ActivityOptions {
-	return workflow.ActivityOptions{
-		ScheduleToStartTimeout: startTimeout,
-		ScheduleToCloseTimeout: scheduleToCloseTimeout,
-		StartToCloseTimeout:    startToCloseTimeout,
 	}
 }

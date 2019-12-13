@@ -201,6 +201,13 @@ func createTestEventDecisionTaskCompleted(eventID int64, attr *s.DecisionTaskCom
 		DecisionTaskCompletedEventAttributes: attr}
 }
 
+func createTestEventDecisionTaskFailed(eventID int64, attr *s.DecisionTaskFailedEventAttributes) *s.HistoryEvent {
+	return &s.HistoryEvent{
+		EventId:                           common.Int64Ptr(eventID),
+		EventType:                         common.EventTypePtr(s.EventTypeDecisionTaskFailed),
+		DecisionTaskFailedEventAttributes: attr}
+}
+
 func createTestEventSignalExternalWorkflowExecutionFailed(eventID int64, attr *s.SignalExternalWorkflowExecutionFailedEventAttributes) *s.HistoryEvent {
 	return &s.HistoryEvent{
 		EventId:   common.Int64Ptr(eventID),
@@ -552,6 +559,95 @@ func (t *TaskHandlersTestSuite) TestCacheEvictionWhenErrorOccurs() {
 
 	// There should be nothing in the cache.
 	t.EqualValues(getWorkflowCache().Size(), 0)
+}
+
+func (t *TaskHandlersTestSuite) TestWithMissingHistoryEvents() {
+	taskList := "taskList"
+	testEvents := []*s.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
+		createTestEventDecisionTaskScheduled(6, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(7),
+	}
+	params := workerExecutionParameters{
+		TaskList:                       taskList,
+		Identity:                       "test-id-1",
+		Logger:                         zap.NewNop(),
+		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+	}
+
+	for _, startEventID := range []int64{0, 3} {
+		taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+		task := createWorkflowTask(testEvents, startEventID, "HelloWorld_Workflow")
+		// newWorkflowTaskWorkerInternal will set the laTunnel in taskHandler, without it, ProcessWorkflowTask()
+		// will fail as it can't find laTunnel in getWorkflowCache().
+		newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}))
+		request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
+
+		t.Error(err)
+		t.Nil(request)
+		t.Contains(err.Error(), "missing history events")
+
+		// There should be nothing in the cache.
+		t.EqualValues(getWorkflowCache().Size(), 0)
+	}
+}
+
+func (t *TaskHandlersTestSuite) TestWithTruncatedHistory() {
+	taskList := "taskList"
+	testEvents := []*s.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskFailed(4, &s.DecisionTaskFailedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
+		createTestEventDecisionTaskScheduled(5, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(6),
+		createTestEventDecisionTaskCompleted(7, &s.DecisionTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(5)}),
+		createTestEventActivityTaskScheduled(8, &s.ActivityTaskScheduledEventAttributes{
+			ActivityId:   common.StringPtr("0"),
+			ActivityType: &s.ActivityType{Name: common.StringPtr("pkg.Greeter_Activity")},
+			TaskList:     &s.TaskList{Name: &taskList},
+		}),
+	}
+	params := workerExecutionParameters{
+		TaskList:                       taskList,
+		Identity:                       "test-id-1",
+		Logger:                         zap.NewNop(),
+		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+	}
+
+	testCases := []struct {
+		startedEventID         int64
+		previousStartedEventID int64
+		isResultErr            bool
+	}{
+		{0, 0, false},
+		{0, 3, false},
+		{10, 0, true},
+		{10, 6, true},
+	}
+
+	for i, tc := range testCases {
+		taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+		task := createWorkflowTask(testEvents, tc.previousStartedEventID, "HelloWorld_Workflow")
+		task.StartedEventId = common.Int64Ptr(tc.startedEventID)
+		// newWorkflowTaskWorkerInternal will set the laTunnel in taskHandler, without it, ProcessWorkflowTask()
+		// will fail as it can't find laTunnel in getWorkflowCache().
+		newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}))
+		request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
+
+		if tc.isResultErr {
+			t.Error(err, "testcase %v failed", i)
+			t.Nil(request)
+			t.Contains(err.Error(), "premature end of stream")
+			t.EqualValues(getWorkflowCache().Size(), 0)
+			continue
+		}
+
+		t.NoError(err, "testcase %v failed", i)
+	}
 }
 
 func (t *TaskHandlersTestSuite) TestSideEffectDefer_Sticky() {
@@ -1284,6 +1380,7 @@ func Test_NonDeterministicCheck(t *testing.T) {
 func Test_IsDecisionMatchEvent_UpsertWorkflowSearchAttributes(t *testing.T) {
 	diType := s.DecisionTypeUpsertWorkflowSearchAttributes
 	eType := s.EventTypeUpsertWorkflowSearchAttributes
+	strictMode := false
 
 	testCases := []struct {
 		name     string
@@ -1314,7 +1411,7 @@ func Test_IsDecisionMatchEvent_UpsertWorkflowSearchAttributes(t *testing.T) {
 				EventType: &eType,
 				UpsertWorkflowSearchAttributesEventAttributes: &s.UpsertWorkflowSearchAttributesEventAttributes{},
 			},
-			expected: false,
+			expected: true,
 		},
 		{
 			name: "attributes match",
@@ -1336,7 +1433,37 @@ func Test_IsDecisionMatchEvent_UpsertWorkflowSearchAttributes(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			require.Equal(t, testCase.expected, isDecisionMatchEvent(testCase.decision, testCase.event, false))
+			require.Equal(t, testCase.expected, isDecisionMatchEvent(testCase.decision, testCase.event, strictMode))
+		})
+	}
+
+	strictMode = true
+
+	testCases = []struct {
+		name     string
+		decision *s.Decision
+		event    *s.HistoryEvent
+		expected bool
+	}{
+		{
+			name: "attributes not match",
+			decision: &s.Decision{
+				DecisionType: &diType,
+				UpsertWorkflowSearchAttributesDecisionAttributes: &s.UpsertWorkflowSearchAttributesDecisionAttributes{
+					SearchAttributes: &s.SearchAttributes{},
+				},
+			},
+			event: &s.HistoryEvent{
+				EventType: &eType,
+				UpsertWorkflowSearchAttributesEventAttributes: &s.UpsertWorkflowSearchAttributesEventAttributes{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			require.Equal(t, testCase.expected, isDecisionMatchEvent(testCase.decision, testCase.event, strictMode))
 		})
 	}
 }

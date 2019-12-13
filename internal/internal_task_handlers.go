@@ -954,6 +954,9 @@ func (w *workflowExecutionContextImpl) retryLocalActivity(lar *localActivityResu
 	if backoff > 0 && backoff <= w.GetDecisionTimeout() {
 		// we need a local retry
 		time.AfterFunc(backoff, func() {
+			// TODO: this should not be a separate goroutine as it introduces race condition when accessing eventHandler.
+			// currently this is solved by changing eventHandler to an atomic.Value. Ideally, this retry timer should be
+			// part of the event loop for processing the workflow task.
 			eventHandler := w.getEventHandler()
 
 			// if decision heartbeat failed, the workflow execution context will be cleared and eventHandler will be nil

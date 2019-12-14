@@ -478,10 +478,14 @@ func (w *workflowExecutionContextImpl) Unlock(err error) {
 
 func (w *workflowExecutionContextImpl) getEventHandler() *workflowExecutionEventHandlerImpl {
 	eventHandler := w.eventHandler.Load()
-	if isInterfaceNil(eventHandler) {
+	if eventHandler == nil {
 		return nil
 	}
-	return eventHandler.(*workflowExecutionEventHandlerImpl)
+	eventHandlerImpl, ok := eventHandler.(*workflowExecutionEventHandlerImpl)
+	if !ok {
+		return nil
+	}
+	return eventHandlerImpl
 }
 
 func (w *workflowExecutionContextImpl) completeWorkflow(result []byte, err error) {

@@ -242,13 +242,14 @@ func (ts *IntegrationTestSuite) TestStackTraceQuery() {
 func (ts *IntegrationTestSuite) TestConsistentQuery() {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
+	// this workflow will start a local activity which blocks for long enough
+	// to ensure that consistent query must wait in order to satisfy consistency
 	run, err := ts.libClient.ExecuteWorkflow(ctx,
-		ts.startWorkflowOptions("test-consistent-query"), ts.workflows.ConsistentQueryWorkflow)
+		ts.startWorkflowOptions("test-consistent-query"), ts.workflows.ConsistentQueryWorkflow, 900*time.Millisecond)
 	ts.Nil(err)
 	err = ts.libClient.SignalWorkflow(ctx, "test-consistent-query", run.GetRunID(), consistentQuerySignalCh, "signal-input")
 	ts.NoError(err)
-	// wait to ensure decision task has a time to become outstanding
-	<-time.After(100 * time.Millisecond)
+	<-time.After(100*time.Millisecond)
 	value, err := ts.libClient.QueryWorkflowWithOptions(ctx, &client.QueryWorkflowWithOptionsRequest{
 		WorkflowID: "test-consistent-query",
 		RunID: run.GetRunID(),

@@ -413,8 +413,8 @@ func (w *Workflows) LargeQueryResultWorkflow(ctx workflow.Context) (string, erro
 	return "hello", nil
 }
 
-func (w *Workflows) ConsistentQueryWorkflow(ctx workflow.Context) error {
-	queryResult := "starting value"
+func (w *Workflows) ConsistentQueryWorkflow(ctx workflow.Context, delay time.Duration) error {
+	queryResult := "starting-value"
 	err := workflow.SetQueryHandler(ctx, "consistent_query", func() (string, error) {
 		return queryResult, nil
 	})
@@ -427,9 +427,7 @@ func (w *Workflows) ConsistentQueryWorkflow(ctx workflow.Context) error {
 	laCtx := workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: 5 * time.Second,
 	})
-
-	// start local activity which blocks for long enough to ensure that consistent query must wait in order to satisfy consistency
-	workflow.ExecuteLocalActivity(laCtx, LocalSleep, 500 * time.Millisecond).Get(laCtx, nil)
+	workflow.ExecuteLocalActivity(laCtx, LocalSleep, delay).Get(laCtx, nil)
 	queryResult = signalData
 	return nil
 }

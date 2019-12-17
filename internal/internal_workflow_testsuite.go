@@ -987,7 +987,9 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithRetryForTest(
 			if backoff > 0 {
 				// need a retry
 				waitCh := make(chan struct{})
-				env.postCallback(func() { env.runningCount-- }, false)
+
+				// register the delayed call back first, otherwise other timers may be fired before the retry timer
+				// is enqueued.
 				env.registerDelayedCallback(func() {
 					env.runningCount++
 					task.Attempt = common.Int32Ptr(task.GetAttempt() + 1)
@@ -997,6 +999,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithRetryForTest(
 					}
 					close(waitCh)
 				}, backoff)
+				env.postCallback(func() { env.runningCount-- }, false)
 
 				<-waitCh
 				continue

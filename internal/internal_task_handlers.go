@@ -486,7 +486,7 @@ func (w *workflowExecutionContextImpl) getEventHandler() *workflowExecutionEvent
 	}
 	eventHandlerImpl, ok := eventHandler.(*workflowExecutionEventHandlerImpl)
 	if !ok {
-		return nil
+		panic("unknown type for workflow execution event handler")
 	}
 	return eventHandlerImpl
 }

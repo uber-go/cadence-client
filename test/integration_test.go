@@ -244,12 +244,19 @@ func (ts *IntegrationTestSuite) TestConsistentQuery() {
 	defer cancel()
 	// this workflow will start a local activity which blocks for long enough
 	// to ensure that consistent query must wait in order to satisfy consistency
-	run, err := ts.libClient.ExecuteWorkflow(ctx,
-		ts.startWorkflowOptions("test-consistent-query"), ts.workflows.ConsistentQueryWorkflow, 900*time.Millisecond)
+	wfOpts := ts.startWorkflowOptions("test-consistent-query")
+	wfOpts.DecisionTaskStartToCloseTimeout = 5 *time.Second
+	run, err := ts.libClient.ExecuteWorkflow(ctx, wfOpts, ts.workflows.ConsistentQueryWorkflow, 3*time.Second)
 	ts.Nil(err)
+	// Wait for a second to ensure that first decision task gets started and completed before we send signal.
+	// Query cannot be run until first decision task has been completed.
+	// If signal occurs right after workflow start then WorkflowStarted and Signal events will both be part of the same
+	// decision task. So query will be blocked waiting for signal to complete, this is not what we want because it
+	// will not exercise the consistent query code path.
+	<-time.After(time.Second)
 	err = ts.libClient.SignalWorkflow(ctx, "test-consistent-query", run.GetRunID(), consistentQuerySignalCh, "signal-input")
 	ts.NoError(err)
-	<-time.After(100*time.Millisecond)
+
 	value, err := ts.libClient.QueryWorkflowWithOptions(ctx, &client.QueryWorkflowWithOptionsRequest{
 		WorkflowID: "test-consistent-query",
 		RunID: run.GetRunID(),

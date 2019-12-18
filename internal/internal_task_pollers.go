@@ -153,10 +153,12 @@ func (lat *localActivityTunnel) getTask() *localActivityTask {
 	}
 }
 
-func (lat *localActivityTunnel) sendTask(task *localActivityTask) {
+func (lat *localActivityTunnel) sendTask(task *localActivityTask) bool {
 	select {
 	case lat.taskCh <- task:
+		return true
 	case <-lat.stopCh:
+		return false
 	}
 }
 

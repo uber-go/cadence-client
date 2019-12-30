@@ -132,6 +132,7 @@ type (
 	}
 
 	SignalWorkflowOption struct {
+		// RequestedID is for dedupping signals
 		RequestedID string
 	}
 )

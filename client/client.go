@@ -50,6 +50,9 @@ type (
 	// StartWorkflowOptions configuration parameters for starting a workflow execution.
 	StartWorkflowOptions = internal.StartWorkflowOptions
 
+	// SignalWorkflowOption configuration parameters for signaling a workflow execution.
+	SignalWorkflowOption = internal.SignalWorkflowOption
+
 	// HistoryEventIterator is a iterator which can return history events
 	HistoryEventIterator = internal.HistoryEventIterator
 
@@ -133,7 +136,7 @@ type (
 		// The errors it can return:
 		//	- EntityNotExistsError
 		//	- InternalServiceError
-		SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error
+		SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}, opts ...SignalWorkflowOption) error
 
 		// SignalWithStartWorkflow sends a signal to a running workflow.
 		// If the workflow is not running or not found, it starts the workflow and then sends the signal in transaction.

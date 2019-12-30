@@ -458,12 +458,12 @@ func (_m *Client) SignalWithStartWorkflow(ctx context.Context, workflowID string
 }
 
 // SignalWorkflow provides a mock function with given fields: ctx, workflowID, runID, signalName, arg
-func (_m *Client) SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error {
-	ret := _m.Called(ctx, workflowID, runID, signalName, arg)
+func (_m *Client) SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}, opts ...internal.SignalWorkflowOption) error {
+	ret := _m.Called(ctx, workflowID, runID, signalName, arg, opts)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, interface{}) error); ok {
-		r0 = rf(ctx, workflowID, runID, signalName, arg)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, interface{}, []internal.SignalWorkflowOption) error); ok {
+		r0 = rf(ctx, workflowID, runID, signalName, arg, opts)
 	} else {
 		r0 = ret.Error(0)
 	}

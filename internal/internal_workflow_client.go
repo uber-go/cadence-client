@@ -130,6 +130,10 @@ type (
 		// func which use a next token to get next page of history events
 		paginate func(nexttoken []byte) (*s.GetWorkflowExecutionHistoryResponse, error)
 	}
+
+	SignalWorkflowOption struct {
+		RequestedID string
+	}
 )
 
 // StartWorkflow starts a workflow execution
@@ -308,7 +312,7 @@ func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, ru
 }
 
 // SignalWorkflow signals a workflow in execution.
-func (wc *workflowClient) SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error {
+func (wc *workflowClient) SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}, opts ...SignalWorkflowOption) error {
 	input, err := encodeArg(wc.dataConverter, arg)
 	if err != nil {
 		return err
@@ -325,6 +329,9 @@ func (wc *workflowClient) SignalWorkflow(ctx context.Context, workflowID string,
 		Identity:   common.StringPtr(wc.identity),
 	}
 
+	for _, opt := range opts {
+		request.RequestId = &opt.RequestedID
+	}
 	return backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx)

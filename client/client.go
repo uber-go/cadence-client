@@ -399,7 +399,7 @@ const (
 
 // NewClient creates an instance of a workflow client
 func NewClient(service workflowserviceclient.Interface, domain string, options *Options) Client {
-	return internal.NewClient(service, domain, options)
+	return &clientAdapter{internal.NewClient(service, domain, options)}
 }
 
 // NewDomainClient creates an instance of a domain client, to manage lifecycle of domains.
@@ -407,9 +407,20 @@ func NewDomainClient(service workflowserviceclient.Interface, options *Options) 
 	return internal.NewDomainClient(service, options)
 }
 
+// clientAdapter adapts an internal.Client into a client.Client.
+//
+// We need this because the internal client's QueryWorkflow relies on the
+// interface internal.Value, while client.Client relies on encoded.Value.
+// Although the interfaces are equivalent, they're not the same type, so we
+// need to re-implement the method.
+type clientAdapter struct{ internal.Client }
+
+func (a *clientAdapter) QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (encoded.Value, error) {
+	return a.Client.QueryWorkflow(ctx, workflowID, runID, queryType, args...)
+}
+
 // make sure if new methods are added to internal.Client they are also added to public Client.
-var _ Client = internal.Client(nil)
-var _ internal.Client = Client(nil)
+var _ Client = (*clientAdapter)(nil)
 var _ DomainClient = internal.DomainClient(nil)
 var _ internal.DomainClient = DomainClient(nil)
 

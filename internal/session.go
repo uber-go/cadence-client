@@ -122,7 +122,7 @@ const (
 	errTooManySessionsMsg string = "too many outstanding sessions"
 
 	defaultSessionHeartBeatTimeout time.Duration = time.Second * 20
-	maxSessionHeartBeatFrequency   time.Duration = time.Second * 10
+	maxSessionHeartBeatInterval    time.Duration = time.Second * 10
 )
 
 var (
@@ -409,11 +409,11 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 	}
 
 	activityEnv := getActivityEnv(ctx)
-	heartbeatFrequency := activityEnv.heartbeatTimeout / 3
-	if heartbeatFrequency > maxSessionHeartBeatFrequency {
-		heartbeatFrequency = maxSessionHeartBeatFrequency
+	heartbeatInterval := activityEnv.heartbeatTimeout / 3
+	if heartbeatInterval > maxSessionHeartBeatInterval {
+		heartbeatInterval = maxSessionHeartBeatInterval
 	}
-	ticker := time.NewTicker(heartbeatFrequency)
+	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 
 	for {

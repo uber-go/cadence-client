@@ -31,14 +31,14 @@ import (
 	"strings"
 )
 
-// WorkflowService_DescribeTaskList_Args represents the arguments for the WorkflowService.DescribeTaskList function.
+// WorkflowService_ListTaskListPartitions_Args represents the arguments for the WorkflowService.ListTaskListPartitions function.
 //
-// The arguments for DescribeTaskList are sent and received over the wire as this struct.
-type WorkflowService_DescribeTaskList_Args struct {
-	Request *shared.DescribeTaskListRequest `json:"request,omitempty"`
+// The arguments for ListTaskListPartitions are sent and received over the wire as this struct.
+type WorkflowService_ListTaskListPartitions_Args struct {
+	Request *shared.ListTaskListPartitionsRequest `json:"request,omitempty"`
 }
 
-// ToWire translates a WorkflowService_DescribeTaskList_Args struct into a Thrift-level intermediate
+// ToWire translates a WorkflowService_ListTaskListPartitions_Args struct into a Thrift-level intermediate
 // representation. This intermediate representation may be serialized
 // into bytes using a ThriftRW protocol implementation.
 //
@@ -53,7 +53,7 @@ type WorkflowService_DescribeTaskList_Args struct {
 //   if err := binaryProtocol.Encode(x, writer); err != nil {
 //     return err
 //   }
-func (v *WorkflowService_DescribeTaskList_Args) ToWire() (wire.Value, error) {
+func (v *WorkflowService_ListTaskListPartitions_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
 		i      int = 0
@@ -73,17 +73,17 @@ func (v *WorkflowService_DescribeTaskList_Args) ToWire() (wire.Value, error) {
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
 }
 
-func _DescribeTaskListRequest_Read(w wire.Value) (*shared.DescribeTaskListRequest, error) {
-	var v shared.DescribeTaskListRequest
+func _ListTaskListPartitionsRequest_Read(w wire.Value) (*shared.ListTaskListPartitionsRequest, error) {
+	var v shared.ListTaskListPartitionsRequest
 	err := v.FromWire(w)
 	return &v, err
 }
 
-// FromWire deserializes a WorkflowService_DescribeTaskList_Args struct from its Thrift-level
+// FromWire deserializes a WorkflowService_ListTaskListPartitions_Args struct from its Thrift-level
 // representation. The Thrift-level representation may be obtained
 // from a ThriftRW protocol implementation.
 //
-// An error is returned if we were unable to build a WorkflowService_DescribeTaskList_Args struct
+// An error is returned if we were unable to build a WorkflowService_ListTaskListPartitions_Args struct
 // from the provided intermediate representation.
 //
 //   x, err := binaryProtocol.Decode(reader, wire.TStruct)
@@ -91,19 +91,19 @@ func _DescribeTaskListRequest_Read(w wire.Value) (*shared.DescribeTaskListReques
 //     return nil, err
 //   }
 //
-//   var v WorkflowService_DescribeTaskList_Args
+//   var v WorkflowService_ListTaskListPartitions_Args
 //   if err := v.FromWire(x); err != nil {
 //     return nil, err
 //   }
 //   return &v, nil
-func (v *WorkflowService_DescribeTaskList_Args) FromWire(w wire.Value) error {
+func (v *WorkflowService_ListTaskListPartitions_Args) FromWire(w wire.Value) error {
 	var err error
 
 	for _, field := range w.GetStruct().Fields {
 		switch field.ID {
 		case 1:
 			if field.Value.Type() == wire.TStruct {
-				v.Request, err = _DescribeTaskListRequest_Read(field.Value)
+				v.Request, err = _ListTaskListPartitionsRequest_Read(field.Value)
 				if err != nil {
 					return err
 				}
@@ -115,9 +115,9 @@ func (v *WorkflowService_DescribeTaskList_Args) FromWire(w wire.Value) error {
 	return nil
 }
 
-// String returns a readable string representation of a WorkflowService_DescribeTaskList_Args
+// String returns a readable string representation of a WorkflowService_ListTaskListPartitions_Args
 // struct.
-func (v *WorkflowService_DescribeTaskList_Args) String() string {
+func (v *WorkflowService_ListTaskListPartitions_Args) String() string {
 	if v == nil {
 		return "<nil>"
 	}
@@ -129,14 +129,14 @@ func (v *WorkflowService_DescribeTaskList_Args) String() string {
 		i++
 	}
 
-	return fmt.Sprintf("WorkflowService_DescribeTaskList_Args{%v}", strings.Join(fields[:i], ", "))
+	return fmt.Sprintf("WorkflowService_ListTaskListPartitions_Args{%v}", strings.Join(fields[:i], ", "))
 }
 
-// Equals returns true if all the fields of this WorkflowService_DescribeTaskList_Args match the
-// provided WorkflowService_DescribeTaskList_Args.
+// Equals returns true if all the fields of this WorkflowService_ListTaskListPartitions_Args match the
+// provided WorkflowService_ListTaskListPartitions_Args.
 //
 // This function performs a deep comparison.
-func (v *WorkflowService_DescribeTaskList_Args) Equals(rhs *WorkflowService_DescribeTaskList_Args) bool {
+func (v *WorkflowService_ListTaskListPartitions_Args) Equals(rhs *WorkflowService_ListTaskListPartitions_Args) bool {
 	if !((v.Request == nil && rhs.Request == nil) || (v.Request != nil && rhs.Request != nil && v.Request.Equals(rhs.Request))) {
 		return false
 	}
@@ -147,73 +147,73 @@ func (v *WorkflowService_DescribeTaskList_Args) Equals(rhs *WorkflowService_Desc
 // MethodName returns the name of the Thrift function as specified in
 // the IDL, for which this struct represent the arguments.
 //
-// This will always be "DescribeTaskList" for this struct.
-func (v *WorkflowService_DescribeTaskList_Args) MethodName() string {
-	return "DescribeTaskList"
+// This will always be "ListTaskListPartitions" for this struct.
+func (v *WorkflowService_ListTaskListPartitions_Args) MethodName() string {
+	return "ListTaskListPartitions"
 }
 
 // EnvelopeType returns the kind of value inside this struct.
 //
 // This will always be Call for this struct.
-func (v *WorkflowService_DescribeTaskList_Args) EnvelopeType() wire.EnvelopeType {
+func (v *WorkflowService_ListTaskListPartitions_Args) EnvelopeType() wire.EnvelopeType {
 	return wire.Call
 }
 
-// WorkflowService_DescribeTaskList_Helper provides functions that aid in handling the
-// parameters and return values of the WorkflowService.DescribeTaskList
+// WorkflowService_ListTaskListPartitions_Helper provides functions that aid in handling the
+// parameters and return values of the WorkflowService.ListTaskListPartitions
 // function.
-var WorkflowService_DescribeTaskList_Helper = struct {
-	// Args accepts the parameters of DescribeTaskList in-order and returns
+var WorkflowService_ListTaskListPartitions_Helper = struct {
+	// Args accepts the parameters of ListTaskListPartitions in-order and returns
 	// the arguments struct for the function.
 	Args func(
-		request *shared.DescribeTaskListRequest,
-	) *WorkflowService_DescribeTaskList_Args
+		request *shared.ListTaskListPartitionsRequest,
+	) *WorkflowService_ListTaskListPartitions_Args
 
 	// IsException returns true if the given error can be thrown
-	// by DescribeTaskList.
+	// by ListTaskListPartitions.
 	//
-	// An error can be thrown by DescribeTaskList only if the
+	// An error can be thrown by ListTaskListPartitions only if the
 	// corresponding exception type was mentioned in the 'throws'
 	// section for it in the Thrift file.
 	IsException func(error) bool
 
-	// WrapResponse returns the result struct for DescribeTaskList
+	// WrapResponse returns the result struct for ListTaskListPartitions
 	// given its return value and error.
 	//
 	// This allows mapping values and errors returned by
-	// DescribeTaskList into a serializable result struct.
+	// ListTaskListPartitions into a serializable result struct.
 	// WrapResponse returns a non-nil error if the provided
-	// error cannot be thrown by DescribeTaskList
+	// error cannot be thrown by ListTaskListPartitions
 	//
-	//   value, err := DescribeTaskList(args)
-	//   result, err := WorkflowService_DescribeTaskList_Helper.WrapResponse(value, err)
+	//   value, err := ListTaskListPartitions(args)
+	//   result, err := WorkflowService_ListTaskListPartitions_Helper.WrapResponse(value, err)
 	//   if err != nil {
-	//     return fmt.Errorf("unexpected error from DescribeTaskList: %v", err)
+	//     return fmt.Errorf("unexpected error from ListTaskListPartitions: %v", err)
 	//   }
 	//   serialize(result)
-	WrapResponse func(*shared.DescribeTaskListResponse, error) (*WorkflowService_DescribeTaskList_Result, error)
+	WrapResponse func(*shared.ListTaskListPartitionsResponse, error) (*WorkflowService_ListTaskListPartitions_Result, error)
 
-	// UnwrapResponse takes the result struct for DescribeTaskList
+	// UnwrapResponse takes the result struct for ListTaskListPartitions
 	// and returns the value or error returned by it.
 	//
-	// The error is non-nil only if DescribeTaskList threw an
+	// The error is non-nil only if ListTaskListPartitions threw an
 	// exception.
 	//
 	//   result := deserialize(bytes)
-	//   value, err := WorkflowService_DescribeTaskList_Helper.UnwrapResponse(result)
-	UnwrapResponse func(*WorkflowService_DescribeTaskList_Result) (*shared.DescribeTaskListResponse, error)
+	//   value, err := WorkflowService_ListTaskListPartitions_Helper.UnwrapResponse(result)
+	UnwrapResponse func(*WorkflowService_ListTaskListPartitions_Result) (*shared.ListTaskListPartitionsResponse, error)
 }{}
 
 func init() {
-	WorkflowService_DescribeTaskList_Helper.Args = func(
-		request *shared.DescribeTaskListRequest,
-	) *WorkflowService_DescribeTaskList_Args {
-		return &WorkflowService_DescribeTaskList_Args{
+	WorkflowService_ListTaskListPartitions_Helper.Args = func(
+		request *shared.ListTaskListPartitionsRequest,
+	) *WorkflowService_ListTaskListPartitions_Args {
+		return &WorkflowService_ListTaskListPartitions_Args{
 			Request: request,
 		}
 	}
 
-	WorkflowService_DescribeTaskList_Helper.IsException = func(err error) bool {
+	WorkflowService_ListTaskListPartitions_Helper.IsException = func(err error) bool {
 		switch err.(type) {
 		case *shared.BadRequestError:
 			return true
@@ -223,49 +223,42 @@ func init() {
 			return true
 		case *shared.ServiceBusyError:
 			return true
-		case *shared.ClientVersionNotSupportedError:
-			return true
 		default:
 			return false
 		}
 	}
 
-	WorkflowService_DescribeTaskList_Helper.WrapResponse = func(success *shared.DescribeTaskListResponse, err error) (*WorkflowService_DescribeTaskList_Result, error) {
+	WorkflowService_ListTaskListPartitions_Helper.WrapResponse = func(success *shared.ListTaskListPartitionsResponse, err error) (*WorkflowService_ListTaskListPartitions_Result, error) {
 		if err == nil {
-			return &WorkflowService_DescribeTaskList_Result{Success: success}, nil
+			return &WorkflowService_ListTaskListPartitions_Result{Success: success}, nil
 		}
 
 		switch e := err.(type) {
 		case *shared.BadRequestError:
 			if e == nil {
-				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_DescribeTaskList_Result.BadRequestError")
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_ListTaskListPartitions_Result.BadRequestError")
 			}
-			return &WorkflowService_DescribeTaskList_Result{BadRequestError: e}, nil
+			return &WorkflowService_ListTaskListPartitions_Result{BadRequestError: e}, nil
 		case *shared.EntityNotExistsError:
 			if e == nil {
-				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_DescribeTaskList_Result.EntityNotExistError")
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_ListTaskListPartitions_Result.EntityNotExistError")
 			}
-			return &WorkflowService_DescribeTaskList_Result{EntityNotExistError: e}, nil
+			return &WorkflowService_ListTaskListPartitions_Result{EntityNotExistError: e}, nil
 		case *shared.LimitExceededError:
 			if e == nil {
-				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_DescribeTaskList_Result.LimitExceededError")
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_ListTaskListPartitions_Result.LimitExceededError")
 			}
-			return &WorkflowService_DescribeTaskList_Result{LimitExceededError: e}, nil
+			return &WorkflowService_ListTaskListPartitions_Result{LimitExceededError: e}, nil
 		case *shared.ServiceBusyError:
 			if e == nil {
-				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_DescribeTaskList_Result.ServiceBusyError")
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_ListTaskListPartitions_Result.ServiceBusyError")
 			}
-			return &WorkflowService_DescribeTaskList_Result{ServiceBusyError: e}, nil
-		case *shared.ClientVersionNotSupportedError:
-			if e == nil {
-				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_DescribeTaskList_Result.ClientVersionNotSupportedError")
-			}
-			return &WorkflowService_DescribeTaskList_Result{ClientVersionNotSupportedError: e}, nil
+			return &WorkflowService_ListTaskListPartitions_Result{ServiceBusyError: e}, nil
 		}
 
 		return nil, err
 	}
-	WorkflowService_DescribeTaskList_Helper.UnwrapResponse = func(result *WorkflowService_DescribeTaskList_Result) (success *shared.DescribeTaskListResponse, err error) {
+	WorkflowService_ListTaskListPartitions_Helper.UnwrapResponse = func(result *WorkflowService_ListTaskListPartitions_Result) (success *shared.ListTaskListPartitionsResponse, err error) {
 		if result.BadRequestError != nil {
 			err = result.BadRequestError
 			return
@@ -282,10 +275,6 @@ func init() {
 			err = result.ServiceBusyError
 			return
 		}
-		if result.ClientVersionNotSupportedError != nil {
-			err = result.ClientVersionNotSupportedError
-			return
-		}
 
 		if result.Success != nil {
 			success = result.Success
@@ -298,22 +287,21 @@ func init() {
 
 }
 
-// WorkflowService_DescribeTaskList_Result represents the result of a WorkflowService.DescribeTaskList function call.
+// WorkflowService_ListTaskListPartitions_Result represents the result of a WorkflowService.ListTaskListPartitions function call.
 //
-// The result of a DescribeTaskList execution is sent and received over the wire as this struct.
+// The result of a ListTaskListPartitions execution is sent and received over the wire as this struct.
 //
 // Success is set only if the function did not throw an exception.
-type WorkflowService_DescribeTaskList_Result struct {
-	// Value returned by DescribeTaskList after a successful execution.
-	Success                        *shared.DescribeTaskListResponse       `json:"success,omitempty"`
-	BadRequestError                *shared.BadRequestError                `json:"badRequestError,omitempty"`
-	EntityNotExistError            *shared.EntityNotExistsError           `json:"entityNotExistError,omitempty"`
-	LimitExceededError             *shared.LimitExceededError             `json:"limitExceededError,omitempty"`
-	ServiceBusyError               *shared.ServiceBusyError               `json:"serviceBusyError,omitempty"`
-	ClientVersionNotSupportedError *shared.ClientVersionNotSupportedError `json:"clientVersionNotSupportedError,omitempty"`
+type WorkflowService_ListTaskListPartitions_Result struct {
+	// Value returned by ListTaskListPartitions after a successful execution.
+	Success             *shared.ListTaskListPartitionsResponse `json:"success,omitempty"`
+	BadRequestError     *shared.BadRequestError                `json:"badRequestError,omitempty"`
+	EntityNotExistError *shared.EntityNotExistsError           `json:"entityNotExistError,omitempty"`
+	LimitExceededError  *shared.LimitExceededError             `json:"limitExceededError,omitempty"`
+	ServiceBusyError    *shared.ServiceBusyError               `json:"serviceBusyError,omitempty"`
 }
 
-// ToWire translates a WorkflowService_DescribeTaskList_Result struct into a Thrift-level intermediate
+// ToWire translates a WorkflowService_ListTaskListPartitions_Result struct into a Thrift-level intermediate
 // representation. This intermediate representation may be serialized
 // into bytes using a ThriftRW protocol implementation.
 //
@@ -328,9 +316,9 @@ type WorkflowService_DescribeTaskList_Result struct {
 //   if err := binaryProtocol.Encode(x, writer); err != nil {
 //     return err
 //   }
-func (v *WorkflowService_DescribeTaskList_Result) ToWire() (wire.Value, error) {
+func (v *WorkflowService_ListTaskListPartitions_Result) ToWire() (wire.Value, error) {
 	var (
-		fields [6]wire.Field
+		fields [5]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -376,39 +364,25 @@ func (v *WorkflowService_DescribeTaskList_Result) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 5, Value: w}
 		i++
 	}
-	if v.ClientVersionNotSupportedError != nil {
-		w, err = v.ClientVersionNotSupportedError.ToWire()
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 6, Value: w}
-		i++
-	}
 
 	if i != 1 {
-		return wire.Value{}, fmt.Errorf("WorkflowService_DescribeTaskList_Result should have exactly one field: got %v fields", i)
+		return wire.Value{}, fmt.Errorf("WorkflowService_ListTaskListPartitions_Result should have exactly one field: got %v fields", i)
 	}
 
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
 }
 
-func _DescribeTaskListResponse_Read(w wire.Value) (*shared.DescribeTaskListResponse, error) {
-	var v shared.DescribeTaskListResponse
+func _ListTaskListPartitionsResponse_Read(w wire.Value) (*shared.ListTaskListPartitionsResponse, error) {
+	var v shared.ListTaskListPartitionsResponse
 	err := v.FromWire(w)
 	return &v, err
 }
 
-func _LimitExceededError_Read(w wire.Value) (*shared.LimitExceededError, error) {
-	var v shared.LimitExceededError
-	err := v.FromWire(w)
-	return &v, err
-}
-
-// FromWire deserializes a WorkflowService_DescribeTaskList_Result struct from its Thrift-level
+// FromWire deserializes a WorkflowService_ListTaskListPartitions_Result struct from its Thrift-level
 // representation. The Thrift-level representation may be obtained
 // from a ThriftRW protocol implementation.
 //
-// An error is returned if we were unable to build a WorkflowService_DescribeTaskList_Result struct
+// An error is returned if we were unable to build a WorkflowService_ListTaskListPartitions_Result struct
 // from the provided intermediate representation.
 //
 //   x, err := binaryProtocol.Decode(reader, wire.TStruct)
@@ -416,19 +390,19 @@ func _LimitExceededError_Read(w wire.Value) (*shared.LimitExceededError, error) 
 //     return nil, err
 //   }
 //
-//   var v WorkflowService_DescribeTaskList_Result
+//   var v WorkflowService_ListTaskListPartitions_Result
 //   if err := v.FromWire(x); err != nil {
 //     return nil, err
 //   }
 //   return &v, nil
-func (v *WorkflowService_DescribeTaskList_Result) FromWire(w wire.Value) error {
+func (v *WorkflowService_ListTaskListPartitions_Result) FromWire(w wire.Value) error {
 	var err error
 
 	for _, field := range w.GetStruct().Fields {
 		switch field.ID {
 		case 0:
 			if field.Value.Type() == wire.TStruct {
-				v.Success, err = _DescribeTaskListResponse_Read(field.Value)
+				v.Success, err = _ListTaskListPartitionsResponse_Read(field.Value)
 				if err != nil {
 					return err
 				}
@@ -466,14 +440,6 @@ func (v *WorkflowService_DescribeTaskList_Result) FromWire(w wire.Value) error {
 				}
 
 			}
-		case 6:
-			if field.Value.Type() == wire.TStruct {
-				v.ClientVersionNotSupportedError, err = _ClientVersionNotSupportedError_Read(field.Value)
-				if err != nil {
-					return err
-				}
-
-			}
 		}
 	}
 
@@ -493,24 +459,21 @@ func (v *WorkflowService_DescribeTaskList_Result) FromWire(w wire.Value) error {
 	if v.ServiceBusyError != nil {
 		count++
 	}
-	if v.ClientVersionNotSupportedError != nil {
-		count++
-	}
 	if count != 1 {
-		return fmt.Errorf("WorkflowService_DescribeTaskList_Result should have exactly one field: got %v fields", count)
+		return fmt.Errorf("WorkflowService_ListTaskListPartitions_Result should have exactly one field: got %v fields", count)
 	}
 
 	return nil
 }
 
-// String returns a readable string representation of a WorkflowService_DescribeTaskList_Result
+// String returns a readable string representation of a WorkflowService_ListTaskListPartitions_Result
 // struct.
-func (v *WorkflowService_DescribeTaskList_Result) String() string {
+func (v *WorkflowService_ListTaskListPartitions_Result) String() string {
 	if v == nil {
 		return "<nil>"
 	}
 
-	var fields [6]string
+	var fields [5]string
 	i := 0
 	if v.Success != nil {
 		fields[i] = fmt.Sprintf("Success: %v", v.Success)
@@ -532,19 +495,15 @@ func (v *WorkflowService_DescribeTaskList_Result) String() string {
 		fields[i] = fmt.Sprintf("ServiceBusyError: %v", v.ServiceBusyError)
 		i++
 	}
-	if v.ClientVersionNotSupportedError != nil {
-		fields[i] = fmt.Sprintf("ClientVersionNotSupportedError: %v", v.ClientVersionNotSupportedError)
-		i++
-	}
 
-	return fmt.Sprintf("WorkflowService_DescribeTaskList_Result{%v}", strings.Join(fields[:i], ", "))
+	return fmt.Sprintf("WorkflowService_ListTaskListPartitions_Result{%v}", strings.Join(fields[:i], ", "))
 }
 
-// Equals returns true if all the fields of this WorkflowService_DescribeTaskList_Result match the
-// provided WorkflowService_DescribeTaskList_Result.
+// Equals returns true if all the fields of this WorkflowService_ListTaskListPartitions_Result match the
+// provided WorkflowService_ListTaskListPartitions_Result.
 //
 // This function performs a deep comparison.
-func (v *WorkflowService_DescribeTaskList_Result) Equals(rhs *WorkflowService_DescribeTaskList_Result) bool {
+func (v *WorkflowService_ListTaskListPartitions_Result) Equals(rhs *WorkflowService_ListTaskListPartitions_Result) bool {
 	if !((v.Success == nil && rhs.Success == nil) || (v.Success != nil && rhs.Success != nil && v.Success.Equals(rhs.Success))) {
 		return false
 	}
@@ -560,9 +519,6 @@ func (v *WorkflowService_DescribeTaskList_Result) Equals(rhs *WorkflowService_De
 	if !((v.ServiceBusyError == nil && rhs.ServiceBusyError == nil) || (v.ServiceBusyError != nil && rhs.ServiceBusyError != nil && v.ServiceBusyError.Equals(rhs.ServiceBusyError))) {
 		return false
 	}
-	if !((v.ClientVersionNotSupportedError == nil && rhs.ClientVersionNotSupportedError == nil) || (v.ClientVersionNotSupportedError != nil && rhs.ClientVersionNotSupportedError != nil && v.ClientVersionNotSupportedError.Equals(rhs.ClientVersionNotSupportedError))) {
-		return false
-	}
 
 	return true
 }
@@ -570,14 +526,14 @@ func (v *WorkflowService_DescribeTaskList_Result) Equals(rhs *WorkflowService_De
 // MethodName returns the name of the Thrift function as specified in
 // the IDL, for which this struct represent the result.
 //
-// This will always be "DescribeTaskList" for this struct.
-func (v *WorkflowService_DescribeTaskList_Result) MethodName() string {
-	return "DescribeTaskList"
+// This will always be "ListTaskListPartitions" for this struct.
+func (v *WorkflowService_ListTaskListPartitions_Result) MethodName() string {
+	return "ListTaskListPartitions"
 }
 
 // EnvelopeType returns the kind of value inside this struct.
 //
 // This will always be Reply for this struct.
-func (v *WorkflowService_DescribeTaskList_Result) EnvelopeType() wire.EnvelopeType {
+func (v *WorkflowService_ListTaskListPartitions_Result) EnvelopeType() wire.EnvelopeType {
 	return wire.Reply
 }

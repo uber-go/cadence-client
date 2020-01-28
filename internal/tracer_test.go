@@ -80,6 +80,7 @@ func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
 	ctxProp := NewTracingContextPropagator(zap.NewNop(), tracer)
 
 	span := tracer.StartSpan("test-operation")
+	assert.NotNil(t, span.Context())
 	ctx := contextWithSpan(Background(), span.Context())
 	header := &shared.Header{
 		Fields: map[string][]byte{},

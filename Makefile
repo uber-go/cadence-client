@@ -1,11 +1,11 @@
-.PHONY: test bins clean cover cover_ci
+.PHONY: git-submodules test bins clean cover cover_ci
 
 # default target
 default: test
 
 IMPORT_ROOT := go.uber.org/cadence
 THRIFT_GENDIR := .gen/go
-THRIFTRW_SRC := idl/github.com/uber/cadence/cadence.thrift
+THRIFTRW_SRC := idls/thrift/cadence.thrift
 # one or more thriftrw-generated file(s), to create / depend on generated code
 THRIFTRW_OUT := $(THRIFT_GENDIR)/cadence/idl.go
 TEST_ARG ?= -v -race
@@ -37,6 +37,8 @@ LINT_SRC := $(filter-out ./mock% $(THRIFTRW_OUT),$(ALL_SRC))
 THRIFTRW_VERSION := v1.11.0
 YARPC_VERSION := v1.29.1
 GOLINT_VERSION := 470b6b0bb3005eda157f0275e2e4895055396a81
+STATICCHECK_VERSION := 2019.2.3
+ERRCHECK_VERSION := v1.2.0
 
 # versioned tools.  just change the version vars above, it'll automatically trigger a rebuild.
 $(BINS)/versions/thriftrw-$(THRIFTRW_VERSION):
@@ -47,6 +49,12 @@ $(BINS)/versions/yarpc-$(YARPC_VERSION):
 
 $(BINS)/versions/golint-$(GOLINT_VERSION):
 	./versioned_go_build.sh golang.org/x/lint $(GOLINT_VERSION) golint $@
+
+$(BINS)/versions/staticcheck-$(STATICCHECK_VERSION):
+	./versioned_go_build.sh honnef.co/go/tools $(STATICCHECK_VERSION) cmd/staticcheck $@
+
+$(BINS)/versions/errcheck-$(ERRCHECK_VERSION):
+	./versioned_go_build.sh github.com/kisielk/errcheck $(ERRCHECK_VERSION) $@
 
 # stable tool targets.  depend on / execute these instead of the versioned ones.
 # this versioned-to-nice-name thing is mostly because thriftrw depends on the yarpc
@@ -60,6 +68,12 @@ $(BINS)/thriftrw-plugin-yarpc: $(BINS)/versions/yarpc-$(YARPC_VERSION)
 $(BINS)/golint: $(BINS)/versions/golint-$(GOLINT_VERSION)
 	@ln -fs $(CURDIR)/$< $@
 
+$(BINS)/staticcheck: $(BINS)/versions/staticcheck-$(STATICCHECK_VERSION)
+	@ln -fs $(CURDIR)/$< $@
+
+$(BINS)/errcheck: $(BINS)/versions/errcheck-$(ERRCHECK_VERSION)
+	@ln -fs $(CURDIR)/$< $@
+
 $(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 	@echo 'thriftrw: $(THRIFTRW_SRC)'
 	@mkdir -p $(dir $@)
@@ -70,6 +84,16 @@ $(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 		        --plugin=yarpc \
 		        --pkg-prefix=$(IMPORT_ROOT)/$(THRIFT_GENDIR) \
 		        --out=$(THRIFT_GENDIR) $(source);)
+
+git-submodules:
+	git submodule update --init --recursive
+
+yarpc-install:
+	GO111MODULE=off go get -u github.com/myitcv/gobin
+	GOOS= GOARCH= gobin -mod=readonly go.uber.org/thriftrw
+	GOOS= GOARCH= gobin -mod=readonly go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc
+
+thriftc: git-submodules yarpc-install $(THRIFTRW_OUT) copyright
 
 clean_thrift:
 	rm -rf .gen
@@ -84,8 +108,7 @@ copyright $(BUILD)/copyright: $(ALL_SRC)
 $(BUILD)/dummy:
 	go build -i -o $@ internal/cmd/dummy/dummy.go
 
-
-bins: $(ALL_SRC) $(BUILD)/copyright lint $(BUILD)/dummy
+bins: thriftc $(ALL_SRC) $(BUILD)/copyright lint $(BUILD)/dummy
 
 unit_test: $(BUILD)/dummy
 	@mkdir -p $(COVER_ROOT)
@@ -104,7 +127,7 @@ integ_test_sticky_on: $(BUILD)/dummy
 	@mkdir -p $(COVER_ROOT)
 	STICKY_OFF=false go test $(TEST_ARG) ./test -coverprofile=$(INTEG_STICKY_ON_COVER_FILE) -coverpkg=./...
 
-test: unit_test integ_test_sticky_off integ_test_sticky_on
+test: thriftc unit_test integ_test_sticky_off integ_test_sticky_on
 
 $(COVER_ROOT)/cover.out: $(UT_COVER_FILE) $(INTEG_STICKY_OFF_COVER_FILE) $(INTEG_STICKY_ON_COVER_FILE)
 	@echo "mode: atomic" > $(COVER_ROOT)/cover.out
@@ -143,6 +166,12 @@ lint: $(BINS)/golint $(ALL_SRC)
 		echo "$$OUTPUT"; \
 		exit 1; \
 	fi
+
+staticcheck: $(BINS)/staticcheck $(ALL_SRC)
+	$(BINS)/staticcheck ./...
+
+errcheck: $(BINS)/errcheck $(ALL_SRC)
+	$(BINS)/errcheck ./...
 
 fmt:
 	@gofmt -w $(ALL_SRC)

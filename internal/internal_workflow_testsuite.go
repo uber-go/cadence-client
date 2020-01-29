@@ -923,10 +923,18 @@ func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivi
 	go func() {
 		var result interface{}
 		defer func() {
-			if result == nil && recover() == nil {
+			panicErr := recover()
+			if result == nil && panicErr == nil {
 				reason := "activity called runtime.Goexit"
 				result = &shared.RespondActivityTaskFailedRequest{
 					Reason: &reason,
+				}
+			} else if panicErr != nil {
+				reason := errReasonPanic
+				details, _ := env.GetDataConverter().ToData(fmt.Sprintf("%v", panicErr))
+				result = &shared.RespondActivityTaskFailedRequest{
+					Reason:  &reason,
+					Details: details,
 				}
 			}
 			// post activity result to workflow dispatcher
@@ -987,7 +995,9 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithRetryForTest(
 			if backoff > 0 {
 				// need a retry
 				waitCh := make(chan struct{})
-				env.postCallback(func() { env.runningCount-- }, false)
+
+				// register the delayed call back first, otherwise other timers may be fired before the retry timer
+				// is enqueued.
 				env.registerDelayedCallback(func() {
 					env.runningCount++
 					task.Attempt = common.Int32Ptr(task.GetAttempt() + 1)
@@ -997,6 +1007,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithRetryForTest(
 					}
 					close(waitCh)
 				}, backoff)
+				env.postCallback(func() { env.runningCount-- }, false)
 
 				<-waitCh
 				continue

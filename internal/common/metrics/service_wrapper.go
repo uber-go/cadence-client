@@ -82,6 +82,8 @@ const (
 	scopeNameDescribeWorkflowExecution        = CadenceMetricsPrefix + "DescribeWorkflowExecution"
 	scopeNameResetStickyTaskList              = CadenceMetricsPrefix + "ResetStickyTaskList"
 	scopeNameGetSearchAttributes              = CadenceMetricsPrefix + "GetSearchAttributes"
+	scopeNameListTaskListPartitions           = CadenceMetricsPrefix + "ListTaskListPartitions"
+	scopeNameGetClusterInfo                   = CadenceMetricsPrefix + "GetClusterInfo"
 )
 
 // NewWorkflowServiceWrapper creates a new wrapper to WorkflowService that will emit metrics for each service call.
@@ -373,6 +375,20 @@ func (w *workflowServiceMetricsWrapper) RespondQueryTaskCompleted(ctx context.Co
 func (w *workflowServiceMetricsWrapper) GetSearchAttributes(ctx context.Context, opts ...yarpc.CallOption) (*shared.GetSearchAttributesResponse, error) {
 	scope := w.getOperationScope(scopeNameGetSearchAttributes)
 	result, err := w.service.GetSearchAttributes(ctx, opts...)
+	scope.handleError(err)
+	return result, err
+}
+
+func (w *workflowServiceMetricsWrapper) ListTaskListPartitions(ctx context.Context, request *shared.ListTaskListPartitionsRequest, opts ...yarpc.CallOption) (*shared.ListTaskListPartitionsResponse, error) {
+	scope := w.getOperationScope(scopeNameListTaskListPartitions)
+	result, err := w.service.ListTaskListPartitions(ctx, request, opts...)
+	scope.handleError(err)
+	return result, err
+}
+
+func (w *workflowServiceMetricsWrapper) GetClusterInfo(ctx context.Context, opts ...yarpc.CallOption) (*shared.ClusterInfo, error) {
+	scope := w.getOperationScope(scopeNameGetClusterInfo)
+	result, err := w.service.GetClusterInfo(ctx, opts...)
 	scope.handleError(err)
 	return result, err
 }

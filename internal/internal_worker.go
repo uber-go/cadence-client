@@ -308,10 +308,7 @@ func newWorkflowTaskWorkerInternal(
 	)
 
 	// laTunnel is the glue that hookup 3 parts
-	laTunnel := &localActivityTunnel{
-		taskCh:   make(chan *localActivityTask, 1000),
-		resultCh: make(chan interface{}),
-	}
+	laTunnel := newLocalActivityTunnel(params.WorkerStopChannel)
 
 	// 1) workflow handler will send local activity task to laTunnel
 	if handlerImpl, ok := taskHandler.(*workflowTaskHandlerImpl); ok {
@@ -670,6 +667,8 @@ func (th *hostEnvImpl) getActivityFn(fnName string) (interface{}, bool) {
 }
 
 func (th *hostEnvImpl) getRegisteredActivities() []activity {
+	th.Lock()
+	defer th.Unlock()
 	activities := make([]activity, 0, len(th.activityFuncMap))
 	for _, a := range th.activityFuncMap {
 		activities = append(activities, a)
@@ -1040,6 +1039,7 @@ var binaryChecksumLock sync.Mutex
 func SetBinaryChecksum(checksum string) {
 	binaryChecksumLock.Lock()
 	defer binaryChecksumLock.Unlock()
+
 	binaryChecksum = checksum
 }
 
@@ -1047,6 +1047,11 @@ func initBinaryChecksum() error {
 	binaryChecksumLock.Lock()
 	defer binaryChecksumLock.Unlock()
 
+	return initBinaryChecksumLocked()
+}
+
+// callers MUST hold binaryChecksumLock before calling
+func initBinaryChecksumLocked() error {
 	if len(binaryChecksum) > 0 {
 		return nil
 	}
@@ -1060,7 +1065,9 @@ func initBinaryChecksum() error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close() // error is unimportant as it is read-only
+	}()
 
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
@@ -1074,8 +1081,14 @@ func initBinaryChecksum() error {
 }
 
 func getBinaryChecksum() string {
+	binaryChecksumLock.Lock()
+	defer binaryChecksumLock.Unlock()
+
 	if len(binaryChecksum) == 0 {
-		initBinaryChecksum()
+		err := initBinaryChecksumLocked()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return binaryChecksum

@@ -31,6 +31,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -91,7 +92,10 @@ type (
 		workflowInfo      *WorkflowInfo
 		wth               *workflowTaskHandlerImpl
 
-		eventHandler *workflowExecutionEventHandlerImpl
+		// eventHandler is changed to a atomic.Value as a temporally bug fix for local activity
+		// retry issue (github issue #915). Therefore, when accessing/modifying this field, the
+		// mutex should still be held.
+		eventHandler atomic.Value
 
 		isWorkflowCompleted bool
 		result              []byte
@@ -123,6 +127,7 @@ type (
 	}
 
 	activityProvider func(name string) activity
+
 	// activityTaskHandlerImpl is the implementation of ActivityTaskHandler
 	activityTaskHandlerImpl struct {
 		taskListName       string
@@ -145,6 +150,8 @@ type (
 		eventsHandler  *workflowExecutionEventHandlerImpl
 		loadedEvents   []*s.HistoryEvent
 		currentIndex   int
+		nextEventID    int64 // next expected eventID for sanity
+		lastEventID    int64 // last expected eventID, zero indicates read until end of stream
 		next           []*s.HistoryEvent
 		binaryChecksum *string
 	}
@@ -160,8 +167,11 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 		eventsHandler: eventsHandler,
 		loadedEvents:  task.task.History.Events,
 		currentIndex:  0,
+		lastEventID:   task.task.GetStartedEventId(),
 	}
-
+	if len(result.loadedEvents) > 0 {
+		result.nextEventID = result.loadedEvents[0].GetEventId()
+	}
 	return result
 }
 
@@ -210,6 +220,9 @@ func (eh *history) loadMoreEvents() error {
 		return err
 	}
 	eh.loadedEvents = append(eh.loadedEvents, historyPage.Events...)
+	if eh.nextEventID == 0 && len(eh.loadedEvents) > 0 {
+		eh.nextEventID = eh.loadedEvents[0].GetEventId()
+	}
 	return nil
 }
 
@@ -262,8 +275,27 @@ func (eh *history) getMoreEvents() (*s.History, error) {
 	return eh.workflowTask.historyIterator.GetNextPage()
 }
 
+func (eh *history) verifyAllEventsProcessed() error {
+	if eh.lastEventID > 0 && eh.nextEventID <= eh.lastEventID {
+		return fmt.Errorf(
+			"history_events: premature end of stream, expectedLastEventID=%v but no more events after eventID=%v",
+			eh.lastEventID,
+			eh.nextEventID-1)
+	}
+	if eh.lastEventID > 0 && eh.nextEventID != (eh.lastEventID+1) {
+		eh.eventsHandler.logger.Warn(
+			"history_events: processed events past the expected lastEventID",
+			zap.Int64("expectedLastEventID", eh.lastEventID),
+			zap.Int64("processedLastEventID", eh.nextEventID-1))
+	}
+	return nil
+}
+
 func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
 	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMoreEvents() {
+		if err := eh.verifyAllEventsProcessed(); err != nil {
+			return nil, nil, err
+		}
 		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, nil
 	}
 
@@ -274,15 +306,27 @@ OrderEvents:
 		// load more history events if needed
 		for eh.currentIndex == len(eh.loadedEvents) {
 			if !eh.hasMoreEvents() {
+				if err = eh.verifyAllEventsProcessed(); err != nil {
+					return
+				}
 				break OrderEvents
 			}
-			if err1 := eh.loadMoreEvents(); err1 != nil {
-				err = err1
+			if err = eh.loadMoreEvents(); err != nil {
 				return
 			}
 		}
 
 		event := eh.loadedEvents[eh.currentIndex]
+		eventID := event.GetEventId()
+		if eventID != eh.nextEventID {
+			err = fmt.Errorf(
+				"missing history events, expectedNextEventID=%v but receivedNextEventID=%v",
+				eh.nextEventID, eventID)
+			return
+		}
+
+		eh.nextEventID++
+
 		switch event.GetEventType() {
 		case s.EventTypeDecisionTaskStarted:
 			isFailed, binaryChecksum, err1 := eh.IsNextDecisionFailed()
@@ -401,6 +445,20 @@ func removeWorkflowContext(runID string) {
 	getWorkflowCache().Delete(runID)
 }
 
+func newWorkflowExecutionContext(
+	startTime time.Time,
+	workflowInfo *WorkflowInfo,
+	taskHandler *workflowTaskHandlerImpl,
+) *workflowExecutionContextImpl {
+	workflowContext := &workflowExecutionContextImpl{
+		workflowStartTime: startTime,
+		workflowInfo:      workflowInfo,
+		wth:               taskHandler,
+	}
+	workflowContext.createEventHandler()
+	return workflowContext
+}
+
 func (w *workflowExecutionContextImpl) Lock() {
 	w.mutex.Lock()
 }
@@ -419,6 +477,18 @@ func (w *workflowExecutionContextImpl) Unlock(err error) {
 	}
 
 	w.mutex.Unlock()
+}
+
+func (w *workflowExecutionContextImpl) getEventHandler() *workflowExecutionEventHandlerImpl {
+	eventHandler := w.eventHandler.Load()
+	if eventHandler == nil {
+		return nil
+	}
+	eventHandlerImpl, ok := eventHandler.(*workflowExecutionEventHandlerImpl)
+	if !ok {
+		panic("unknown type for workflow execution event handler")
+	}
+	return eventHandlerImpl
 }
 
 func (w *workflowExecutionContextImpl) completeWorkflow(result []byte, err error) {
@@ -453,7 +523,7 @@ func (w *workflowExecutionContextImpl) onEviction() {
 }
 
 func (w *workflowExecutionContextImpl) IsDestroyed() bool {
-	return w.eventHandler == nil
+	return w.getEventHandler() == nil
 }
 
 func (w *workflowExecutionContextImpl) queueResetStickinessTask() {
@@ -479,17 +549,19 @@ func (w *workflowExecutionContextImpl) clearState() {
 	w.err = nil
 	w.previousStartedEventID = 0
 	w.newDecisions = nil
-	if w.eventHandler != nil {
+
+	eventHandler := w.getEventHandler()
+	if eventHandler != nil {
 		// Set isReplay to true to prevent user code in defer guarded by !isReplaying() from running
-		w.eventHandler.isReplay = true
-		w.eventHandler.Close()
-		w.eventHandler = nil
+		eventHandler.isReplay = true
+		eventHandler.Close()
+		w.eventHandler.Store((*workflowExecutionEventHandlerImpl)(nil))
 	}
 }
 
 func (w *workflowExecutionContextImpl) createEventHandler() {
 	w.clearState()
-	w.eventHandler = newWorkflowExecutionEventHandler(
+	eventHandler := newWorkflowExecutionEventHandler(
 		w.workflowInfo,
 		w.completeWorkflow,
 		w.wth.logger,
@@ -499,7 +571,8 @@ func (w *workflowExecutionContextImpl) createEventHandler() {
 		w.wth.dataConverter,
 		w.wth.contextPropagators,
 		w.wth.tracer,
-	).(*workflowExecutionEventHandlerImpl)
+	)
+	w.eventHandler.Store(eventHandler)
 }
 
 func resetHistory(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (*s.History, error) {
@@ -555,10 +628,7 @@ func (wth *workflowTaskHandlerImpl) createWorkflowContext(task *s.PollForDecisio
 	}
 
 	wfStartTime := time.Unix(0, h.Events[0].GetTimestamp())
-	workflowContext := &workflowExecutionContextImpl{workflowStartTime: wfStartTime, workflowInfo: workflowInfo, wth: wth}
-	workflowContext.createEventHandler()
-
-	return workflowContext, nil
+	return newWorkflowExecutionContext(wfStartTime, workflowInfo, wth), nil
 }
 
 func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
@@ -737,7 +807,7 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	}
 	w.SetCurrentTask(task)
 
-	eventHandler := w.eventHandler
+	eventHandler := w.getEventHandler()
 	reorderedHistory := newHistory(workflowTask, eventHandler)
 	var replayDecisions []*s.Decision
 	var respondEvents []*s.HistoryEvent
@@ -874,7 +944,7 @@ func (w *workflowExecutionContextImpl) ProcessLocalActivityResult(workflowTask *
 		return nil, nil // nothing to do here as we are retrying...
 	}
 
-	err := w.eventHandler.ProcessLocalActivityResult(lar)
+	err := w.getEventHandler().ProcessLocalActivityResult(lar)
 	if err != nil {
 		return nil, err
 	}
@@ -891,12 +961,25 @@ func (w *workflowExecutionContextImpl) retryLocalActivity(lar *localActivityResu
 	if backoff > 0 && backoff <= w.GetDecisionTimeout() {
 		// we need a local retry
 		time.AfterFunc(backoff, func() {
-			if _, ok := w.eventHandler.pendingLaTasks[lar.task.activityID]; !ok {
+			// TODO: this should not be a separate goroutine as it introduces race condition when accessing eventHandler.
+			// currently this is solved by changing eventHandler to an atomic.Value. Ideally, this retry timer should be
+			// part of the event loop for processing the workflow task.
+			eventHandler := w.getEventHandler()
+
+			// if decision heartbeat failed, the workflow execution context will be cleared and eventHandler will be nil
+			if eventHandler == nil {
+				return
+			}
+
+			if _, ok := eventHandler.pendingLaTasks[lar.task.activityID]; !ok {
 				return
 			}
 
 			lar.task.attempt++
-			w.laTunnel.sendTask(lar.task)
+
+			if !w.laTunnel.sendTask(lar.task) {
+				lar.task.attempt--
+			}
 		})
 		return true
 	}
@@ -968,18 +1051,25 @@ func (w *workflowExecutionContextImpl) CompleteDecisionTask(workflowTask *workfl
 	if w.currentDecisionTask == nil {
 		return nil
 	}
+	eventHandler := w.getEventHandler()
+
 	// w.laTunnel could be nil for worker.ReplayHistory() because there is no worker started, in that case we don't
 	// care about the pending local activities, and just return because the result is ignored anyway by the caller.
 	if w.hasPendingLocalActivityWork() && w.laTunnel != nil {
-		if len(w.eventHandler.unstartedLaTasks) > 0 {
+		if len(eventHandler.unstartedLaTasks) > 0 {
 			// start new local activity tasks
-			for activityID := range w.eventHandler.unstartedLaTasks {
-				task := w.eventHandler.pendingLaTasks[activityID]
+			unstartedLaTasks := make(map[string]struct{})
+			for activityID := range eventHandler.unstartedLaTasks {
+				task := eventHandler.pendingLaTasks[activityID]
 				task.wc = w
 				task.workflowTask = workflowTask
-				w.laTunnel.sendTask(task)
+				if !w.laTunnel.sendTask(task) {
+					unstartedLaTasks[activityID] = struct{}{}
+					task.wc = nil
+					task.workflowTask = nil
+				}
 			}
-			w.eventHandler.unstartedLaTasks = make(map[string]struct{})
+			eventHandler.unstartedLaTasks = unstartedLaTasks
 		}
 		// cannot complete decision task as there are pending local activities
 		if waitLocalActivities {
@@ -987,23 +1077,24 @@ func (w *workflowExecutionContextImpl) CompleteDecisionTask(workflowTask *workfl
 		}
 	}
 
-	eventDecisions := w.eventHandler.decisionsHelper.getDecisions(true)
+	eventDecisions := eventHandler.decisionsHelper.getDecisions(true)
 	if len(eventDecisions) > 0 {
 		w.newDecisions = append(w.newDecisions, eventDecisions...)
 	}
 
-	completeRequest := w.wth.completeWorkflow(w.eventHandler, w.currentDecisionTask, w, w.newDecisions, !waitLocalActivities)
+	completeRequest := w.wth.completeWorkflow(eventHandler, w.currentDecisionTask, w, w.newDecisions, !waitLocalActivities)
 	w.clearCurrentTask()
 
 	return completeRequest
 }
 
 func (w *workflowExecutionContextImpl) hasPendingLocalActivityWork() bool {
+	eventHandler := w.getEventHandler()
 	return !w.isWorkflowCompleted &&
 		w.currentDecisionTask != nil &&
 		w.currentDecisionTask.Query == nil && // don't run local activity for query task
-		w.eventHandler != nil &&
-		len(w.eventHandler.pendingLaTasks) > 0
+		eventHandler != nil &&
+		len(eventHandler.pendingLaTasks) > 0
 }
 
 func (w *workflowExecutionContextImpl) clearCurrentTask() {
@@ -1462,10 +1553,11 @@ func errorToFailDecisionTask(taskToken []byte, err error, identity string) *s.Re
 	failedCause := s.DecisionTaskFailedCauseWorkflowWorkerUnhandledFailure
 	_, details := getErrorDetails(err, nil)
 	return &s.RespondDecisionTaskFailedRequest{
-		TaskToken: taskToken,
-		Cause:     &failedCause,
-		Details:   details,
-		Identity:  common.StringPtr(identity),
+		TaskToken:      taskToken,
+		Cause:          &failedCause,
+		Details:        details,
+		Identity:       common.StringPtr(identity),
+		BinaryChecksum: common.StringPtr(getBinaryChecksum()),
 	}
 }
 
@@ -1720,7 +1812,14 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	if <-ctx.Done(); ctx.Err() == context.DeadlineExceeded {
 		return nil, ctx.Err()
 	}
-
+	if err != nil {
+		ath.logger.Error("Activity error.",
+			zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
+			zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
+			zap.String(tagActivityType, activityType),
+			zap.Error(err),
+		)
+	}
 	return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, output, err, ath.dataConverter), nil
 }
 
@@ -1737,7 +1836,7 @@ func (ath *activityTaskHandlerImpl) getActivity(name string) activity {
 }
 
 func (ath *activityTaskHandlerImpl) getRegisteredActivityNames() (activityNames []string) {
-	for _, a := range ath.hostEnv.activityFuncMap {
+	for _, a := range ath.hostEnv.getRegisteredActivities() {
 		activityNames = append(activityNames, a.ActivityType().Name)
 	}
 	return

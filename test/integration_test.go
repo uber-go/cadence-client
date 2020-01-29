@@ -99,12 +99,31 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 }
 
 func (ts *IntegrationTestSuite) TearDownSuite() {
+	ts.Assertions = require.New(ts.T())
 	ts.rpcClient.Close()
-	// sleep for a while to allow the pollers to shutdown
-	// then assert that there are no lingering go routines
-	time.Sleep(1 * time.Minute)
-	// https://github.com/uber-go/cadence-client/issues/739
-	goleak.VerifyNoLeaks(ts.T(), goleak.IgnoreTopFunction("go.uber.org/cadence/internal.(*coroutineState).initialYield"))
+
+	// allow the pollers to shut down, and ensure there are no goroutine leaks.
+	// this will wait for up to 1 minute for leaks to subside, but exit relatively quickly if possible.
+	max := time.After(time.Minute)
+	var last error
+	for {
+		select {
+		case <-max:
+			if last != nil {
+				ts.NoError(last)
+				return
+			}
+			ts.FailNow("leaks timed out but no error, should be impossible")
+		case <-time.After(time.Second):
+			// https://github.com/uber-go/cadence-client/issues/739
+			last = goleak.FindLeaks(goleak.IgnoreTopFunction("go.uber.org/cadence/internal.(*coroutineState).initialYield"))
+			if last == nil {
+				// no leak, done waiting
+				return
+			}
+			// else wait for another check or the timeout (which will record the latest error)
+		}
+	}
 }
 
 func (ts *IntegrationTestSuite) SetupTest() {
@@ -217,6 +236,39 @@ func (ts *IntegrationTestSuite) TestStackTraceQuery() {
 	var trace string
 	ts.Nil(value.Get(&trace))
 	ts.True(strings.Contains(trace, "go.uber.org/cadence/test.(*Workflows).Basic"))
+}
+
+func (ts *IntegrationTestSuite) TestConsistentQuery() {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	// this workflow will start a local activity which blocks for long enough
+	// to ensure that consistent query must wait in order to satisfy consistency
+	wfOpts := ts.startWorkflowOptions("test-consistent-query")
+	wfOpts.DecisionTaskStartToCloseTimeout = 5 * time.Second
+	run, err := ts.libClient.ExecuteWorkflow(ctx, wfOpts, ts.workflows.ConsistentQueryWorkflow, 3*time.Second)
+	ts.Nil(err)
+	// Wait for a second to ensure that first decision task gets started and completed before we send signal.
+	// Query cannot be run until first decision task has been completed.
+	// If signal occurs right after workflow start then WorkflowStarted and Signal events will both be part of the same
+	// decision task. So query will be blocked waiting for signal to complete, this is not what we want because it
+	// will not exercise the consistent query code path.
+	<-time.After(time.Second)
+	err = ts.libClient.SignalWorkflow(ctx, "test-consistent-query", run.GetRunID(), consistentQuerySignalCh, "signal-input")
+	ts.NoError(err)
+
+	value, err := ts.libClient.QueryWorkflowWithOptions(ctx, &client.QueryWorkflowWithOptionsRequest{
+		WorkflowID:            "test-consistent-query",
+		RunID:                 run.GetRunID(),
+		QueryType:             "consistent_query",
+		QueryConsistencyLevel: shared.QueryConsistencyLevelStrong.Ptr(),
+	})
+	ts.Nil(err)
+	ts.NotNil(value)
+	ts.NotNil(value.QueryResult)
+	ts.Nil(value.QueryRejected)
+	var queryResult string
+	ts.Nil(value.QueryResult.Get(&queryResult))
+	ts.Equal("signal-input", queryResult)
 }
 
 func (ts *IntegrationTestSuite) TestWorkflowIDReuseRejectDuplicate() {

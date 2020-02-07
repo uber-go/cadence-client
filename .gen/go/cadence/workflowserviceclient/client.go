@@ -82,6 +82,12 @@ type Interface interface {
 		opts ...yarpc.CallOption,
 	) (*shared.GetWorkflowExecutionHistoryResponse, error)
 
+	GetWorkflowExecutionRawHistory(
+		ctx context.Context,
+		GetRequest *shared.GetWorkflowExecutionRawHistoryRequest,
+		opts ...yarpc.CallOption,
+	) (*shared.GetWorkflowExecutionRawHistoryResponse, error)
+
 	ListArchivedWorkflowExecutions(
 		ctx context.Context,
 		ListRequest *shared.ListArchivedWorkflowExecutionsRequest,
@@ -129,6 +135,12 @@ type Interface interface {
 		PollRequest *shared.PollForDecisionTaskRequest,
 		opts ...yarpc.CallOption,
 	) (*shared.PollForDecisionTaskResponse, error)
+
+	PollForWorkflowExecutionRawHistory(
+		ctx context.Context,
+		GetRequest *shared.PollForWorkflowExecutionRawHistoryRequest,
+		opts ...yarpc.CallOption,
+	) (*shared.PollForWorkflowExecutionRawHistoryResponse, error)
 
 	QueryWorkflow(
 		ctx context.Context,
@@ -469,6 +481,29 @@ func (c client) GetWorkflowExecutionHistory(
 	return
 }
 
+func (c client) GetWorkflowExecutionRawHistory(
+	ctx context.Context,
+	_GetRequest *shared.GetWorkflowExecutionRawHistoryRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.GetWorkflowExecutionRawHistoryResponse, err error) {
+
+	args := cadence.WorkflowService_GetWorkflowExecutionRawHistory_Helper.Args(_GetRequest)
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_GetWorkflowExecutionRawHistory_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_GetWorkflowExecutionRawHistory_Helper.UnwrapResponse(&result)
+	return
+}
+
 func (c client) ListArchivedWorkflowExecutions(
 	ctx context.Context,
 	_ListRequest *shared.ListArchivedWorkflowExecutionsRequest,
@@ -650,6 +685,29 @@ func (c client) PollForDecisionTask(
 	}
 
 	success, err = cadence.WorkflowService_PollForDecisionTask_Helper.UnwrapResponse(&result)
+	return
+}
+
+func (c client) PollForWorkflowExecutionRawHistory(
+	ctx context.Context,
+	_GetRequest *shared.PollForWorkflowExecutionRawHistoryRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.PollForWorkflowExecutionRawHistoryResponse, err error) {
+
+	args := cadence.WorkflowService_PollForWorkflowExecutionRawHistory_Helper.Args(_GetRequest)
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_PollForWorkflowExecutionRawHistory_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_PollForWorkflowExecutionRawHistory_Helper.UnwrapResponse(&result)
 	return
 }
 

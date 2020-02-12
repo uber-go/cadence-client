@@ -25,6 +25,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"go.uber.org/cadence/internal/common/persistence"
 	"sync"
 	"time"
 
@@ -717,6 +718,29 @@ func (h *historyIteratorImpl) HasNextPage() bool {
 	return h.nextPageToken != nil
 }
 
+// deSerializeBlobDataToHistoryEvents deserialize the blob data to history event data
+func deSerializeBlobDataToHistoryEvents(
+	dataBlobs []*s.DataBlob,
+) (*s.History, error) {
+
+	var historyEvents []*s.HistoryEvent
+
+	for _, batch := range dataBlobs {
+		events, err := persistence.DeserializeBatchEvents(batch)
+		if err != nil {
+			return nil, err
+		}
+		if len(events) == 0 {
+			return nil, &s.InternalServiceError{
+				Message: fmt.Sprintf("corrupted history event batch, empty events"),
+			}
+		}
+
+		historyEvents = append(historyEvents, events...)
+	}
+	return &s.History{Events: historyEvents}, nil
+}
+
 func newGetHistoryPageFunc(
 	ctx context.Context,
 	service workflowserviceclient.Interface,
@@ -728,14 +752,14 @@ func newGetHistoryPageFunc(
 	return func(nextPageToken []byte) (*s.History, []byte, error) {
 		metricsScope.Counter(metrics.WorkflowGetHistoryCounter).Inc(1)
 		startTime := time.Now()
-		var resp *s.GetWorkflowExecutionHistoryResponse
+		var resp *s.GetWorkflowExecutionRawHistoryResponse
 		err := backoff.Retry(ctx,
 			func() error {
 				tchCtx, cancel, opt := newChannelContext(ctx)
 				defer cancel()
 
 				var err1 error
-				resp, err1 = service.GetWorkflowExecutionHistory(tchCtx, &s.GetWorkflowExecutionHistoryRequest{
+				resp, err1 = service.GetWorkflowExecutionRawHistory(tchCtx, &s.GetWorkflowExecutionRawHistoryRequest{
 					Domain:        common.StringPtr(domain),
 					Execution:     execution,
 					NextPageToken: nextPageToken,
@@ -746,22 +770,25 @@ func newGetHistoryPageFunc(
 			metricsScope.Counter(metrics.WorkflowGetHistoryFailedCounter).Inc(1)
 			return nil, nil, err
 		}
-
 		metricsScope.Counter(metrics.WorkflowGetHistorySucceedCounter).Inc(1)
 		metricsScope.Timer(metrics.WorkflowGetHistoryLatency).Record(time.Now().Sub(startTime))
-		h := resp.History
-		size := len(h.Events)
-		if size > 0 && atDecisionTaskCompletedEventID > 0 &&
-			h.Events[size-1].GetEventId() > atDecisionTaskCompletedEventID {
-			first := h.Events[0].GetEventId() // eventIds start from 1
-			h.Events = h.Events[:atDecisionTaskCompletedEventID-first+1]
-			if h.Events[len(h.Events)-1].GetEventType() != s.EventTypeDecisionTaskCompleted {
-				return nil, nil, fmt.Errorf("newGetHistoryPageFunc: atDecisionTaskCompletedEventID(%v) "+
-					"points to event that is not DecisionTaskCompleted", atDecisionTaskCompletedEventID)
+		h, err1 := deSerializeBlobDataToHistoryEvents(resp.RawHistory)
+		if err1 == nil {
+			size := len(h.Events)
+			if size > 0 && atDecisionTaskCompletedEventID > 0 &&
+				h.Events[size-1].GetEventId() > atDecisionTaskCompletedEventID {
+				first := h.Events[0].GetEventId() // eventIds start from 1
+				h.Events = h.Events[:atDecisionTaskCompletedEventID-first+1]
+				if h.Events[len(h.Events)-1].GetEventType() != s.EventTypeDecisionTaskCompleted {
+					return nil, nil, fmt.Errorf("newGetHistoryPageFunc: atDecisionTaskCompletedEventID(%v) "+
+						"points to event that is not DecisionTaskCompleted", atDecisionTaskCompletedEventID)
+				}
+				return h, nil, nil
 			}
-			return h, nil, nil
+			return h, resp.NextPageToken, nil
 		}
-		return h, resp.NextPageToken, nil
+
+		return nil, nil, nil
 	}
 }
 

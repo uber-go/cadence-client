@@ -165,7 +165,27 @@ type (
 		//			}
 		//			events = append(events, event)
 		//		}
-		GetWorkflowHistory(ctx context.Context, workflowID string, runID string, isLongPoll bool, filterType s.HistoryEventFilterType) HistoryEventIterator
+		GetWorkflowHistory(ctx context.Context, workflowID string, runID string) HistoryEventIterator
+
+		// PollWorkflowHistory gets history events of a particular workflow
+		// - workflow ID of the workflow.
+		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
+		// - whether use long poll for tracking new events: when the workflow is running, there can be new events generated during iteration
+		// 	 of HistoryEventIterator, if isLongPoll == true, then iterator will do long poll, tracking new history event, i.e. the iteration
+		//   will not be finished until workflow is finished; if isLongPoll == false, then iterator will only return current history events.
+		// - whether return all history events or just the last event, which contains the workflow execution end result
+		// Example:-
+		//	To iterate all events,
+		//		iter := GetWorkflowHistory(ctx, workflowID, runID, isLongPoll, filterType)
+		//		events := []*shared.HistoryEvent{}
+		//		for iter.HasNext() {
+		//			event, err := iter.Next()
+		//			if err != nil {
+		//				return err
+		//			}
+		//			events = append(events, event)
+		//		}
+		PollWorkflowHistory(ctx context.Context, workflowID string, runID string, filterType s.HistoryEventFilterType) HistoryEventIterator
 
 		// CompleteActivity reports activity completed.
 		// activity Execute method can return acitivity.activity.ErrResultPending to

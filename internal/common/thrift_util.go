@@ -21,7 +21,11 @@
 package common
 
 import (
+	"bytes"
 	"github.com/apache/thrift/lib/go/thrift"
+	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/thriftrw/protocol"
+	"go.uber.org/thriftrw/wire"
 )
 
 // TSerialize is used to serialize thrift TStruct to []byte
@@ -81,4 +85,46 @@ func TListDeserialize(ts []thrift.TStruct, b []byte) (err error) {
 	}
 
 	return
+}
+
+type (
+	// ThriftObject represents a thrift object
+	ThriftObject interface {
+		FromWire(w wire.Value) error
+		ToWire() (wire.Value, error)
+	}
+)
+
+const (
+	// used by thriftrw binary codec
+	preambleVersion0 byte = 0x59
+)
+
+var (
+	// MissingBinaryEncodingVersion indicate that the encoding version is missing
+	MissingBinaryEncodingVersion = &shared.BadRequestError{Message: "Missing binary encoding version."}
+	// InvalidBinaryEncodingVersion indicate that the encoding version is incorrect
+	InvalidBinaryEncodingVersion = &shared.BadRequestError{Message: "Invalid binary encoding version."}
+	// MsgPayloadNotThriftEncoded indicate message is not thrift encoded
+	MsgPayloadNotThriftEncoded = &shared.BadRequestError{Message: "Message payload is not thrift encoded."}
+)
+
+// Decode decode the object
+func Decode(binary []byte, val ThriftObject) error {
+	if len(binary) < 1 {
+		return MissingBinaryEncodingVersion
+	}
+
+	version := binary[0]
+	if version != preambleVersion0 {
+		return InvalidBinaryEncodingVersion
+	}
+
+	reader := bytes.NewReader(binary[1:])
+	wireVal, err := protocol.Binary.Decode(reader, wire.TStruct)
+	if err != nil {
+		return err
+	}
+
+	return val.FromWire(wireVal)
 }

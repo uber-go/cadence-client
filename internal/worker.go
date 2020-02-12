@@ -267,16 +267,22 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 		RunId:      common.StringPtr(execution.RunID),
 		WorkflowId: common.StringPtr(execution.ID),
 	}
-	request := &shared.GetWorkflowExecutionHistoryRequest{
+	request := &shared.GetWorkflowExecutionRawHistoryRequest{
 		Domain:    common.StringPtr(domain),
 		Execution: sharedExecution,
 	}
-	hResponse, err := service.GetWorkflowExecutionHistory(ctx, request)
+	hResponse, err := service.GetWorkflowExecutionRawHistory(ctx, request)
 	if err != nil {
 		return err
 	}
 
-	return replayWorkflowHistory(logger, service, domain, hResponse.History)
+	historyEvent, err := deSerializeBlobDataToHistoryEvents(hResponse.RawHistory)
+
+	if err != nil {
+		return err
+	}
+
+	return replayWorkflowHistory(logger, service, domain, historyEvent)
 }
 
 // ReplayWorkflowHistory executes a single decision task for the given history.

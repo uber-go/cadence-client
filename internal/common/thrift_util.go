@@ -128,3 +128,24 @@ func Decode(binary []byte, val ThriftObject) error {
 
 	return val.FromWire(wireVal)
 }
+
+func Encode(obj ThriftObject) ([]byte, error) {
+	if obj == nil {
+		return nil, MsgPayloadNotThriftEncoded
+	}
+	var writer bytes.Buffer
+	// use the first byte to version the serialization
+	err := writer.WriteByte(preambleVersion0)
+	if err != nil {
+		return nil, err
+	}
+	val, err := obj.ToWire()
+	if err != nil {
+		return nil, err
+	}
+	err = protocol.Binary.Encode(val, &writer)
+	if err != nil {
+		return nil, err
+	}
+	return writer.Bytes(), nil
+}

@@ -31,6 +31,7 @@ type (
 	// PayloadSerializer is used by persistence to serialize/deserialize history event(s) and others
 	// It will only be used inside persistence, so that serialize/deserialize is transparent for application
 	PayloadSerializer interface {
+		SerializeBatchEvents(batch []*s.HistoryEvent, encodingType s.EncodingType) (*s.DataBlob, error)
 		// deserialize history events
 		DeserializeBatchEvents(data *s.DataBlob) ([]*s.HistoryEvent, error)
 	}
@@ -51,6 +52,10 @@ type (
 	}
 )
 
+func SerializeBatchEvents(events []*s.HistoryEvent, encodingType s.EncodingType) (*s.DataBlob, error) {
+	return serialize(events, encodingType)
+}
+
 // DeserializeBatchEvents will deserialize blob data to history event data
 func DeserializeBatchEvents(data *s.DataBlob) ([]*s.HistoryEvent, error) {
 	if data == nil {
@@ -62,6 +67,49 @@ func DeserializeBatchEvents(data *s.DataBlob) ([]*s.HistoryEvent, error) {
 	}
 	err := deserialize(data, &events)
 	return events, err
+}
+
+func serialize(input interface{}, encodingType s.EncodingType) (*s.DataBlob, error) {
+	if input == nil {
+		return nil, nil
+	}
+
+	var data []byte
+	var err error
+
+	switch encodingType {
+	case s.EncodingTypeThriftRW:
+		data, err = thriftrwEncode(input)
+	case s.EncodingTypeJSON: // For backward-compatibility
+		encodingType = s.EncodingTypeJSON
+		data, err = json.Marshal(input)
+	default:
+		return nil, NewUnknownEncodingTypeError(encodingType)
+	}
+
+	if err != nil {
+		return nil, NewCadenceSerializationError(err.Error())
+	}
+	return NewDataBlob(data, encodingType), nil
+}
+
+func thriftrwEncode(input interface{}) ([]byte, error) {
+	switch input.(type) {
+	case []*s.HistoryEvent:
+		return common.Encode(&s.History{Events: input.([]*s.HistoryEvent)})
+	case *s.HistoryEvent:
+		return common.Encode(input.(*s.HistoryEvent))
+	case *s.Memo:
+		return common.Encode(input.(*s.Memo))
+	case *s.ResetPoints:
+		return common.Encode(input.(*s.ResetPoints))
+	case *s.BadBinaries:
+		return common.Encode(input.(*s.BadBinaries))
+	case *s.VersionHistories:
+		return common.Encode(input.(*s.VersionHistories))
+	default:
+		return nil, nil
+	}
 }
 
 func deserialize(data *s.DataBlob, target interface{}) error {
@@ -124,6 +172,11 @@ func (e *CadenceSerializationError) Error() string {
 	return fmt.Sprintf("cadence serialization error: %v", e.msg)
 }
 
+// NewCadenceSerializationError returns a CadenceSerializationError
+func NewCadenceSerializationError(msg string) *CadenceSerializationError {
+	return &CadenceSerializationError{msg: msg}
+}
+
 // NewCadenceDeserializationError returns a CadenceDeserializationError
 func NewCadenceDeserializationError(msg string) *CadenceDeserializationError {
 	return &CadenceDeserializationError{msg: msg}
@@ -131,4 +184,15 @@ func NewCadenceDeserializationError(msg string) *CadenceDeserializationError {
 
 func (e *CadenceDeserializationError) Error() string {
 	return fmt.Sprintf("cadence deserialization error: %v", e.msg)
+}
+
+func NewDataBlob(data []byte, encodingType s.EncodingType) *s.DataBlob {
+	if data == nil || len(data) == 0 {
+		return nil
+	}
+
+	return &s.DataBlob{
+		Data:         data,
+		EncodingType: &encodingType,
+	}
 }

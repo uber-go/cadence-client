@@ -52,6 +52,7 @@ type (
 	}
 )
 
+// SerializeBatchEvents will serialize history event data to blob data
 func SerializeBatchEvents(events []*s.HistoryEvent, encodingType s.EncodingType) (*s.DataBlob, error) {
 	return serialize(events, encodingType)
 }
@@ -186,6 +187,7 @@ func (e *CadenceDeserializationError) Error() string {
 	return fmt.Sprintf("cadence deserialization error: %v", e.msg)
 }
 
+// NewDataBlob creates new blob data
 func NewDataBlob(data []byte, encodingType s.EncodingType) *s.DataBlob {
 	if data == nil || len(data) == 0 {
 		return nil

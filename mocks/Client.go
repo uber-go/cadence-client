@@ -215,13 +215,29 @@ func (_m *Client) GetWorkflow(ctx context.Context, workflowID string, runID stri
 	return r0
 }
 
-// GetWorkflowHistory provides a mock function with given fields: ctx, workflowID, runID, isLongPoll, filterType
-func (_m *Client) GetWorkflowHistory(ctx context.Context, workflowID string, runID string, isLongPoll bool, filterType shared.HistoryEventFilterType) client.HistoryEventIterator {
-	ret := _m.Called(ctx, workflowID, runID, isLongPoll, filterType)
+// GetWorkflowHistory provides a mock function with given fields: ctx, workflowID, runID
+func (_m *Client) GetWorkflowHistory(ctx context.Context, workflowID string, runID string) client.HistoryEventIterator {
+	ret := _m.Called(ctx, workflowID, runID)
 
 	var r0 internal.HistoryEventIterator
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool, shared.HistoryEventFilterType) internal.HistoryEventIterator); ok {
-		r0 = rf(ctx, workflowID, runID, isLongPoll, filterType)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) internal.HistoryEventIterator); ok {
+		r0 = rf(ctx, workflowID, runID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(internal.HistoryEventIterator)
+		}
+	}
+
+	return r0
+}
+
+// PollWorkflowHistory provides a mock function with given fields: ctx, workflowID, runID and filterType
+func (_m *Client) PollWorkflowHistory(ctx context.Context, workflowID string, runID string, filterType shared.HistoryEventFilterType) client.HistoryEventIterator {
+	ret := _m.Called(ctx, workflowID, runID, filterType)
+
+	var r0 internal.HistoryEventIterator
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, shared.HistoryEventFilterType) internal.HistoryEventIterator); ok {
+		r0 = rf(ctx, workflowID, runID, filterType)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(internal.HistoryEventIterator)

@@ -129,6 +129,7 @@ func Decode(binary []byte, val ThriftObject) error {
 	return val.FromWire(wireVal)
 }
 
+// Encode encode the object
 func Encode(obj ThriftObject) ([]byte, error) {
 	if obj == nil {
 		return nil, MsgPayloadNotThriftEncoded

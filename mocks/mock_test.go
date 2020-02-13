@@ -83,15 +83,23 @@ func Test_MockClient(t *testing.T) {
 	require.NoError(t, wfRun.Get(context.Background(), &testWorkflowID))
 
 	mockHistoryIter := &HistoryEventIterator{}
-	mockHistoryIter.On("HasNext").Return(true).Once()
-	mockHistoryIter.On("Next").Return(&shared.HistoryEvent{}, nil).Once()
-	mockClient.On("GetWorkflowHistory", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	mockHistoryIter.On("HasNext").Return(true).Twice()
+	mockHistoryIter.On("Next").Return(&shared.HistoryEvent{}, nil).Twice()
+	mockClient.On("GetWorkflowHistory", mock.Anything, mock.Anything, mock.Anything).
 		Return(mockHistoryIter).Once()
-	historyIter := mockClient.GetWorkflowHistory(context.Background(), testWorkflowID, testRunID, true, shared.HistoryEventFilterTypeCloseEvent)
+	mockClient.On("PollWorkflowHistory", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(mockHistoryIter).Once()
+	historyIter := mockClient.GetWorkflowHistory(context.Background(), testWorkflowID, testRunID)
+	pollHistoryIter := mockClient.PollWorkflowHistory(context.Background(), testWorkflowID, testRunID, shared.HistoryEventFilterTypeCloseEvent)
 	mockClient.AssertExpectations(t)
 	require.NotNil(t, historyIter)
+	require.NotNil(t, pollHistoryIter)
 	require.Equal(t, true, historyIter.HasNext())
+	require.Equal(t, true, pollHistoryIter.HasNext())
 	next, err := historyIter.Next()
+	pollNext, err1 := pollHistoryIter.Next()
 	require.NotNil(t, next)
 	require.NoError(t, err)
+	require.NotNil(t, pollNext)
+	require.NoError(t, err1)
 }

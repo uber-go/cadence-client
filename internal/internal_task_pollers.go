@@ -25,7 +25,7 @@ package internal
 import (
 	"context"
 	"fmt"
-	"go.uber.org/cadence/internal/common/persistence"
+	"go.uber.org/cadence/internal/common/util"
 	"sync"
 	"time"
 
@@ -718,29 +718,6 @@ func (h *historyIteratorImpl) HasNextPage() bool {
 	return h.nextPageToken != nil
 }
 
-// deSerializeBlobDataToHistoryEvents deserialize the blob data to history event data
-func deSerializeBlobDataToHistoryEvents(
-	dataBlobs []*s.DataBlob,
-) (*s.History, error) {
-
-	var historyEvents []*s.HistoryEvent
-
-	for _, batch := range dataBlobs {
-		events, err := persistence.DeserializeBatchEvents(batch)
-		if err != nil {
-			return nil, err
-		}
-		if len(events) == 0 {
-			return nil, &s.InternalServiceError{
-				Message: fmt.Sprintf("corrupted history event batch, empty events"),
-			}
-		}
-
-		historyEvents = append(historyEvents, events...)
-	}
-	return &s.History{Events: historyEvents}, nil
-}
-
 func newGetHistoryPageFunc(
 	ctx context.Context,
 	service workflowserviceclient.Interface,
@@ -772,7 +749,7 @@ func newGetHistoryPageFunc(
 		}
 		metricsScope.Counter(metrics.WorkflowGetHistorySucceedCounter).Inc(1)
 		metricsScope.Timer(metrics.WorkflowGetHistoryLatency).Record(time.Now().Sub(startTime))
-		h, err1 := deSerializeBlobDataToHistoryEvents(resp.RawHistory)
+		h, err1 := util.DeSerializeBlobDataToHistoryEvents(resp.RawHistory)
 		if err1 == nil {
 			size := len(h.Events)
 			if size > 0 && atDecisionTaskCompletedEventID > 0 &&

@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/common/util"
 	"reflect"
 	"time"
 
@@ -512,7 +513,7 @@ func (wc *workflowClient) PollWorkflowHistory(ctx context.Context, workflowID st
 					if err != nil {
 						return err
 					}
-					historyEvents, err := deSerializeBlobDataToHistoryEvents(rawResponse.RawHistory)
+					historyEvents, err := util.DeSerializeBlobDataToHistoryEvents(rawResponse.RawHistory)
 
 					if err == nil {
 						response = &s.GetWorkflowExecutionHistoryResponse{
@@ -541,7 +542,7 @@ func (wc *workflowClient) PollWorkflowHistory(ctx context.Context, workflowID st
 	}
 }
 
-// GetWorkflowHistory performs polling of the history blob data from server and deserialize to history event construct data
+// GetWorkflowHistory performs short polling of the history blob data from server and deserialize to history event construct data
 // workflowID is required, other parameters are optional.
 // If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
 func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID string, runID string) HistoryEventIterator {
@@ -569,7 +570,7 @@ func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID str
 					if err != nil {
 						return err
 					}
-					historyEvents, err := deSerializeBlobDataToHistoryEvents(rawResponse.RawHistory)
+					historyEvents, err := util.DeSerializeBlobDataToHistoryEvents(rawResponse.RawHistory)
 
 					if err == nil {
 						response = &s.GetWorkflowExecutionHistoryResponse{

@@ -41390,6 +41390,16 @@ func (v *VersionHistoryItem) GetEventID() (o int64) {
 	return
 }
 
+// GetEvents returns the value of Events if it is set or its
+// zero value if it is unset.
+func (v *History) GetEvents() (o []*HistoryEvent) {
+	if v != nil && v.Events != nil {
+		return v.Events
+	}
+
+	return
+}
+
 // GetVersion returns the value of Version if it is set or its
 // zero value if it is unset.
 func (v *VersionHistoryItem) GetVersion() (o int64) {

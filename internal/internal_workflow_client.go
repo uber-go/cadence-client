@@ -1163,6 +1163,16 @@ func (workflowRun *workflowRunImpl) Get(ctx context.Context, valuePtr interface{
 		attributes := closeEvent.WorkflowExecutionContinuedAsNewEventAttributes
 		workflowRun.currentRunID = attributes.GetNewExecutionRunId()
 		return workflowRun.Get(ctx, valuePtr)
+	case s.EventTypeDecisionTaskCompleted:
+		attributes := closeEvent.DecisionTaskCompletedEventAttributes
+		if valuePtr == nil || attributes.ExecutionContext == nil {
+			return nil
+		}
+		rf := reflect.ValueOf(valuePtr)
+		if rf.Type().Kind() != reflect.Ptr {
+			return errors.New("value parameter is not a pointer")
+		}
+		err = deSerializeFunctionResult(workflowRun.workflowFn, attributes.ExecutionContext, valuePtr, workflowRun.dataConverter)
 	default:
 		err = fmt.Errorf("Unexpected event type %s when handling workflow execution result", closeEvent.GetEventType())
 	}

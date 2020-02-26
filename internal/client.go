@@ -150,13 +150,9 @@ type (
 		// GetWorkflowHistory gets history events of a particular workflow
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
-		// - whether use long poll for tracking new events: when the workflow is running, there can be new events generated during iteration
-		// 	 of HistoryEventIterator, if isLongPoll == true, then iterator will do long poll, tracking new history event, i.e. the iteration
-		//   will not be finished until workflow is finished; if isLongPoll == false, then iterator will only return current history events.
-		// - whether return all history events or just the last event, which contains the workflow execution end result
 		// Example:-
 		//	To iterate all events,
-		//		iter := GetWorkflowHistory(ctx, workflowID, runID, isLongPoll, filterType)
+		//		iter := GetWorkflowHistory(ctx, workflowID, runID)
 		//		events := []*shared.HistoryEvent{}
 		//		for iter.HasNext() {
 		//			event, err := iter.Next()
@@ -170,13 +166,10 @@ type (
 		// PollWorkflowHistory gets history events of a particular workflow
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
-		// - whether use long poll for tracking new events: when the workflow is running, there can be new events generated during iteration
-		// 	 of HistoryEventIterator, if isLongPoll == true, then iterator will do long poll, tracking new history event, i.e. the iteration
-		//   will not be finished until workflow is finished; if isLongPoll == false, then iterator will only return current history events.
 		// - whether return all history events or just the last event, which contains the workflow execution end result
 		// Example:-
 		//	To iterate all events,
-		//		iter := GetWorkflowHistory(ctx, workflowID, runID, isLongPoll, filterType)
+		//		iter := PollWorkflowHistory(ctx, workflowID, runID, filterType)
 		//		events := []*shared.HistoryEvent{}
 		//		for iter.HasNext() {
 		//			event, err := iter.Next()

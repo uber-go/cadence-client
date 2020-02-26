@@ -130,7 +130,7 @@ type (
 		// Defines rate limiting on number of activity tasks that can be executed per second per worker.
 		WorkerActivitiesPerSecond float64
 
-		// MaxConcurrentActivityPollers is the max number of poller for activity task list
+		// MaxConcurrentActivityPollers is the max number of pollers for activity task list
 		MaxConcurrentActivityPollers int
 
 		// Defines how many concurrent decision task executions by this worker.
@@ -139,7 +139,7 @@ type (
 		// Defines rate limiting on number of decision tasks that can be executed per second per worker.
 		WorkerDecisionTasksPerSecond float64
 
-		// MaxConcurrentDecisionPollers is the max number of poller for decision task list
+		// MaxConcurrentDecisionPollers is the max number of pollers for decision task list
 		MaxConcurrentDecisionPollers int
 
 		// Defines how many concurrent local activity executions by this worker.

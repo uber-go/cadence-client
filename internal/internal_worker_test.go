@@ -1147,7 +1147,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 	require.True(t, decisionWorker.executionParameters.Identity != "")
 	require.NotNil(t, decisionWorker.executionParameters.Logger)
 	require.NotNil(t, decisionWorker.executionParameters.MetricsScope)
-	require.True(t, len(decisionWorker.executionParameters.ContextPropagators) > 0)
+	require.Nil(t, decisionWorker.executionParameters.ContextPropagators)
 
 	expected := workerExecutionParameters{
 		TaskList:                             taskList,
@@ -1176,7 +1176,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 	require.True(t, activityWorker.executionParameters.Identity != "")
 	require.NotNil(t, activityWorker.executionParameters.Logger)
 	require.NotNil(t, activityWorker.executionParameters.MetricsScope)
-	require.True(t, len(activityWorker.executionParameters.ContextPropagators) > 0)
+	require.Nil(t, activityWorker.executionParameters.ContextPropagators)
 	assertWorkerExecutionParamsEqual(t, expected, activityWorker.executionParameters)
 }
 

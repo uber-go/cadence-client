@@ -14,7 +14,6 @@ type (
 	SagaOptions struct {
 		ParallelCompensation bool
 		ContinueWithError    bool
-		SkipCompensation     bool
 	}
 
 	sagaImpl struct {

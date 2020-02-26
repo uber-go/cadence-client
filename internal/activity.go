@@ -33,6 +33,12 @@ import (
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	commonproto "go.temporal.io/temporal-proto/common"
+	"go.temporal.io/temporal-proto/workflowservice"
+
+	"go.temporal.io/temporal/internal/common"
+	"go.temporal.io/temporal/internal/common/backoff"
 )
 
 type (

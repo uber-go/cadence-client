@@ -464,44 +464,18 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		rootCtx = context.Background()
 	}
 
-	timeoutDuration := time.Duration(task.params.ScheduleToCloseTimeoutSeconds) * time.Second
-	deadline := time.Now().Add(timeoutDuration)
-	if task.attempt > 0 && !task.expireTime.IsZero() && task.expireTime.Before(deadline) {
-		// this is attempt and expire time is before SCHEDULE_TO_CLOSE timeout
-		deadline = task.expireTime
-	}
-
-	var scheduled time.Time
-	var started time.Time
-	var taskToken []byte
-	if task.workflowTask != nil && task.workflowTask.task != nil {
-		scheduled = time.Unix(0, task.workflowTask.task.GetScheduledTimestamp())
-	}
-
-	if task.workflowTask != nil && task.workflowTask.task != nil {
-		started = time.Unix(0, task.workflowTask.task.GetStartedTimestamp())
-	}
-
-	if task.workflowTask != nil && task.workflowTask.task != nil {
-		taskToken = task.workflowTask.task.TaskToken
-	}
-
 	ctx := context.WithValue(rootCtx, activityEnvContextKey, &activityEnvironment{
-		taskToken:          taskToken,
-		workflowType:       &task.params.WorkflowInfo.WorkflowType,
-		workflowDomain:     task.params.WorkflowInfo.Domain,
-		taskList:           task.params.WorkflowInfo.TaskListName,
-		scheduledTimestamp: scheduled,
-		startedTimestamp:   started,
-		deadline:           deadline,
-		activityType:       ActivityType{Name: activityType},
-		activityID:         fmt.Sprintf("%v", task.activityID),
-		workflowExecution:  task.params.WorkflowInfo.WorkflowExecution,
-		logger:             lath.logger,
-		metricsScope:       metricsScope,
-		isLocalActivity:    true,
-		dataConverter:      lath.dataConverter,
-		attempt:            task.attempt,
+		workflowType:      &task.params.WorkflowInfo.WorkflowType,
+		workflowDomain:    task.params.WorkflowInfo.Domain,
+		taskList:          task.params.WorkflowInfo.TaskListName,
+		activityType:      ActivityType{Name: activityType},
+		activityID:        fmt.Sprintf("%v", task.activityID),
+		workflowExecution: task.params.WorkflowInfo.WorkflowExecution,
+		logger:            lath.logger,
+		metricsScope:      metricsScope,
+		isLocalActivity:   true,
+		dataConverter:     lath.dataConverter,
+		attempt:           task.attempt,
 	})
 
 	// panic handler
@@ -527,6 +501,13 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 			metricsScope.Counter(metrics.LocalActivityFailedCounter).Inc(1)
 		}
 	}()
+
+	timeoutDuration := time.Duration(task.params.ScheduleToCloseTimeoutSeconds) * time.Second
+	deadline := time.Now().Add(timeoutDuration)
+	if task.attempt > 0 && !task.expireTime.IsZero() && task.expireTime.Before(deadline) {
+		// this is attempt and expire time is before SCHEDULE_TO_CLOSE timeout
+		deadline = task.expireTime
+	}
 
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	task.Lock()

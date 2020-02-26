@@ -494,12 +494,11 @@ func (wc *workflowEnvironmentImpl) ExecuteLocalActivity(params executeLocalActiv
 
 func newLocalActivityTask(params executeLocalActivityParams, callback laResultHandler, activityID string) *localActivityTask {
 	task := &localActivityTask{
-		activityID:   activityID,
-		params:       &params,
-		callback:     callback,
-		retryPolicy:  params.RetryPolicy,
-		attempt:      params.Attempt,
-		workflowTask: &workflowTask{},
+		activityID:  activityID,
+		params:      &params,
+		callback:    callback,
+		retryPolicy: params.RetryPolicy,
+		attempt:     params.Attempt,
 	}
 
 	if params.RetryPolicy != nil && params.RetryPolicy.ExpirationInterval > 0 {

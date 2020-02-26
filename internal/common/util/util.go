@@ -65,7 +65,7 @@ func AwaitWaitGroup(wg *sync.WaitGroup, timeout time.Duration) bool {
 
 // DeSerializeBlobDataToHistoryEvents deserialize the blob data to history event data
 func DeSerializeBlobDataToHistoryEvents(
-	dataBlobs []*s.DataBlob,
+	dataBlobs []*s.DataBlob, filterType s.HistoryEventFilterType,
 ) (*s.History, error) {
 
 	var historyEvents []*s.HistoryEvent
@@ -82,6 +82,10 @@ func DeSerializeBlobDataToHistoryEvents(
 		}
 
 		historyEvents = append(historyEvents, events...)
+	}
+
+	if filterType == s.HistoryEventFilterTypeCloseEvent {
+		historyEvents = []*s.HistoryEvent{historyEvents[len(historyEvents)-1]}
 	}
 	return &s.History{Events: historyEvents}, nil
 }

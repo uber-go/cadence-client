@@ -513,7 +513,7 @@ func (wc *workflowClient) PollWorkflowHistory(ctx context.Context, workflowID st
 					if err != nil {
 						return err
 					}
-					historyEvents, err := util.DeSerializeBlobDataToHistoryEvents(rawResponse.RawHistory)
+					historyEvents, err := util.DeSerializeBlobDataToHistoryEvents(rawResponse.RawHistory, filterType)
 
 					if err == nil {
 						response = &s.GetWorkflowExecutionHistoryResponse{
@@ -570,7 +570,7 @@ func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID str
 					if err != nil {
 						return err
 					}
-					historyEvents, err := util.DeSerializeBlobDataToHistoryEvents(rawResponse.RawHistory)
+					historyEvents, err := util.DeSerializeBlobDataToHistoryEvents(rawResponse.RawHistory, s.HistoryEventFilterTypeAllEvent)
 
 					if err == nil {
 						response = &s.GetWorkflowExecutionHistoryResponse{

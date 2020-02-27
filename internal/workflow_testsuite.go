@@ -163,6 +163,11 @@ func (t *TestActivityEnvironment) ExecuteLocalActivity(activityFn interface{}, a
 	return t.impl.executeLocalActivity(activityFn, args...)
 }
 
+// ExecuteLocalActivity executes a local activity and return the local activity. The tested activity will be executed synchronously in the calling goroutinue.
+func (t *TestActivityEnvironment) ExecuteLocalActivityParams(activityFn interface{}, args ...interface{}) (result *localActivityResult, err error) {
+	return t.impl.executeLocalActivityParams(activityFn, args...)
+}
+
 // SetWorkerOptions sets the WorkerOptions that will be use by TestActivityEnvironment. TestActivityEnvironment will
 // use options of Identity, MetricsScope and BackgroundActivityContext on the WorkerOptions. Other options are ignored.
 // Note: WorkerOptions is defined in internal package, use public type worker.Options instead.

@@ -186,7 +186,7 @@ func (s *historyEventIteratorSuite) TestIterator_NoError() {
 	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), request2, gomock.Any()).Return(response2, nil).Times(1)
 
 	events := []*shared.HistoryEvent{}
-	iter := s.wfClient.PollWorkflowHistory(context.Background(), workflowID, runID, shared.HistoryEventFilterTypeAllEvent)
+	iter := s.wfClient.GetWorkflowHistory(context.Background(), workflowID, runID, true, shared.HistoryEventFilterTypeAllEvent)
 	for iter.HasNext() {
 		event, err := iter.Next()
 		s.Nil(err)
@@ -223,7 +223,7 @@ func (s *historyEventIteratorSuite) TestIterator_NoError_EmptyPage() {
 	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), request2, gomock.Any()).Return(response2, nil).Times(1)
 
 	events := []*shared.HistoryEvent{}
-	iter := s.wfClient.PollWorkflowHistory(context.Background(), workflowID, runID, shared.HistoryEventFilterTypeAllEvent)
+	iter := s.wfClient.GetWorkflowHistory(context.Background(), workflowID, runID, true, shared.HistoryEventFilterTypeAllEvent)
 	for iter.HasNext() {
 		event, err := iter.Next()
 		s.Nil(err)
@@ -264,7 +264,7 @@ func (s *historyEventIteratorSuite) TestIterator_Error() {
 
 	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), request1, gomock.Any()).Return(response1, nil).Times(1)
 
-	iter := s.wfClient.PollWorkflowHistory(context.Background(), workflowID, runID, shared.HistoryEventFilterTypeAllEvent)
+	iter := s.wfClient.GetWorkflowHistory(context.Background(), workflowID, runID, true, shared.HistoryEventFilterTypeAllEvent)
 
 	s.True(iter.HasNext())
 	event, err := iter.Next()

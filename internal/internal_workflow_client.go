@@ -276,7 +276,7 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 	}
 
 	iterFn := func(fnCtx context.Context, fnRunID string) HistoryEventIterator {
-		return wc.PollWorkflowHistory(fnCtx, workflowID, fnRunID, s.HistoryEventFilterTypeCloseEvent)
+		return wc.GetWorkflowHistory(fnCtx, workflowID, fnRunID, true, s.HistoryEventFilterTypeCloseEvent)
 	}
 
 	return &workflowRunImpl{
@@ -296,7 +296,7 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, runID string) WorkflowRun {
 
 	iterFn := func(fnCtx context.Context, fnRunID string) HistoryEventIterator {
-		return wc.PollWorkflowHistory(fnCtx, workflowID, fnRunID, s.HistoryEventFilterTypeCloseEvent)
+		return wc.GetWorkflowHistory(fnCtx, workflowID, fnRunID, true, s.HistoryEventFilterTypeCloseEvent)
 	}
 
 	return &workflowRunImpl{
@@ -481,6 +481,16 @@ func (wc *workflowClient) TerminateWorkflow(ctx context.Context, workflowID stri
 	return err
 }
 
+// GetWorkflowHistory return a channel which contains the history events of a given workflow
+func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID string, runID string,
+	isLongPoll bool, filterType s.HistoryEventFilterType) HistoryEventIterator {
+	if isLongPoll {
+		return wc.PollWorkflowHistory(ctx, workflowID, runID, filterType)
+	} else {
+		return wc.GetWorkflowRawHistory(ctx, workflowID, runID)
+	}
+}
+
 // PollWorkflowHistory performs long polling of the history blob data from server and deserialize to history event construct data
 // workflowID is required, other parameters are optional.
 // If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
@@ -542,10 +552,10 @@ func (wc *workflowClient) PollWorkflowHistory(ctx context.Context, workflowID st
 	}
 }
 
-// GetWorkflowHistory performs short polling of the history blob data from server and deserialize to history event construct data
+// GetWorkflowRawHistory performs short polling of the history blob data from server and deserialize to history event construct data
 // workflowID is required, other parameters are optional.
 // If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
-func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID string, runID string) HistoryEventIterator {
+func (wc *workflowClient) GetWorkflowRawHistory(ctx context.Context, workflowID string, runID string) HistoryEventIterator {
 	domain := wc.domain
 	paginate := func(nexttoken []byte) (*s.GetWorkflowExecutionHistoryResponse, error) {
 

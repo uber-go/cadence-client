@@ -63,8 +63,8 @@ func AwaitWaitGroup(wg *sync.WaitGroup, timeout time.Duration) bool {
 	}
 }
 
-// DeSerializeBlobDataToHistoryEvents deserialize the blob data to history event data
-func DeSerializeBlobDataToHistoryEvents(
+// DeserializeBlobDataToHistoryEvents deserialize the blob data to history event data
+func DeserializeBlobDataToHistoryEvents(
 	dataBlobs []*s.DataBlob, filterType s.HistoryEventFilterType,
 ) (*s.History, error) {
 

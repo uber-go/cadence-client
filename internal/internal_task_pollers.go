@@ -749,7 +749,7 @@ func newGetHistoryPageFunc(
 		}
 		metricsScope.Counter(metrics.WorkflowGetHistorySucceedCounter).Inc(1)
 		metricsScope.Timer(metrics.WorkflowGetHistoryLatency).Record(time.Now().Sub(startTime))
-		h, err1 := util.DeSerializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
+		h, err1 := util.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
 		if err1 == nil {
 			size := len(h.Events)
 			if size > 0 && atDecisionTaskCompletedEventID > 0 &&

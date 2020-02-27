@@ -277,7 +277,7 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 		return err
 	}
 
-	historyEvent, err := util.DeSerializeBlobDataToHistoryEvents(hResponse.RawHistory, shared.HistoryEventFilterTypeAllEvent)
+	historyEvent, err := util.DeserializeBlobDataToHistoryEvents(hResponse.RawHistory, shared.HistoryEventFilterTypeAllEvent)
 
 	if err != nil {
 		return err

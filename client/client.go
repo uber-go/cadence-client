@@ -167,7 +167,7 @@ type (
 		//	- InternalServiceError
 		TerminateWorkflow(ctx context.Context, workflowID string, runID string, reason string, details []byte) error
 
-		// GetWorkflowHistory performs the short pull to get history events of a particular workflow
+		// GetWorkflowHistory gets history events of a particular workflow
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
 		// - whether use long poll for tracking new events: when the workflow is running, there can be new events generated during iteration

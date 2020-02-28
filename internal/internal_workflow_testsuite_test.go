@@ -1616,26 +1616,15 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivity() {
 	}
 
 	env := s.NewTestActivityEnvironment()
-	result, err := env.ExecuteLocalActivity(localActivityFn, "local_activity")
+	result, localActivity, err := env.ExecuteLocalActivity(localActivityFn, "local_activity")
 	s.NoError(err)
+	s.Equal(WorkflowType{Name: workflowTypeNotSpecified}, localActivity.task.params.WorkflowInfo.WorkflowType)
+	s.Equal(defaultTestDomain, localActivity.task.params.WorkflowInfo.Domain)
+	s.Equal(defaultTestTaskList, localActivity.task.params.WorkflowInfo.TaskListName)
 	var laResult string
 	err = result.Get(&laResult)
 	s.NoError(err)
 	s.Equal("hello local_activity", laResult)
-}
-
-func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityParams() {
-	localActivityFn := func(ctx context.Context, name string) (string, error) {
-		return "hello " + name, nil
-	}
-
-	env := s.NewTestActivityEnvironment()
-	result, err := env.ExecuteLocalActivityParams(localActivityFn, "local_activity")
-	s.NoError(err)
-
-	s.Equal(WorkflowType{Name: workflowTypeNotSpecified}, result.task.params.WorkflowInfo.WorkflowType)
-	s.Equal(defaultTestDomain, result.task.params.WorkflowInfo.Domain)
-	s.Equal(defaultTestTaskList, result.task.params.WorkflowInfo.TaskListName)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowLocalActivityWithMockAndListeners() {

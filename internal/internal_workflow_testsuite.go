@@ -534,10 +534,10 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	}
 }
 
-func (env *testWorkflowEnvironmentImpl) executeLocalActivityParams(
+func (env *testWorkflowEnvironmentImpl) executeLocalActivity(
 	activityFn interface{},
 	args ...interface{},
-) (result *localActivityResult, err error) {
+) (val Value, result *localActivityResult, err error) {
 	params := executeLocalActivityParams{
 		localActivityOptions: localActivityOptions{
 			ScheduleToCloseTimeoutSeconds: common.Int32Ceil(env.testTimeout.Seconds()),
@@ -561,41 +561,9 @@ func (env *testWorkflowEnvironmentImpl) executeLocalActivityParams(
 
 	result = taskHandler.executeLocalActivityTask(task)
 	if result.err != nil {
-		return nil, result.err
+		return nil, nil, result.err
 	}
-	return result, nil
-}
-
-func (env *testWorkflowEnvironmentImpl) executeLocalActivity(
-	activityFn interface{},
-	args ...interface{},
-) (Value, error) {
-	params := executeLocalActivityParams{
-		localActivityOptions: localActivityOptions{
-			ScheduleToCloseTimeoutSeconds: common.Int32Ceil(env.testTimeout.Seconds()),
-		},
-		ActivityFn:   activityFn,
-		InputArgs:    args,
-		WorkflowInfo: env.workflowInfo,
-	}
-	task := &localActivityTask{
-		activityID: "test-local-activity",
-		params:     &params,
-		callback: func(lar *localActivityResultWrapper) {
-		},
-	}
-	taskHandler := localActivityTaskHandler{
-		userContext:  env.workerOptions.BackgroundActivityContext,
-		metricsScope: env.metricsScope,
-		logger:       env.logger,
-		tracer:       opentracing.NoopTracer{},
-	}
-
-	result := taskHandler.executeLocalActivityTask(task)
-	if result.err != nil {
-		return nil, result.err
-	}
-	return newEncodedValue(result.result, env.GetDataConverter()), nil
+	return newEncodedValue(result.result, env.GetDataConverter()), result, nil
 }
 
 func (env *testWorkflowEnvironmentImpl) startDecisionTask() {

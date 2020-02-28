@@ -464,8 +464,10 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		rootCtx = context.Background()
 	}
 
+	workflowTypeLocal := task.params.WorkflowInfo.WorkflowType
+
 	ctx := context.WithValue(rootCtx, activityEnvContextKey, &activityEnvironment{
-		workflowType:      &task.params.WorkflowInfo.WorkflowType,
+		workflowType:      &workflowTypeLocal,
 		workflowDomain:    task.params.WorkflowInfo.Domain,
 		taskList:          task.params.WorkflowInfo.TaskListName,
 		activityType:      ActivityType{Name: activityType},

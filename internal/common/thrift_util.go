@@ -22,6 +22,9 @@ package common
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/thriftrw/protocol"
@@ -149,4 +152,124 @@ func Encode(obj ThriftObject) ([]byte, error) {
 		return nil, err
 	}
 	return writer.Bytes(), nil
+}
+
+// SerializeBatchEvents will serialize history event data to blob data
+func SerializeBatchEvents(events []*shared.HistoryEvent, encodingType shared.EncodingType) (*shared.DataBlob, error) {
+	return serialize(events, encodingType)
+}
+
+// DeserializeBatchEvents will deserialize blob data to history event data
+func DeserializeBatchEvents(data *shared.DataBlob) ([]*shared.HistoryEvent, error) {
+	if data == nil {
+		return nil, nil
+	}
+	var events []*shared.HistoryEvent
+	if data != nil && len(data.Data) == 0 {
+		return events, nil
+	}
+	err := deserialize(data, &events)
+	return events, err
+}
+
+func serialize(input interface{}, encodingType shared.EncodingType) (*shared.DataBlob, error) {
+	if input == nil {
+		return nil, nil
+	}
+
+	var data []byte
+	var err error
+
+	switch encodingType {
+	case shared.EncodingTypeThriftRW:
+		data, err = thriftrwEncode(input)
+	case shared.EncodingTypeJSON: // For backward-compatibility
+		encodingType = shared.EncodingTypeJSON
+		data, err = json.Marshal(input)
+	default:
+		return nil, fmt.Errorf("unknown or unsupported encoding type %v", encodingType)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("cadence serialization error: %v", err.Error())
+	}
+	return NewDataBlob(data, encodingType), nil
+}
+
+func thriftrwEncode(input interface{}) ([]byte, error) {
+	switch input.(type) {
+	case []*shared.HistoryEvent:
+		return Encode(&shared.History{Events: input.([]*shared.HistoryEvent)})
+	case *shared.HistoryEvent:
+		return Encode(input.(*shared.HistoryEvent))
+	case *shared.Memo:
+		return Encode(input.(*shared.Memo))
+	case *shared.ResetPoints:
+		return Encode(input.(*shared.ResetPoints))
+	case *shared.BadBinaries:
+		return Encode(input.(*shared.BadBinaries))
+	case *shared.VersionHistories:
+		return Encode(input.(*shared.VersionHistories))
+	default:
+		return nil, nil
+	}
+}
+
+func deserialize(data *shared.DataBlob, target interface{}) error {
+	if data == nil {
+		return nil
+	}
+	if len(data.Data) == 0 {
+		return errors.New("DeserializeEvent empty data")
+	}
+	var err error
+
+	switch *(data.EncodingType) {
+	case shared.EncodingTypeThriftRW:
+		err = thriftrwDecode(data.Data, target)
+	case shared.EncodingTypeJSON: // For backward-compatibility
+		err = json.Unmarshal(data.Data, target)
+
+	}
+
+	if err != nil {
+		return fmt.Errorf("DeserializeBatchEvents encoding: \"%v\", error: %v", data.EncodingType, err.Error())
+	}
+	return nil
+}
+
+func thriftrwDecode(data []byte, target interface{}) error {
+	switch target := target.(type) {
+	case *[]*shared.HistoryEvent:
+		history := shared.History{Events: *target}
+		if err := Decode(data, &history); err != nil {
+			return err
+		}
+		*target = history.GetEvents()
+		return nil
+	case *shared.HistoryEvent:
+		return Decode(data, target)
+	case *shared.Memo:
+		return Decode(data, target)
+	case *shared.ResetPoints:
+		return Decode(data, target)
+	case *shared.BadBinaries:
+		return Decode(data, target)
+	case *shared.VersionHistories:
+		return Decode(data, target)
+	default:
+		return nil
+	}
+}
+
+// NewDataBlob creates new blob data
+func NewDataBlob(data []byte, encodingType shared.EncodingType) *shared.DataBlob {
+	if data == nil || len(data) == 0 {
+		return nil
+	}
+
+	return &shared.DataBlob{
+		Data:         data,
+		EncodingType: &encodingType,
+	}
 }

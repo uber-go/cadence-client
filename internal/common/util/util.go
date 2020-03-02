@@ -23,7 +23,7 @@ package util
 import (
 	"fmt"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common/persistence"
+	"go.uber.org/cadence/internal/common"
 	"sync"
 	"time"
 )
@@ -71,7 +71,7 @@ func DeserializeBlobDataToHistoryEvents(
 	var historyEvents []*s.HistoryEvent
 
 	for _, batch := range dataBlobs {
-		events, err := persistence.DeserializeBatchEvents(batch)
+		events, err := common.DeserializeBatchEvents(batch)
 		if err != nil {
 			return nil, err
 		}

@@ -525,11 +525,12 @@ func (wc *workflowClient) PollWorkflowHistory(ctx context.Context, workflowID st
 					}
 					historyEvents, err := util.DeserializeBlobDataToHistoryEvents(rawResponse.RawHistory, filterType)
 
-					if err == nil {
-						response = &s.GetWorkflowExecutionHistoryResponse{
-							History:       historyEvents,
-							NextPageToken: rawResponse.NextPageToken,
-						}
+					if err != nil {
+						return err
+					}
+					response = &s.GetWorkflowExecutionHistoryResponse{
+						History:       historyEvents,
+						NextPageToken: rawResponse.NextPageToken,
 					}
 
 					return err
@@ -552,7 +553,7 @@ func (wc *workflowClient) PollWorkflowHistory(ctx context.Context, workflowID st
 	}
 }
 
-// GetWorkflowRawHistory performs short polling of the history blob data from server and deserialize to history event construct data
+// GetWorkflowHistory performs short polling of the history blob data from server and deserialize to history event construct data
 // workflowID is required, other parameters are optional.
 // If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
 func (wc *workflowClient) GetWorkflowRawHistory(ctx context.Context, workflowID string, runID string) HistoryEventIterator {
@@ -582,11 +583,12 @@ func (wc *workflowClient) GetWorkflowRawHistory(ctx context.Context, workflowID 
 					}
 					historyEvents, err := util.DeserializeBlobDataToHistoryEvents(rawResponse.RawHistory, s.HistoryEventFilterTypeAllEvent)
 
-					if err == nil {
-						response = &s.GetWorkflowExecutionHistoryResponse{
-							History:       historyEvents,
-							NextPageToken: rawResponse.NextPageToken,
-						}
+					if err != nil {
+						return err
+					}
+					response = &s.GetWorkflowExecutionHistoryResponse{
+						History:       historyEvents,
+						NextPageToken: rawResponse.NextPageToken,
 					}
 
 					return err

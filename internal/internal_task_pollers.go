@@ -750,22 +750,23 @@ func newGetHistoryPageFunc(
 		metricsScope.Counter(metrics.WorkflowGetHistorySucceedCounter).Inc(1)
 		metricsScope.Timer(metrics.WorkflowGetHistoryLatency).Record(time.Now().Sub(startTime))
 		h, err1 := util.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
-		if err1 == nil {
-			size := len(h.Events)
-			if size > 0 && atDecisionTaskCompletedEventID > 0 &&
-				h.Events[size-1].GetEventId() > atDecisionTaskCompletedEventID {
-				first := h.Events[0].GetEventId() // eventIds start from 1
-				h.Events = h.Events[:atDecisionTaskCompletedEventID-first+1]
-				if h.Events[len(h.Events)-1].GetEventType() != s.EventTypeDecisionTaskCompleted {
-					return nil, nil, fmt.Errorf("newGetHistoryPageFunc: atDecisionTaskCompletedEventID(%v) "+
-						"points to event that is not DecisionTaskCompleted", atDecisionTaskCompletedEventID)
-				}
-				return h, nil, nil
-			}
-			return h, resp.NextPageToken, nil
+
+		if err1 != nil {
+			return nil, nil, nil
 		}
 
-		return nil, nil, nil
+		size := len(h.Events)
+		if size > 0 && atDecisionTaskCompletedEventID > 0 &&
+			h.Events[size-1].GetEventId() > atDecisionTaskCompletedEventID {
+			first := h.Events[0].GetEventId() // eventIds start from 1
+			h.Events = h.Events[:atDecisionTaskCompletedEventID-first+1]
+			if h.Events[len(h.Events)-1].GetEventType() != s.EventTypeDecisionTaskCompleted {
+				return nil, nil, fmt.Errorf("newGetHistoryPageFunc: atDecisionTaskCompletedEventID(%v) "+
+					"points to event that is not DecisionTaskCompleted", atDecisionTaskCompletedEventID)
+			}
+			return h, nil, nil
+		}
+		return h, resp.NextPageToken, nil
 	}
 }
 

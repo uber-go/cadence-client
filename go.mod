@@ -43,7 +43,7 @@ require (
 	go.uber.org/goleak v0.10.0
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/net/metrics v1.0.1 // indirect
-	go.uber.org/thriftrw v1.20.2
+	go.uber.org/thriftrw v1.11.0
 	go.uber.org/tools v0.0.0-20190430173459-422a61c266e1 // indirect
 	go.uber.org/yarpc v1.42.0
 	go.uber.org/zap v1.8.0

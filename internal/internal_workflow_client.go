@@ -25,7 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/util"
+	"go.uber.org/cadence/internal/common/Serializer"
 	"reflect"
 	"time"
 
@@ -481,7 +481,8 @@ func (wc *workflowClient) TerminateWorkflow(ctx context.Context, workflowID stri
 	return err
 }
 
-// GetWorkflowHistory return a channel which contains the history events of a given workflow
+// GetWorkflowHistory calls PollWorkflowHistory for long poll of history data or GetWorkflowRawHistory in the case
+// of short poll of history data. The flag isLongPoll is used to determine which case is happening.
 func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID string, runID string,
 	isLongPoll bool, filterType s.HistoryEventFilterType) HistoryEventIterator {
 	if isLongPoll {
@@ -523,7 +524,7 @@ func (wc *workflowClient) PollWorkflowHistory(ctx context.Context, workflowID st
 					if err != nil {
 						return err
 					}
-					historyEvents, err := util.DeserializeBlobDataToHistoryEvents(rawResponse.RawHistory, filterType)
+					historyEvents, err := Serializer.DeserializeBlobDataToHistoryEvents(rawResponse.RawHistory, filterType)
 
 					if err != nil {
 						return err
@@ -581,7 +582,7 @@ func (wc *workflowClient) GetWorkflowRawHistory(ctx context.Context, workflowID 
 					if err != nil {
 						return err
 					}
-					historyEvents, err := util.DeserializeBlobDataToHistoryEvents(rawResponse.RawHistory, s.HistoryEventFilterTypeAllEvent)
+					historyEvents, err := Serializer.DeserializeBlobDataToHistoryEvents(rawResponse.RawHistory, s.HistoryEventFilterTypeAllEvent)
 
 					if err != nil {
 						return err

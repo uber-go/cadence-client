@@ -25,7 +25,7 @@ package internal
 import (
 	"context"
 	"fmt"
-	"go.uber.org/cadence/internal/common/util"
+	"go.uber.org/cadence/internal/common/Serializer"
 	"sync"
 	"time"
 
@@ -749,7 +749,7 @@ func newGetHistoryPageFunc(
 		}
 		metricsScope.Counter(metrics.WorkflowGetHistorySucceedCounter).Inc(1)
 		metricsScope.Timer(metrics.WorkflowGetHistoryLatency).Record(time.Now().Sub(startTime))
-		h, err1 := util.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
+		h, err1 := Serializer.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
 
 		if err1 != nil {
 			return nil, nil, nil

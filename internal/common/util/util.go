@@ -21,9 +21,6 @@
 package util
 
 import (
-	"fmt"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
 	"sync"
 	"time"
 )
@@ -61,31 +58,4 @@ func AwaitWaitGroup(wg *sync.WaitGroup, timeout time.Duration) bool {
 	case <-time.After(timeout):
 		return false
 	}
-}
-
-// DeserializeBlobDataToHistoryEvents deserialize the blob data to history event data
-func DeserializeBlobDataToHistoryEvents(
-	dataBlobs []*s.DataBlob, filterType s.HistoryEventFilterType,
-) (*s.History, error) {
-
-	var historyEvents []*s.HistoryEvent
-
-	for _, batch := range dataBlobs {
-		events, err := common.DeserializeBatchEvents(batch)
-		if err != nil {
-			return nil, err
-		}
-		if len(events) == 0 {
-			return nil, &s.InternalServiceError{
-				Message: fmt.Sprintf("corrupted history event batch, empty events"),
-			}
-		}
-
-		historyEvents = append(historyEvents, events...)
-	}
-
-	if filterType == s.HistoryEventFilterTypeCloseEvent {
-		historyEvents = []*s.HistoryEvent{historyEvents[len(historyEvents)-1]}
-	}
-	return &s.History{Events: historyEvents}, nil
 }

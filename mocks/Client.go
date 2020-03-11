@@ -220,8 +220,8 @@ func (_m *Client) GetWorkflowHistory(ctx context.Context, workflowID string, run
 	ret := _m.Called(ctx, workflowID, runID, isLongPoll, filterType)
 
 	var r0 internal.HistoryEventIterator
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) internal.HistoryEventIterator); ok {
-		r0 = rf(ctx, workflowID, runID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool, shared.HistoryEventFilterType) internal.HistoryEventIterator); ok {
+		r0 = rf(ctx, workflowID, runID, isLongPoll, filterType)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(internal.HistoryEventIterator)

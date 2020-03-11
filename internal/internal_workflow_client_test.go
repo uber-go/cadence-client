@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/common/Serializer"
 	"log"
 	"os"
 	"testing"
@@ -233,7 +234,7 @@ func (s *historyEventIteratorSuite) TestIterator_NoError_EmptyPage() {
 
 func serializeEvents(events []*shared.HistoryEvent) *shared.DataBlob {
 
-	blob, _ := common.SerializeBatchEvents(events, shared.EncodingTypeThriftRW)
+	blob, _ := Serializer.SerializeBatchEvents(events, shared.EncodingTypeThriftRW)
 
 	return &shared.DataBlob{
 		EncodingType: shared.EncodingTypeThriftRW.Ptr(),

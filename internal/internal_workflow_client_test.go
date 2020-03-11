@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/Serializer"
 	"log"
 	"os"
 	"testing"
@@ -157,33 +156,30 @@ func (s *historyEventIteratorSuite) TearDownTest() {
 
 func (s *historyEventIteratorSuite) TestIterator_NoError() {
 	filterType := shared.HistoryEventFilterTypeAllEvent
-	dummyEvent := []*shared.HistoryEvent{
-		// dummy history event
-		&shared.HistoryEvent{},
-	}
-
-	blobData := serializeEvents(dummyEvent)
-
-	request1 := getPollWorkFlowExecutionHistoryRequest(filterType)
-	response1 := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			// dummy history event
-			blobData,
+	request1 := getGetWorkflowExecutionHistoryRequest(filterType)
+	response1 := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				// dummy history event
+				&shared.HistoryEvent{},
+			},
 		},
 		NextPageToken: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 	}
-	request2 := getPollWorkFlowExecutionHistoryRequest(filterType)
+	request2 := getGetWorkflowExecutionHistoryRequest(filterType)
 	request2.NextPageToken = response1.NextPageToken
-	response2 := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			// dummy history event
-			blobData,
+	response2 := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				// dummy history event
+				&shared.HistoryEvent{},
+			},
 		},
 		NextPageToken: nil,
 	}
 
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), request1, gomock.Any()).Return(response1, nil).Times(1)
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), request2, gomock.Any()).Return(response2, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), request1, gomock.Any()).Return(response1, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), request2, gomock.Any()).Return(response2, nil).Times(1)
 
 	events := []*shared.HistoryEvent{}
 	iter := s.wfClient.GetWorkflowHistory(context.Background(), workflowID, runID, true, shared.HistoryEventFilterTypeAllEvent)
@@ -197,30 +193,27 @@ func (s *historyEventIteratorSuite) TestIterator_NoError() {
 
 func (s *historyEventIteratorSuite) TestIterator_NoError_EmptyPage() {
 	filterType := shared.HistoryEventFilterTypeAllEvent
-	dummyEvent := []*shared.HistoryEvent{
-		// dummy history event
-		&shared.HistoryEvent{},
-	}
-
-	blobData := serializeEvents(dummyEvent)
-
-	request1 := getPollWorkFlowExecutionHistoryRequest(filterType)
-	response1 := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory:    []*shared.DataBlob{},
+	request1 := getGetWorkflowExecutionHistoryRequest(filterType)
+	response1 := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{},
+		},
 		NextPageToken: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 	}
-	request2 := getPollWorkFlowExecutionHistoryRequest(filterType)
+	request2 := getGetWorkflowExecutionHistoryRequest(filterType)
 	request2.NextPageToken = response1.NextPageToken
-	response2 := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			// dummy history event
-			blobData,
+	response2 := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				// dummy history event
+				&shared.HistoryEvent{},
+			},
 		},
 		NextPageToken: nil,
 	}
 
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), request1, gomock.Any()).Return(response1, nil).Times(1)
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), request2, gomock.Any()).Return(response2, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), request1, gomock.Any()).Return(response1, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), request2, gomock.Any()).Return(response2, nil).Times(1)
 
 	events := []*shared.HistoryEvent{}
 	iter := s.wfClient.GetWorkflowHistory(context.Background(), workflowID, runID, true, shared.HistoryEventFilterTypeAllEvent)
@@ -232,37 +225,22 @@ func (s *historyEventIteratorSuite) TestIterator_NoError_EmptyPage() {
 	s.Equal(1, len(events))
 }
 
-func serializeEvents(events []*shared.HistoryEvent) *shared.DataBlob {
-
-	blob, _ := Serializer.SerializeBatchEvents(events, shared.EncodingTypeThriftRW)
-
-	return &shared.DataBlob{
-		EncodingType: shared.EncodingTypeThriftRW.Ptr(),
-		Data:         blob.Data,
-	}
-}
-
 func (s *historyEventIteratorSuite) TestIterator_Error() {
 	filterType := shared.HistoryEventFilterTypeAllEvent
-	dummyEvent := []*shared.HistoryEvent{
-		// dummy history event
-		&shared.HistoryEvent{},
-	}
-
-	blobData := serializeEvents(dummyEvent)
-
-	request1 := getPollWorkFlowExecutionHistoryRequest(filterType)
-	response1 := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			// dummy history event
-			blobData,
+	request1 := getGetWorkflowExecutionHistoryRequest(filterType)
+	response1 := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				// dummy history event
+				&shared.HistoryEvent{},
+			},
 		},
 		NextPageToken: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 	}
-	request2 := getPollWorkFlowExecutionHistoryRequest(filterType)
+	request2 := getGetWorkflowExecutionHistoryRequest(filterType)
 	request2.NextPageToken = response1.NextPageToken
 
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), request1, gomock.Any()).Return(response1, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), request1, gomock.Any()).Return(response1, nil).Times(1)
 
 	iter := s.wfClient.GetWorkflowHistory(context.Background(), workflowID, runID, true, shared.HistoryEventFilterTypeAllEvent)
 
@@ -271,13 +249,12 @@ func (s *historyEventIteratorSuite) TestIterator_Error() {
 	s.NotNil(event)
 	s.Nil(err)
 
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), request2, gomock.Any()).Return(nil, &shared.EntityNotExistsError{}).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), request2, gomock.Any()).Return(nil, &shared.EntityNotExistsError{}).Times(1)
 
 	s.True(iter.HasNext())
 	event, err = iter.Next()
 	s.Nil(event)
 	s.NotNil(err)
-
 }
 
 // workflowRunSuite
@@ -333,24 +310,21 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Success() {
 	eventType := shared.EventTypeWorkflowExecutionCompleted
 	workflowResult := time.Hour * 59
 	encodedResult, _ := encodeArg(getDefaultDataConverter(), workflowResult)
-	events := []*shared.HistoryEvent{
-		&shared.HistoryEvent{
-			EventType: &eventType,
-			WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
-				Result: encodedResult,
+	getRequest := getGetWorkflowExecutionHistoryRequest(filterType)
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				&shared.HistoryEvent{
+					EventType: &eventType,
+					WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
+						Result: encodedResult,
+					},
+				},
 			},
-		},
-	}
-
-	blobData := serializeEvents(events)
-	getRequest := getPollWorkFlowExecutionHistoryRequest(filterType)
-	getResponse := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -383,26 +357,22 @@ func (s *workflowRunSuite) TestExecuteWorkflowWorkflowExecutionAlreadyStartedErr
 	eventType := shared.EventTypeWorkflowExecutionCompleted
 	workflowResult := time.Hour * 59
 	encodedResult, _ := encodeArg(nil, workflowResult)
-	events := []*shared.HistoryEvent{
-		{
-			EventType: &eventType,
-			WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
-				Result: encodedResult,
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				{
+					EventType: &eventType,
+					WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
+						Result: encodedResult,
+					},
+				},
 			},
-		},
-	}
-
-	blobData := serializeEvents(events)
-
-	getResponse := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
 		},
 		NextPageToken: nil,
 	}
-	getHistory := s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(getResponse, nil).Times(1)
-	getHistory.Do(func(ctx interface{}, getRequest *shared.PollForWorkflowExecutionRawHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
+	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
 		workflowID := getRequest.Execution.WorkflowId
 		s.NotNil(workflowID)
 		s.NotEmpty(*workflowID)
@@ -438,25 +408,22 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoIdInOptions() {
 	eventType := shared.EventTypeWorkflowExecutionCompleted
 	workflowResult := time.Hour * 59
 	encodedResult, _ := encodeArg(nil, workflowResult)
-	events := []*shared.HistoryEvent{
-		{
-			EventType: &eventType,
-			WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
-				Result: encodedResult,
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				{
+					EventType: &eventType,
+					WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
+						Result: encodedResult,
+					},
+				},
 			},
-		},
-	}
-
-	blobData := serializeEvents(events)
-	getResponse := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
 		},
 		NextPageToken: nil,
 	}
 	var wid *string
-	getHistory := s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
-	getHistory.Do(func(ctx interface{}, getRequest *shared.PollForWorkflowExecutionRawHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
+	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
 		wid = getRequest.Execution.WorkflowId
 		s.NotNil(wid)
 		s.NotEmpty(*wid)
@@ -490,24 +457,21 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Cancelled() {
 	eventType := shared.EventTypeWorkflowExecutionCanceled
 	details := "some details"
 	encodedDetails, _ := encodeArg(getDefaultDataConverter(), details)
-	events := []*shared.HistoryEvent{
-		&shared.HistoryEvent{
-			EventType: &eventType,
-			WorkflowExecutionCanceledEventAttributes: &shared.WorkflowExecutionCanceledEventAttributes{
-				Details: encodedDetails,
+	getRequest := getGetWorkflowExecutionHistoryRequest(filterType)
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				&shared.HistoryEvent{
+					EventType: &eventType,
+					WorkflowExecutionCanceledEventAttributes: &shared.WorkflowExecutionCanceledEventAttributes{
+						Details: encodedDetails,
+					},
+				},
 			},
-		},
-	}
-
-	blobData := serializeEvents(events)
-	getRequest := getPollWorkFlowExecutionHistoryRequest(filterType)
-	getResponse := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -542,26 +506,22 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Failed() {
 	details := "some details"
 	dataConverter := getDefaultDataConverter()
 	encodedDetails, _ := encodeArg(dataConverter, details)
-	getRequest := getPollWorkFlowExecutionHistoryRequest(filterType)
-
-	events := []*shared.HistoryEvent{
-		&shared.HistoryEvent{
-			EventType: &eventType,
-			WorkflowExecutionFailedEventAttributes: &shared.WorkflowExecutionFailedEventAttributes{
-				Reason:  common.StringPtr(reason),
-				Details: encodedDetails,
+	getRequest := getGetWorkflowExecutionHistoryRequest(filterType)
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				&shared.HistoryEvent{
+					EventType: &eventType,
+					WorkflowExecutionFailedEventAttributes: &shared.WorkflowExecutionFailedEventAttributes{
+						Reason:  common.StringPtr(reason),
+						Details: encodedDetails,
+					},
+				},
 			},
-		},
-	}
-
-	blobData := serializeEvents(events)
-	getResponse := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -590,23 +550,19 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Terminated() {
 
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType := shared.EventTypeWorkflowExecutionTerminated
-	getRequest := getPollWorkFlowExecutionHistoryRequest(filterType)
-
-	events := []*shared.HistoryEvent{
-		&shared.HistoryEvent{
-			EventType: &eventType,
-			WorkflowExecutionTerminatedEventAttributes: &shared.WorkflowExecutionTerminatedEventAttributes{},
-		},
-	}
-
-	blobData := serializeEvents(events)
-	getResponse := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
+	getRequest := getGetWorkflowExecutionHistoryRequest(filterType)
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				&shared.HistoryEvent{
+					EventType: &eventType,
+					WorkflowExecutionTerminatedEventAttributes: &shared.WorkflowExecutionTerminatedEventAttributes{},
+				},
+			},
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -636,25 +592,21 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_TimedOut() {
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType := shared.EventTypeWorkflowExecutionTimedOut
 	timeType := shared.TimeoutTypeScheduleToStart
-	getRequest := getPollWorkFlowExecutionHistoryRequest(filterType)
-
-	events := []*shared.HistoryEvent{
-		&shared.HistoryEvent{
-			EventType: &eventType,
-			WorkflowExecutionTimedOutEventAttributes: &shared.WorkflowExecutionTimedOutEventAttributes{
-				TimeoutType: &timeType,
+	getRequest := getGetWorkflowExecutionHistoryRequest(filterType)
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				&shared.HistoryEvent{
+					EventType: &eventType,
+					WorkflowExecutionTimedOutEventAttributes: &shared.WorkflowExecutionTimedOutEventAttributes{
+						TimeoutType: &timeType,
+					},
+				},
 			},
-		},
-	}
-
-	blobData := serializeEvents(events)
-	getResponse := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -687,48 +639,41 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_ContinueAsNew() {
 	newRunID := "some other random run ID"
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType1 := shared.EventTypeWorkflowExecutionContinuedAsNew
-	getRequest1 := getPollWorkFlowExecutionHistoryRequest(filterType)
-
-	events := []*shared.HistoryEvent{
-		&shared.HistoryEvent{
-			EventType: &eventType1,
-			WorkflowExecutionContinuedAsNewEventAttributes: &shared.WorkflowExecutionContinuedAsNewEventAttributes{
-				NewExecutionRunId: common.StringPtr(newRunID),
+	getRequest1 := getGetWorkflowExecutionHistoryRequest(filterType)
+	getResponse1 := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				&shared.HistoryEvent{
+					EventType: &eventType1,
+					WorkflowExecutionContinuedAsNewEventAttributes: &shared.WorkflowExecutionContinuedAsNewEventAttributes{
+						NewExecutionRunId: common.StringPtr(newRunID),
+					},
+				},
 			},
-		},
-	}
-
-	blobData := serializeEvents(events)
-	getResponse1 := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), getRequest1, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse1, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest1, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse1, nil).Times(1)
 
 	workflowResult := time.Hour * 59
 	encodedResult, _ := encodeArg(getDefaultDataConverter(), workflowResult)
 	eventType2 := shared.EventTypeWorkflowExecutionCompleted
-	getRequest2 := getPollWorkFlowExecutionHistoryRequest(filterType)
+	getRequest2 := getGetWorkflowExecutionHistoryRequest(filterType)
 	getRequest2.Execution.RunId = common.StringPtr(newRunID)
-	events = []*shared.HistoryEvent{
-		&shared.HistoryEvent{
-			EventType: &eventType2,
-			WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
-				Result: encodedResult,
+	getResponse2 := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				&shared.HistoryEvent{
+					EventType: &eventType2,
+					WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
+						Result: encodedResult,
+					},
+				},
 			},
-		},
-	}
-
-	blobData = serializeEvents(events)
-	getResponse2 := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), getRequest2, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse2, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest2, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse2, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -754,24 +699,21 @@ func (s *workflowRunSuite) TestGetWorkflow() {
 	eventType := shared.EventTypeWorkflowExecutionCompleted
 	workflowResult := time.Hour * 59
 	encodedResult, _ := encodeArg(getDefaultDataConverter(), workflowResult)
-	getRequest := getPollWorkFlowExecutionHistoryRequest(filterType)
-	events := []*shared.HistoryEvent{
-		&shared.HistoryEvent{
-			EventType: &eventType,
-			WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
-				Result: encodedResult,
+	getRequest := getGetWorkflowExecutionHistoryRequest(filterType)
+	getResponse := &shared.GetWorkflowExecutionHistoryResponse{
+		History: &shared.History{
+			Events: []*shared.HistoryEvent{
+				&shared.HistoryEvent{
+					EventType: &eventType,
+					WorkflowExecutionCompletedEventAttributes: &shared.WorkflowExecutionCompletedEventAttributes{
+						Result: encodedResult,
+					},
+				},
 			},
-		},
-	}
-
-	blobData := serializeEvents(events)
-	getResponse := &shared.PollForWorkflowExecutionRawHistoryResponse{
-		RawHistory: []*shared.DataBlob{
-			blobData,
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().PollForWorkflowExecutionRawHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
 
 	workflowID := workflowID
 	runID := runID
@@ -800,46 +742,6 @@ func getGetWorkflowExecutionHistoryRequest(filterType shared.HistoryEventFilterT
 		},
 		WaitForNewEvent:        common.BoolPtr(isLongPoll),
 		HistoryEventFilterType: &filterType,
-	}
-
-	return request
-}
-
-func getPollWorkFlowExecutionHistoryRequest(filterType shared.HistoryEventFilterType) *shared.PollForWorkflowExecutionRawHistoryRequest {
-
-	request := &shared.PollForWorkflowExecutionRawHistoryRequest{
-		Domain: common.StringPtr(domain),
-		Execution: &shared.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      getRunID(runID),
-		},
-		HistoryEventFilterType: &filterType,
-	}
-
-	return request
-}
-
-func getWorkFlowExecutionRawHistoryRequest() *shared.GetWorkflowExecutionRawHistoryRequest {
-
-	request := &shared.GetWorkflowExecutionRawHistoryRequest{
-		Domain: common.StringPtr(domain),
-		Execution: &shared.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      getRunID(runID),
-		},
-	}
-
-	return request
-}
-
-func getPollWorkFlowExecutionRawHistoryRequest() *shared.PollForWorkflowExecutionRawHistoryRequest {
-
-	request := &shared.PollForWorkflowExecutionRawHistoryRequest{
-		Domain: common.StringPtr(domain),
-		Execution: &shared.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      getRunID(runID),
-		},
 	}
 
 	return request

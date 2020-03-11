@@ -185,7 +185,7 @@ func thriftrwDecode(data []byte, target interface{}) error {
 		if err := Decode(data, &history); err != nil {
 			return err
 		}
-		*target = history.GetEvents()
+		*target = history.Events
 		return nil
 	case *shared.HistoryEvent:
 		return Decode(data, target)

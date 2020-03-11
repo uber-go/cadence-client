@@ -729,14 +729,14 @@ func newGetHistoryPageFunc(
 	return func(nextPageToken []byte) (*s.History, []byte, error) {
 		metricsScope.Counter(metrics.WorkflowGetHistoryCounter).Inc(1)
 		startTime := time.Now()
-		var resp *s.GetWorkflowExecutionRawHistoryResponse
+		var resp *s.GetWorkflowExecutionHistoryResponse
 		err := backoff.Retry(ctx,
 			func() error {
 				tchCtx, cancel, opt := newChannelContext(ctx)
 				defer cancel()
 
 				var err1 error
-				resp, err1 = service.GetWorkflowExecutionRawHistory(tchCtx, &s.GetWorkflowExecutionRawHistoryRequest{
+				resp, err1 = service.GetWorkflowExecutionHistory(tchCtx, &s.GetWorkflowExecutionHistoryRequest{
 					Domain:        common.StringPtr(domain),
 					Execution:     execution,
 					NextPageToken: nextPageToken,
@@ -747,12 +747,20 @@ func newGetHistoryPageFunc(
 			metricsScope.Counter(metrics.WorkflowGetHistoryFailedCounter).Inc(1)
 			return nil, nil, err
 		}
+
 		metricsScope.Counter(metrics.WorkflowGetHistorySucceedCounter).Inc(1)
 		metricsScope.Timer(metrics.WorkflowGetHistoryLatency).Record(time.Now().Sub(startTime))
-		h, err1 := Serializer.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
 
-		if err1 != nil {
-			return nil, nil, nil
+		var h *s.History
+
+		if resp.RawHistory != nil {
+			var err1 error
+			h, err1 = Serializer.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
+			if err1 != nil {
+				return nil, nil, nil
+			}
+		} else {
+			h = resp.History
 		}
 
 		size := len(h.Events)

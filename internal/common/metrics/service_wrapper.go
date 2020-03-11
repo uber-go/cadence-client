@@ -164,20 +164,6 @@ func (w *workflowServiceMetricsWrapper) GetWorkflowExecutionHistory(ctx context.
 	return result, err
 }
 
-func (w *workflowServiceMetricsWrapper) GetWorkflowExecutionRawHistory(ctx context.Context, request *shared.GetWorkflowExecutionRawHistoryRequest, opts ...yarpc.CallOption) (*shared.GetWorkflowExecutionRawHistoryResponse, error) {
-	scope := w.getOperationScope(scopeNameGetWorkflowExecutionRawHistory)
-	result, err := w.service.GetWorkflowExecutionRawHistory(ctx, request, opts...)
-	scope.handleError(err)
-	return result, err
-}
-
-func (w *workflowServiceMetricsWrapper) PollForWorkflowExecutionRawHistory(ctx context.Context, request *shared.PollForWorkflowExecutionRawHistoryRequest, opts ...yarpc.CallOption) (*shared.PollForWorkflowExecutionRawHistoryResponse, error) {
-	scope := w.getOperationScope(scopeNamePollForWorkflowExecutionRawHistory)
-	result, err := w.service.PollForWorkflowExecutionRawHistory(ctx, request, opts...)
-	scope.handleError(err)
-	return result, err
-}
-
 func (w *workflowServiceMetricsWrapper) ListClosedWorkflowExecutions(ctx context.Context, request *shared.ListClosedWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListClosedWorkflowExecutionsResponse, error) {
 	scope := w.getOperationScope(scopeNameListClosedWorkflowExecutions)
 	result, err := w.service.ListClosedWorkflowExecutions(ctx, request, opts...)

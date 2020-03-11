@@ -481,124 +481,59 @@ func (wc *workflowClient) TerminateWorkflow(ctx context.Context, workflowID stri
 	return err
 }
 
-// GetWorkflowHistory calls PollWorkflowHistory for long poll of history data or GetWorkflowRawHistory in the case
-// of short poll of history data. The flag isLongPoll is used to determine which case is happening.
+// GetWorkflowHistory return a channel which contains the history events of a given workflow
 func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID string, runID string,
 	isLongPoll bool, filterType s.HistoryEventFilterType) HistoryEventIterator {
-	if isLongPoll {
-		return wc.PollWorkflowHistory(ctx, workflowID, runID, filterType)
-	} else {
-		return wc.GetWorkflowRawHistory(ctx, workflowID, runID)
-	}
-}
 
-// PollWorkflowHistory performs long polling of the history blob data from server and deserialize to history event construct data
-// workflowID is required, other parameters are optional.
-// If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
-func (wc *workflowClient) PollWorkflowHistory(ctx context.Context, workflowID string, runID string,
-	filterType s.HistoryEventFilterType) HistoryEventIterator {
 	domain := wc.domain
 	paginate := func(nexttoken []byte) (*s.GetWorkflowExecutionHistoryResponse, error) {
-
-		var response *s.GetWorkflowExecutionHistoryResponse
-		var err error
-		request := &s.PollForWorkflowExecutionRawHistoryRequest{
+		request := &s.GetWorkflowExecutionHistoryRequest{
 			Domain: common.StringPtr(domain),
 			Execution: &s.WorkflowExecution{
 				WorkflowId: common.StringPtr(workflowID),
 				RunId:      getRunID(runID),
 			},
+			WaitForNewEvent:        common.BoolPtr(isLongPoll),
 			HistoryEventFilterType: &filterType,
 			NextPageToken:          nexttoken,
 		}
-	Loop:
-		for {
-			err = backoff.Retry(ctx,
-				func() error {
-					tchCtx, cancel, opt := newChannelContext(ctx, func(builder *contextBuilder) {
-						builder.Timeout = defaultGetHistoryTimeoutInSecs * time.Second
-					})
-					defer cancel()
-					rawResponse, err := wc.workflowService.PollForWorkflowExecutionRawHistory(tchCtx, request, opt...)
-
-					if err != nil {
-						return err
-					}
-					historyEvents, err := Serializer.DeserializeBlobDataToHistoryEvents(rawResponse.RawHistory, filterType)
-
-					if err != nil {
-						return err
-					}
-					response = &s.GetWorkflowExecutionHistoryResponse{
-						History:       historyEvents,
-						NextPageToken: rawResponse.NextPageToken,
-					}
-
-					return err
-				}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
-
-			if err != nil {
-				return nil, err
-			}
-			if len(response.History.Events) == 0 && len(response.NextPageToken) != 0 {
-				request.NextPageToken = response.NextPageToken
-				continue Loop
-			}
-			break Loop
-		}
-		return response, nil
-	}
-
-	return &historyEventIteratorImpl{
-		paginate: paginate,
-	}
-}
-
-// GetWorkflowHistory performs short polling of the history blob data from server and deserialize to history event construct data
-// workflowID is required, other parameters are optional.
-// If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
-func (wc *workflowClient) GetWorkflowRawHistory(ctx context.Context, workflowID string, runID string) HistoryEventIterator {
-	domain := wc.domain
-	paginate := func(nexttoken []byte) (*s.GetWorkflowExecutionHistoryResponse, error) {
 
 		var response *s.GetWorkflowExecutionHistoryResponse
 		var err error
-		request := &s.GetWorkflowExecutionRawHistoryRequest{
-			Domain: common.StringPtr(domain),
-			Execution: &s.WorkflowExecution{
-				WorkflowId: common.StringPtr(workflowID),
-				RunId:      getRunID(runID),
-			},
-			NextPageToken: nexttoken,
-		}
 	Loop:
 		for {
 			err = backoff.Retry(ctx,
 				func() error {
-					tchCtx, cancel, opt := newChannelContext(ctx)
+					var err1 error
+					tchCtx, cancel, opt := newChannelContext(ctx, func(builder *contextBuilder) {
+						if isLongPoll {
+							builder.Timeout = defaultGetHistoryTimeoutInSecs * time.Second
+						}
+					})
 					defer cancel()
-					rawResponse, err := wc.workflowService.GetWorkflowExecutionRawHistory(tchCtx, request, opt...)
+					response, err1 = wc.workflowService.GetWorkflowExecutionHistory(tchCtx, request, opt...)
 
-					if err != nil {
-						return err
-					}
-					historyEvents, err := Serializer.DeserializeBlobDataToHistoryEvents(rawResponse.RawHistory, s.HistoryEventFilterTypeAllEvent)
-
-					if err != nil {
-						return err
-					}
-					response = &s.GetWorkflowExecutionHistoryResponse{
-						History:       historyEvents,
-						NextPageToken: rawResponse.NextPageToken,
+					if err1 != nil {
+						return err1
 					}
 
-					return err
+					if response.RawHistory != nil {
+						history, err := Serializer.DeserializeBlobDataToHistoryEvents(response.RawHistory, filterType)
+						if err != nil {
+							return err
+						}
+						response.History = history
+					}
+					return err1
 				}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 
 			if err != nil {
 				return nil, err
 			}
-
+			if isLongPoll && len(response.History.Events) == 0 && len(response.NextPageToken) != 0 {
+				request.NextPageToken = response.NextPageToken
+				continue Loop
+			}
 			break Loop
 		}
 		return response, nil

@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/Serializer"
+	"go.uber.org/cadence/internal/common/serializer"
 	"log"
 	"os"
 	"testing"
@@ -1332,7 +1332,7 @@ func (s *workflowClientTestSuite) TestGetSearchAttributes() {
 
 func serializeEvents(events []*shared.HistoryEvent) *shared.DataBlob {
 
-	blob, _ := Serializer.SerializeBatchEvents(events, shared.EncodingTypeThriftRW)
+	blob, _ := serializer.SerializeBatchEvents(events, shared.EncodingTypeThriftRW)
 
 	return &shared.DataBlob{
 		EncodingType: shared.EncodingTypeThriftRW.Ptr(),

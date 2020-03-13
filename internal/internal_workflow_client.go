@@ -25,7 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/Serializer"
+	"go.uber.org/cadence/internal/common/serializer"
 	"reflect"
 	"time"
 
@@ -518,7 +518,7 @@ func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID str
 					}
 
 					if response.RawHistory != nil {
-						history, err := Serializer.DeserializeBlobDataToHistoryEvents(response.RawHistory, filterType)
+						history, err := serializer.DeserializeBlobDataToHistoryEvents(response.RawHistory, filterType)
 						if err != nil {
 							return err
 						}

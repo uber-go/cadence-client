@@ -25,7 +25,7 @@ package internal
 import (
 	"context"
 	"fmt"
-	"go.uber.org/cadence/internal/common/Serializer"
+	"go.uber.org/cadence/internal/common/serializer"
 	"sync"
 	"time"
 
@@ -755,7 +755,7 @@ func newGetHistoryPageFunc(
 
 		if resp.RawHistory != nil {
 			var err1 error
-			h, err1 = Serializer.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
+			h, err1 = serializer.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
 			if err1 != nil {
 				return nil, nil, nil
 			}

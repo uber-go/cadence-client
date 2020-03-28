@@ -21,12 +21,14 @@
 package common
 
 import (
+	"context"
+
 	"github.com/apache/thrift/lib/go/thrift"
 )
 
 // TSerialize is used to serialize thrift TStruct to []byte
 func TSerialize(t thrift.TStruct) (b []byte, err error) {
-	return thrift.NewTSerializer().Write(t)
+	return thrift.NewTSerializer().Write(context.Background(), t)
 }
 
 // TListSerialize is used to serialize list of thrift TStruct to []byte
@@ -48,11 +50,11 @@ func TListSerialize(ts []thrift.TStruct) (b []byte, err error) {
 		}
 	}
 
-	if err = t.Protocol.Flush(); err != nil {
+	if err = t.Protocol.Flush(context.Background()); err != nil {
 		return
 	}
 
-	if err = t.Transport.Flush(); err != nil {
+	if err = t.Transport.Flush(context.Background()); err != nil {
 		return
 	}
 

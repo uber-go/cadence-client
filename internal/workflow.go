@@ -655,7 +655,7 @@ type WorkflowInfo struct {
 	ContinuedExecutionRunID             *string
 	ParentWorkflowDomain                *string
 	ParentWorkflowExecution             *WorkflowExecution
-	Memo                                *s.Memo // Value can be decoded using data converter (DefaultDataConverter, or custom one if set).
+	Memo                                *s.Memo             // Value can be decoded using data converter (DefaultDataConverter, or custom one if set).
 	SearchAttributes                    *s.SearchAttributes // Value can be decoded using DefaultDataConverter.
 	BinaryChecksum                      *string
 }

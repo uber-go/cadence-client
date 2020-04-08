@@ -34,7 +34,6 @@ require (
 	github.com/stretchr/testify v1.3.0
 	github.com/uber-go/mapdecode v1.0.0 // indirect
 	github.com/uber-go/tally v3.3.1+incompatible
-	github.com/uber/cadence-idl v0.0.0-20200408153039-b07c6291fa3a // indirect
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	github.com/uber/tchannel-go v1.14.0

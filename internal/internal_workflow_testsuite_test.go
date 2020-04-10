@@ -2147,7 +2147,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_Channel() {
 				}
 
 				// continue as new
-				return NewContinueAsNewError(ctx, "this-workflow-fn")
+				return NewContinueAsNewError(ctx, "this-workflow")
 			}
 
 			for i := range fanoutChs {

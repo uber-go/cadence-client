@@ -673,6 +673,66 @@ func (s *internalWorkerTestSuite) TestRecordActivityHeartbeatByID() {
 	require.NotNil(s.T(), heartbeatRequest)
 }
 
+func (s *internalWorkerTestSuite) TestWorkflowUnRegistration() {
+
+	wf1 := func(ctx Context) (string, error) { return "wf1", nil }
+	wf2 := func(ctx Context) (string, error) { return "wf2", nil }
+
+	s.T().Run("Should allow re-registering an unregistered workflow", func(t *testing.T) {
+		RegisterWorkflow(wf1)
+		require.Panics(s.T(), func() {
+			RegisterWorkflow(wf1)
+		}, "should not allow to register the same workflow twice")
+		UnRegisterWorkflow(wf1)
+		require.NotPanics(s.T(), func() {
+			RegisterWorkflow(wf1)
+		}, "should allow to register the workflow once it has been unregistered")
+		UnRegisterWorkflow(wf1)
+	})
+
+	s.T().Run("Should not mix-up two different workflows registration/unregistration", func(t *testing.T) {
+		RegisterWorkflow(wf1)
+		RegisterWorkflow(wf2)
+		UnRegisterWorkflow(wf2)
+		require.Panics(s.T(), func() {
+			RegisterWorkflow(wf1)
+		}, "un-registration of wf2 should not affect the registration of wf1")
+		UnRegisterWorkflow(wf1)
+	})
+
+	s.T().Run("Should allow un-registration of workflow registered with alias", func(t *testing.T) {
+		RegisterWorkflowWithOptions(wf2, RegisterWorkflowOptions{Name: "alias"})
+		UnRegisterWorkflow(wf2)
+		require.NotPanics(s.T(), func() {
+			RegisterWorkflowWithOptions(wf2, RegisterWorkflowOptions{Name: "alias"})
+		}, "workflow should not be registered after its un-registration")
+		UnRegisterWorkflow(wf2)
+	})
+
+	s.T().Run("Should allow un-registration by name of workflow registered with alias", func(t *testing.T) {
+		RegisterWorkflowWithOptions(wf2, RegisterWorkflowOptions{Name: "alias"})
+		UnRegisterWorkflow("alias")
+		require.NotPanics(s.T(), func() {
+			RegisterWorkflowWithOptions(wf2, RegisterWorkflowOptions{Name: "alias"})
+		}, "workflow should not be registered after its un-registration by alias")
+		UnRegisterWorkflow(wf2)
+	})
+
+	s.T().Run("Should allow selective un-registration by alias name of workflow registered twice with different aliases", func(t *testing.T) {
+		RegisterWorkflowWithOptions(wf2, RegisterWorkflowOptions{Name: "alias1"})
+		RegisterWorkflowWithOptions(wf2, RegisterWorkflowOptions{Name: "alias2"})
+		UnRegisterWorkflow("alias1")
+		require.NotPanics(s.T(), func() {
+			RegisterWorkflowWithOptions(wf2, RegisterWorkflowOptions{Name: "alias1"})
+		}, "workflow should not be registered after its un-registration by alias1")
+		require.Panics(s.T(), func() {
+			RegisterWorkflowWithOptions(wf2, RegisterWorkflowOptions{Name: "alias2"})
+		}, "workflow alias2 still be registered after the un-registration of alias1")
+		UnRegisterWorkflow("alias1")
+		UnRegisterWorkflow("alias2")
+	})
+}
+
 type activitiesCallingOptionsWorkflow struct {
 	t *testing.T
 }

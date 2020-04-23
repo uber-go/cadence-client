@@ -341,7 +341,7 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 		PreviousStartedEventId: common.Int64Ptr(0),
 	}
 
-	r := newWorkflowTaskHandler(testDomain, params, nil, getHostEnvironment())
+	r := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	_, err := r.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	s.NoError(err)
 }
@@ -420,11 +420,10 @@ func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
 func (s *internalWorkerTestSuite) TestNoActivitiesOrWorkflows() {
 	t := s.T()
 	w := createWorker(s.service)
-	aw := w.(*aggregatedWorker)
-	aw.hostEnv = newHostEnvironment()
-	assert.Empty(t, aw.hostEnv.getRegisteredActivities())
-	assert.Empty(t, aw.hostEnv.getRegisteredWorkflowTypes())
-	assert.NoError(t, aw.Start())
+	w.registry = newRegistry(nil)
+	assert.Empty(t, w.registry.getRegisteredActivities())
+	assert.Empty(t, w.registry.getRegisteredWorkflowTypes())
+	assert.NoError(t, w.Start())
 }
 
 func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
@@ -488,13 +487,13 @@ func (m *mockPollForActivityTaskRequest) String() string {
 	return "PollForActivityTaskRequest"
 }
 
-func createWorker(service *workflowservicetest.MockClient) Worker {
+func createWorker(service *workflowservicetest.MockClient) *aggregatedWorker {
 	return createWorkerWithThrottle(service, float64(0.0), nil)
 }
 
 func createWorkerWithThrottle(
 	service *workflowservicetest.MockClient, activitiesPerSecond float64, dc DataConverter,
-) Worker {
+) *aggregatedWorker {
 	domain := "testDomain"
 	domainStatus := shared.DomainStatusRegistered
 	domainDesc := &shared.DescribeDomainResponse{
@@ -541,7 +540,7 @@ func createWorkerWithThrottle(
 	return worker
 }
 
-func createWorkerWithDataConverter(service *workflowservicetest.MockClient) Worker {
+func createWorkerWithDataConverter(service *workflowservicetest.MockClient) *aggregatedWorker {
 	return createWorkerWithThrottle(service, float64(0.0), newTestDataConverter())
 }
 
@@ -920,9 +919,9 @@ func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataC
 		fn: func(arg1 int) (err error) {
 			return NewCustomError("testReason", "testStringDetails")
 		}}
-
+	registry := getGlobalRegistry()
 	encResult, e := a1.Execute(ctx, testEncodeFunctionArgs(dataConverter, a1.fn, 1))
-	err := deSerializeFunctionResult(a1.fn, encResult, nil, dataConverter)
+	err := deSerializeFunctionResult(a1.fn, encResult, nil, dataConverter, registry)
 	require.NoError(t, err)
 	require.Error(t, e)
 	errWD := e.(*CustomError)
@@ -937,7 +936,7 @@ func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataC
 			return NewCustomError("testReason", testErrorDetails{T: "testErrorStack"})
 		}}
 	encResult, e = a2.Execute(ctx, testEncodeFunctionArgs(dataConverter, a2.fn, 1))
-	err = deSerializeFunctionResult(a2.fn, encResult, nil, dataConverter)
+	err = deSerializeFunctionResult(a2.fn, encResult, nil, dataConverter, registry)
 	require.NoError(t, err)
 	require.Error(t, e)
 	errWD = e.(*CustomError)
@@ -953,7 +952,7 @@ func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataC
 		}}
 	encResult, e = a3.Execute(ctx, testEncodeFunctionArgs(dataConverter, a3.fn, 1))
 	var result string
-	err = deSerializeFunctionResult(a3.fn, encResult, &result, dataConverter)
+	err = deSerializeFunctionResult(a3.fn, encResult, &result, dataConverter, registry)
 	require.NoError(t, err)
 	require.Equal(t, "testResult", result)
 	require.Error(t, e)
@@ -968,7 +967,7 @@ func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataC
 			return "testResult4", NewCustomError("testReason", "testMultipleString", testErrorDetails{T: "testErrorStack4"})
 		}}
 	encResult, e = a4.Execute(ctx, testEncodeFunctionArgs(dataConverter, a4.fn, 1))
-	err = deSerializeFunctionResult(a3.fn, encResult, &result, dataConverter)
+	err = deSerializeFunctionResult(a3.fn, encResult, &result, dataConverter, registry)
 	require.NoError(t, err)
 	require.Equal(t, "testResult4", result)
 	require.Error(t, e)
@@ -991,13 +990,14 @@ func TestActivityErrorWithDetails_WithDataConverter(t *testing.T) {
 }
 
 func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataConverter DataConverter) {
+	registry := getGlobalRegistry()
 	a1 := activityExecutor{
 		name: "test",
 		fn: func(arg1 int) (err error) {
 			return NewCanceledError("testCancelStringDetails")
 		}}
 	encResult, e := a1.Execute(ctx, testEncodeFunctionArgs(dataConverter, a1.fn, 1))
-	err := deSerializeFunctionResult(a1.fn, encResult, nil, dataConverter)
+	err := deSerializeFunctionResult(a1.fn, encResult, nil, dataConverter, registry)
 	require.NoError(t, err)
 	require.Error(t, e)
 	errWD := e.(*CanceledError)
@@ -1011,7 +1011,7 @@ func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataCon
 			return NewCanceledError(testErrorDetails{T: "testCancelErrorStack"})
 		}}
 	encResult, e = a2.Execute(ctx, testEncodeFunctionArgs(dataConverter, a2.fn, 1))
-	err = deSerializeFunctionResult(a2.fn, encResult, nil, dataConverter)
+	err = deSerializeFunctionResult(a2.fn, encResult, nil, dataConverter, registry)
 	require.NoError(t, err)
 	require.Error(t, e)
 	errWD = e.(*CanceledError)
@@ -1026,7 +1026,7 @@ func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataCon
 		}}
 	encResult, e = a3.Execute(ctx, testEncodeFunctionArgs(dataConverter, a2.fn, 1))
 	var r string
-	err = deSerializeFunctionResult(a3.fn, encResult, &r, dataConverter)
+	err = deSerializeFunctionResult(a3.fn, encResult, &r, dataConverter, registry)
 	require.NoError(t, err)
 	require.Equal(t, "testResult", r)
 	require.Error(t, e)
@@ -1040,7 +1040,7 @@ func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataCon
 			return "testResult4", NewCanceledError("testMultipleString", testErrorDetails{T: "testErrorStack4"})
 		}}
 	encResult, e = a4.Execute(ctx, testEncodeFunctionArgs(dataConverter, a2.fn, 1))
-	err = deSerializeFunctionResult(a3.fn, encResult, &r, dataConverter)
+	err = deSerializeFunctionResult(a3.fn, encResult, &r, dataConverter, registry)
 	require.NoError(t, err)
 	require.Equal(t, "testResult4", r)
 	require.Error(t, e)
@@ -1062,6 +1062,7 @@ func TestActivityCancelledError_WithDataConverter(t *testing.T) {
 }
 
 func testActivityExecutionVariousTypesHelper(ctx context.Context, t *testing.T, dataConverter DataConverter) {
+	registry := getGlobalRegistry()
 	a1 := activityExecutor{
 		fn: func(ctx context.Context, arg1 string) (*testWorkflowResult, error) {
 			return &testWorkflowResult{V: 1}, nil
@@ -1069,7 +1070,7 @@ func testActivityExecutionVariousTypesHelper(ctx context.Context, t *testing.T, 
 	encResult, e := a1.Execute(ctx, testEncodeFunctionArgs(dataConverter, a1.fn, "test"))
 	require.NoError(t, e)
 	var r *testWorkflowResult
-	err := deSerializeFunctionResult(a1.fn, encResult, &r, dataConverter)
+	err := deSerializeFunctionResult(a1.fn, encResult, &r, dataConverter, registry)
 	require.NoError(t, err)
 	require.Equal(t, 1, r.V)
 
@@ -1079,7 +1080,7 @@ func testActivityExecutionVariousTypesHelper(ctx context.Context, t *testing.T, 
 		}}
 	encResult, e = a2.Execute(ctx, testEncodeFunctionArgs(dataConverter, a2.fn, r))
 	require.NoError(t, e)
-	err = deSerializeFunctionResult(a2.fn, encResult, &r, dataConverter)
+	err = deSerializeFunctionResult(a2.fn, encResult, &r, dataConverter, registry)
 	require.NoError(t, err)
 	require.Equal(t, 2, r.V)
 }
@@ -1111,7 +1112,7 @@ func TestActivityNilArgs(t *testing.T) {
 	}
 
 	args := []interface{}{nil, nil, nil}
-	_, input, err := getValidatedActivityFunction(activityFn, args, nil)
+	_, input, err := getValidatedActivityFunction(activityFn, args, nil, getGlobalRegistry())
 	require.NoError(t, err)
 
 	reflectArgs, err := decodeArgs(nil, reflect.TypeOf(activityFn), input)
@@ -1131,19 +1132,15 @@ func TestActivityNilArgs_WithDataConverter(t *testing.T) {
 	}
 
 	args := []interface{}{nil, nil, nil}
-	_, _, err := getValidatedActivityFunction(activityFn, args, newTestDataConverter())
+	_, _, err := getValidatedActivityFunction(activityFn, args, newTestDataConverter(), getGlobalRegistry())
 	require.Error(t, err) // testDataConverter cannot encode nil value
 }
 
 func TestWorkerOptionDefaults(t *testing.T) {
 	domain := "worker-options-test"
 	taskList := "worker-options-tl"
-	worker := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
-	aggWorker, ok := worker.(*aggregatedWorker)
-	require.True(t, ok)
-
-	decisionWorker, ok := aggWorker.workflowWorker.(*workflowWorker)
-	require.True(t, ok)
+	aggWorker := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
+	decisionWorker := aggWorker.workflowWorker
 	require.True(t, decisionWorker.executionParameters.Identity != "")
 	require.NotNil(t, decisionWorker.executionParameters.Logger)
 	require.NotNil(t, decisionWorker.executionParameters.MetricsScope)
@@ -1171,8 +1168,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
 
-	activityWorker, ok := aggWorker.activityWorker.(*activityWorker)
-	require.True(t, ok)
+	activityWorker := aggWorker.activityWorker
 	require.True(t, activityWorker.executionParameters.Identity != "")
 	require.NotNil(t, activityWorker.executionParameters.Logger)
 	require.NotNil(t, activityWorker.executionParameters.MetricsScope)
@@ -1204,13 +1200,9 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 		Tracer:                                  opentracing.NoopTracer{},
 	}
 
-	worker := newAggregatedWorker(nil, domain, taskList, options)
-	aggWorker, ok := worker.(*aggregatedWorker)
-	require.True(t, ok)
-
-	decisionWorker, ok := aggWorker.workflowWorker.(*workflowWorker)
+	aggWorker := newAggregatedWorker(nil, domain, taskList, options)
+	decisionWorker := aggWorker.workflowWorker
 	require.True(t, len(decisionWorker.executionParameters.ContextPropagators) > 0)
-	require.True(t, ok)
 
 	expected := workerExecutionParameters{
 		TaskList:                             taskList,
@@ -1233,8 +1225,7 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
 
-	activityWorker, ok := aggWorker.activityWorker.(*activityWorker)
-	require.True(t, ok)
+	activityWorker := aggWorker.activityWorker
 	require.True(t, len(activityWorker.executionParameters.ContextPropagators) > 0)
 	assertWorkerExecutionParamsEqual(t, expected, activityWorker.executionParameters)
 }

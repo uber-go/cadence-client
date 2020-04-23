@@ -112,7 +112,7 @@ type (
 		enableLoggingInReplay bool // flag to indicate if workflow should enable logging in replay mode
 
 		metricsScope       tally.Scope
-		hostEnv            *hostEnvImpl
+		registry           *registry
 		dataConverter      DataConverter
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
@@ -175,7 +175,7 @@ func newWorkflowExecutionEventHandler(
 	logger *zap.Logger,
 	enableLoggingInReplay bool,
 	scope tally.Scope,
-	hostEnv *hostEnvImpl,
+	registry *registry,
 	dataConverter DataConverter,
 	contextPropagators []ContextPropagator,
 	tracer opentracing.Tracer,
@@ -191,7 +191,7 @@ func newWorkflowExecutionEventHandler(
 		openSessions:          make(map[string]*SessionInfo),
 		completeHandler:       completeHandler,
 		enableLoggingInReplay: enableLoggingInReplay,
-		hostEnv:               hostEnv,
+		registry:              registry,
 		dataConverter:         dataConverter,
 		contextPropagators:    contextPropagators,
 		tracer:                tracer,
@@ -734,6 +734,10 @@ func (wc *workflowEnvironmentImpl) getOpenSessions() []*SessionInfo {
 	return openSessions
 }
 
+func (wc *workflowEnvironmentImpl) GetRegistry() *registry {
+	return wc.registry
+}
+
 func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	event *m.HistoryEvent,
 	isReplay bool,
@@ -944,7 +948,7 @@ func (weh *workflowExecutionEventHandlerImpl) Close() {
 
 func (weh *workflowExecutionEventHandlerImpl) handleWorkflowExecutionStarted(
 	attributes *m.WorkflowExecutionStartedEventAttributes) (err error) {
-	weh.workflowDefinition, err = weh.hostEnv.getWorkflowDefinition(
+	weh.workflowDefinition, err = weh.registry.getWorkflowDefinition(
 		weh.workflowInfo.WorkflowType,
 	)
 	if err != nil {

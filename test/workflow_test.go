@@ -30,6 +30,7 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/client"
 	"go.uber.org/cadence/internal"
+	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
 )
 
@@ -451,7 +452,7 @@ func (w *Workflows) RetryTimeoutStableErrorWorkflow(ctx workflow.Context) ([]str
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
-	err := workflow.ExecuteActivity(ctx, "retryTimeoutStableErrorActivity").Get(ctx, nil)
+	err := workflow.ExecuteActivity(ctx, "Activities_RetryTimeoutStableErrorActivity").Get(ctx, nil)
 
 	cerr, ok := err.(*cadence.CustomError)
 	if !ok {
@@ -514,30 +515,30 @@ func (w *Workflows) InspectLocalActivityInfo(ctx workflow.Context) error {
 		ctx, activites.InspectActivityInfo, domain, taskList, wfType).Get(ctx, nil)
 }
 
-func (w *Workflows) register() {
-	workflow.Register(w.Basic)
-	workflow.Register(w.ActivityRetryOnError)
-	workflow.Register(w.ActivityRetryOnHBTimeout)
-	workflow.Register(w.ActivityRetryOnTimeout)
-	workflow.Register(w.ActivityRetryOptionsChange)
-	workflow.Register(w.ContinueAsNew)
-	workflow.Register(w.ContinueAsNewWithOptions)
-	workflow.Register(w.IDReusePolicy)
-	workflow.Register(w.ChildWorkflowRetryOnError)
-	workflow.Register(w.ChildWorkflowRetryOnTimeout)
-	workflow.Register(w.ChildWorkflowSuccess)
-	workflow.Register(w.ChildWorkflowSuccessWithParentClosePolicyTerminate)
-	workflow.Register(w.ChildWorkflowSuccessWithParentClosePolicyAbandon)
-	workflow.Register(w.InspectActivityInfo)
-	workflow.Register(w.InspectLocalActivityInfo)
-	workflow.Register(w.sleep)
-	workflow.Register(w.child)
-	workflow.Register(w.childForMemoAndSearchAttr)
-	workflow.Register(w.ActivityCancelRepro)
-	workflow.Register(w.SimplestWorkflow)
-	workflow.Register(w.LargeQueryResultWorkflow)
-	workflow.Register(w.RetryTimeoutStableErrorWorkflow)
-	workflow.Register(w.ConsistentQueryWorkflow)
+func (w *Workflows) register(worker worker.Worker) {
+	worker.RegisterWorkflow(w.Basic)
+	worker.RegisterWorkflow(w.ActivityRetryOnError)
+	worker.RegisterWorkflow(w.ActivityRetryOnHBTimeout)
+	worker.RegisterWorkflow(w.ActivityRetryOnTimeout)
+	worker.RegisterWorkflow(w.ActivityRetryOptionsChange)
+	worker.RegisterWorkflow(w.ContinueAsNew)
+	worker.RegisterWorkflow(w.ContinueAsNewWithOptions)
+	worker.RegisterWorkflow(w.IDReusePolicy)
+	worker.RegisterWorkflow(w.ChildWorkflowRetryOnError)
+	worker.RegisterWorkflow(w.ChildWorkflowRetryOnTimeout)
+	worker.RegisterWorkflow(w.ChildWorkflowSuccess)
+	worker.RegisterWorkflow(w.ChildWorkflowSuccessWithParentClosePolicyTerminate)
+	worker.RegisterWorkflow(w.ChildWorkflowSuccessWithParentClosePolicyAbandon)
+	worker.RegisterWorkflow(w.InspectActivityInfo)
+	worker.RegisterWorkflow(w.InspectLocalActivityInfo)
+	worker.RegisterWorkflow(w.sleep)
+	worker.RegisterWorkflow(w.child)
+	worker.RegisterWorkflow(w.childForMemoAndSearchAttr)
+	worker.RegisterWorkflow(w.ActivityCancelRepro)
+	worker.RegisterWorkflow(w.SimplestWorkflow)
+	worker.RegisterWorkflow(w.LargeQueryResultWorkflow)
+	worker.RegisterWorkflow(w.RetryTimeoutStableErrorWorkflow)
+	worker.RegisterWorkflow(w.ConsistentQueryWorkflow)
 }
 
 func (w *Workflows) defaultActivityOptions() workflow.ActivityOptions {

@@ -1139,12 +1139,8 @@ func TestActivityNilArgs_WithDataConverter(t *testing.T) {
 func TestWorkerOptionDefaults(t *testing.T) {
 	domain := "worker-options-test"
 	taskList := "worker-options-tl"
-	worker := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
-	aggWorker, ok := worker.(*aggregatedWorker)
-	require.True(t, ok)
-
-	decisionWorker, ok := aggWorker.workflowWorker.(*workflowWorker)
-	require.True(t, ok)
+	aggWorker := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
+	decisionWorker := aggWorker.workflowWorker
 	require.True(t, decisionWorker.executionParameters.Identity != "")
 	require.NotNil(t, decisionWorker.executionParameters.Logger)
 	require.NotNil(t, decisionWorker.executionParameters.MetricsScope)
@@ -1172,8 +1168,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
 
-	activityWorker, ok := aggWorker.activityWorker.(*activityWorker)
-	require.True(t, ok)
+	activityWorker := aggWorker.activityWorker
 	require.True(t, activityWorker.executionParameters.Identity != "")
 	require.NotNil(t, activityWorker.executionParameters.Logger)
 	require.NotNil(t, activityWorker.executionParameters.MetricsScope)
@@ -1205,13 +1200,9 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 		Tracer:                                  opentracing.NoopTracer{},
 	}
 
-	worker := newAggregatedWorker(nil, domain, taskList, options)
-	aggWorker, ok := worker.(*aggregatedWorker)
-	require.True(t, ok)
-
-	decisionWorker, ok := aggWorker.workflowWorker.(*workflowWorker)
+	aggWorker := newAggregatedWorker(nil, domain, taskList, options)
+	decisionWorker := aggWorker.workflowWorker
 	require.True(t, len(decisionWorker.executionParameters.ContextPropagators) > 0)
-	require.True(t, ok)
 
 	expected := workerExecutionParameters{
 		TaskList:                             taskList,
@@ -1234,8 +1225,7 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
 
-	activityWorker, ok := aggWorker.activityWorker.(*activityWorker)
-	require.True(t, ok)
+	activityWorker := aggWorker.activityWorker
 	require.True(t, len(activityWorker.executionParameters.ContextPropagators) > 0)
 	assertWorkerExecutionParamsEqual(t, expected, activityWorker.executionParameters)
 }

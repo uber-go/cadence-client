@@ -494,27 +494,6 @@ func (w *Workflows) sleep(ctx workflow.Context, d time.Duration) error {
 	return workflow.ExecuteActivity(ctx, "Activities_Sleep", d).Get(ctx, nil)
 }
 
-func (w *Workflows) register(worker worker.Worker) {
-	worker.RegisterWorkflow(w.Basic)
-	worker.RegisterWorkflow(w.ActivityRetryOnError)
-	worker.RegisterWorkflow(w.ActivityRetryOnHBTimeout)
-	worker.RegisterWorkflow(w.ActivityRetryOnTimeout)
-	worker.RegisterWorkflow(w.ActivityRetryOptionsChange)
-	worker.RegisterWorkflow(w.ContinueAsNew)
-	worker.RegisterWorkflow(w.ContinueAsNewWithOptions)
-	worker.RegisterWorkflow(w.IDReusePolicy)
-	worker.RegisterWorkflow(w.ChildWorkflowRetryOnError)
-	worker.RegisterWorkflow(w.ChildWorkflowRetryOnTimeout)
-	worker.RegisterWorkflow(w.ChildWorkflowSuccess)
-	worker.RegisterWorkflow(w.ChildWorkflowSuccessWithParentClosePolicyTerminate)
-	worker.RegisterWorkflow(w.ChildWorkflowSuccessWithParentClosePolicyAbandon)
-	worker.RegisterWorkflow(w.sleep)
-	worker.RegisterWorkflow(w.child)
-	worker.RegisterWorkflow(w.childForMemoAndSearchAttr)
-	worker.RegisterWorkflow(w.ActivityCancelRepro)
-	worker.RegisterWorkflow(w.SimplestWorkflow)
-}
-
 func (w *Workflows) InspectActivityInfo(ctx workflow.Context) error {
 	info := workflow.GetInfo(ctx)
 	domain := info.Domain

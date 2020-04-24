@@ -471,7 +471,7 @@ func (env *testWorkflowEnvironmentImpl) getWorkflowDefinition(wt WorkflowType) (
 	wf, ok := env.registry.getWorkflowFn(wt.Name)
 	if !ok {
 		supported := strings.Join(env.registry.getRegisteredWorkflowTypes(), ", ")
-		return nil, fmt.Errorf("Unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
+		return nil, fmt.Errorf("unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
 	}
 	wd := &workflowExecutorWrapper{
 		workflowExecutor: &workflowExecutor{name: wt.Name, fn: wf},

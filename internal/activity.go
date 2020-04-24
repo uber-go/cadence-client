@@ -125,7 +125,7 @@ type (
 // An activity function takes a context and input and returns a (result, error) or just error.
 //
 // And activity struct is a structure with all its exported methods treated as activities. The default
-// name of each activity is the <structure name>_<>method name>. Use RegisterActivityWithOptions to override the
+// name of each activity is the <structure name>_<method name>. Use RegisterActivityWithOptions to override the
 // "<structure name>_" prefix.
 //
 // Examples:
@@ -167,7 +167,7 @@ func RegisterActivity(activityFunc interface{}) {
 // activity.RegisterWithOptions(activities.SampleActivity1, RegisterActivityOptions{Name: "Sample1"})
 // activity.RegisterWithOptions(activities.SampleActivity2, RegisterActivityOptions{Name: "Sample2"})
 // See RegisterActivity function for more info.
-// The othe use of options is to disable duplicated activity registration check
+// The other use of options is to disable duplicated activity registration check
 // which might be useful for integration tests.
 // activity.RegisterWithOptions(barActivity, RegisterActivityOptions{DisableAlreadyRegisteredCheck: true})
 func RegisterActivityWithOptions(activityFunc interface{}, opts RegisterActivityOptions) {

@@ -29,6 +29,7 @@ import (
 
 	"go.uber.org/cadence"
 	"go.uber.org/cadence/activity"
+	"go.uber.org/cadence/worker"
 )
 
 type Activities struct {
@@ -43,11 +44,6 @@ type Activities2 struct {
 
 var errFailOnPurpose = cadence.NewCustomError("failing-on-purpose")
 
-func (a *Activities) RetryTimeoutStableErrorActivity(ctx context.Context) error {
-	time.Sleep(time.Second * 3)
-	return errFailOnPurpose
-}
-
 func newActivities() *Activities {
 	activities2 := &Activities2{}
 	result := &Activities{activities2: activities2}
@@ -55,13 +51,18 @@ func newActivities() *Activities {
 	return result
 }
 
-func (a *Activities) Sleep(ctx context.Context, delay time.Duration) error {
+func (a *Activities) RetryTimeoutStableErrorActivity() error {
+	time.Sleep(time.Second * 3)
+	return errFailOnPurpose
+}
+
+func (a *Activities) Sleep(_ context.Context, delay time.Duration) error {
 	a.append("sleep")
 	time.Sleep(delay)
 	return nil
 }
 
-func LocalSleep(ctx context.Context, delay time.Duration) error {
+func LocalSleep(_ context.Context, delay time.Duration) error {
 	time.Sleep(delay)
 	return nil
 }
@@ -80,7 +81,7 @@ func (a *Activities) HeartbeatAndSleep(ctx context.Context, seq int, delay time.
 	return seq, nil
 }
 
-func (a *Activities) fail(ctx context.Context) error {
+func (a *Activities) fail(_ context.Context) error {
 	a.append("fail")
 	return errFailOnPurpose
 }
@@ -122,18 +123,18 @@ func (a *Activities) clearInvoked() {
 	a.invocations = []string{}
 }
 
-func (a *Activities2) ToUpper(ctx context.Context, arg string) (string, error) {
+func (a *Activities2) ToUpper(_ context.Context, arg string) (string, error) {
 	a.impl.append("toUpper")
 	return strings.ToUpper(arg), nil
 }
 
-func (a *Activities2) ToUpperWithDelay(ctx context.Context, arg string, delay time.Duration) (string, error) {
+func (a *Activities2) ToUpperWithDelay(_ context.Context, arg string, delay time.Duration) (string, error) {
 	a.impl.append("toUpperWithDelay")
 	time.Sleep(delay)
 	return strings.ToUpper(arg), nil
 }
 
-func (a *Activities) GetMemoAndSearchAttr(ctx context.Context, memo, searchAttr string) (string, error) {
+func (a *Activities) GetMemoAndSearchAttr(_ context.Context, memo, searchAttr string) (string, error) {
 	a.append("getMemoAndSearchAttr")
 	return memo + ", " + searchAttr, nil
 }
@@ -141,7 +142,8 @@ func (a *Activities) GetMemoAndSearchAttr(ctx context.Context, memo, searchAttr 
 func (a *Activities) register(worker worker.Worker) {
 	worker.RegisterActivity(a)
 	// Check reregistration
-	activity.RegisterWithOptions(a.fail, activity.RegisterOptions{Name: "Fail", DisableAlreadyRegisteredCheck: true})
+	worker.RegisterActivityWithOptions(a.fail, activity.RegisterOptions{Name: "Fail", DisableAlreadyRegisteredCheck: true})
 	// Check prefix
-	activity.RegisterWithOptions(a.activities2, activity.RegisterOptions{Name: "Prefix_", DisableAlreadyRegisteredCheck: true})
+	worker.RegisterActivityWithOptions(a.activities2, activity.RegisterOptions{Name: "Prefix_", DisableAlreadyRegisteredCheck: true})
+	worker.RegisterActivityWithOptions(a.InspectActivityInfo, activity.RegisterOptions{Name: "inspectActivityInfo"})
 }

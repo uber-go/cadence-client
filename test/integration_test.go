@@ -428,7 +428,7 @@ func (ts *IntegrationTestSuite) registerDomain() {
 		}
 	}
 	ts.NoError(err)
-	time.Sleep(domainCacheRefreshInterval) // wait for domain cache refresh on temporal-server
+	time.Sleep(domainCacheRefreshInterval) // wait for domain cache refresh on cadence-server
 	// bellow is used to guarantee domain is ready
 	var dummyReturn string
 	err = ts.executeWorkflow("test-domain-exist", ts.workflows.SimplestWorkflow, &dummyReturn)

@@ -300,7 +300,7 @@ func getValidatedActivityFunction(f interface{}, args []interface{}, dataConvert
 
 	default:
 		return nil, nil, fmt.Errorf(
-			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
+			"invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
 	}
 
 	input, err := encodeArgs(dataConverter, args)
@@ -328,7 +328,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value, dataCo
 
 	if resultSize < 1 || resultSize > 2 {
 		return nil, fmt.Errorf(
-			"The function: %v signature returns %d results, it is expecting to return either error or (result, error)",
+			"the function: %v signature returns %d results, it is expecting to return either error or (result, error)",
 			fnName, resultSize)
 	}
 

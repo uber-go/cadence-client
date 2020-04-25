@@ -204,7 +204,7 @@ type (
 		CompleteActivity(ctx context.Context, taskToken []byte, result interface{}, err error) error
 
 		// CompleteActivityById reports activity completed.
-		// Similar to CompleteActivity, but may save user from keeping taskToken info.
+		// Similar to CompleteActivity, but may save cadence user from keeping taskToken info.
 		// activity Execute method can return activity.ErrResultPending to
 		// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivityById() method
 		// should be called when that activity is completed with the actual result and error. If err is nil, activity task

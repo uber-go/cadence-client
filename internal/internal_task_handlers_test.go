@@ -1170,7 +1170,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NoError() {
 		taskToken: nil,
 	}
 
-	heartbeatErr := cadenceInvoker.Heartbeat(nil)
+	heartbeatErr := cadenceInvoker.Heartbeat(nil, false)
 
 	t.Nil(heartbeatErr)
 }
@@ -1190,7 +1190,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 		0,
 		make(chan struct{}))
 
-	heartbeatErr := cadenceInvoker.Heartbeat(nil)
+	heartbeatErr := cadenceInvoker.Heartbeat(nil, false)
 	t.NotNil(heartbeatErr)
 	_, ok := (heartbeatErr).(*s.EntityNotExistsError)
 	t.True(ok, "heartbeatErr must be EntityNotExistsError.")
@@ -1214,7 +1214,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveErro
 		0,
 		make(chan struct{}))
 
-	heartbeatErr := cadenceInvoker.Heartbeat(nil)
+	heartbeatErr := cadenceInvoker.Heartbeat(nil, false)
 	t.NotNil(heartbeatErr)
 	_, ok := (heartbeatErr).(*s.DomainNotActiveError)
 	t.True(ok, "heartbeatErr must be DomainNotActiveError.")

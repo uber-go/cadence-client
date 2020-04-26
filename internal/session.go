@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
+	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/zap"
 )
 
@@ -416,19 +417,25 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 
+	heartbeatRetryPolicy := backoff.NewExponentialRetryPolicy(time.Second)
+	heartbeatRetryPolicy.SetMaximumInterval(time.Second * 2)
+	heartbeatRetryPolicy.SetExpirationInterval(heartbeatInterval)
+
 	for {
 		select {
 		case <-ctx.Done():
 			sessionEnv.CompleteSession(sessionID)
 			return ctx.Err()
 		case <-ticker.C:
-			// here we skip the internal heartbeat batching, as otherwise the activity has only once chance
-			// for heartbeating and if that failed, the entire session will get fail due to heartbeat timeout.
-			// since the heartbeat interval is controlled by the session framework, we don't need to worry about
-			// calling heartbeat too frequently and causing trouble for the sever. (note the min heartbeat timeout
-			// is 1 sec.)
-			err := activityEnv.serviceInvoker.Heartbeat([]byte{}, true)
-			if err != nil {
+			heartbeatOp := func() error {
+				// here we skip the internal heartbeat batching, as otherwise the activity has only once chance
+				// for heartbeating and if that failed, the entire session will get fail due to heartbeat timeout.
+				// since the heartbeat interval is controlled by the session framework, we don't need to worry about
+				// calling heartbeat too frequently and causing trouble for the sever. (note the min heartbeat timeout
+				// is 1 sec.)
+				return activityEnv.serviceInvoker.Heartbeat([]byte{}, true)
+			}
+			isRetryable := func(err error) bool {
 				// there will be two types of error here:
 				// 1. transient errors like timeout, in which case we should not fail the session
 				// 2. non-retryable errors like activity cancelled, activity not found or domain
@@ -436,7 +443,15 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 				// so in the next iteration, ctx.Done() will be selected. Here we rely on the heartbeat
 				// internal implementation to tell which error is non-retryable.
 				GetActivityLogger(ctx).Error("session heartbeat failed with error:", zap.Error(err), zap.String("sessionID", sessionID))
+
+				select {
+				case <-ctx.Done():
+					return false
+				default:
+					return true
+				}
 			}
+			_ = backoff.Retry(ctx, heartbeatOp, heartbeatRetryPolicy, isRetryable)
 		case <-doneCh:
 			return nil
 		}

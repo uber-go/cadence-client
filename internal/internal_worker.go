@@ -568,19 +568,26 @@ func (r *registry) RegisterActivity(af interface{}) {
 	r.RegisterActivityWithOptions(af, RegisterActivityOptions{})
 }
 
-func (r *registry) RegisterActivityWithOptions(
-	af interface{},
-	options RegisterActivityOptions,
-) {
-	// Validate that it is a function
+func (r *registry) RegisterActivityWithOptions(af interface{}, options RegisterActivityOptions) {
 	fnType := reflect.TypeOf(af)
+	var err error
 	if fnType.Kind() == reflect.Ptr && fnType.Elem().Kind() == reflect.Struct {
-		r.registerActivityStructWithOptions(af, options)
-		return
+		err = r.registerActivityStruct(af, options)
+	} else {
+		err = r.registerActivityFunction(af, options)
 	}
-	if err := validateFnFormat(fnType, false); err != nil {
+
+	if err != nil {
 		panic(err)
 	}
+}
+
+func (r *registry) registerActivityFunction(af interface{}, options RegisterActivityOptions) error {
+	fnType := reflect.TypeOf(af)
+	if err := validateFnFormat(fnType, false); err != nil {
+		return fmt.Errorf("failed to register activity method: %v", err)
+	}
+
 	fnName := getFunctionName(af)
 	alias := options.Name
 	registerName := fnName
@@ -589,16 +596,18 @@ func (r *registry) RegisterActivityWithOptions(
 	}
 	if !options.DisableAlreadyRegisteredCheck {
 		if _, ok := r.activityFuncMap[registerName]; ok {
-			panic(fmt.Sprintf("activity type \"%v\" is already registered", registerName))
+			return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 		}
 	}
 	r.addActivityFn(registerName, af)
 	if len(alias) > 0 {
 		r.addActivityAlias(fnName, alias)
 	}
+
+	return nil
 }
 
-func (r *registry) registerActivityStructWithOptions(aStruct interface{}, options RegisterActivityOptions) error {
+func (r *registry) registerActivityStruct(aStruct interface{}, options RegisterActivityOptions) error {
 	structValue := reflect.ValueOf(aStruct)
 	structType := structValue.Type()
 	count := 0
@@ -611,7 +620,7 @@ func (r *registry) registerActivityStructWithOptions(aStruct interface{}, option
 		}
 		name := method.Name
 		if err := validateFnFormat(method.Type, false); err != nil {
-			return fmt.Errorf("method %v of %v: %e", name, structType.Name(), err)
+			return fmt.Errorf("failed to register activity method %v of %v: %e", name, structType.Name(), err)
 		}
 		prefix := options.Name
 		registerName := name
@@ -627,9 +636,11 @@ func (r *registry) registerActivityStructWithOptions(aStruct interface{}, option
 		r.addActivityFn(registerName, methodValue.Interface())
 		count++
 	}
+
 	if count == 0 {
-		return fmt.Errorf("no activities (public methods) found at %v structure", structType.Name())
+		return fmt.Errorf("no activities (public methods) found in %v structure", structType.Name())
 	}
+
 	return nil
 }
 

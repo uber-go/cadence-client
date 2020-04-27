@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,27 +30,40 @@ import (
 
 	"go.uber.org/cadence"
 	"go.uber.org/cadence/activity"
+	"go.uber.org/cadence/worker"
 )
 
 type Activities struct {
-	sync.Mutex
+	mu          sync.Mutex
 	invocations []string
+	activities2 *Activities2
+}
+
+type Activities2 struct {
+	impl *Activities
 }
 
 var errFailOnPurpose = cadence.NewCustomError("failing-on-purpose")
 
-func (a *Activities) RetryTimeoutStableErrorActivity(ctx context.Context) error {
+func newActivities() *Activities {
+	activities2 := &Activities2{}
+	result := &Activities{activities2: activities2}
+	activities2.impl = result
+	return result
+}
+
+func (a *Activities) RetryTimeoutStableErrorActivity() error {
 	time.Sleep(time.Second * 3)
 	return errFailOnPurpose
 }
 
-func (a *Activities) Sleep(ctx context.Context, delay time.Duration) error {
+func (a *Activities) Sleep(_ context.Context, delay time.Duration) error {
 	a.append("sleep")
 	time.Sleep(delay)
 	return nil
 }
 
-func LocalSleep(ctx context.Context, delay time.Duration) error {
+func LocalSleep(_ context.Context, delay time.Duration) error {
 	time.Sleep(delay)
 	return nil
 }
@@ -68,23 +82,7 @@ func (a *Activities) HeartbeatAndSleep(ctx context.Context, seq int, delay time.
 	return seq, nil
 }
 
-func (a *Activities) ToUpper(ctx context.Context, arg string) (string, error) {
-	a.append("toUpper")
-	return strings.ToUpper(arg), nil
-}
-
-func (a *Activities) ToUpperWithDelay(ctx context.Context, arg string, delay time.Duration) (string, error) {
-	a.append("toUpperWithDelay")
-	time.Sleep(delay)
-	return strings.ToUpper(arg), nil
-}
-
-func (a *Activities) GetMemoAndSearchAttr(ctx context.Context, memo, searchAttr string) (string, error) {
-	a.append("getMemoAndSearchAttr")
-	return memo + ", " + searchAttr, nil
-}
-
-func (a *Activities) Fail(ctx context.Context) error {
+func (a *Activities) fail(_ context.Context) error {
 	a.append("fail")
 	return errFailOnPurpose
 }
@@ -105,14 +103,14 @@ func (a *Activities) InspectActivityInfo(ctx context.Context, domain, taskList, 
 }
 
 func (a *Activities) append(name string) {
-	a.Lock()
-	defer a.Unlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.invocations = append(a.invocations, name)
 }
 
 func (a *Activities) invoked() []string {
-	a.Lock()
-	defer a.Unlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	result := make([]string, len(a.invocations))
 	for i := range a.invocations {
 		result[i] = a.invocations[i]
@@ -121,18 +119,32 @@ func (a *Activities) invoked() []string {
 }
 
 func (a *Activities) clearInvoked() {
-	a.Lock()
-	defer a.Unlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.invocations = []string{}
 }
 
-func (a *Activities) register() {
-	activity.RegisterWithOptions(a.Fail, activity.RegisterOptions{Name: "fail"})
-	activity.RegisterWithOptions(a.Sleep, activity.RegisterOptions{Name: "sleep"})
-	activity.RegisterWithOptions(a.ToUpper, activity.RegisterOptions{Name: "toUpper"})
-	activity.RegisterWithOptions(a.ToUpperWithDelay, activity.RegisterOptions{Name: "toUpperWithDelay"})
-	activity.RegisterWithOptions(a.HeartbeatAndSleep, activity.RegisterOptions{Name: "heartbeatAndSleep"})
-	activity.RegisterWithOptions(a.GetMemoAndSearchAttr, activity.RegisterOptions{Name: "getMemoAndSearchAttr"})
-	activity.RegisterWithOptions(a.RetryTimeoutStableErrorActivity, activity.RegisterOptions{Name: "retryTimeoutStableErrorActivity"})
-	activity.RegisterWithOptions(a.InspectActivityInfo, activity.RegisterOptions{Name: "inspectActivityInfo"})
+func (a *Activities2) ToUpper(_ context.Context, arg string) (string, error) {
+	a.impl.append("toUpper")
+	return strings.ToUpper(arg), nil
+}
+
+func (a *Activities2) ToUpperWithDelay(_ context.Context, arg string, delay time.Duration) (string, error) {
+	a.impl.append("toUpperWithDelay")
+	time.Sleep(delay)
+	return strings.ToUpper(arg), nil
+}
+
+func (a *Activities) GetMemoAndSearchAttr(_ context.Context, memo, searchAttr string) (string, error) {
+	a.append("getMemoAndSearchAttr")
+	return memo + ", " + searchAttr, nil
+}
+
+func (a *Activities) register(worker worker.Worker) {
+	worker.RegisterActivity(a)
+	// Check reregistration
+	worker.RegisterActivityWithOptions(a.fail, activity.RegisterOptions{Name: "Fail", DisableAlreadyRegisteredCheck: true})
+	// Check prefix
+	worker.RegisterActivityWithOptions(a.activities2, activity.RegisterOptions{Name: "Prefix_", DisableAlreadyRegisteredCheck: true})
+	worker.RegisterActivityWithOptions(a.InspectActivityInfo, activity.RegisterOptions{Name: "inspectActivityInfo"})
 }

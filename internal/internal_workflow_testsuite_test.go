@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -172,7 +173,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 		s.NoError(args.Get(&input))
 		activityCalls = append(activityCalls, fmt.Sprintf("%s:%s", activityInfo.ActivityType.Name, input))
 	})
-	expectedCalls := []string{}
+	var expectedCalls []string
 	for i := 1; i <= runCount; i++ {
 		expectedCalls = append(expectedCalls, fmt.Sprintf("testActivityHello:msg%v", i))
 	}
@@ -478,19 +479,19 @@ func testWorkflowHello(ctx Context) (string, error) {
 func testWorkflowContext(ctx Context) (string, error) {
 	value := ctx.Value(contextKey(testHeader))
 	if val, ok := value.(string); ok {
-		return string(val), nil
+		return val, nil
 	}
 	return "", fmt.Errorf("context did not propagate to workflow")
 }
 
-func testActivityHello(ctx context.Context, msg string) (string, error) {
+func testActivityHello(_ context.Context, msg string) (string, error) {
 	return "hello" + "_" + msg, nil
 }
 
 func testActivityContext(ctx context.Context) (string, error) {
 	value := ctx.Value(contextKey(testHeader))
 	if val, ok := value.(string); ok {
-		return string(val), nil
+		return val, nil
 	}
 	return "", fmt.Errorf("context did not propagate to workflow")
 }
@@ -1154,6 +1155,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_GetVersion() {
 			f = ExecuteActivity(ctx, newActivity, "new_msg")
 		}
 		err := f.Get(ctx, nil) // wait for result
+		if err != nil {
+			return err
+		}
 
 		// test searchable change version
 		wfInfo := GetWorkflowInfo(ctx)
@@ -1199,6 +1203,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockGetVersion() {
 		}
 		var ret1 string
 		err := f.Get(ctx, &ret1) // wait for result
+		if err != nil {
+			return "", err
+		}
 
 		v2 := GetVersion(ctx, "change_2", DefaultVersion, 2)
 		if v2 == DefaultVersion {
@@ -1208,6 +1215,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockGetVersion() {
 		}
 		var ret2 string
 		err = f.Get(ctx, &ret2) // wait for result
+		if err != nil {
+			return "", err
+		}
 
 		// test searchable change version
 		wfInfo := GetWorkflowInfo(ctx)
@@ -1525,7 +1535,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityFullyQualifiedName() {
 func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFullyQualifiedName() {
 	defer func() {
 		if r := recover(); r != nil {
-			s.Contains(r.(error).Error(), "Unable to find workflow type")
+			s.Contains(r.(error).Error(), "unable to find workflow type")
 		}
 	}()
 	env := s.NewTestWorkflowEnvironment()

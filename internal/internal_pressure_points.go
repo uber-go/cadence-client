@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -61,14 +62,14 @@ func newWorkflowWorkerWithPressurePoints(
 	domain string,
 	params workerExecutionParameters,
 	pressurePoints map[string]map[string]string,
-	hostEnv *hostEnvImpl,
-) (worker Worker) {
+	registry *registry,
+) (worker *workflowWorker) {
 	return newWorkflowWorker(
 		service,
 		domain,
 		params,
 		&pressurePointMgrImpl{config: pressurePoints, logger: params.Logger},
-		hostEnv,
+		registry,
 	)
 }
 

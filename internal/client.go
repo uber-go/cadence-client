@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -183,7 +184,7 @@ type (
 		CompleteActivity(ctx context.Context, taskToken []byte, result interface{}, err error) error
 
 		// CompleteActivityById reports activity completed.
-		// Similar to CompleteActivity, but may save cadence user from keeping taskToken info.
+		// Similar to CompleteActivity, but may save user from keeping taskToken info.
 		// activity Execute method can return activity.ErrResultPending to
 		// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivityById() method
 		// should be called when that activity is completed with the actual result and error. If err is nil, activity task
@@ -518,6 +519,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	return &workflowClient{
 		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),
 		domain:             domain,
+		registry:           newRegistry(getGlobalRegistry()),
 		metricsScope:       metrics.NewTaggedScope(metricScope),
 		identity:           identity,
 		dataConverter:      dataConverter,

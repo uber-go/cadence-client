@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -282,7 +283,7 @@ func validateFunctionArgs(f interface{}, args []interface{}, isWorkflow bool) er
 	return nil
 }
 
-func getValidatedActivityFunction(f interface{}, args []interface{}, dataConverter DataConverter) (*ActivityType, []byte, error) {
+func getValidatedActivityFunction(f interface{}, args []interface{}, dataConverter DataConverter, registry *registry) (*ActivityType, []byte, error) {
 	fnName := ""
 	fType := reflect.TypeOf(f)
 	switch getKind(fType) {
@@ -294,13 +295,13 @@ func getValidatedActivityFunction(f interface{}, args []interface{}, dataConvert
 			return nil, nil, err
 		}
 		fnName = getFunctionName(f)
-		if alias, ok := getHostEnvironment().getActivityAlias(fnName); ok {
+		if alias, ok := registry.getActivityAlias(fnName); ok {
 			fnName = alias
 		}
 
 	default:
 		return nil, nil, fmt.Errorf(
-			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
+			"invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
 	}
 
 	input, err := encodeArgs(dataConverter, args)
@@ -328,7 +329,7 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value, dataCo
 
 	if resultSize < 1 || resultSize > 2 {
 		return nil, fmt.Errorf(
-			"The function: %v signature returns %d results, it is expecting to return either error or (result, error)",
+			"the function: %v signature returns %d results, it is expecting to return either error or (result, error)",
 			fnName, resultSize)
 	}
 
@@ -380,7 +381,7 @@ func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interf
 	return nil
 }
 
-func deSerializeFunctionResult(f interface{}, result []byte, to interface{}, dataConverter DataConverter) error {
+func deSerializeFunctionResult(f interface{}, result []byte, to interface{}, dataConverter DataConverter, registry *registry) error {
 	fType := reflect.TypeOf(f)
 	if dataConverter == nil {
 		dataConverter = getDefaultDataConverter()
@@ -394,7 +395,7 @@ func deSerializeFunctionResult(f interface{}, result []byte, to interface{}, dat
 	case reflect.String:
 		// If we know about this function through registration then we will try to return corresponding result type.
 		fnName := reflect.ValueOf(f).String()
-		if fnRegistered, ok := getHostEnvironment().getActivityFn(fnName); ok {
+		if fnRegistered, ok := registry.getActivityFn(fnName); ok {
 			return deSerializeFnResultFromFnType(reflect.TypeOf(fnRegistered), result, to, dataConverter)
 		}
 	}

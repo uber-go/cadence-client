@@ -39801,6 +39801,7 @@ type UpdateDomainRequest struct {
 	ReplicationConfiguration *DomainReplicationConfiguration `json:"replicationConfiguration,omitempty"`
 	SecurityToken            *string                         `json:"securityToken,omitempty"`
 	DeleteBadBinary          *string                         `json:"deleteBadBinary,omitempty"`
+	FailoverTimeoutInSeconds *int32                          `json:"failoverTimeoutInSeconds,omitempty"`
 }
 
 // ToWire translates a UpdateDomainRequest struct into a Thrift-level intermediate
@@ -39820,7 +39821,7 @@ type UpdateDomainRequest struct {
 //   }
 func (v *UpdateDomainRequest) ToWire() (wire.Value, error) {
 	var (
-		fields [6]wire.Field
+		fields [7]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -39872,6 +39873,14 @@ func (v *UpdateDomainRequest) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 60, Value: w}
+		i++
+	}
+	if v.FailoverTimeoutInSeconds != nil {
+		w, err = wire.NewValueI32(*(v.FailoverTimeoutInSeconds)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 70, Value: w}
 		i++
 	}
 
@@ -39960,6 +39969,16 @@ func (v *UpdateDomainRequest) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 70:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.FailoverTimeoutInSeconds = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -39973,7 +39992,7 @@ func (v *UpdateDomainRequest) String() string {
 		return "<nil>"
 	}
 
-	var fields [6]string
+	var fields [7]string
 	i := 0
 	if v.Name != nil {
 		fields[i] = fmt.Sprintf("Name: %v", *(v.Name))
@@ -39997,6 +40016,10 @@ func (v *UpdateDomainRequest) String() string {
 	}
 	if v.DeleteBadBinary != nil {
 		fields[i] = fmt.Sprintf("DeleteBadBinary: %v", *(v.DeleteBadBinary))
+		i++
+	}
+	if v.FailoverTimeoutInSeconds != nil {
+		fields[i] = fmt.Sprintf("FailoverTimeoutInSeconds: %v", *(v.FailoverTimeoutInSeconds))
 		i++
 	}
 
@@ -40024,6 +40047,9 @@ func (v *UpdateDomainRequest) Equals(rhs *UpdateDomainRequest) bool {
 		return false
 	}
 	if !_String_EqualsPtr(v.DeleteBadBinary, rhs.DeleteBadBinary) {
+		return false
+	}
+	if !_I32_EqualsPtr(v.FailoverTimeoutInSeconds, rhs.FailoverTimeoutInSeconds) {
 		return false
 	}
 
@@ -40055,6 +40081,16 @@ func (v *UpdateDomainRequest) GetSecurityToken() (o string) {
 func (v *UpdateDomainRequest) GetDeleteBadBinary() (o string) {
 	if v.DeleteBadBinary != nil {
 		return *v.DeleteBadBinary
+	}
+
+	return
+}
+
+// GetFailoverTimeoutInSeconds returns the value of FailoverTimeoutInSeconds if it is set or its
+// zero value if it is unset.
+func (v *UpdateDomainRequest) GetFailoverTimeoutInSeconds() (o int32) {
+	if v.FailoverTimeoutInSeconds != nil {
+		return *v.FailoverTimeoutInSeconds
 	}
 
 	return
@@ -45075,6 +45111,7 @@ const (
 	WorkflowIdReusePolicyAllowDuplicateFailedOnly WorkflowIdReusePolicy = 0
 	WorkflowIdReusePolicyAllowDuplicate           WorkflowIdReusePolicy = 1
 	WorkflowIdReusePolicyRejectDuplicate          WorkflowIdReusePolicy = 2
+	WorkflowIdReusePolicyTerminateIfRunning       WorkflowIdReusePolicy = 3
 )
 
 // WorkflowIdReusePolicy_Values returns all recognized values of WorkflowIdReusePolicy.
@@ -45083,6 +45120,7 @@ func WorkflowIdReusePolicy_Values() []WorkflowIdReusePolicy {
 		WorkflowIdReusePolicyAllowDuplicateFailedOnly,
 		WorkflowIdReusePolicyAllowDuplicate,
 		WorkflowIdReusePolicyRejectDuplicate,
+		WorkflowIdReusePolicyTerminateIfRunning,
 	}
 }
 
@@ -45101,6 +45139,9 @@ func (v *WorkflowIdReusePolicy) UnmarshalText(value []byte) error {
 		return nil
 	case "RejectDuplicate":
 		*v = WorkflowIdReusePolicyRejectDuplicate
+		return nil
+	case "TerminateIfRunning":
+		*v = WorkflowIdReusePolicyTerminateIfRunning
 		return nil
 	default:
 		return fmt.Errorf("unknown enum value %q for %q", value, "WorkflowIdReusePolicy")
@@ -45149,6 +45190,8 @@ func (v WorkflowIdReusePolicy) String() string {
 		return "AllowDuplicate"
 	case 2:
 		return "RejectDuplicate"
+	case 3:
+		return "TerminateIfRunning"
 	}
 	return fmt.Sprintf("WorkflowIdReusePolicy(%d)", w)
 }
@@ -45173,6 +45216,8 @@ func (v WorkflowIdReusePolicy) MarshalJSON() ([]byte, error) {
 		return ([]byte)("\"AllowDuplicate\""), nil
 	case 2:
 		return ([]byte)("\"RejectDuplicate\""), nil
+	case 3:
+		return ([]byte)("\"TerminateIfRunning\""), nil
 	}
 	return ([]byte)(strconv.FormatInt(int64(v), 10)), nil
 }

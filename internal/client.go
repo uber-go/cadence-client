@@ -475,11 +475,15 @@ const (
 	WorkflowIDReusePolicyAllowDuplicateFailedOnly WorkflowIDReusePolicy = iota
 
 	// WorkflowIDReusePolicyAllowDuplicate allow start a workflow execution using
-	// the same workflow ID,when workflow not running.
+	// the same workflow ID, when workflow not running.
 	WorkflowIDReusePolicyAllowDuplicate
 
 	// WorkflowIDReusePolicyRejectDuplicate do not allow start a workflow execution using the same workflow ID at all
 	WorkflowIDReusePolicyRejectDuplicate
+
+	// WorkflowIDReusePolicyTerminateIfRunning terminate current running workflow using the same workflow ID if exist,
+	// then start a new run in one transaction
+	WorkflowIDReusePolicyTerminateIfRunning
 )
 
 // NewClient creates an instance of a workflow client
@@ -553,6 +557,8 @@ func (p WorkflowIDReusePolicy) toThriftPtr() *s.WorkflowIdReusePolicy {
 		policy = s.WorkflowIdReusePolicyAllowDuplicateFailedOnly
 	case WorkflowIDReusePolicyRejectDuplicate:
 		policy = s.WorkflowIdReusePolicyRejectDuplicate
+	case WorkflowIDReusePolicyTerminateIfRunning:
+		policy = s.WorkflowIdReusePolicyTerminateIfRunning
 	default:
 		panic(fmt.Sprintf("unknown workflow reuse policy %v", p))
 	}

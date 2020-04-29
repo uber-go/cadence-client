@@ -2836,3 +2836,21 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityDeadlineExceeded() {
 	s.NoError(err)
 	s.Equal("context deadline exceeded", details)
 }
+
+func (s *WorkflowTestSuiteUnitTest) Test_AwaitWithTimeout() {
+	workflowFn := func(ctx Context) (bool, error) {
+		t := NewTimer(ctx, time.Second)
+		value := false
+		err := Await(ctx, func() bool { return t.IsReady() || value})
+		return value, err
+	}
+
+	RegisterWorkflow(workflowFn)
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	result := true
+	_ = env.GetWorkflowResult(&result)
+	s.False(result)
+}

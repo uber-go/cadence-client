@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -47,6 +48,18 @@ type (
 	// coroutines to finish
 	WaitGroup = internal.WaitGroup
 )
+
+// Blocks the calling thread until condition() returns true
+// Returns CanceledError if the ctx is canceled.
+// The following code is going to block until the captured count
+// variable is set to 5.
+//
+// workflow.Await(ctx, func() bool {
+//   return count == 5
+// })
+func Await(ctx Context, condition func() bool) error {
+	return internal.Await(ctx, condition)
+}
 
 // NewChannel create new Channel instance
 func NewChannel(ctx Context) Channel {

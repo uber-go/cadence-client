@@ -387,6 +387,10 @@ const (
 
 	// WorkflowIDReusePolicyRejectDuplicate do not allow start a workflow execution using the same workflow ID at all
 	WorkflowIDReusePolicyRejectDuplicate WorkflowIDReusePolicy = internal.WorkflowIDReusePolicyRejectDuplicate
+
+	// WorkflowIDReusePolicyTerminateIfRunning terminate current running workflow using the same workflow ID if exist,
+	// then start a new run in one transaction
+	WorkflowIDReusePolicyTerminateIfRunning = internal.WorkflowIDReusePolicyTerminateIfRunning
 )
 
 const (

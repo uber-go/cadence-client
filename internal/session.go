@@ -450,7 +450,9 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 				}
 			}
 			err := backoff.Retry(ctx, heartbeatOp, heartbeatRetryPolicy, isRetryable)
-			GetActivityLogger(ctx).Info("session heartbeat failed", zap.Error(err), zap.String("sessionID", sessionID))
+			if err != nil {
+				GetActivityLogger(ctx).Info("session heartbeat failed", zap.Error(err), zap.String("sessionID", sessionID))
+			}
 		case <-doneCh:
 			return nil
 		}

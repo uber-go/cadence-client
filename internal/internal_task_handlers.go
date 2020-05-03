@@ -1670,6 +1670,10 @@ func (i *cadenceInvoker) Heartbeat(details []byte, skipBatching bool) error {
 			i.Unlock()
 
 			if detailsToReport != nil {
+				// TODO: there is a potential race condition here as the lock is released here and
+				// locked again in the Hearbeat() method. This possible that a heartbeat call from
+				// user activity grabs the lock first and calls internalHeartBeat before this
+				// batching goroutine, which means some activity progress will be lost.
 				i.Heartbeat(*detailsToReport, false)
 			}
 		}()

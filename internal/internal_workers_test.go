@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -102,7 +103,7 @@ func (s *WorkersTestSuite) TestWorkflowWorker() {
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
-		s.service, domain, executionParameters, nil, overrides, getHostEnvironment(),
+		s.service, domain, executionParameters, nil, overrides, getGlobalRegistry(),
 	)
 	workflowWorker.Start()
 	workflowWorker.Stop()
@@ -125,10 +126,10 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 	}
 	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler()}
 	a := &greeterActivity{}
-	hostEnv := getHostEnvironment()
-	hostEnv.addActivity(a.ActivityType().Name, a)
+	registry := getGlobalRegistry()
+	registry.addActivity(a.ActivityType().Name, a)
 	activityWorker := newActivityWorker(
-		s.service, domain, executionParameters, overrides, hostEnv, nil,
+		s.service, domain, executionParameters, overrides, registry, nil,
 	)
 	activityWorker.Start()
 	activityWorker.Stop()
@@ -174,19 +175,16 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	activityTaskHandler := newNoResponseActivityTaskHandler()
 	overrides := &workerOverrides{activityTaskHandler: activityTaskHandler}
 	a := &greeterActivity{}
-	hostEnv := getHostEnvironment()
-	hostEnv.addActivity(a.ActivityType().Name, a)
+	registry := getGlobalRegistry()
+	registry.addActivity(a.ActivityType().Name, a)
 	worker := newActivityWorker(
-		s.service, domain, executionParameters, overrides, hostEnv, nil,
+		s.service, domain, executionParameters, overrides, registry, nil,
 	)
 	worker.Start()
 	activityTaskHandler.BlockedOnExecuteCalled()
 	go worker.Stop()
 
-	activityWorker, ok := worker.(*activityWorker)
-	s.Equal(true, ok)
-
-	<-activityWorker.worker.shutdownCh
+	<-worker.worker.shutdownCh
 	err := ctx.Err()
 	s.NoError(err)
 
@@ -208,7 +206,7 @@ func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
-		s.service, domain, executionParameters, nil, overrides, getHostEnvironment(),
+		s.service, domain, executionParameters, nil, overrides, getGlobalRegistry(),
 	)
 	workflowWorker.Start()
 	workflowWorker.Stop()

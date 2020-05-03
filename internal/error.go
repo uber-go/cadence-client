@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -219,7 +220,8 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *C
 	if options == nil {
 		panic("context is missing required options for continue as new")
 	}
-	workflowType, input, err := getValidatedWorkflowFunction(wfn, args, options.dataConverter)
+	env := getWorkflowEnvironment(ctx)
+	workflowType, input, err := getValidatedWorkflowFunction(wfn, args, options.dataConverter, env.GetRegistry())
 	if err != nil {
 		panic(err)
 	}

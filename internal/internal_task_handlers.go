@@ -1621,11 +1621,11 @@ type cadenceInvoker struct {
 	workerStopChannel     <-chan struct{}
 }
 
-func (i *cadenceInvoker) Heartbeat(details []byte) error {
+func (i *cadenceInvoker) Heartbeat(details []byte, skipBatching bool) error {
 	i.Lock()
 	defer i.Unlock()
 
-	if i.hbBatchEndTimer != nil {
+	if i.hbBatchEndTimer != nil && !skipBatching {
 		// If we have started batching window, keep track of last reported progress.
 		i.lastDetailsToReport = &details
 		return nil
@@ -1635,7 +1635,7 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 
 	// If the activity is cancelled, the activity can ignore the cancellation and do its work
 	// and complete. Our cancellation is co-operative, so we will try to heartbeat.
-	if err == nil || isActivityCancelled {
+	if (err == nil || isActivityCancelled) && !skipBatching {
 		// We have successfully sent heartbeat, start next batching window.
 		i.lastDetailsToReport = nil
 
@@ -1671,7 +1671,11 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 			i.Unlock()
 
 			if detailsToReport != nil {
-				i.Heartbeat(*detailsToReport)
+				// TODO: there is a potential race condition here as the lock is released here and
+				// locked again in the Hearbeat() method. This possible that a heartbeat call from
+				// user activity grabs the lock first and calls internalHeartBeat before this
+				// batching goroutine, which means some activity progress will be lost.
+				i.Heartbeat(*detailsToReport, false)
 			}
 		}()
 	}

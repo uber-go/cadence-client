@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
+	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/zap"
 )
 
@@ -121,8 +122,8 @@ const (
 
 	errTooManySessionsMsg string = "too many outstanding sessions"
 
-	defaultSessionHeartBeatTimeout time.Duration = time.Second * 20
-	maxSessionHeartBeatInterval    time.Duration = time.Second * 10
+	defaultSessionHeartbeatTimeout time.Duration = time.Second * 20
+	maxSessionHeartbeatInterval    time.Duration = time.Second * 10
 )
 
 var (
@@ -305,7 +306,7 @@ func createSession(ctx Context, creationTasklist string, options *SessionOptions
 		},
 	}
 
-	heartbeatTimeout := defaultSessionHeartBeatTimeout
+	heartbeatTimeout := defaultSessionHeartbeatTimeout
 	if options.HeartbeatTimeout != time.Duration(0) {
 		heartbeatTimeout = options.HeartbeatTimeout
 	}
@@ -410,11 +411,15 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 
 	activityEnv := getActivityEnv(ctx)
 	heartbeatInterval := activityEnv.heartbeatTimeout / 3
-	if heartbeatInterval > maxSessionHeartBeatInterval {
-		heartbeatInterval = maxSessionHeartBeatInterval
+	if heartbeatInterval > maxSessionHeartbeatInterval {
+		heartbeatInterval = maxSessionHeartbeatInterval
 	}
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
+
+	heartbeatRetryPolicy := backoff.NewExponentialRetryPolicy(time.Second)
+	heartbeatRetryPolicy.SetMaximumInterval(time.Second * 2)
+	heartbeatRetryPolicy.SetExpirationInterval(heartbeatInterval)
 
 	for {
 		select {
@@ -422,10 +427,31 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 			sessionEnv.CompleteSession(sessionID)
 			return ctx.Err()
 		case <-ticker.C:
-			err := activityEnv.serviceInvoker.Heartbeat([]byte{})
+			heartbeatOp := func() error {
+				// here we skip the internal heartbeat batching, as otherwise the activity has only once chance
+				// for heartbeating and if that failed, the entire session will get fail due to heartbeat timeout.
+				// since the heartbeat interval is controlled by the session framework, we don't need to worry about
+				// calling heartbeat too frequently and causing trouble for the sever. (note the min heartbeat timeout
+				// is 1 sec.)
+				return activityEnv.serviceInvoker.Heartbeat([]byte{}, true)
+			}
+			isRetryable := func(_ error) bool {
+				// there will be two types of error here:
+				// 1. transient errors like timeout, in which case we should not fail the session
+				// 2. non-retryable errors like activity cancelled, activity not found or domain
+				// not active. In those cases, the internal implementation will cancel the context,
+				// so in the next iteration, ctx.Done() will be selected. Here we rely on the heartbeat
+				// internal implementation to tell which error is non-retryable.
+				select {
+				case <-ctx.Done():
+					return false
+				default:
+					return true
+				}
+			}
+			err := backoff.Retry(ctx, heartbeatOp, heartbeatRetryPolicy, isRetryable)
 			if err != nil {
-				sessionEnv.CompleteSession(sessionID)
-				return err
+				GetActivityLogger(ctx).Info("session heartbeat failed", zap.Error(err), zap.String("sessionID", sessionID))
 			}
 		case <-doneCh:
 			return nil

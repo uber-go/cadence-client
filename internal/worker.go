@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +27,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/common/serializer"
 	"io/ioutil"
 	"math"
 	"time"
@@ -42,17 +44,6 @@ import (
 )
 
 type (
-	// Worker represents objects that can be started and stopped.
-	Worker interface {
-		// Start starts the worker in a non-blocking fashion
-		Start() error
-		// Run is a blocking start and cleans up resources when killed
-		// returns error only if it fails to start the worker
-		Run() error
-		// Stop cleans up any resources opened by worker
-		Stop()
-	}
-
 	// WorkerOptions is used to configure a worker instance.
 	// The current timeout resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
 	// subjected to change in the future.
@@ -262,7 +253,7 @@ func NewWorker(
 	domain string,
 	taskList string,
 	options WorkerOptions,
-) Worker {
+) *aggregatedWorker {
 	return newAggregatedWorker(service, domain, taskList, options)
 }
 
@@ -281,6 +272,15 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 	hResponse, err := service.GetWorkflowExecutionHistory(ctx, request)
 	if err != nil {
 		return err
+	}
+
+	if hResponse.RawHistory != nil {
+		history, err := serializer.DeserializeBlobDataToHistoryEvents(hResponse.RawHistory, shared.HistoryEventFilterTypeAllEvent)
+		if err != nil {
+			return err
+		}
+
+		hResponse.History = history
 	}
 
 	return replayWorkflowHistory(logger, service, domain, hResponse.History)
@@ -387,7 +387,7 @@ func replayWorkflowHistory(logger *zap.Logger, service workflowserviceclient.Int
 		Identity: "replayID",
 		Logger:   logger,
 	}
-	taskHandler := newWorkflowTaskHandler(domain, params, nil, getHostEnvironment())
+	taskHandler := newWorkflowTaskHandler(domain, params, nil, getGlobalRegistry())
 	resp, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator}, nil)
 	if err != nil {
 		return err

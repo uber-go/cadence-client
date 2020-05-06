@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -118,7 +119,7 @@ type (
 		identity                       string
 		enableLoggingInReplay          bool
 		disableStickyExecution         bool
-		hostEnv                        *hostEnvImpl
+		registry                       *registry
 		laTunnel                       *localActivityTunnel
 		nonDeterministicWorkflowPolicy NonDeterministicWorkflowPolicy
 		dataConverter                  DataConverter
@@ -136,7 +137,7 @@ type (
 		metricsScope       *metrics.TaggedScope
 		logger             *zap.Logger
 		userContext        context.Context
-		hostEnv            *hostEnvImpl
+		registry           *registry
 		activityProvider   activityProvider
 		dataConverter      DataConverter
 		workerStopCh       <-chan struct{}
@@ -369,7 +370,7 @@ func newWorkflowTaskHandler(
 	domain string,
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
-	hostEnv *hostEnvImpl,
+	registry *registry,
 ) WorkflowTaskHandler {
 	ensureRequiredParams(&params)
 	return &workflowTaskHandlerImpl{
@@ -380,7 +381,7 @@ func newWorkflowTaskHandler(
 		identity:                       params.Identity,
 		enableLoggingInReplay:          params.EnableLoggingInReplay,
 		disableStickyExecution:         params.DisableStickyExecution,
-		hostEnv:                        hostEnv,
+		registry:                       registry,
 		nonDeterministicWorkflowPolicy: params.NonDeterministicWorkflowPolicy,
 		dataConverter:                  params.DataConverter,
 		contextPropagators:             params.ContextPropagators,
@@ -567,7 +568,7 @@ func (w *workflowExecutionContextImpl) createEventHandler() {
 		w.wth.logger,
 		w.wth.enableLoggingInReplay,
 		w.wth.metricsScope,
-		w.wth.hostEnv,
+		w.wth.registry,
 		w.wth.dataConverter,
 		w.wth.contextPropagators,
 		w.wth.tracer,
@@ -1580,15 +1581,15 @@ func (wth *workflowTaskHandlerImpl) executeAnyPressurePoints(event *s.HistoryEve
 func newActivityTaskHandler(
 	service workflowserviceclient.Interface,
 	params workerExecutionParameters,
-	env *hostEnvImpl,
+	registry *registry,
 ) ActivityTaskHandler {
-	return newActivityTaskHandlerWithCustomProvider(service, params, env, nil)
+	return newActivityTaskHandlerWithCustomProvider(service, params, registry, nil)
 }
 
 func newActivityTaskHandlerWithCustomProvider(
 	service workflowserviceclient.Interface,
 	params workerExecutionParameters,
-	env *hostEnvImpl,
+	registry *registry,
 	activityProvider activityProvider,
 ) ActivityTaskHandler {
 	return &activityTaskHandlerImpl{
@@ -1598,7 +1599,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		logger:             params.Logger,
 		metricsScope:       metrics.NewTaggedScope(params.MetricsScope),
 		userContext:        params.UserContext,
-		hostEnv:            env,
+		registry:           registry,
 		activityProvider:   activityProvider,
 		dataConverter:      params.DataConverter,
 		workerStopCh:       params.WorkerStopChannel,
@@ -1620,11 +1621,11 @@ type cadenceInvoker struct {
 	workerStopChannel     <-chan struct{}
 }
 
-func (i *cadenceInvoker) Heartbeat(details []byte) error {
+func (i *cadenceInvoker) Heartbeat(details []byte, skipBatching bool) error {
 	i.Lock()
 	defer i.Unlock()
 
-	if i.hbBatchEndTimer != nil {
+	if i.hbBatchEndTimer != nil && !skipBatching {
 		// If we have started batching window, keep track of last reported progress.
 		i.lastDetailsToReport = &details
 		return nil
@@ -1634,7 +1635,7 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 
 	// If the activity is cancelled, the activity can ignore the cancellation and do its work
 	// and complete. Our cancellation is co-operative, so we will try to heartbeat.
-	if err == nil || isActivityCancelled {
+	if (err == nil || isActivityCancelled) && !skipBatching {
 		// We have successfully sent heartbeat, start next batching window.
 		i.lastDetailsToReport = nil
 
@@ -1670,7 +1671,11 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 			i.Unlock()
 
 			if detailsToReport != nil {
-				i.Heartbeat(*detailsToReport)
+				// TODO: there is a potential race condition here as the lock is released here and
+				// locked again in the Hearbeat() method. This possible that a heartbeat call from
+				// user activity grabs the lock first and calls internalHeartBeat before this
+				// batching goroutine, which means some activity progress will be lost.
+				i.Heartbeat(*detailsToReport, false)
 			}
 		}()
 	}
@@ -1828,7 +1833,7 @@ func (ath *activityTaskHandlerImpl) getActivity(name string) activity {
 		return ath.activityProvider(name)
 	}
 
-	if a, ok := ath.hostEnv.getActivity(name); ok {
+	if a, ok := ath.registry.getActivity(name); ok {
 		return a
 	}
 
@@ -1836,7 +1841,7 @@ func (ath *activityTaskHandlerImpl) getActivity(name string) activity {
 }
 
 func (ath *activityTaskHandlerImpl) getRegisteredActivityNames() (activityNames []string) {
-	for _, a := range ath.hostEnv.getRegisteredActivities() {
+	for _, a := range ath.registry.getRegisteredActivities() {
 		activityNames = append(activityNames, a.ActivityType().Name)
 	}
 	return

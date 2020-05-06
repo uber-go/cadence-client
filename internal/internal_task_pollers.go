@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -36,11 +37,12 @@ import (
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
+	"go.uber.org/cadence/internal/common/serializer"
 	"go.uber.org/zap"
 )
 
 const (
-	pollTaskServiceTimeOut = 3 * time.Minute // Server long poll is 1 * Minutes + delta
+	pollTaskServiceTimeOut = 150 * time.Second // Server long poll is 2 * Minutes + delta
 
 	stickyDecisionScheduleToStartTimeoutSeconds = 5
 
@@ -755,7 +757,19 @@ func newGetHistoryPageFunc(
 
 		metricsScope.Counter(metrics.WorkflowGetHistorySucceedCounter).Inc(1)
 		metricsScope.Timer(metrics.WorkflowGetHistoryLatency).Record(time.Now().Sub(startTime))
-		h := resp.History
+
+		var h *s.History
+
+		if resp.RawHistory != nil {
+			var err1 error
+			h, err1 = serializer.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
+			if err1 != nil {
+				return nil, nil, nil
+			}
+		} else {
+			h = resp.History
+		}
+
 		size := len(h.Events)
 		if size > 0 && atDecisionTaskCompletedEventID > 0 &&
 			h.Events[size-1].GetEventId() > atDecisionTaskCompletedEventID {

@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -183,7 +184,7 @@ type (
 		CompleteActivity(ctx context.Context, taskToken []byte, result interface{}, err error) error
 
 		// CompleteActivityById reports activity completed.
-		// Similar to CompleteActivity, but may save cadence user from keeping taskToken info.
+		// Similar to CompleteActivity, but may save user from keeping taskToken info.
 		// activity Execute method can return activity.ErrResultPending to
 		// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivityById() method
 		// should be called when that activity is completed with the actual result and error. If err is nil, activity task
@@ -474,11 +475,15 @@ const (
 	WorkflowIDReusePolicyAllowDuplicateFailedOnly WorkflowIDReusePolicy = iota
 
 	// WorkflowIDReusePolicyAllowDuplicate allow start a workflow execution using
-	// the same workflow ID,when workflow not running.
+	// the same workflow ID, when workflow not running.
 	WorkflowIDReusePolicyAllowDuplicate
 
 	// WorkflowIDReusePolicyRejectDuplicate do not allow start a workflow execution using the same workflow ID at all
 	WorkflowIDReusePolicyRejectDuplicate
+
+	// WorkflowIDReusePolicyTerminateIfRunning terminate current running workflow using the same workflow ID if exist,
+	// then start a new run in one transaction
+	WorkflowIDReusePolicyTerminateIfRunning
 )
 
 // NewClient creates an instance of a workflow client
@@ -514,6 +519,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	return &workflowClient{
 		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),
 		domain:             domain,
+		registry:           newRegistry(getGlobalRegistry()),
 		metricsScope:       metrics.NewTaggedScope(metricScope),
 		identity:           identity,
 		dataConverter:      dataConverter,
@@ -551,6 +557,8 @@ func (p WorkflowIDReusePolicy) toThriftPtr() *s.WorkflowIdReusePolicy {
 		policy = s.WorkflowIdReusePolicyAllowDuplicateFailedOnly
 	case WorkflowIDReusePolicyRejectDuplicate:
 		policy = s.WorkflowIdReusePolicyRejectDuplicate
+	case WorkflowIDReusePolicyTerminateIfRunning:
+		policy = s.WorkflowIdReusePolicyTerminateIfRunning
 	default:
 		panic(fmt.Sprintf("unknown workflow reuse policy %v", p))
 	}

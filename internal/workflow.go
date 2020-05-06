@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -125,7 +126,7 @@ type (
 		// child workflow to cancel or send signal to child workflow.
 		//  childWorkflowFuture := workflow.ExecuteChildWorkflow(ctx, child, ...)
 		//  var childWE WorkflowExecution
-		//  if err := childWorkflowFuture.GetChildWorkflowExecution().Get(&childWE); err == nil {
+		//  if err := childWorkflowFuture.GetChildWorkflowExecution().Get(ctx, &childWE); err == nil {
 		//      // child workflow started, you can use childWE to get the WorkflowID and RunID of child workflow
 		//  }
 		GetChildWorkflowExecution() Future
@@ -223,10 +224,12 @@ type (
 
 // RegisterWorkflowOptions consists of options for registering a workflow
 type RegisterWorkflowOptions struct {
-	Name string
+	Name                          string
+	DisableAlreadyRegisteredCheck bool
 }
 
 // RegisterWorkflow - registers a workflow function with the framework.
+// The public form is: workflow.Register(...)
 // A workflow takes a cadence context and input and returns a (result, error) or just error.
 // Examples:
 //	func sampleWorkflow(ctx workflow.Context, input []byte) (result []byte, err error)
@@ -239,11 +242,12 @@ func RegisterWorkflow(workflowFunc interface{}) {
 	RegisterWorkflowWithOptions(workflowFunc, RegisterWorkflowOptions{})
 }
 
-// RegisterWorkflowWithOptions registers the workflow function with options
+// RegisterWorkflowWithOptions registers the workflow function with options.
+// The public form is: workflow.RegisterWithOptions(...)
 // The user can use options to provide an external name for the workflow or leave it empty if no
 // external name is required. This can be used as
-//  client.RegisterWorkflow(sampleWorkflow, RegisterWorkflowOptions{})
-//  client.RegisterWorkflow(sampleWorkflow, RegisterWorkflowOptions{Name: "foo"})
+//  workflow.RegisterWithOptions(sampleWorkflow, RegisterWorkflowOptions{})
+//  workflow.RegisterWithOptions(sampleWorkflow, RegisterWorkflowOptions{Name: "foo"})
 // A workflow takes a cadence context and input and returns a (result, error) or just error.
 // Examples:
 //	func sampleWorkflow(ctx workflow.Context, input []byte) (result []byte, err error)
@@ -251,13 +255,30 @@ func RegisterWorkflow(workflowFunc interface{}) {
 //	func sampleWorkflow(ctx workflow.Context) (result []byte, err error)
 //	func sampleWorkflow(ctx workflow.Context, arg1 int) (result string, err error)
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
-// This method calls panic if workflowFunc doesn't comply with the expected format.
+// This method calls panic if workflowFunc doesn't comply with the expected format or tries to register the same workflow
+// type name twice. Use workflow.RegisterOptions.DisableAlreadyRegisteredCheck to allow multiple registrations.
 func RegisterWorkflowWithOptions(workflowFunc interface{}, opts RegisterWorkflowOptions) {
-	thImpl := getHostEnvironment()
-	err := thImpl.RegisterWorkflowWithOptions(workflowFunc, opts)
-	if err != nil {
-		panic(err)
+	registry := getGlobalRegistry()
+	registry.RegisterWorkflowWithOptions(workflowFunc, opts)
+}
+
+// Blocks the calling thread until condition() returns true
+// Returns CanceledError if the ctx is canceled.
+func Await(ctx Context, condition func() bool) error {
+	state := getState(ctx)
+	defer state.unblocked()
+
+	for !condition() {
+		doneCh := ctx.Done()
+		// TODO: Consider always returning a channel
+		if doneCh != nil {
+			if _, more := doneCh.ReceiveAsyncWithMoreFlag(nil); !more {
+				return NewCanceledError("Await context cancelled")
+			}
+		}
+		state.yield("Await")
 	}
+	return nil
 }
 
 // NewChannel create new Channel instance
@@ -271,20 +292,20 @@ func NewChannel(ctx Context) Channel {
 // Name appears in stack traces that are blocked on this channel.
 func NewNamedChannel(ctx Context, name string) Channel {
 	env := getWorkflowEnvironment(ctx)
-	return &channelImpl{name: name, dataConverter: getDataConverterFromWorkflowContext(ctx), scope: env.GetMetricsScope(), logger: env.GetLogger()}
+	return &channelImpl{name: name, dataConverter: getDataConverterFromWorkflowContext(ctx), env: env}
 }
 
 // NewBufferedChannel create new buffered Channel instance
 func NewBufferedChannel(ctx Context, size int) Channel {
 	env := getWorkflowEnvironment(ctx)
-	return &channelImpl{size: size, dataConverter: getDataConverterFromWorkflowContext(ctx), scope: env.GetMetricsScope(), logger: env.GetLogger()}
+	return &channelImpl{size: size, dataConverter: getDataConverterFromWorkflowContext(ctx), env: env}
 }
 
 // NewNamedBufferedChannel create new BufferedChannel instance with a given human readable name.
 // Name appears in stack traces that are blocked on this Channel.
 func NewNamedBufferedChannel(ctx Context, name string, size int) Channel {
 	env := getWorkflowEnvironment(ctx)
-	return &channelImpl{name: name, size: size, dataConverter: getDataConverterFromWorkflowContext(ctx), scope: env.GetMetricsScope(), logger: env.GetLogger()}
+	return &channelImpl{name: name, size: size, dataConverter: getDataConverterFromWorkflowContext(ctx), env: env}
 }
 
 // NewSelector creates a new Selector instance.
@@ -352,8 +373,9 @@ func NewFuture(ctx Context) (Future, Settable) {
 func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Future {
 	// Validate type and its arguments.
 	dataConverter := getDataConverterFromWorkflowContext(ctx)
+	registry := getRegistryFromWorkflowContext(ctx)
 	future, settable := newDecodeFuture(ctx, activity)
-	activityType, input, err := getValidatedActivityFunction(activity, args, dataConverter)
+	activityType, input, err := getValidatedActivityFunction(activity, args, dataConverter, registry)
 	if err != nil {
 		settable.Set(nil, err)
 		return future
@@ -565,7 +587,8 @@ func ExecuteChildWorkflow(ctx Context, childWorkflow interface{}, args ...interf
 	}
 	workflowOptionsFromCtx := getWorkflowEnvOptions(ctx)
 	dc := workflowOptionsFromCtx.dataConverter
-	wfType, input, err := getValidatedWorkflowFunction(childWorkflow, args, dc)
+	env := getWorkflowEnvironment(ctx)
+	wfType, input, err := getValidatedWorkflowFunction(childWorkflow, args, dc, env.GetRegistry())
 	if err != nil {
 		executionSettable.Set(nil, err)
 		mainSettable.Set(nil, err)
@@ -675,10 +698,10 @@ func GetMetricsScope(ctx Context) tally.Scope {
 	return getWorkflowEnvironment(ctx).GetMetricsScope()
 }
 
-// Now returns the current time when the decision is started or replayed.
-// The workflow needs to use this Now() to get the wall clock time instead of the Go lang library one.
+// Now returns the current time in UTC. It corresponds to the time when the decision task is started or replayed.
+// Workflow needs to use this method to get the wall clock time instead of the one from the golang library.
 func Now(ctx Context) time.Time {
-	return getWorkflowEnvironment(ctx).Now()
+	return getWorkflowEnvironment(ctx).Now().UTC()
 }
 
 // NewTimer returns immediately and the future becomes ready after the specified duration d. The workflow needs to use

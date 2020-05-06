@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +26,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/common/serializer"
 	"reflect"
 	"time"
 
@@ -57,6 +59,7 @@ type (
 	workflowClient struct {
 		workflowService    workflowserviceclient.Interface
 		domain             string
+		registry           *registry
 		metricsScope       *metrics.TaggedScope
 		identity           string
 		dataConverter      DataConverter
@@ -101,6 +104,7 @@ type (
 		currentRunID  string
 		iterFn        func(ctx context.Context, runID string) HistoryEventIterator
 		dataConverter DataConverter
+		registry      *registry
 	}
 
 	// HistoryEventIterator represents the interface for
@@ -120,7 +124,7 @@ type (
 	historyEventIteratorImpl struct {
 		// whether this iterator is initialized
 		initialized bool
-		// local cached histroy events and corresponding comsuming index
+		// local cached history events and corresponding consuming index
 		nextEventIndex int
 		events         []*s.HistoryEvent
 		// token to get next page of history events
@@ -169,7 +173,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	// Validate type and its arguments.
-	workflowType, input, err := getValidatedWorkflowFunction(workflowFunc, args, wc.dataConverter)
+	workflowType, input, err := getValidatedWorkflowFunction(workflowFunc, args, wc.dataConverter, wc.registry)
 	if err != nil {
 		return nil, err
 	}
@@ -285,6 +289,7 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 		currentRunID:  runID,
 		iterFn:        iterFn,
 		dataConverter: wc.dataConverter,
+		registry:      wc.registry,
 	}, nil
 }
 
@@ -304,6 +309,7 @@ func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, ru
 		currentRunID:  runID,
 		iterFn:        iterFn,
 		dataConverter: wc.dataConverter,
+		registry:      wc.registry,
 	}
 }
 
@@ -365,7 +371,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 	}
 
 	// Validate type and its arguments.
-	workflowType, input, err := getValidatedWorkflowFunction(workflowFunc, workflowArgs, wc.dataConverter)
+	workflowType, input, err := getValidatedWorkflowFunction(workflowFunc, workflowArgs, wc.dataConverter, wc.registry)
 	if err != nil {
 		return nil, err
 	}
@@ -517,6 +523,18 @@ func (wc *workflowClient) GetWorkflowHistory(
 					})
 					defer cancel()
 					response, err1 = wc.workflowService.GetWorkflowExecutionHistory(tchCtx, request, opt...)
+
+					if err1 != nil {
+						return err1
+					}
+
+					if response.RawHistory != nil {
+						history, err := serializer.DeserializeBlobDataToHistoryEvents(response.RawHistory, filterType)
+						if err != nil {
+							return err
+						}
+						response.History = history
+					}
 					return err1
 				},
 				createDynamicServiceRetryPolicy(ctx),
@@ -1102,7 +1120,7 @@ func (workflowRun *workflowRunImpl) Get(ctx context.Context, valuePtr interface{
 		if rf.Type().Kind() != reflect.Ptr {
 			return errors.New("value parameter is not a pointer")
 		}
-		err = deSerializeFunctionResult(workflowRun.workflowFn, attributes.Result, valuePtr, workflowRun.dataConverter)
+		err = deSerializeFunctionResult(workflowRun.workflowFn, attributes.Result, valuePtr, workflowRun.dataConverter, workflowRun.registry)
 	case s.EventTypeWorkflowExecutionFailed:
 		attributes := closeEvent.WorkflowExecutionFailedEventAttributes
 		err = constructError(attributes.GetReason(), attributes.Details, workflowRun.dataConverter)

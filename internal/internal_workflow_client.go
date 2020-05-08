@@ -487,11 +487,16 @@ func (wc *workflowClient) TerminateWorkflow(ctx context.Context, workflowID stri
 }
 
 // GetWorkflowHistory return a channel which contains the history events of a given workflow
-func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID string, runID string,
-	isLongPoll bool, filterType s.HistoryEventFilterType) HistoryEventIterator {
+func (wc *workflowClient) GetWorkflowHistory(
+	ctx context.Context,
+	workflowID string,
+	runID string,
+	isLongPoll bool,
+	filterType s.HistoryEventFilterType,
+) HistoryEventIterator {
 
 	domain := wc.domain
-	paginate := func(nexttoken []byte) (*s.GetWorkflowExecutionHistoryResponse, error) {
+	paginate := func(nextToken []byte) (*s.GetWorkflowExecutionHistoryResponse, error) {
 		request := &s.GetWorkflowExecutionHistoryRequest{
 			Domain: common.StringPtr(domain),
 			Execution: &s.WorkflowExecution{
@@ -500,7 +505,8 @@ func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID str
 			},
 			WaitForNewEvent:        common.BoolPtr(isLongPoll),
 			HistoryEventFilterType: &filterType,
-			NextPageToken:          nexttoken,
+			NextPageToken:          nextToken,
+			SkipArchival:           common.BoolPtr(isLongPoll),
 		}
 
 		var response *s.GetWorkflowExecutionHistoryResponse
@@ -530,7 +536,12 @@ func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID str
 						response.History = history
 					}
 					return err1
-				}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+				},
+				createDynamicServiceRetryPolicy(ctx),
+				func(err error) bool {
+					return isServiceTransientError(err) || isEntityNonExistFromPassive(err)
+				},
+			)
 
 			if err != nil {
 				return nil, err
@@ -547,6 +558,16 @@ func (wc *workflowClient) GetWorkflowHistory(ctx context.Context, workflowID str
 	return &historyEventIteratorImpl{
 		paginate: paginate,
 	}
+}
+
+func isEntityNonExistFromPassive(err error) bool {
+	if nonExistError, ok := err.(*s.EntityNotExistsError); ok {
+		return nonExistError.GetActiveCluster() != "" &&
+			nonExistError.GetCurrentCluster() != "" &&
+			nonExistError.GetActiveCluster() != nonExistError.GetCurrentCluster()
+	}
+
+	return false
 }
 
 // CompleteActivity reports activity completed. activity Execute method can return activity.ErrResultPending to

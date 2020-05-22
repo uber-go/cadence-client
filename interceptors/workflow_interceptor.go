@@ -1,3 +1,5 @@
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Modifications Copyright (c) 2017-2020 Uber Technologies Inc.
 // Copyright (c) 2020 Temporal Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -21,7 +23,7 @@
 package interceptors
 
 import (
-	"go.temporal.io/temporal/internal"
+	"go.uber.org/cadence/internal"
 )
 
 type (

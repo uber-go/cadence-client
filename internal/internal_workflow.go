@@ -448,7 +448,7 @@ func newWorkflowInterceptors(env workflowEnvironment, factories []WorkflowInterc
 }
 
 func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header *shared.Header, input []byte) {
-	interceptors, envInterceptor := newWorkflowInterceptors(env, env.GetRegistry().getInterceptors())
+	interceptors, envInterceptor := newWorkflowInterceptors(env, env.GetRegistry().WorkflowInterceptors())
 	dispatcher, rootCtx := newDispatcher(newWorkflowContext(env, interceptors, envInterceptor), func(ctx Context) {
 		r := &workflowResult{}
 
@@ -1134,7 +1134,7 @@ func getValidatedWorkflowFunction(workflowFunc interface{}, args []interface{}, 
 
 	default:
 		return nil, nil, fmt.Errorf(
-			"Invalid type 'workflowFunc' parameter provided, it can be either worker function or name of the worker type: %v",
+			"invalid type 'workflowFunc' parameter provided, it can be either worker function or name of the worker type: %v",
 			workflowFunc)
 	}
 

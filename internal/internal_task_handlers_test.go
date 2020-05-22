@@ -50,7 +50,7 @@ type (
 	TaskHandlersTestSuite struct {
 		suite.Suite
 		logger   *zap.Logger
-		service  *workflowservicetest.MockWorkflowServiceClient
+		service  *workflowservicetest.MockClient
 		registry *registry
 	}
 )

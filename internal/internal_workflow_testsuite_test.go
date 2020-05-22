@@ -2926,7 +2926,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_AwaitWithTimeout() {
 	workflowFn := func(ctx Context) (bool, error) {
 		t := NewTimer(ctx, time.Second)
 		value := false
-		err := Await(ctx, func() bool { return t.IsReady() || value})
+		err := Await(ctx, func() bool { return t.IsReady() || value })
 		return value, err
 	}
 

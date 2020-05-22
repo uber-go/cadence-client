@@ -80,10 +80,11 @@ func TestUnregisteredActivity(t *testing.T) {
 		})
 		return ExecuteActivity(ctx, "unregistered").Get(ctx, nil)
 	}
-	RegisterWorkflow(workflow)
+	env.RegisterWorkflow(workflow)
 	env.ExecuteWorkflow(workflow)
 	require.Error(t, env.GetWorkflowError())
 	ee := env.GetWorkflowError()
+	require.NotNil(t, ee)
 	require.True(t, strings.HasPrefix(ee.Error(), "unable to find activityType=unregistered"), ee.Error())
 }
 
@@ -110,23 +111,4 @@ func TestNoExplicitRegistrationRequired(t *testing.T) {
 	err := env.GetWorkflowResult(&result)
 	require.NoError(t, err)
 	require.Equal(t, "Hello World!", result)
-}
-
-func TestUnregisteredActivity(t *testing.T) {
-	t.Parallel()
-	testSuite := &WorkflowTestSuite{}
-	env := testSuite.NewTestWorkflowEnvironment()
-	workflow := func(ctx Context) error {
-		ctx = WithActivityOptions(ctx, ActivityOptions{
-			ScheduleToStartTimeout: time.Minute,
-			StartToCloseTimeout:    time.Minute,
-		})
-		return ExecuteActivity(ctx, "unregistered").Get(ctx, nil)
-	}
-	env.RegisterWorkflow(workflow)
-	env.ExecuteWorkflow(workflow)
-	require.Error(t, env.GetWorkflowError())
-	ee := env.GetWorkflowError()
-	require.NotNil(t, ee)
-	require.True(t, strings.HasPrefix(ee.Error(), "unable to find activityType=unregistered"), ee.Error())
 }

@@ -777,7 +777,7 @@ func isUseThriftDecoding(objs []interface{}) bool {
 }
 
 func (r *registry) getWorkflowDefinition(wt WorkflowType) (workflowDefinition, error) {
-	lookup := wt.Name
+	lookup := getFunctionName(wt.Name)
 	if alias, ok := r.getWorkflowAlias(lookup); ok {
 		lookup = alias
 	}

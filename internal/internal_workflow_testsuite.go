@@ -103,7 +103,6 @@ type (
 		fn            interface{}
 		isWorkflow    bool
 		dataConverter DataConverter
-		interceptors  []WorkflowInterceptorFactory
 	}
 
 	taskListSpecificActivity struct {
@@ -159,8 +158,9 @@ type (
 	// testWorkflowEnvironmentImpl is the environment that runs the workflow/activity unit tests.
 	testWorkflowEnvironmentImpl struct {
 		*testWorkflowEnvironmentShared
-		parentEnv *testWorkflowEnvironmentImpl
-		registry  *registry
+		parentEnv            *testWorkflowEnvironmentImpl
+		registry             *registry
+		workflowInterceptors []WorkflowInterceptorFactory
 
 		workflowInfo   *WorkflowInfo
 		workflowDef    workflowDefinition
@@ -190,6 +190,9 @@ type (
 		testWorkflowEnvironment *testWorkflowEnvironmentImpl
 	}
 )
+
+// make sure interface is implemented
+var _ workflowEnvironment = (*testWorkflowEnvironmentImpl)(nil)
 
 func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *registry) *testWorkflowEnvironmentImpl {
 	var r *registry
@@ -406,7 +409,7 @@ func (env *testWorkflowEnvironmentImpl) setWorkerOptions(options WorkerOptions) 
 	if len(options.ContextPropagators) > 0 {
 		env.workerOptions.ContextPropagators = options.ContextPropagators
 	}
-	env.registry.SetWorkflowInterceptors(options.WorkflowInterceptorChainFactories)
+	env.workflowInterceptors = options.WorkflowInterceptorChainFactories
 }
 
 func (env *testWorkflowEnvironmentImpl) setWorkerStopChannel(c chan struct{}) {
@@ -490,7 +493,7 @@ func (env *testWorkflowEnvironmentImpl) getWorkflowDefinition(wt WorkflowType) (
 		return nil, fmt.Errorf("unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
 	}
 	wd := &workflowExecutorWrapper{
-		workflowExecutor: &workflowExecutor{workflowType: wt.Name, fn: wf, interceptors: env.registry.WorkflowInterceptors()},
+		workflowExecutor: &workflowExecutor{workflowType: wt.Name, fn: wf},
 		env:              env,
 	}
 	return newSyncWorkflowDefinition(wd), nil
@@ -1299,8 +1302,13 @@ func (w *workflowExecutorWrapper) Execute(ctx Context, input []byte) (result []b
 		env.runningCount++
 	}
 
-	m := &mockWrapper{env: env, name: w.workflowType, fn: w.fn, isWorkflow: true,
-		dataConverter: env.GetDataConverter(), interceptors: env.GetRegistry().WorkflowInterceptors()}
+	m := &mockWrapper{
+		env:           env,
+		name:          w.workflowType,
+		fn:            w.fn,
+		isWorkflow:    true,
+		dataConverter: env.GetDataConverter(),
+	}
 	// This method is called by workflow's dispatcher. In this test suite, it is run in the main loop. We cannot block
 	// the main loop, but the mock could block if it is configured to wait. So we need to use a separate goroutinue to
 	// run the mock, and resume after mock call returns.
@@ -1817,7 +1825,7 @@ func (env *testWorkflowEnvironmentImpl) getMockedVersion(mockedChangeID, changeI
 	args := []interface{}{changeID, minSupported, maxSupported}
 	// below call will panic if mock is not properly setup.
 	mockRet := env.mock.MethodCalled(mockMethod, args...)
-	m := &mockWrapper{name: mockMethodForGetVersion, fn: mockFnGetVersion, interceptors: env.registry.WorkflowInterceptors()}
+	m := &mockWrapper{name: mockMethodForGetVersion, fn: mockFnGetVersion}
 	if mockFn := m.getMockFn(mockRet); mockFn != nil {
 		executor := &activityExecutor{name: mockMethodForGetVersion, fn: mockFn}
 		reflectValues := executor.executeWithActualArgsWithoutParseResult(nil, args)
@@ -1974,8 +1982,12 @@ func (env *testWorkflowEnvironmentImpl) setHeartbeatDetails(details interface{})
 	env.heartbeatDetails = data
 }
 
-func (wc *testWorkflowEnvironmentImpl) GetRegistry() *registry {
-	return wc.registry
+func (env *testWorkflowEnvironmentImpl) GetRegistry() *registry {
+	return env.registry
+}
+
+func (env *testWorkflowEnvironmentImpl) GetWorkflowInterceptors() []WorkflowInterceptorFactory {
+	return env.workflowInterceptors
 }
 
 func newTestSessionEnvironment(testWorkflowEnvironment *testWorkflowEnvironmentImpl,
@@ -2013,9 +2025,6 @@ func mockFnRequestCancelExternalWorkflow(domainName, workflowID, runID string) e
 func mockFnGetVersion(changeID string, minSupported, maxSupported Version) Version {
 	return DefaultVersion
 }
-
-// make sure interface is implemented
-var _ workflowEnvironment = (*testWorkflowEnvironmentImpl)(nil)
 
 type testReporter struct {
 	logger *zap.Logger

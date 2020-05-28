@@ -194,6 +194,8 @@ type (
 		ContextPropagators []ContextPropagator
 
 		Tracer opentracing.Tracer
+
+		WorkflowInterceptors []WorkflowInterceptorFactory
 	}
 )
 
@@ -532,19 +534,10 @@ func (aw *activityWorker) Stop() {
 
 type registry struct {
 	sync.Mutex
-	workflowFuncMap      map[string]interface{}
-	workflowAliasMap     map[string]string
-	activityFuncMap      map[string]activity
-	activityAliasMap     map[string]string
-	workflowInterceptors []WorkflowInterceptorFactory
-}
-
-func (r *registry) WorkflowInterceptors() []WorkflowInterceptorFactory {
-	return r.workflowInterceptors
-}
-
-func (r *registry) SetWorkflowInterceptors(workflowInterceptors []WorkflowInterceptorFactory) {
-	r.workflowInterceptors = workflowInterceptors
+	workflowFuncMap  map[string]interface{}
+	workflowAliasMap map[string]string
+	activityFuncMap  map[string]activity
+	activityAliasMap map[string]string
 }
 
 func (r *registry) RegisterWorkflow(af interface{}) {
@@ -786,7 +779,7 @@ func (r *registry) getWorkflowDefinition(wt WorkflowType) (workflowDefinition, e
 		supported := strings.Join(r.getRegisteredWorkflowTypes(), ", ")
 		return nil, fmt.Errorf("unable to find workflow type: %v. Supported types: [%v]", lookup, supported)
 	}
-	wd := &workflowExecutor{workflowType: lookup, fn: wf, interceptors: r.workflowInterceptors}
+	wd := &workflowExecutor{workflowType: lookup, fn: wf}
 	return newSyncWorkflowDefinition(wd), nil
 }
 
@@ -927,7 +920,6 @@ func newRegistry() *registry {
 type workflowExecutor struct {
 	workflowType string
 	fn           interface{}
-	interceptors []WorkflowInterceptorFactory
 }
 
 func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
@@ -1457,6 +1449,7 @@ func newAggregatedWorker(
 		WorkerStopTimeout:                    wOptions.WorkerStopTimeout,
 		ContextPropagators:                   wOptions.ContextPropagators,
 		Tracer:                               wOptions.Tracer,
+		WorkflowInterceptors:                 wOptions.WorkflowInterceptorChainFactories,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -1473,7 +1466,6 @@ func newAggregatedWorker(
 
 	// worker specific registry
 	registry := newRegistry()
-	registry.SetWorkflowInterceptors(wOptions.WorkflowInterceptorChainFactories)
 
 	// workflow factory.
 	var workflowWorker *workflowWorker

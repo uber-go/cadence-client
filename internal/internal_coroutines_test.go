@@ -35,7 +35,7 @@ import (
 
 func createRootTestContext() (ctx Context) {
 	env := new(WorkflowUnitTest).NewTestWorkflowEnvironment()
-	interceptors, envInterceptor := newWorkflowInterceptors(env.impl, env.impl.GetRegistry().WorkflowInterceptors())
+	interceptors, envInterceptor := newWorkflowInterceptors(env.impl, env.impl.workflowInterceptors)
 	return newWorkflowContext(env.impl, interceptors, envInterceptor)
 }
 

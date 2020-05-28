@@ -538,6 +538,7 @@ type registry struct {
 	workflowAliasMap map[string]string
 	activityFuncMap  map[string]activity
 	activityAliasMap map[string]string
+	next             *registry // Allows to chain registries
 }
 
 func (r *registry) RegisterWorkflow(af interface{}) {
@@ -657,34 +658,43 @@ func (r *registry) addWorkflowAlias(fnName string, alias string) {
 }
 
 func (r *registry) getWorkflowAlias(fnName string) (string, bool) {
-	r.Lock()
-	defer r.Unlock()
+	r.Lock() // do not defer for Unlock to call next.getWorkflowAlias without lock
 	alias, ok := r.workflowAliasMap[fnName]
+	if !ok && r.next != nil {
+		r.Unlock()
+		return r.next.getWorkflowAlias(fnName)
+	}
+	r.Unlock()
 	return alias, ok
 }
 
 func (r *registry) addWorkflowFn(fnName string, wf interface{}) {
 	r.Lock()
 	defer r.Unlock()
-	if r.workflowFuncMap == nil {
-		panic("nil workflowFuncMap: registry must be created with newRegistry")
-	}
 	r.workflowFuncMap[fnName] = wf
 }
 
 func (r *registry) getWorkflowFn(fnName string) (interface{}, bool) {
-	r.Lock()
-	defer r.Unlock()
+	r.Lock() // do not defer for Unlock to call next.getWorkflowFn without lock
 	fn, ok := r.workflowFuncMap[fnName]
+	if !ok && r.next != nil {
+		r.Unlock()
+		return r.next.getWorkflowFn(fnName)
+	}
+	r.Unlock()
 	return fn, ok
 }
 
 func (r *registry) getRegisteredWorkflowTypes() []string {
-	r.Lock()
-	defer r.Unlock()
+	r.Lock() // do not defer for Unlock to call next.getRegisteredWorkflowTypes without lock
 	var result []string
 	for t := range r.workflowFuncMap {
 		result = append(result, t)
+	}
+	r.Unlock()
+	if r.next != nil {
+		nextTypes := r.next.getRegisteredWorkflowTypes()
+		result = append(result, nextTypes...)
 	}
 	return result
 }
@@ -696,9 +706,13 @@ func (r *registry) addActivityAlias(fnName string, alias string) {
 }
 
 func (r *registry) getActivityAlias(fnName string) (string, bool) {
-	r.Lock()
-	defer r.Unlock()
+	r.Lock() // do not defer for Unlock to call next.getActivityAlias without lock
 	alias, ok := r.activityAliasMap[fnName]
+	if !ok && r.next != nil {
+		r.Unlock()
+		return r.next.getActivityAlias(fnName)
+	}
+	r.Unlock()
 	return alias, ok
 }
 
@@ -713,9 +727,13 @@ func (r *registry) addActivityFn(fnName string, af interface{}) {
 }
 
 func (r *registry) getActivity(fnName string) (activity, bool) {
-	r.Lock()
-	defer r.Unlock()
+	r.Lock() // do not defer for Unlock to call next.getActivity without lock
 	a, ok := r.activityFuncMap[fnName]
+	if !ok && r.next != nil {
+		r.Unlock()
+		return r.next.getActivity(fnName)
+	}
+	r.Unlock()
 	return a, ok
 }
 
@@ -727,11 +745,15 @@ func (r *registry) getActivityFn(fnName string) (interface{}, bool) {
 }
 
 func (r *registry) getRegisteredActivities() []activity {
-	r.Lock()
-	defer r.Unlock()
+	r.Lock() // do not defer for Unlock to call next.getRegisteredActivities without lock
 	activities := make([]activity, 0, len(r.activityFuncMap))
 	for _, a := range r.activityFuncMap {
 		activities = append(activities, a)
+	}
+	r.Unlock()
+	if r.next != nil {
+		nextActivities := r.next.getRegisteredActivities()
+		activities = append(activities, nextActivities...)
 	}
 	return activities
 }
@@ -907,13 +929,31 @@ func isTypeByteSlice(inType reflect.Type) bool {
 	return inType == typeOfByteSlice || inType == reflect.PtrTo(typeOfByteSlice)
 }
 
+var once sync.Once
+
+// Singleton to hold the host registration details.
+var thImpl *registry
+
 func newRegistry() *registry {
 	return &registry{
 		workflowFuncMap:  make(map[string]interface{}),
 		workflowAliasMap: make(map[string]string),
 		activityFuncMap:  make(map[string]activity),
 		activityAliasMap: make(map[string]string),
+		next:             getGlobalRegistry(),
 	}
+}
+
+func getGlobalRegistry() *registry {
+	once.Do(func() {
+		thImpl = &registry{
+			workflowFuncMap:  make(map[string]interface{}),
+			workflowAliasMap: make(map[string]string),
+			activityFuncMap:  make(map[string]activity),
+			activityAliasMap: make(map[string]string),
+		}
+	})
+	return thImpl
 }
 
 // Wrapper to execute workflow functions.

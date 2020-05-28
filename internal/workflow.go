@@ -230,6 +230,44 @@ type RegisterWorkflowOptions struct {
 	DisableAlreadyRegisteredCheck bool
 }
 
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
+// RegisterWorkflow - registers a workflow function with the framework.
+// The public form is: workflow.Register(...)
+// A workflow takes a cadence context and input and returns a (result, error) or just error.
+// Examples:
+//	func sampleWorkflow(ctx workflow.Context, input []byte) (result []byte, err error)
+//	func sampleWorkflow(ctx workflow.Context, arg1 int, arg2 string) (result []byte, err error)
+//	func sampleWorkflow(ctx workflow.Context) (result []byte, err error)
+//	func sampleWorkflow(ctx workflow.Context, arg1 int) (result string, err error)
+// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
+// This method calls panic if workflowFunc doesn't comply with the expected format.
+func RegisterWorkflow(workflowFunc interface{}) {
+	RegisterWorkflowWithOptions(workflowFunc, RegisterWorkflowOptions{})
+}
+
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
+// RegisterWorkflowWithOptions registers the workflow function with options.
+// The public form is: workflow.RegisterWithOptions(...)
+// The user can use options to provide an external name for the workflow or leave it empty if no
+// external name is required. This can be used as
+//  workflow.RegisterWithOptions(sampleWorkflow, RegisterWorkflowOptions{})
+//  workflow.RegisterWithOptions(sampleWorkflow, RegisterWorkflowOptions{Name: "foo"})
+// A workflow takes a cadence context and input and returns a (result, error) or just error.
+// Examples:
+//	func sampleWorkflow(ctx workflow.Context, input []byte) (result []byte, err error)
+//	func sampleWorkflow(ctx workflow.Context, arg1 int, arg2 string) (result []byte, err error)
+//	func sampleWorkflow(ctx workflow.Context) (result []byte, err error)
+//	func sampleWorkflow(ctx workflow.Context, arg1 int) (result string, err error)
+// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
+// This method calls panic if workflowFunc doesn't comply with the expected format or tries to register the same workflow
+// type name twice. Use workflow.RegisterOptions.DisableAlreadyRegisteredCheck to allow multiple registrations.
+func RegisterWorkflowWithOptions(workflowFunc interface{}, opts RegisterWorkflowOptions) {
+	registry := getGlobalRegistry()
+	registry.RegisterWorkflowWithOptions(workflowFunc, opts)
+}
+
 // Await blocks the calling thread until condition() returns true
 // Returns CanceledError if the ctx is canceled.
 func Await(ctx Context, condition func() bool) error {

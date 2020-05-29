@@ -32,6 +32,9 @@ type ActivityOptions = internal.ActivityOptions
 // LocalActivityOptions doc
 type LocalActivityOptions = internal.LocalActivityOptions
 
+// RetryPolicy specify how to retry activity if error happens.
+type RetryPolicy = internal.RetryPolicy
+
 // WithActivityOptions adds all options to the copy of the context.
 func WithActivityOptions(ctx Context, options ActivityOptions) Context {
 	return internal.WithActivityOptions(ctx, options)
@@ -67,7 +70,12 @@ func WithHeartbeatTimeout(ctx Context, d time.Duration) Context {
 	return internal.WithHeartbeatTimeout(ctx, d)
 }
 
-// WithWaitForCancellation adds wait for the cacellation to the copy of the context.
+// WithWaitForCancellation adds wait for the cancellation to the copy of the context.
 func WithWaitForCancellation(ctx Context, wait bool) Context {
 	return internal.WithWaitForCancellation(ctx, wait)
+}
+
+// WithRetryPolicy adds retry policy to the copy of the context.
+func WithRetryPolicy(ctx Context, retryPolicy RetryPolicy) Context {
+	return internal.WithRetryPolicy(ctx, retryPolicy)
 }

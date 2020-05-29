@@ -2569,6 +2569,40 @@ func (s *WorkflowTestSuiteUnitTest) Test_SameActivityIDFromDifferentChildWorkflo
 	s.Equal("hello_child_1 hello_child_2", actualResult)
 }
 
+func (s *WorkflowTestSuiteUnitTest) Test_MockChildWorkflowAlreadyRunning() {
+	childWorkflowFn := func(ctx Context) error {
+		return nil
+	}
+
+	runID := "run-id"
+	workflowFn := func(ctx Context) error {
+		cwo := ChildWorkflowOptions{
+			ExecutionStartToCloseTimeout: time.Minute,
+		}
+		ctx = WithChildWorkflowOptions(ctx, cwo)
+		err := ExecuteChildWorkflow(ctx, childWorkflowFn).Get(ctx, nil)
+		s.Error(err)
+
+		alreadySytartedErr, ok := err.(*shared.WorkflowExecutionAlreadyStartedError)
+		s.True(ok)
+		s.Equal(runID, *alreadySytartedErr.RunId)
+
+		return nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	RegisterWorkflow(childWorkflowFn)
+	RegisterWorkflow(workflowFn)
+
+	env.OnWorkflow(childWorkflowFn, mock.Anything).
+		Return(&shared.WorkflowExecutionAlreadyStartedError{
+			RunId: &runID,
+		})
+
+	env.ExecuteWorkflow(workflowFn)
+	s.NoError(env.GetWorkflowError())
+}
+
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowAlreadyRunning() {
 	workflowFn := func(ctx Context) (string, error) {
 		ctx1 := WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
@@ -2841,7 +2875,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_AwaitWithTimeout() {
 	workflowFn := func(ctx Context) (bool, error) {
 		t := NewTimer(ctx, time.Second)
 		value := false
-		err := Await(ctx, func() bool { return t.IsReady() || value})
+		err := Await(ctx, func() bool { return t.IsReady() || value })
 		return value, err
 	}
 

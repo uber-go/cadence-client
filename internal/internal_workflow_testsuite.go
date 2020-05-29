@@ -764,7 +764,7 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 
 	if err != nil {
 		switch err := err.(type) {
-		case *CanceledError, *ContinueAsNewError, *TimeoutError:
+		case *CanceledError, *ContinueAsNewError, *TimeoutError, *shared.WorkflowExecutionAlreadyStartedError:
 			env.testError = err
 		case *workflowPanicError:
 			env.testError = newPanicError(err.value, err.stackTrace)

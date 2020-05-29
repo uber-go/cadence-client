@@ -260,7 +260,11 @@ func (bw *baseWorker) pollTask() {
 		if err != nil && enableVerboseLogging {
 			bw.logger.Debug("Failed to poll for task.", zap.Error(err))
 		}
-		if err != nil && isServiceTransientError(err) {
+		if err != nil {
+			if isNonRetriableError(err) {
+				bw.logger.Error("Worker stop polling task.", zap.Error(err))
+				return
+			}
 			bw.retrier.Failed()
 		} else {
 			bw.retrier.Succeeded()
@@ -275,6 +279,18 @@ func (bw *baseWorker) pollTask() {
 	} else {
 		bw.pollerRequestCh <- struct{}{} // poll failed, trigger a new poll
 	}
+}
+
+func isNonRetriableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	switch err.(type) {
+	case *shared.BadRequestError,
+		*shared.ClientVersionNotSupportedError:
+		return true
+	}
+	return false
 }
 
 func (bw *baseWorker) processTask(task interface{}) {

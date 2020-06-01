@@ -127,7 +127,7 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler()}
 	a := &greeterActivity{}
 	registry := getGlobalRegistry()
-	registry.addActivity(a.ActivityType().Name, a)
+	registry.addActivityWithLock(a.ActivityType().Name, a)
 	activityWorker := newActivityWorker(
 		s.service, domain, executionParameters, overrides, registry, nil,
 	)
@@ -176,7 +176,7 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	overrides := &workerOverrides{activityTaskHandler: activityTaskHandler}
 	a := &greeterActivity{}
 	registry := getGlobalRegistry()
-	registry.addActivity(a.ActivityType().Name, a)
+	registry.addActivityWithLock(a.ActivityType().Name, a)
 	worker := newActivityWorker(
 		s.service, domain, executionParameters, overrides, registry, nil,
 	)

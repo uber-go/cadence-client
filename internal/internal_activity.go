@@ -395,8 +395,8 @@ func deSerializeFunctionResult(f interface{}, result []byte, to interface{}, dat
 	case reflect.String:
 		// If we know about this function through registration then we will try to return corresponding result type.
 		fnName := reflect.ValueOf(f).String()
-		if fnRegistered, ok := registry.getActivityFn(fnName); ok {
-			return deSerializeFnResultFromFnType(reflect.TypeOf(fnRegistered), result, to, dataConverter)
+		if activity, ok := registry.GetActivity(fnName); ok {
+			return deSerializeFnResultFromFnType(reflect.TypeOf(activity.GetFunction()), result, to, dataConverter)
 		}
 	}
 

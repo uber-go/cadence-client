@@ -640,7 +640,7 @@ func (r *registry) registerActivityStruct(aStruct interface{}, options RegisterA
 		}
 		registerName = prefix + name
 		if !options.DisableAlreadyRegisteredCheck {
-			if _, ok := r.getActivityFn(registerName); ok {
+			if _, ok := r.getActivityNoLock(registerName); ok {
 				return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 			}
 		}
@@ -709,22 +709,23 @@ func (r *registry) addActivityWithLock(fnName string, a activity) {
 	r.activityFuncMap[fnName] = a
 }
 
-func (r *registry) getActivity(fnName string) (activity, bool) {
-	r.Lock() // do not defer for Unlock to call next.getActivity without lock
+func (r *registry) GetActivity(fnName string) (activity, bool) {
+	r.Lock() // do not defer for Unlock to call next.GetActivity without lock
 	a, ok := r.activityFuncMap[fnName]
 	if !ok && r.next != nil {
 		r.Unlock()
-		return r.next.getActivity(fnName)
+		return r.next.GetActivity(fnName)
 	}
 	r.Unlock()
 	return a, ok
 }
 
-func (r *registry) getActivityFn(fnName string) (interface{}, bool) {
-	if a, ok := r.getActivity(fnName); ok {
-		return a.GetFunction(), ok
+func (r *registry) getActivityNoLock(fnName string) (activity, bool) {
+	a, ok := r.activityFuncMap[fnName]
+	if !ok && r.next != nil {
+		return r.next.getActivityNoLock(fnName)
 	}
-	return nil, false
+	return a, ok
 }
 
 func (r *registry) getRegisteredActivities() []activity {

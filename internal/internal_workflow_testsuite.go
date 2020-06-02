@@ -158,9 +158,8 @@ type (
 	// testWorkflowEnvironmentImpl is the environment that runs the workflow/activity unit tests.
 	testWorkflowEnvironmentImpl struct {
 		*testWorkflowEnvironmentShared
-		parentEnv            *testWorkflowEnvironmentImpl
-		registry             *registry
-		workflowInterceptors []WorkflowInterceptorFactory
+		parentEnv *testWorkflowEnvironmentImpl
+		registry  *registry
 
 		workflowInfo   *WorkflowInfo
 		workflowDef    workflowDefinition
@@ -191,23 +190,7 @@ type (
 	}
 )
 
-// make sure interface is implemented
-var _ workflowEnvironment = (*testWorkflowEnvironmentImpl)(nil)
-
-func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *registry) *testWorkflowEnvironmentImpl {
-	var r *registry
-	if parentRegistry == nil {
-		r = newRegistry()
-		r.RegisterActivityWithOptions(sessionCreationActivity, RegisterActivityOptions{
-			Name: sessionCreationActivityName,
-		})
-		r.RegisterActivityWithOptions(sessionCompletionActivity, RegisterActivityOptions{
-			Name: sessionCompletionActivityName,
-		})
-	} else {
-		r = parentRegistry
-	}
-
+func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite) *testWorkflowEnvironmentImpl {
 	env := &testWorkflowEnvironmentImpl{
 		testWorkflowEnvironmentShared: &testWorkflowEnvironmentShared{
 			testSuite:                  s,
@@ -239,7 +222,7 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *regist
 			ExecutionStartToCloseTimeoutSeconds: 1,
 			TaskStartToCloseTimeoutSeconds:      1,
 		},
-		registry: r,
+		registry: newRegistry(getGlobalRegistry()),
 
 		changeVersions: make(map[string]Version),
 		openSessions:   make(map[string]*SessionInfo),
@@ -334,7 +317,7 @@ func (env *testWorkflowEnvironmentImpl) setStartTime(startTime time.Time) {
 
 func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(params *executeWorkflowParams, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) (*testWorkflowEnvironmentImpl, error) {
 	// create a new test env
-	childEnv := newTestWorkflowEnvironmentImpl(env.testSuite, env.registry)
+	childEnv := newTestWorkflowEnvironmentImpl(env.testSuite)
 	childEnv.parentEnv = env
 	childEnv.startedHandler = startedHandler
 	childEnv.testWorkflowEnvironmentShared = env.testWorkflowEnvironmentShared
@@ -409,7 +392,6 @@ func (env *testWorkflowEnvironmentImpl) setWorkerOptions(options WorkerOptions) 
 	if len(options.ContextPropagators) > 0 {
 		env.workerOptions.ContextPropagators = options.ContextPropagators
 	}
-	env.workflowInterceptors = options.WorkflowInterceptorChainFactories
 }
 
 func (env *testWorkflowEnvironmentImpl) setWorkerStopChannel(c chan struct{}) {
@@ -418,7 +400,7 @@ func (env *testWorkflowEnvironmentImpl) setWorkerStopChannel(c chan struct{}) {
 
 func (env *testWorkflowEnvironmentImpl) setActivityTaskList(tasklist string, activityFns ...interface{}) {
 	for _, activityFn := range activityFns {
-		fnName := getActivityFunctionName(env.registry, activityFn)
+		fnName := getFunctionName(activityFn)
 		taskListActivity, ok := env.taskListSpecificActivities[fnName]
 		if !ok {
 			taskListActivity = &taskListSpecificActivity{fn: activityFn, taskLists: make(map[string]struct{})}
@@ -493,7 +475,7 @@ func (env *testWorkflowEnvironmentImpl) getWorkflowDefinition(wt WorkflowType) (
 		return nil, fmt.Errorf("unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
 	}
 	wd := &workflowExecutorWrapper{
-		workflowExecutor: &workflowExecutor{workflowType: wt.Name, fn: wf},
+		workflowExecutor: &workflowExecutor{name: wt.Name, fn: wf},
 		env:              env,
 	}
 	return newSyncWorkflowDefinition(wd), nil
@@ -503,12 +485,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	activityFn interface{},
 	args ...interface{},
 ) (Value, error) {
-	activityType, err := getValidatedActivityFunction(activityFn, args, env.registry)
-	if err != nil {
-		panic(err)
-	}
-
-	input, err := encodeArgs(env.GetDataConverter(), args)
+	activityType, input, err := getValidatedActivityFunction(activityFn, args, env.GetDataConverter(), env.registry)
 	if err != nil {
 		panic(err)
 	}
@@ -1075,8 +1052,8 @@ func getRetryBackoffFromThriftRetryPolicy(tp *shared.RetryPolicy, attempt int32,
 func (env *testWorkflowEnvironmentImpl) ExecuteLocalActivity(params executeLocalActivityParams, callback laResultHandler) *localActivityInfo {
 	activityID := getStringID(env.nextID())
 	wOptions := augmentWorkerOptions(env.workerOptions)
-	ae := &activityExecutor{name: getActivityFunctionName(env.registry, params.ActivityFn), fn: params.ActivityFn}
-	if at, _ := getValidatedActivityFunction(params.ActivityFn, params.InputArgs, env.registry); at != nil {
+	ae := &activityExecutor{name: getFunctionName(params.ActivityFn), fn: params.ActivityFn}
+	if at, _, _ := getValidatedActivityFunction(params.ActivityFn, params.InputArgs, wOptions.DataConverter, env.registry); at != nil {
 		// local activity could be registered, if so use the registered name. This name is only used to find a mock.
 		ae.name = at.Name
 	}
@@ -1117,7 +1094,7 @@ func (env *testWorkflowEnvironmentImpl) RequestCancelLocalActivity(activityID st
 		env.logger.Debug("RequestCancelLocalActivity failed, LocalActivity not exists or already completed.", zap.String(tagActivityID, activityID))
 		return
 	}
-	activityInfo := env.getActivityInfo(activityID, getActivityFunctionName(env.registry, task.params.ActivityFn))
+	activityInfo := env.getActivityInfo(activityID, getFunctionName(task.params.ActivityFn))
 	env.logger.Debug("RequestCancelLocalActivity", zap.String(tagActivityID, activityID))
 	delete(env.localActivities, activityID)
 	env.postCallback(func() {
@@ -1189,7 +1166,7 @@ func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, 
 
 func (env *testWorkflowEnvironmentImpl) handleLocalActivityResult(result *localActivityResult) {
 	activityID := result.task.activityID
-	activityType := getActivityFunctionName(env.registry, result.task.params.ActivityFn)
+	activityType := getFunctionName(result.task.params.ActivityFn)
 	env.logger.Debug(fmt.Sprintf("handleLocalActivityResult: Err: %v, Result: %v.", result.err, string(result.result)),
 		zap.String(tagActivityID, activityID), zap.String(tagActivityType, activityType))
 
@@ -1302,19 +1279,13 @@ func (w *workflowExecutorWrapper) Execute(ctx Context, input []byte) (result []b
 		env.runningCount++
 	}
 
-	m := &mockWrapper{
-		env:           env,
-		name:          w.workflowType,
-		fn:            w.fn,
-		isWorkflow:    true,
-		dataConverter: env.GetDataConverter(),
-	}
+	m := &mockWrapper{env: env, name: w.name, fn: w.fn, isWorkflow: true, dataConverter: env.GetDataConverter()}
 	// This method is called by workflow's dispatcher. In this test suite, it is run in the main loop. We cannot block
 	// the main loop, but the mock could block if it is configured to wait. So we need to use a separate goroutinue to
 	// run the mock, and resume after mock call returns.
 	mockReadyChannel := NewChannel(ctx)
 	// make a copy of the context for getMockReturn() call to avoid race condition
-	ctxCopy := newWorkflowContext(w.env, nil, nil)
+	ctxCopy := newWorkflowContext(w.env)
 	go func() {
 		// getMockReturn could block if mock is configured to wait. The returned mockRet is what has been configured
 		// for the mock by using MockCallWrapper.Return(). The mockRet could be mock values or mock function. We process
@@ -1489,7 +1460,7 @@ func (m *mockWrapper) executeMock(ctx interface{}, input []byte, mockRet mock.Ar
 	if mockFn := m.getMockFn(mockRet); mockFn != nil {
 		// we found a mock function that matches to actual function, so call that mockFn
 		if m.isWorkflow {
-			executor := &workflowExecutor{workflowType: fnName, fn: mockFn}
+			executor := &workflowExecutor{name: fnName, fn: mockFn}
 			return executor.Execute(ctx.(Context), input)
 		}
 		executor := &activityExecutor{name: fnName, fn: mockFn}
@@ -1982,12 +1953,8 @@ func (env *testWorkflowEnvironmentImpl) setHeartbeatDetails(details interface{})
 	env.heartbeatDetails = data
 }
 
-func (env *testWorkflowEnvironmentImpl) GetRegistry() *registry {
-	return env.registry
-}
-
-func (env *testWorkflowEnvironmentImpl) GetWorkflowInterceptors() []WorkflowInterceptorFactory {
-	return env.workflowInterceptors
+func (wc *testWorkflowEnvironmentImpl) GetRegistry() *registry {
+	return wc.registry
 }
 
 func newTestSessionEnvironment(testWorkflowEnvironment *testWorkflowEnvironmentImpl,
@@ -2025,6 +1992,9 @@ func mockFnRequestCancelExternalWorkflow(domainName, workflowID, runID string) e
 func mockFnGetVersion(changeID string, minSupported, maxSupported Version) Version {
 	return DefaultVersion
 }
+
+// make sure interface is implemented
+var _ workflowEnvironment = (*testWorkflowEnvironmentImpl)(nil)
 
 type testReporter struct {
 	logger *zap.Logger

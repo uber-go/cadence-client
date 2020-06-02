@@ -35,8 +35,7 @@ import (
 
 func createRootTestContext() (ctx Context) {
 	env := new(WorkflowUnitTest).NewTestWorkflowEnvironment()
-	interceptors, envInterceptor := newWorkflowInterceptors(env.impl, env.impl.workflowInterceptors)
-	return newWorkflowContext(env.impl, interceptors, envInterceptor)
+	return newWorkflowContext(env.impl)
 }
 
 func TestDispatcher(t *testing.T) {
@@ -1182,11 +1181,11 @@ func TestChainedFuture(t *testing.T) {
 		require.NoError(t, fut.Get(ctx, &out))
 		return out, nil
 	}
+	RegisterWorkflow(workflowFn)
+	RegisterActivity(activityFn)
 
 	s := WorkflowTestSuite{}
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
-	env.RegisterActivity(activityFn)
 
 	env.ExecuteWorkflow(workflowFn)
 	err := env.GetWorkflowError()

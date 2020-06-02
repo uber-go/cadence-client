@@ -39,6 +39,7 @@ type SessionTestSuite struct {
 }
 
 func (s *SessionTestSuite) SetupSuite() {
+	RegisterActivityWithOptions(testSessionActivity, RegisterActivityOptions{Name: "testSessionActivity"})
 	s.sessionOptions = &SessionOptions{
 		ExecutionTimeout: time.Minute,
 		CreationTimeout:  time.Minute,
@@ -79,8 +80,8 @@ func (s *SessionTestSuite) TestCreationCompletion() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.OnActivity(sessionCreationActivityName, mock.Anything, mock.Anything).Return(sessionCreationActivity).Once()
 	env.OnActivity(sessionCompletionActivityName, mock.Anything, mock.Anything).Return(sessionCompletionActivity).Once()
 	env.ExecuteWorkflow(workflowFn)
@@ -101,6 +102,7 @@ func (s *SessionTestSuite) TestCreationWithOpenSessionContext() {
 		return err
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
 	env.ExecuteWorkflow(workflowFn)
 
@@ -131,8 +133,8 @@ func (s *SessionTestSuite) TestCreationWithClosedSessionContext() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.OnActivity(sessionCreationActivityName, mock.Anything, mock.Anything).Return(sessionCreationActivity).Once()
 	env.OnActivity(sessionCompletionActivityName, mock.Anything, mock.Anything).Return(sessionCompletionActivity).Once()
 	env.ExecuteWorkflow(workflowFn)
@@ -164,8 +166,8 @@ func (s *SessionTestSuite) TestCreationWithFailedSessionContext() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.OnActivity(sessionCreationActivityName, mock.Anything, mock.Anything).Return(sessionCreationActivity).Once()
 	env.OnActivity(sessionCompletionActivityName, mock.Anything, mock.Anything).Return(sessionCompletionActivity).Once()
 	env.ExecuteWorkflow(workflowFn)
@@ -186,8 +188,8 @@ func (s *SessionTestSuite) TestCompletionWithClosedSessionContext() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -206,8 +208,8 @@ func (s *SessionTestSuite) TestCompletionWithFailedSessionContext() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -248,8 +250,8 @@ func (s *SessionTestSuite) TestGetSessionInfo() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -278,8 +280,8 @@ func (s *SessionTestSuite) TestRecreation() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.OnActivity(sessionCreationActivityName, mock.Anything, mock.Anything).Return(sessionCreationActivity).Once()
 	env.OnActivity(sessionCompletionActivityName, mock.Anything, mock.Anything).Return(sessionCompletionActivity).Once()
 	env.ExecuteWorkflow(workflowFn)
@@ -306,8 +308,8 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_CreationOnly() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.SetWorkerOptions(WorkerOptions{
 		MaxConcurrentSessionExecutionSize: maxConcurrentSessionExecutionSize,
 	})
@@ -348,8 +350,8 @@ func (s *SessionTestSuite) TestMaxConcurrentSession_WithRecreation() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.SetWorkerOptions(WorkerOptions{
 		MaxConcurrentSessionExecutionSize: maxConcurrentSessionExecutionSize,
 	})
@@ -385,10 +387,9 @@ func (s *SessionTestSuite) TestSessionTaskList() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterActivity(testSessionActivity)
-
-	var taskListUsed []string
+	taskListUsed := []string{}
 	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		taskListUsed = append(taskListUsed, activityInfo.TaskList)
 	})
@@ -439,10 +440,9 @@ func (s *SessionTestSuite) TestSessionRecreationTaskList() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterActivity(testSessionActivity)
-
-	var taskListUsed []string
+	taskListUsed := []string{}
 	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		taskListUsed = append(taskListUsed, activityInfo.TaskList)
 	})
@@ -475,8 +475,8 @@ func (s *SessionTestSuite) TestExecuteActivityInFailedSession() {
 		return ExecuteActivity(sessionCtx, testSessionActivity, "a random name").Get(sessionCtx, nil)
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -500,9 +500,8 @@ func (s *SessionTestSuite) TestExecuteActivityInClosedSession() {
 		return ExecuteActivity(sessionCtx, testSessionActivity, "some random message").Get(sessionCtx, nil)
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
-	env.RegisterActivity(testSessionActivity)
 	var taskListUsed string
 	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		taskListUsed = activityInfo.TaskList
@@ -557,8 +556,8 @@ func (s *SessionTestSuite) TestCompletionFailed() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.OnActivity(sessionCreationActivityName, mock.Anything, mock.Anything).Return(sessionCreationActivity).Once()
 	env.OnActivity(sessionCompletionActivityName, mock.Anything, mock.Anything).Return(errors.New("some random error")).Once()
 	env.ExecuteWorkflow(workflowFn)
@@ -584,8 +583,8 @@ func (s *SessionTestSuite) TestUserTimerWithinSession() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	env.AssertExpectations(s.T())
@@ -621,8 +620,8 @@ func (s *SessionTestSuite) TestActivityRetryWithinSession() {
 		return nil
 	}
 
+	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterActivity(testSessionActivity)
 	env.OnActivity(testSessionActivity, mock.Anything, mock.Anything).Return("", errors.New("some random error"))
 	env.ExecuteWorkflow(workflowFn)
 

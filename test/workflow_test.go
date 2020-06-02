@@ -517,8 +517,7 @@ func (w *Workflows) InspectLocalActivityInfo(ctx workflow.Context) error {
 }
 
 func (w *Workflows) register(worker worker.Worker) {
-	// Kept to verify backward compatibility of workflow registration.
-	workflow.RegisterWithOptions(w.Basic, workflow.RegisterOptions{DisableAlreadyRegisteredCheck: true})
+	worker.RegisterWorkflow(w.Basic)
 	worker.RegisterWorkflow(w.ActivityRetryOnError)
 	worker.RegisterWorkflow(w.ActivityRetryOnHBTimeout)
 	worker.RegisterWorkflow(w.ActivityRetryOnTimeout)
@@ -541,7 +540,6 @@ func (w *Workflows) register(worker worker.Worker) {
 	worker.RegisterWorkflow(w.LargeQueryResultWorkflow)
 	worker.RegisterWorkflow(w.RetryTimeoutStableErrorWorkflow)
 	worker.RegisterWorkflow(w.ConsistentQueryWorkflow)
-
 }
 
 func (w *Workflows) defaultActivityOptions() workflow.ActivityOptions {

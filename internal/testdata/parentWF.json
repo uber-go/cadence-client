@@ -6,7 +6,7 @@
   "taskId": 50331648,
   "workflowExecutionStartedEventAttributes": {
     "workflowType": {
-      "name": "testReplayWorkflowFromFileParent"
+      "name": "go.uber.org/cadence/internal.testReplayWorkflowFromFileParent"
     },
     "taskList": {
       "name": "childWorkflowGroup"

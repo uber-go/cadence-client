@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -36,7 +35,6 @@ import (
 	"go.uber.org/cadence"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/client"
-	"go.uber.org/cadence/interceptors"
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/goleak"
@@ -54,7 +52,6 @@ type IntegrationTestSuite struct {
 	worker       worker.Worker
 	seq          int64
 	taskListName string
-	tracer       *tracingInterceptorFactory
 }
 
 const (
@@ -139,13 +136,6 @@ func (ts *IntegrationTestSuite) SetupTest() {
 		DisableStickyExecution: ts.config.IsStickyOff,
 		Logger:                 logger,
 	})
-	ts.tracer = newtracingInterceptorFactory()
-	options := worker.Options{
-		DisableStickyExecution:            ts.config.IsStickyOff,
-		Logger:                            logger,
-		WorkflowInterceptorChainFactories: []interceptors.WorkflowInterceptorFactory{ts.tracer},
-	}
-	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, options)
 	ts.registerWorkflowsAndActivities(ts.worker)
 	ts.Nil(ts.worker.Start())
 }
@@ -159,10 +149,6 @@ func (ts *IntegrationTestSuite) TestBasic() {
 	err := ts.executeWorkflow("test-basic", ts.workflows.Basic, &expected)
 	ts.NoError(err)
 	ts.EqualValues(expected, ts.activities.invoked())
-	// See https://grokbase.com/p/gg/golang-nuts/153jjj8dgg/go-nuts-fm-suffix-in-function-name-what-does-it-mean
-	// for explanation of -fm postfix.
-	ts.Equal([]string{"ExecuteWorkflow begin", "ExecuteActivity", "ExecuteActivity", "ExecuteWorkflow end"},
-		ts.tracer.GetTrace("Basic-fm"))
 }
 
 func (ts *IntegrationTestSuite) TestActivityRetryOnError() {
@@ -368,7 +354,6 @@ func (ts *IntegrationTestSuite) TestChildWFWithMemoAndSearchAttributes() {
 	ts.NoError(err)
 	ts.EqualValues([]string{"getMemoAndSearchAttr"}, ts.activities.invoked())
 	ts.Equal("memoVal, searchAttrVal", result)
-	ts.Equal([]string{"ExecuteWorkflow begin", "ExecuteChildWorkflow", "ExecuteWorkflow end"}, ts.tracer.GetTrace("ChildWorkflowSuccess-fm"))
 }
 
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
@@ -378,6 +363,7 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
+	fmt.Println("liang test done")
 }
 
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
@@ -391,10 +377,8 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 
 func (ts *IntegrationTestSuite) TestActivityCancelUsingReplay() {
 	logger, err := zap.NewDevelopment()
-	ts.NoError(err)
-	replayer := worker.NewWorkflowReplayer()
-	replayer.RegisterWorkflowWithOptions(ts.workflows.ActivityCancelRepro, workflow.RegisterOptions{DisableAlreadyRegisteredCheck: true})
-	err = replayer.ReplayPartialWorkflowHistoryFromJSONFile(logger, "fixtures/activity.cancel.sm.repro.json", 12)
+	workflow.RegisterWithOptions(ts.workflows.ActivityCancelRepro, workflow.RegisterOptions{DisableAlreadyRegisteredCheck: true})
+	err = worker.ReplayPartialWorkflowHistoryFromJSONFile(logger, "fixtures/activity.cancel.sm.repro.json", 12)
 	ts.NoError(err)
 }
 
@@ -504,58 +488,4 @@ func (ts *IntegrationTestSuite) startWorkflowOptions(wfID string) client.StartWo
 func (ts *IntegrationTestSuite) registerWorkflowsAndActivities(w worker.Worker) {
 	ts.workflows.register(w)
 	ts.activities.register(w)
-}
-
-var _ interceptors.WorkflowInterceptorFactory = (*tracingInterceptorFactory)(nil)
-
-type tracingInterceptorFactory struct {
-	sync.Mutex
-	// key is workflow id
-	instances map[string]*tracingInterceptor
-}
-
-func newtracingInterceptorFactory() *tracingInterceptorFactory {
-	return &tracingInterceptorFactory{instances: make(map[string]*tracingInterceptor)}
-}
-
-func (t *tracingInterceptorFactory) GetTrace(workflowType string) []string {
-	t.Mutex.Lock()
-	defer t.Mutex.Unlock()
-	if i, ok := t.instances[workflowType]; ok {
-		return i.trace
-	}
-	panic(fmt.Sprintf("Unknown workflowType %v, known types: %v", workflowType, t.instances))
-}
-func (t *tracingInterceptorFactory) NewInterceptor(info *workflow.Info, next interceptors.WorkflowInterceptor) interceptors.WorkflowInterceptor {
-	t.Mutex.Lock()
-	defer t.Mutex.Unlock()
-	result := &tracingInterceptor{
-		WorkflowInterceptorBase: interceptors.WorkflowInterceptorBase{Next: next},
-	}
-	t.instances[info.WorkflowType.Name] = result
-	return result
-}
-
-var _ interceptors.WorkflowInterceptor = (*tracingInterceptor)(nil)
-
-type tracingInterceptor struct {
-	interceptors.WorkflowInterceptorBase
-	trace []string
-}
-
-func (t *tracingInterceptor) ExecuteActivity(ctx workflow.Context, activityType string, args ...interface{}) workflow.Future {
-	t.trace = append(t.trace, "ExecuteActivity")
-	return t.Next.ExecuteActivity(ctx, activityType, args...)
-}
-
-func (t *tracingInterceptor) ExecuteChildWorkflow(ctx workflow.Context, childWorkflowType string, args ...interface{}) workflow.ChildWorkflowFuture {
-	t.trace = append(t.trace, "ExecuteChildWorkflow")
-	return t.Next.ExecuteChildWorkflow(ctx, childWorkflowType, args...)
-}
-
-func (t *tracingInterceptor) ExecuteWorkflow(ctx workflow.Context, workflowType string, args ...interface{}) []interface{} {
-	t.trace = append(t.trace, "ExecuteWorkflow begin")
-	result := t.Next.ExecuteWorkflow(ctx, workflowType, args...)
-	t.trace = append(t.trace, "ExecuteWorkflow end")
-	return result
 }

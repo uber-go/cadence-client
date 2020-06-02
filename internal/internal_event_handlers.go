@@ -45,7 +45,7 @@ const (
 	queryResultSizeLimit = 2000000 // 2MB
 )
 
-// Make sure that interfaces are implemented
+// Assert that structs do indeed implement the interfaces
 var _ workflowEnvironment = (*workflowEnvironmentImpl)(nil)
 var _ workflowExecutionEventHandler = (*workflowExecutionEventHandlerImpl)(nil)
 
@@ -112,12 +112,11 @@ type (
 		isReplay              bool // flag to indicate if workflow is in replay mode
 		enableLoggingInReplay bool // flag to indicate if workflow should enable logging in replay mode
 
-		metricsScope         tally.Scope
-		registry             *registry
-		dataConverter        DataConverter
-		contextPropagators   []ContextPropagator
-		tracer               opentracing.Tracer
-		workflowInterceptors []WorkflowInterceptorFactory
+		metricsScope       tally.Scope
+		registry           *registry
+		dataConverter      DataConverter
+		contextPropagators []ContextPropagator
+		tracer             opentracing.Tracer
 	}
 
 	localActivityTask struct {
@@ -181,7 +180,6 @@ func newWorkflowExecutionEventHandler(
 	dataConverter DataConverter,
 	contextPropagators []ContextPropagator,
 	tracer opentracing.Tracer,
-	workflowInterceptors []WorkflowInterceptorFactory,
 ) workflowExecutionEventHandler {
 	context := &workflowEnvironmentImpl{
 		workflowInfo:          workflowInfo,
@@ -198,7 +196,6 @@ func newWorkflowExecutionEventHandler(
 		dataConverter:         dataConverter,
 		contextPropagators:    contextPropagators,
 		tracer:                tracer,
-		workflowInterceptors:  workflowInterceptors,
 	}
 	context.logger = logger.With(
 		zapcore.Field{Key: tagWorkflowType, Type: zapcore.StringType, String: workflowInfo.WorkflowType.Name},
@@ -740,10 +737,6 @@ func (wc *workflowEnvironmentImpl) getOpenSessions() []*SessionInfo {
 
 func (wc *workflowEnvironmentImpl) GetRegistry() *registry {
 	return wc.registry
-}
-
-func (wc *workflowEnvironmentImpl) GetWorkflowInterceptors() []WorkflowInterceptorFactory {
-	return wc.workflowInterceptors
 }
 
 func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(

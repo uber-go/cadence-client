@@ -5,7 +5,7 @@
     "eventType": "WorkflowExecutionStarted",
     "workflowExecutionStartedEventAttributes": {
       "workflowType": {
-        "name": "testReplayWorkflowFromFile"
+        "name": "go.uber.org/cadence/internal.testReplayWorkflowFromFile"
       },
       "taskList": {
         "name": "taskList1"

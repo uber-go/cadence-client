@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2020 Uber Technologies Inc.
-// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
+// Copyright (c) 2017 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,9 +29,7 @@
 package evictiontest
 
 import (
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
@@ -45,7 +42,20 @@ import (
 	"go.uber.org/cadence/worker"
 	"go.uber.org/yarpc"
 	"golang.org/x/net/context"
+	"strconv"
+	"time"
 )
+
+func init() {
+	// this is an arbitrary workflow we use for this test
+	// NOTE: a simple helloworld that doesn't execute an activity
+	// won't work because the workflow will simply just complete
+	// and won't stay in the cache.
+	// for this test, we need a workflow that "blocks" either by
+	// running an activity or waiting on a timer so that its execution
+	// context sticks around in the cache.
+	internal.RegisterWorkflow(testReplayWorkflow)
+}
 
 func testReplayWorkflow(ctx internal.Context) error {
 	ao := internal.ActivityOptions{
@@ -90,19 +100,14 @@ func TestWorkersTestSuite(t *testing.T) {
 var callOptions = []interface{}{gomock.Any(), gomock.Any(), gomock.Any()}
 
 func createTestEventWorkflowExecutionStarted(eventID int64, attr *m.WorkflowExecutionStartedEventAttributes) *m.HistoryEvent {
-	return &m.HistoryEvent{
-		EventId:                                 common.Int64Ptr(eventID),
-		EventType:                               common.EventTypePtr(m.EventTypeWorkflowExecutionStarted),
-		WorkflowExecutionStartedEventAttributes: attr,
-	}
+	return &m.HistoryEvent{EventId: common.Int64Ptr(eventID), EventType: common.EventTypePtr(m.EventTypeWorkflowExecutionStarted), WorkflowExecutionStartedEventAttributes: attr}
 }
 
 func createTestEventDecisionTaskScheduled(eventID int64, attr *m.DecisionTaskScheduledEventAttributes) *m.HistoryEvent {
 	return &m.HistoryEvent{
 		EventId:                              common.Int64Ptr(eventID),
 		EventType:                            common.EventTypePtr(m.EventTypeDecisionTaskScheduled),
-		DecisionTaskScheduledEventAttributes: attr,
-	}
+		DecisionTaskScheduledEventAttributes: attr}
 }
 
 func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
@@ -115,10 +120,7 @@ func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
 
 	var taskCounter atomic.Int32 // lambda variable to keep count
 	// mock that manufactures unique decision tasks
-	mockPollForDecisionTask := func(
-		ctx context.Context,
-		_PollRequest *m.PollForDecisionTaskRequest,
-		opts ...yarpc.CallOption,
+	mockPollForDecisionTask := func(ctx context.Context, _PollRequest *m.PollForDecisionTaskRequest, opts ...yarpc.CallOption,
 	) (success *m.PollForDecisionTaskResponse, err error) {
 		taskID := taskCounter.Inc()
 		workflowID := common.StringPtr("testID" + strconv.Itoa(int(taskID)))
@@ -130,17 +132,14 @@ func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
 		ret := &m.PollForDecisionTaskResponse{
 			TaskToken:              make([]byte, 5),
 			WorkflowExecution:      &m.WorkflowExecution{WorkflowId: workflowID, RunId: runID},
-			WorkflowType:           &m.WorkflowType{Name: common.StringPtr("testReplayWorkflow")},
+			WorkflowType:           &m.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/evictiontest.testReplayWorkflow")},
 			History:                &m.History{Events: testEvents},
 			PreviousStartedEventId: common.Int64Ptr(5)}
 		return ret, nil
 	}
 
 	resetStickyAPICalled := make(chan struct{})
-	mockResetStickyTaskList := func(
-		ctx context.Context,
-		_ResetRequest *m.ResetStickyTaskListRequest,
-		opts ...yarpc.CallOption,
+	mockResetStickyTaskList := func(ctx context.Context, _ResetRequest *m.ResetStickyTaskListRequest, opts ...yarpc.CallOption,
 	) (success *m.ResetStickyTaskListResponse, err error) {
 		resetStickyAPICalled <- struct{}{}
 		return &m.ResetStickyTaskListResponse{}, nil
@@ -168,14 +167,6 @@ func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
 	s.service.EXPECT().ResetStickyTaskList(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(mockResetStickyTaskList).Times(1)
 
 	workflowWorker := internal.NewWorker(s.service, "test-domain", "tasklist", worker.Options{DisableActivityWorker: true})
-	// this is an arbitrary workflow we use for this test
-	// NOTE: a simple helloworld that doesn't execute an activity
-	// won't work because the workflow will simply just complete
-	// and won't stay in the cache.
-	// for this test, we need a workflow that "blocks" either by
-	// running an activity or waiting on a timer so that its execution
-	// context sticks around in the cache.
-	workflowWorker.RegisterWorkflow(testReplayWorkflow)
 
 	workflowWorker.Start()
 

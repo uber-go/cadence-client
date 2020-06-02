@@ -49,42 +49,41 @@ const (
 type (
 	TaskHandlersTestSuite struct {
 		suite.Suite
-		logger   *zap.Logger
-		service  *workflowservicetest.MockClient
-		registry *registry
+		logger  *zap.Logger
+		service *workflowservicetest.MockClient
 	}
 )
 
-func registerWorkflows(r *registry) {
-	r.RegisterWorkflowWithOptions(
+func init() {
+	RegisterWorkflowWithOptions(
 		helloWorldWorkflowFunc,
 		RegisterWorkflowOptions{Name: "HelloWorld_Workflow"},
 	)
-	r.RegisterWorkflowWithOptions(
+	RegisterWorkflowWithOptions(
 		helloWorldWorkflowCancelFunc,
 		RegisterWorkflowOptions{Name: "HelloWorld_WorkflowCancel"},
 	)
-	r.RegisterWorkflowWithOptions(
+	RegisterWorkflowWithOptions(
 		returnPanicWorkflowFunc,
 		RegisterWorkflowOptions{Name: "ReturnPanicWorkflow"},
 	)
-	r.RegisterWorkflowWithOptions(
+	RegisterWorkflowWithOptions(
 		panicWorkflowFunc,
 		RegisterWorkflowOptions{Name: "PanicWorkflow"},
 	)
-	r.RegisterWorkflowWithOptions(
+	RegisterWorkflowWithOptions(
 		getWorkflowInfoWorkflowFunc,
 		RegisterWorkflowOptions{Name: "GetWorkflowInfoWorkflow"},
 	)
-	r.RegisterWorkflowWithOptions(
+	RegisterWorkflowWithOptions(
 		querySignalWorkflowFunc,
 		RegisterWorkflowOptions{Name: "QuerySignalWorkflow"},
 	)
-	r.RegisterActivityWithOptions(
+	RegisterActivityWithOptions(
 		greeterActivityFunc,
 		RegisterActivityOptions{Name: "Greeter_Activity"},
 	)
-	r.RegisterWorkflowWithOptions(
+	RegisterWorkflowWithOptions(
 		binaryChecksumWorkflowFunc,
 		RegisterWorkflowOptions{Name: "BinaryChecksumWorkflow"},
 	)
@@ -118,13 +117,10 @@ func (t *TaskHandlersTestSuite) SetupTest() {
 func (t *TaskHandlersTestSuite) SetupSuite() {
 	logger, _ := zap.NewDevelopment()
 	t.logger = logger
-	registerWorkflows(t.registry)
 }
 
 func TestTaskHandlersTestSuite(t *testing.T) {
-	suite.Run(t, &TaskHandlersTestSuite{
-		registry: newRegistry(),
-	})
+	suite.Run(t, new(TaskHandlersTestSuite))
 }
 
 func createTestEventWorkflowExecutionCompleted(eventID int64, attr *s.WorkflowExecutionCompletedEventAttributes) *s.HistoryEvent {
@@ -294,7 +290,7 @@ func (t *TaskHandlersTestSuite) testWorkflowTaskWorkflowExecutionStartedHelper(p
 		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &testWorkflowTaskTasklist}}),
 	}
 	task := createWorkflowTask(testEvents, 0, "HelloWorld_Workflow")
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
@@ -350,7 +346,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_BinaryChecksum() {
 		Identity: "test-id-1",
 		Logger:   t.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	response := request.(*s.RespondDecisionTaskCompletedRequest)
 
@@ -390,7 +386,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 		Identity: "test-id-1",
 		Logger:   t.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	response := request.(*s.RespondDecisionTaskCompletedRequest)
 
@@ -436,7 +432,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_QueryWorkflow_Sticky() {
 		Identity: "test-id-1",
 		Logger:   t.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 
 	// first make progress on the workflow
 	task := createWorkflowTask(testEvents[0:1], 0, "HelloWorld_Workflow")
@@ -484,30 +480,30 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_QueryWorkflow_NonSticky() {
 
 	// query after first decision task (notice the previousStartEventID is always the last eventID for query task)
 	task := createQueryTask(testEvents[0:3], 3, "HelloWorld_Workflow", queryType)
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	response, _ := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.verifyQueryResult(response, "waiting-activity-result")
 
 	// query after activity task complete but before second decision task started
 	task = createQueryTask(testEvents[0:7], 7, "HelloWorld_Workflow", queryType)
-	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	response, _ = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.verifyQueryResult(response, "waiting-activity-result")
 
 	// query after second decision task
 	task = createQueryTask(testEvents[0:8], 8, "HelloWorld_Workflow", queryType)
-	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	response, _ = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.verifyQueryResult(response, "done")
 
 	// query after second decision task with extra events
 	task = createQueryTask(testEvents[0:9], 9, "HelloWorld_Workflow", queryType)
-	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	response, _ = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.verifyQueryResult(response, "done")
 
 	task = createQueryTask(testEvents[0:9], 9, "HelloWorld_Workflow", "invalid-query-type")
-	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler = newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	response, _ = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.NotNil(response)
 	queryResp, ok := response.(*s.RespondQueryTaskCompletedRequest)
@@ -549,7 +545,7 @@ func (t *TaskHandlersTestSuite) TestCacheEvictionWhenErrorOccurs() {
 		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
 	}
 
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	// now change the history event so it does not match to decision produced via replay
 	testEvents[4].ActivityTaskScheduledEventAttributes.ActivityType.Name = common.StringPtr("some-other-activity")
 	task := createWorkflowTask(testEvents, 3, "HelloWorld_Workflow")
@@ -584,7 +580,7 @@ func (t *TaskHandlersTestSuite) TestWithMissingHistoryEvents() {
 	}
 
 	for _, startEventID := range []int64{0, 3} {
-		taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+		taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 		task := createWorkflowTask(testEvents, startEventID, "HelloWorld_Workflow")
 		// newWorkflowTaskWorkerInternal will set the laTunnel in taskHandler, without it, ProcessWorkflowTask()
 		// will fail as it can't find laTunnel in getWorkflowCache().
@@ -635,7 +631,7 @@ func (t *TaskHandlersTestSuite) TestWithTruncatedHistory() {
 	}
 
 	for i, tc := range testCases {
-		taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+		taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 		task := createWorkflowTask(testEvents, tc.previousStartedEventID, "HelloWorld_Workflow")
 		task.StartedEventId = common.Int64Ptr(tc.startedEventID)
 		// newWorkflowTaskWorkerInternal will set the laTunnel in taskHandler, without it, ProcessWorkflowTask()
@@ -680,7 +676,7 @@ func (t *TaskHandlersTestSuite) testSideEffectDeferHelper(disableSticky bool) {
 		return nil
 	}
 	workflowName := fmt.Sprintf("SideEffectDeferWorkflow-Sticky=%v", disableSticky)
-	t.registry.RegisterWorkflowWithOptions(
+	RegisterWorkflowWithOptions(
 		workflowFunc,
 		RegisterWorkflowOptions{Name: workflowName},
 	)
@@ -699,7 +695,7 @@ func (t *TaskHandlersTestSuite) testSideEffectDeferHelper(disableSticky bool) {
 		DisableStickyExecution: disableSticky,
 	}
 
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	task := createWorkflowTask(testEvents, 0, workflowName)
 	_, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.Nil(err)
@@ -742,7 +738,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 		WorkerStopChannel:              stopC,
 	}
 
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	// there should be no error as the history events matched the decisions.
@@ -763,7 +759,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 	// now, create a new task handler with fail nondeterministic workflow policy
 	// and verify that it handles the mismatching history correctly.
 	params.NonDeterministicWorkflowPolicy = NonDeterministicWorkflowPolicyFailWorkflow
-	failOnNondeterminismTaskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	failOnNondeterminismTaskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	task = createWorkflowTask(testEvents, 3, "HelloWorld_Workflow")
 	request, err = failOnNondeterminismTaskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	// When FailWorkflow policy is set, task handler does not return an error,
@@ -803,7 +799,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowReturnsPanicError() {
 		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
 	}
 
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.NoError(err)
 	t.NotNil(request)
@@ -831,7 +827,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowPanics() {
 		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
 	}
 
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.NoError(err)
 	t.NotNil(request)
@@ -883,7 +879,7 @@ func (t *TaskHandlersTestSuite) TestGetWorkflowInfo() {
 		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
 	}
 
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.NoError(err)
 	t.NotNil(request)
@@ -915,7 +911,7 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_InvalidQueryTask() {
 		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
 	}
 
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	task := createWorkflowTask(nil, 3, "HelloWorld_Workflow")
 	task.Query = &s.WorkflowQuery{}
 	task.Queries = map[string]*s.WorkflowQuery{"query_id": {}}
@@ -964,7 +960,7 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_Success() {
 		Logger:   t.logger,
 	}
 
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
@@ -1028,7 +1024,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {
 		Identity: "test-id-1",
 		Logger:   t.logger,
 	}
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
@@ -1063,7 +1059,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PageToken() {
 			return &s.History{nextEvents}, nil, nil
 		},
 	}
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: historyIterator}, nil)
 	response := request.(*s.RespondDecisionTaskCompletedRequest)
 	t.NoError(err)
@@ -1093,7 +1089,7 @@ func (t *TaskHandlersTestSuite) TestLocalActivityRetry_DecisionHeartbeatFail() {
 		workflowComplete = true
 		return err
 	}
-	t.registry.RegisterWorkflowWithOptions(
+	RegisterWorkflowWithOptions(
 		retryLocalActivityWorkflowFunc,
 		RegisterWorkflowOptions{Name: "RetryLocalActivityWorkflow"},
 	)
@@ -1121,7 +1117,7 @@ func (t *TaskHandlersTestSuite) TestLocalActivityRetry_DecisionHeartbeatFail() {
 	}
 	defer close(stopCh)
 
-	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, getGlobalRegistry())
 	laTunnel := newLocalActivityTunnel(params.WorkerStopChannel)
 	taskHandlerImpl, ok := taskHandler.(*workflowTaskHandlerImpl)
 	t.True(ok)
@@ -1273,7 +1269,7 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
 		{time.Duration(1 * time.Second), time.Now(), 1, time.Now(), 2, context.DeadlineExceeded},
 	}
 	a := &testActivityDeadline{logger: t.logger}
-	registry := t.registry
+	registry := getGlobalRegistry()
 	registry.addActivityWithLock(a.ActivityType().Name, a)
 
 	mockCtrl := gomock.NewController(t.T())
@@ -1327,7 +1323,7 @@ func activityWithWorkerStop(ctx context.Context) error {
 
 func (t *TaskHandlersTestSuite) TestActivityExecutionWorkerStop() {
 	a := &testActivityDeadline{logger: t.logger}
-	registry := t.registry
+	registry := getGlobalRegistry()
 	registry.RegisterActivityWithOptions(
 		activityWithWorkerStop,
 		RegisterActivityOptions{Name: a.ActivityType().Name, DisableAlreadyRegisteredCheck: true},

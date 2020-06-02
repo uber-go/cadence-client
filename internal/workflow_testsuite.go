@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2020 Uber Technologies Inc.
-// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
+// Copyright (c) 2017 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -114,13 +113,13 @@ func (b ErrorDetailsValues) HasValues() bool {
 // NewTestWorkflowEnvironment creates a new instance of TestWorkflowEnvironment. Use the returned TestWorkflowEnvironment
 // to run your workflow in the test environment.
 func (s *WorkflowTestSuite) NewTestWorkflowEnvironment() *TestWorkflowEnvironment {
-	return &TestWorkflowEnvironment{impl: newTestWorkflowEnvironmentImpl(s, nil)}
+	return &TestWorkflowEnvironment{impl: newTestWorkflowEnvironmentImpl(s)}
 }
 
 // NewTestActivityEnvironment creates a new instance of TestActivityEnvironment. Use the returned TestActivityEnvironment
 // to run your activity in the test environment.
 func (s *WorkflowTestSuite) NewTestActivityEnvironment() *TestActivityEnvironment {
-	return &TestActivityEnvironment{impl: newTestWorkflowEnvironmentImpl(s, nil)}
+	return &TestActivityEnvironment{impl: newTestWorkflowEnvironmentImpl(s)}
 }
 
 // SetLogger sets the logger for this WorkflowTestSuite. If you don't set logger, test suite will create a default logger
@@ -150,16 +149,6 @@ func (s *WorkflowTestSuite) SetContextPropagators(ctxProps []ContextPropagator) 
 // the workflow
 func (s *WorkflowTestSuite) SetHeader(header *shared.Header) {
 	s.header = header
-}
-
-// RegisterActivity registers activity implementation with TestWorkflowEnvironment
-func (t *TestActivityEnvironment) RegisterActivity(a interface{}) {
-	t.impl.RegisterActivity(a)
-}
-
-// RegisterActivityWithOptions registers activity implementation with TestWorkflowEnvironment
-func (t *TestActivityEnvironment) RegisterActivityWithOptions(a interface{}, options RegisterActivityOptions) {
-	t.impl.RegisterActivityWithOptions(a, options)
 }
 
 // ExecuteActivity executes an activity. The tested activity will be executed synchronously in the calling goroutinue.
@@ -206,9 +195,6 @@ func (t *TestWorkflowEnvironment) RegisterWorkflow(w interface{}) {
 }
 
 func (t *TestWorkflowEnvironment) RegisterWorkflowWithOptions(w interface{}, options RegisterWorkflowOptions) {
-	if len(t.ExpectedCalls) > 0 {
-		panic("RegisterWorkflow calls cannot follow mock related ones like OnWorkflow or similar")
-	}
 	t.impl.RegisterWorkflowWithOptions(w, options)
 }
 
@@ -217,9 +203,6 @@ func (t *TestWorkflowEnvironment) RegisterActivity(a interface{}) {
 }
 
 func (t *TestWorkflowEnvironment) RegisterActivityWithOptions(a interface{}, options RegisterActivityOptions) {
-	if len(t.ExpectedCalls) > 0 {
-		panic("RegisterActivity calls cannot follow mock related ones like OnActivity or similar")
-	}
 	t.impl.RegisterActivityWithOptions(a, options)
 }
 
@@ -251,7 +234,10 @@ func (t *TestWorkflowEnvironment) OnActivity(activity interface{}, args ...inter
 		if err := validateFnFormat(fnType, false); err != nil {
 			panic(err)
 		}
-		fnName := getActivityFunctionName(t.impl.registry, activity)
+		fnName := getFunctionName(activity)
+		if alias, ok := t.impl.registry.getActivityAlias(fnName); ok {
+			fnName = alias
+		}
 		call = t.Mock.On(fnName, args...)
 
 	case reflect.String:
@@ -291,7 +277,7 @@ func (t *TestWorkflowEnvironment) OnWorkflow(workflow interface{}, args ...inter
 		if err := validateFnFormat(fnType, true); err != nil {
 			panic(err)
 		}
-		fnName := getWorkflowFunctionName(t.impl.registry, workflow)
+		fnName := getFunctionName(workflow)
 		if alias, ok := t.impl.registry.getWorkflowAlias(fnName); ok {
 			fnName = alias
 		}

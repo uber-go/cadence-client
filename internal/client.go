@@ -519,7 +519,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	return &workflowClient{
 		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),
 		domain:             domain,
-		registry:           newRegistry(getGlobalRegistry()),
+		registry:           newRegistry(),
 		metricsScope:       metrics.NewTaggedScope(metricScope),
 		identity:           identity,
 		dataConverter:      dataConverter,

@@ -116,6 +116,47 @@ type (
 		Stop()
 	}
 
+	// WorkflowReplayer supports replaying a workflow from its event history.
+	// Use for troubleshooting and backwards compatibility unit tests.
+	// For example if a workflow failed in production then its history can be downloaded through UI or CLI
+	// and replayed in a debugger as many times as necessary.
+	// Use this class to create unit tests that check if workflow changes are backwards compatible.
+	// It is important to maintain backwards compatibility through use of workflow.GetVersion
+	// to ensure that new deployments are not going to break open workflows.
+	WorkflowReplayer interface {
+
+		// RegisterWorkflow registers workflow that is going to be replayed
+		RegisterWorkflow(w interface{})
+
+		// RegisterWorkflowWithOptions registers workflow that is going to be replayed with user provided name
+		RegisterWorkflowWithOptions(w interface{}, options workflow.RegisterOptions)
+
+		// ReplayWorkflowHistory executes a single decision task for the given json history file.
+		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+		// The logger is an optional parameter. Defaults to the noop logger.
+		ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error
+
+		// ReplayWorkflowHistoryFromJSONFile executes a single decision task for the json history file downloaded from the cli.
+		// To download the history file: cadence workflow showid <workflow_id> -of <output_filename>
+		// See https://github.com/uber/cadence/blob/master/tools/cli/README.md for full documentation
+		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+		// The logger is an optional parameter. Defaults to the noop logger.
+		ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string) error
+
+		// ReplayPartialWorkflowHistoryFromJSONFile executes a single decision task for the json history file upto provided
+		// lastEventID(inclusive), downloaded from the cli.
+		// To download the history file: cadence workflow showid <workflow_id> -of <output_filename>
+		// See https://github.com/uber/cadence/blob/master/tools/cli/README.md for full documentation
+		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+		// The logger is an optional parameter. Defaults to the noop logger.
+		ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string, lastEventID int64) error
+
+		// ReplayWorkflowExecution loads a workflow execution history from the Cadence service and executes a single decision task for it.
+		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+		// The logger is the only optional parameter. Defaults to the noop logger.
+		ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.Interface, logger *zap.Logger, domain string, execution workflow.Execution) error
+	}
+
 	// Options is used to configure a worker instance.
 	Options = internal.WorkerOptions
 
@@ -153,6 +194,11 @@ func New(
 	options Options,
 ) Worker {
 	return internal.NewWorker(service, domain, taskList, options)
+}
+
+// NewWorkflowReplayer creates a WorkflowReplayer instance.
+func NewWorkflowReplayer() WorkflowReplayer {
+	return internal.NewWorkflowReplayer()
 }
 
 // EnableVerboseLogging enable or disable verbose logging of internal Cadence library components.

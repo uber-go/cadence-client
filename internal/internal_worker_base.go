@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/uber-go/tally"
@@ -262,7 +263,8 @@ func (bw *baseWorker) pollTask() {
 		}
 		if err != nil {
 			if isNonRetriableError(err) {
-				bw.logger.Error("Worker stop polling task.", zap.Error(err))
+				bw.logger.Error("Worker received non-retriable error. Shutting down.", zap.Error(err))
+				syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 				return
 			}
 			bw.retrier.Failed()

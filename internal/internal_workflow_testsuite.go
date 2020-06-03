@@ -350,6 +350,7 @@ func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(param
 		cronSchedule = &params.cronSchedule
 	}
 	// set workflow info data for child workflow
+	childEnv.header = params.header
 	childEnv.workflowInfo.Attempt = params.attempt
 	childEnv.workflowInfo.WorkflowExecution.ID = params.workflowID
 	childEnv.workflowInfo.WorkflowExecution.RunID = params.workflowID + "_RunID"

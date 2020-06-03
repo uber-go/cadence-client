@@ -22,6 +22,9 @@ package internal
 
 import (
 	"reflect"
+
+	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/internal/common/util"
 )
 
 type (
@@ -74,12 +77,12 @@ func getDefaultDataConverter() DataConverter {
 }
 
 func (dc *defaultDataConverter) ToData(r ...interface{}) ([]byte, error) {
-	if len(r) == 1 && isTypeByteSlice(reflect.TypeOf(r[0])) {
+	if len(r) == 1 && util.IsTypeByteSlice(reflect.TypeOf(r[0])) {
 		return r[0].([]byte), nil
 	}
 
 	var encoder encoding
-	if isUseThriftEncoding(r) {
+	if common.IsUseThriftEncoding(r) {
 		encoder = &thriftEncoding{}
 	} else {
 		encoder = &jsonEncoding{}
@@ -93,13 +96,13 @@ func (dc *defaultDataConverter) ToData(r ...interface{}) ([]byte, error) {
 }
 
 func (dc *defaultDataConverter) FromData(data []byte, to ...interface{}) error {
-	if len(to) == 1 && isTypeByteSlice(reflect.TypeOf(to[0])) {
+	if len(to) == 1 && util.IsTypeByteSlice(reflect.TypeOf(to[0])) {
 		reflect.ValueOf(to[0]).Elem().SetBytes(data)
 		return nil
 	}
 
 	var encoder encoding
-	if isUseThriftDecoding(to) {
+	if common.IsUseThriftDecoding(to) {
 		encoder = &thriftEncoding{}
 	} else {
 		encoder = &jsonEncoding{}

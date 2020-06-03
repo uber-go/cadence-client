@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -46,11 +46,15 @@ type (
 // that could report the activity completed event to cadence server via Client.CompleteActivity() API.
 var ErrResultPending = internal.ErrActivityResultPending
 
+// Deprecated: Global activity registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 // Register - calls RegisterWithOptions with default registration options.
 func Register(activityFunc interface{}) {
 	internal.RegisterActivity(activityFunc)
 }
 
+// Deprecated: Global activity registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 // RegisterWithOptions registers the activity function with options
 // The user can use options to provide an external name for the activity or leave it empty if no
 // external name is required. This can be used as

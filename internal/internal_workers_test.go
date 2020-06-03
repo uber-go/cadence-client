@@ -103,7 +103,7 @@ func (s *WorkersTestSuite) TestWorkflowWorker() {
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
-		s.service, domain, executionParameters, nil, overrides, getGlobalRegistry(),
+		s.service, domain, executionParameters, nil, overrides, newRegistry(),
 	)
 	workflowWorker.Start()
 	workflowWorker.Stop()
@@ -126,8 +126,8 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 	}
 	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler()}
 	a := &greeterActivity{}
-	registry := getGlobalRegistry()
-	registry.addActivity(a.ActivityType().Name, a)
+	registry := newRegistry()
+	registry.addActivityWithLock(a.ActivityType().Name, a)
 	activityWorker := newActivityWorker(
 		s.service, domain, executionParameters, overrides, registry, nil,
 	)
@@ -175,8 +175,8 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	activityTaskHandler := newNoResponseActivityTaskHandler()
 	overrides := &workerOverrides{activityTaskHandler: activityTaskHandler}
 	a := &greeterActivity{}
-	registry := getGlobalRegistry()
-	registry.addActivity(a.ActivityType().Name, a)
+	registry := newRegistry()
+	registry.addActivityWithLock(a.ActivityType().Name, a)
 	worker := newActivityWorker(
 		s.service, domain, executionParameters, overrides, registry, nil,
 	)
@@ -206,7 +206,7 @@ func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
-		s.service, domain, executionParameters, nil, overrides, getGlobalRegistry(),
+		s.service, domain, executionParameters, nil, overrides, newRegistry(),
 	)
 	workflowWorker.Start()
 	workflowWorker.Stop()
@@ -238,11 +238,6 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 		isWorkflowCompleted = true
 		return err
 	}
-
-	RegisterWorkflowWithOptions(
-		longDecisionWorkflowFn,
-		RegisterWorkflowOptions{Name: "long-running-decision-workflow-type"},
-	)
 
 	domain := "testDomain"
 	taskList := "long-running-decision-tl"
@@ -335,6 +330,12 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 		Identity:              "test-worker-identity",
 	}
 	worker := newAggregatedWorker(s.service, domain, taskList, options)
+	worker.RegisterWorkflowWithOptions(
+		longDecisionWorkflowFn,
+		RegisterWorkflowOptions{Name: "long-running-decision-workflow-type"},
+	)
+	worker.RegisterActivity(localActivitySleep)
+
 	worker.Start()
 	// wait for test to complete
 	select {
@@ -374,11 +375,6 @@ func (s *WorkersTestSuite) TestMultipleLocalActivities() {
 		isWorkflowCompleted = true
 		return err
 	}
-
-	RegisterWorkflowWithOptions(
-		longDecisionWorkflowFn,
-		RegisterWorkflowOptions{Name: "multiple-local-activities-workflow-type"},
-	)
 
 	domain := "testDomain"
 	taskList := "multiple-local-activities-tl"
@@ -463,6 +459,12 @@ func (s *WorkersTestSuite) TestMultipleLocalActivities() {
 		Identity:              "test-worker-identity",
 	}
 	worker := newAggregatedWorker(s.service, domain, taskList, options)
+	worker.RegisterWorkflowWithOptions(
+		longDecisionWorkflowFn,
+		RegisterWorkflowOptions{Name: "multiple-local-activities-workflow-type"},
+	)
+	worker.RegisterActivity(localActivitySleep)
+
 	worker.Start()
 	// wait for test to complete
 	select {

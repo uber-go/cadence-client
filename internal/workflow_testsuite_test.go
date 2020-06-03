@@ -80,10 +80,11 @@ func TestUnregisteredActivity(t *testing.T) {
 		})
 		return ExecuteActivity(ctx, "unregistered").Get(ctx, nil)
 	}
-	RegisterWorkflow(workflow)
+	env.RegisterWorkflow(workflow)
 	env.ExecuteWorkflow(workflow)
 	require.Error(t, env.GetWorkflowError())
 	ee := env.GetWorkflowError()
+	require.NotNil(t, ee)
 	require.True(t, strings.HasPrefix(ee.Error(), "unable to find activityType=unregistered"), ee.Error())
 }
 

@@ -934,7 +934,7 @@ func getGetWorkflowExecutionHistoryRequest(filterType shared.HistoryEventFilterT
 		},
 		WaitForNewEvent:        common.BoolPtr(isLongPoll),
 		HistoryEventFilterType: &filterType,
-		SkipArchival: common.BoolPtr(true),
+		SkipArchival:           common.BoolPtr(true),
 	}
 
 	return request

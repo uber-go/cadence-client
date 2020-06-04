@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -51,6 +51,8 @@ type (
 	Info = internal.WorkflowInfo
 )
 
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 // Register - registers a workflow function with the framework.
 // A workflow takes a workflow context and input and returns a (result, error) or just error.
 // Examples:
@@ -64,6 +66,8 @@ func Register(workflowFunc interface{}) {
 	internal.RegisterWorkflow(workflowFunc)
 }
 
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 // RegisterWithOptions registers the workflow function with options
 // The user can use options to provide an external name for the workflow or leave it empty if no
 // external name is required. This can be used as

@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,6 +21,7 @@
 package util
 
 import (
+	"reflect"
 	"sync"
 	"time"
 )
@@ -58,4 +59,11 @@ func AwaitWaitGroup(wg *sync.WaitGroup, timeout time.Duration) bool {
 	case <-time.After(timeout):
 		return false
 	}
+}
+
+var typeOfByteSlice = reflect.TypeOf(([]byte)(nil))
+
+// IsTypeByteSlice checks whether the type passed in is a ByteSlice type
+func IsTypeByteSlice(inType reflect.Type) bool {
+	return inType == typeOfByteSlice || inType == reflect.PtrTo(typeOfByteSlice)
 }

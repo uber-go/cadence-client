@@ -39,6 +39,7 @@ import (
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/metrics"
+	"go.uber.org/cadence/internal/common/util"
 	"go.uber.org/zap"
 )
 
@@ -305,7 +306,7 @@ func (f *futureImpl) Get(ctx Context, value interface{}) error {
 		return errors.New("value parameter is not a pointer")
 	}
 
-	if blob, ok := f.value.([]byte); ok && !isTypeByteSlice(reflect.TypeOf(value)) {
+	if blob, ok := f.value.([]byte); ok && !util.IsTypeByteSlice(reflect.TypeOf(value)) {
 		if err := decodeArg(getDataConverterFromWorkflowContext(ctx), blob, value); err != nil {
 			return err
 		}
@@ -1354,7 +1355,7 @@ func (h *queryHandler) execute(input []byte) (result []byte, err error) {
 	fnType := reflect.TypeOf(h.fn)
 	var args []reflect.Value
 
-	if fnType.NumIn() == 1 && isTypeByteSlice(fnType.In(0)) {
+	if fnType.NumIn() == 1 && util.IsTypeByteSlice(fnType.In(0)) {
 		args = append(args, reflect.ValueOf(input))
 	} else {
 		decoded, err := decodeArgs(h.dataConverter, fnType, input)

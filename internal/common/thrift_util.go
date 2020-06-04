@@ -21,6 +21,8 @@
 package common
 
 import (
+	"reflect"
+
 	"github.com/apache/thrift/lib/go/thrift"
 )
 
@@ -81,4 +83,51 @@ func TListDeserialize(ts []thrift.TStruct, b []byte) (err error) {
 	}
 
 	return
+}
+
+// IsUseThriftEncoding checks if the objects passed in are all encoded using thrift.
+func IsUseThriftEncoding(objs []interface{}) bool {
+	// NOTE: our criteria to use which encoder is simple if all the types are serializable using thrift then we use
+	// thrift encoder. For everything else we default to gob.
+
+	if len(objs) == 0 {
+		return false
+	}
+
+	for i := 0; i < len(objs); i++ {
+		if !IsThriftType(objs[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsUseThriftDecoding checks if the objects passed in are all de-serializable using thrift.
+func IsUseThriftDecoding(objs []interface{}) bool {
+	// NOTE: our criteria to use which encoder is simple if all the types are de-serializable using thrift then we use
+	// thrift decoder. For everything else we default to gob.
+
+	if len(objs) == 0 {
+		return false
+	}
+
+	for i := 0; i < len(objs); i++ {
+		rVal := reflect.ValueOf(objs[i])
+		if rVal.Kind() != reflect.Ptr || !IsThriftType(reflect.Indirect(rVal).Interface()) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsThriftType checks whether the object passed in is a thrift encoded object.
+func IsThriftType(v interface{}) bool {
+	// NOTE: Thrift serialization works only if the values are pointers.
+	// Thrift has a validation that it meets thift.TStruct which has Read/Write pointer receivers.
+
+	if reflect.ValueOf(v).Kind() != reflect.Ptr {
+		return false
+	}
+	t := reflect.TypeOf((*thrift.TStruct)(nil)).Elem()
+	return reflect.TypeOf(v).Implements(t)
 }

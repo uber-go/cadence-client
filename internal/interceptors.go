@@ -1,4 +1,3 @@
-// Copyright (c) 2017-2020 Uber Technologies Inc.
 // Modifications Copyright (c) 2020 Uber Technologies Inc.
 // Copyright (c) 2020 Temporal Technologies, Inc.
 //

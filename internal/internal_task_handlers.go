@@ -1767,6 +1767,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 		rootCtx = context.Background()
 	}
 	canCtx, cancel := context.WithCancel(rootCtx)
+	defer cancel()
 
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh)
 	defer func() {
@@ -1813,6 +1814,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 
 	info := ctx.Value(activityEnvContextKey).(*activityEnvironment)
 	ctx, dlCancelFunc := context.WithDeadline(ctx, info.deadline)
+	defer dlCancelFunc()
 
 	ctx, span := createOpenTracingActivitySpan(ctx, ath.tracer, time.Now(), activityType, t.WorkflowExecution.GetWorkflowId(), t.WorkflowExecution.GetRunId())
 	defer span.Finish()

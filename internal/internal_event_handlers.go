@@ -132,6 +132,7 @@ type (
 		attempt      int32 // attempt starting from 0
 		retryPolicy  *RetryPolicy
 		expireTime   time.Time
+		header       *shared.Header
 	}
 
 	localActivityMarkerData struct {
@@ -503,6 +504,7 @@ func newLocalActivityTask(params executeLocalActivityParams, callback laResultHa
 		callback:    callback,
 		retryPolicy: params.RetryPolicy,
 		attempt:     params.Attempt,
+		header:      params.Header,
 	}
 
 	if params.RetryPolicy != nil && params.RetryPolicy.ExpirationInterval > 0 {

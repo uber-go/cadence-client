@@ -22,22 +22,29 @@
 package test
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strings"
 
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/transport/tchannel"
+
+	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	"go.uber.org/cadence/workflow"
 )
+type (
+	// Config contains the integration test configuration
+	 Config struct {
+		ServiceAddr string
+		ServiceName string
+		IsStickyOff bool
+		Debug       bool
+	}
 
-// Config contains the integration test configuration
-type Config struct {
-	ServiceAddr string
-	ServiceName string
-	IsStickyOff bool
-	Debug       bool
-}
-
+	// context.WithValue need this type instead of basic type string to avoid lint error
+	contextKey string
+)
 func newConfig() Config {
 	cfg := Config{
 		ServiceName: "cadence-frontend",
@@ -106,4 +113,71 @@ func newRPCClient(
 	}
 	client := workflowserviceclient.New(dispatcher.ClientConfig(serviceName))
 	return &rpcClient{Interface: client, dispatcher: dispatcher}, nil
+}
+
+// stringMapPropagator propagates the list of keys across a workflow,
+// interpreting the payloads as strings.
+// BORROWED FROM 'internal' PACKAGE TESTS.
+type stringMapPropagator struct {
+	keys map[string]struct{}
+}
+
+// NewStringMapPropagator returns a context propagator that propagates a set of
+// string key-value pairs across a workflow
+func NewStringMapPropagator(keys []string) workflow.ContextPropagator {
+	keyMap := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		keyMap[key] = struct{}{}
+	}
+	return &stringMapPropagator{keyMap}
+}
+
+// Inject injects values from context into headers for propagation
+func (s *stringMapPropagator) Inject(ctx context.Context, writer workflow.HeaderWriter) error {
+	for key := range s.keys {
+		value, ok := ctx.Value(contextKey(key)).(string)
+		if !ok {
+			return fmt.Errorf("unable to extract key from context %v", key)
+		}
+		writer.Set(key, []byte(value))
+	}
+	return nil
+}
+
+// InjectFromWorkflow injects values from context into headers for propagation
+func (s *stringMapPropagator) InjectFromWorkflow(ctx workflow.Context, writer workflow.HeaderWriter) error {
+	for key := range s.keys {
+		value, ok := ctx.Value(contextKey(key)).(string)
+		if !ok {
+			return fmt.Errorf("unable to extract key from context %v", key)
+		}
+		writer.Set(key, []byte(value))
+	}
+	return nil
+}
+
+// Extract extracts values from headers and puts them into context
+func (s *stringMapPropagator) Extract(ctx context.Context, reader workflow.HeaderReader) (context.Context, error) {
+	if err := reader.ForEachKey(func(key string, value []byte) error {
+		if _, ok := s.keys[key]; ok {
+			ctx = context.WithValue(ctx, contextKey(key), string(value))
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return ctx, nil
+}
+
+// ExtractToWorkflow extracts values from headers and puts them into context
+func (s *stringMapPropagator) ExtractToWorkflow(ctx workflow.Context, reader workflow.HeaderReader) (workflow.Context, error) {
+	if err := reader.ForEachKey(func(key string, value []byte) error {
+		if _, ok := s.keys[key]; ok {
+			ctx = workflow.WithValue(ctx, contextKey(key), string(value))
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return ctx, nil
 }

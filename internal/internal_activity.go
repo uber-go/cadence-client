@@ -88,6 +88,7 @@ type (
 		DataConverter DataConverter
 		Attempt       int32
 		ScheduledTime time.Time
+		Header        *shared.Header
 	}
 
 	// asyncActivityClient for requesting activity execution

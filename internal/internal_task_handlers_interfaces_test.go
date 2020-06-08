@@ -96,7 +96,8 @@ func (s *PollLayerInterfacesTestSuite) TearDownTest() {
 }
 
 func (s *PollLayerInterfacesTestSuite) TestProcessWorkflowTaskInterface() {
-	ctx, _ := thrift.NewContext(10)
+	ctx, cancel := thrift.NewContext(10)
+	defer cancel()
 
 	// mocks
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any()).Return(&m.PollForDecisionTaskResponse{}, nil)
@@ -116,7 +117,8 @@ func (s *PollLayerInterfacesTestSuite) TestProcessWorkflowTaskInterface() {
 }
 
 func (s *PollLayerInterfacesTestSuite) TestProcessActivityTaskInterface() {
-	ctx, _ := thrift.NewContext(10)
+	ctx, cancel := thrift.NewContext(10)
+	defer cancel()
 
 	// mocks
 	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any()).Return(&m.PollForActivityTaskResponse{}, nil)

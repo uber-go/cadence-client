@@ -1320,3 +1320,31 @@ func testEncodeFunctionArgs(dataConverter DataConverter, args ...interface{}) []
 	}
 	return input
 }
+
+func TestIsNonRetriableError(t *testing.T) {
+	tests := []struct {
+		err      error
+		expected bool
+	}{
+		{
+			err:      nil,
+			expected: false,
+		},
+		{
+			err:      &shared.ServiceBusyError{},
+			expected: false,
+		},
+		{
+			err:      &shared.BadRequestError{},
+			expected: true,
+		},
+		{
+			err:      &shared.ClientVersionNotSupportedError{},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		require.Equal(t, test.expected, isNonRetriableError(test.err))
+	}
+}

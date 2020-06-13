@@ -37,7 +37,9 @@ type RetryPolicy = internal.RetryPolicy
 
 // WithActivityOptions makes a copy of the context and adds the
 // passed in options to the context. If an activity options exists,
-// it will be overwritten by the passed in value.
+// it will be overwritten by the passed in value as a whole.
+// So specify all the values in the options as necessary, as values
+// in the existing context options will not be carried over.
 func WithActivityOptions(ctx Context, options ActivityOptions) Context {
 	return internal.WithActivityOptions(ctx, options)
 }

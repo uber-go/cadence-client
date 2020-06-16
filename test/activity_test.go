@@ -90,7 +90,7 @@ func (a *Activities) fail(_ context.Context) error {
 func (a *Activities) DuplicateStringInContext(ctx context.Context) (string, error) {
 	originalString := ctx.Value(contextKey(testContextKey))
 	if originalString == nil {
-		return "", fmt.Errorf("context did not propagate to local activity")
+		return "", fmt.Errorf("context did not propagate to activity")
 	}
 	return strings.Repeat(originalString.(string), 2), nil
 }

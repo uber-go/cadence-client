@@ -33,6 +33,7 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/workflow"
 )
+
 type (
 	// Config contains the integration test configuration
 	 Config struct {
@@ -45,6 +46,7 @@ type (
 	// context.WithValue need this type instead of basic type string to avoid lint error
 	contextKey string
 )
+
 func newConfig() Config {
 	cfg := Config{
 		ServiceName: "cadence-frontend",

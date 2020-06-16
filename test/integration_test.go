@@ -61,6 +61,7 @@ const (
 	ctxTimeout                 = 15 * time.Second
 	domainName                 = "integration-test-domain"
 	domainCacheRefreshInterval = 20 * time.Second
+	testContextKey			   = "test-context-key"
 )
 
 func TestIntegrationSuite(t *testing.T) {
@@ -97,7 +98,10 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 	rpcClient, err := newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
 	ts.NoError(err)
 	ts.rpcClient = rpcClient
-	ts.libClient = client.NewClient(ts.rpcClient.Interface, domainName, &client.Options{})
+	ts.libClient = client.NewClient(ts.rpcClient.Interface, domainName,
+		&client.Options{
+			ContextPropagators: []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
+		})
 	ts.registerDomain()
 }
 
@@ -138,12 +142,14 @@ func (ts *IntegrationTestSuite) SetupTest() {
 	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, worker.Options{
 		DisableStickyExecution: ts.config.IsStickyOff,
 		Logger:                 logger,
+		ContextPropagators:     []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
 	})
 	ts.tracer = newtracingInterceptorFactory()
 	options := worker.Options{
 		DisableStickyExecution:            ts.config.IsStickyOff,
 		Logger:                            logger,
 		WorkflowInterceptorChainFactories: []interceptors.WorkflowInterceptorFactory{ts.tracer},
+		ContextPropagators:     []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
 	}
 	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, options)
 	ts.registerWorkflowsAndActivities(ts.worker)
@@ -403,6 +409,13 @@ func (ts *IntegrationTestSuite) TestActivityCancelRepro() {
 	err := ts.executeWorkflow("test-activity-cancel-sm", ts.workflows.ActivityCancelRepro, &expected)
 	ts.NoError(err)
 	ts.EqualValues(expected, ts.activities.invoked())
+}
+
+func (ts *IntegrationTestSuite) TestWorkflowWithLocalActivityCtxPropagation() {
+	var expected string
+	err := ts.executeWorkflow("test-wf-local-activity-ctx-prop", ts.workflows.WorkflowWithLocalActivityCtxPropagation, &expected)
+	ts.NoError(err)
+	ts.EqualValues(expected, "test-data-in-contexttest-data-in-context")
 }
 
 func (ts *IntegrationTestSuite) TestLargeQueryResultError() {

@@ -87,19 +87,12 @@ func (a *Activities) fail(_ context.Context) error {
 	return errFailOnPurpose
 }
 
-func (a *Activities) InspectActivityInfo(ctx context.Context, domain, taskList, wfType string) error {
-	a.append("inspectActivityInfo")
-	info := activity.GetInfo(ctx)
-	if info.WorkflowDomain != domain {
-		return fmt.Errorf("expected domainName %v but got %v", domain, info.WorkflowDomain)
+func (a *Activities) DuplicateStringInContext(ctx context.Context) (string, error) {
+	originalString := ctx.Value(contextKey(testContextKey))
+	if originalString == nil {
+		return "", fmt.Errorf("context did not propagate to activity")
 	}
-	if info.WorkflowType == nil || info.WorkflowType.Name != wfType {
-		return fmt.Errorf("expected workflowType %v but got %v", wfType, info.WorkflowType)
-	}
-	if info.TaskList != taskList {
-		return fmt.Errorf("expected taskList %v but got %v", taskList, info.TaskList)
-	}
-	return nil
+	return strings.Repeat(originalString.(string), 2), nil
 }
 
 func (a *Activities) append(name string) {
@@ -138,6 +131,21 @@ func (a *Activities2) ToUpperWithDelay(_ context.Context, arg string, delay time
 func (a *Activities) GetMemoAndSearchAttr(_ context.Context, memo, searchAttr string) (string, error) {
 	a.append("getMemoAndSearchAttr")
 	return memo + ", " + searchAttr, nil
+}
+
+func (a *Activities) InspectActivityInfo(ctx context.Context, domain, taskList, wfType string) error {
+	a.append("inspectActivityInfo")
+	info := activity.GetInfo(ctx)
+	if info.WorkflowDomain != domain {
+		return fmt.Errorf("expected domainName %v but got %v", domain, info.WorkflowDomain)
+	}
+	if info.WorkflowType == nil || info.WorkflowType.Name != wfType {
+		return fmt.Errorf("expected workflowType %v but got %v", wfType, info.WorkflowType)
+	}
+	if info.TaskList != taskList {
+		return fmt.Errorf("expected taskList %v but got %v", taskList, info.TaskList)
+	}
+	return nil
 }
 
 func (a *Activities) register(worker worker.Worker) {

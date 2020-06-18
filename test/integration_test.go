@@ -61,7 +61,7 @@ const (
 	ctxTimeout                 = 15 * time.Second
 	domainName                 = "integration-test-domain"
 	domainCacheRefreshInterval = 20 * time.Second
-	testContextKey			   = "test-context-key"
+	testContextKey             = "test-context-key"
 )
 
 func TestIntegrationSuite(t *testing.T) {
@@ -149,7 +149,7 @@ func (ts *IntegrationTestSuite) SetupTest() {
 		DisableStickyExecution:            ts.config.IsStickyOff,
 		Logger:                            logger,
 		WorkflowInterceptorChainFactories: []interceptors.WorkflowInterceptorFactory{ts.tracer},
-		ContextPropagators:     []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
+		ContextPropagators:                []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
 	}
 	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, options)
 	ts.registerWorkflowsAndActivities(ts.worker)

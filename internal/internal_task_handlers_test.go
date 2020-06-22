@@ -358,9 +358,9 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_BinaryChecksum() {
 	t.NotNil(response)
 	t.Equal(1, len(response.Decisions))
 	t.Equal(s.DecisionTypeCompleteWorkflowExecution, response.Decisions[0].GetDecisionType())
-	checksumsJSON := string(response.Decisions[0].CompleteWorkflowExecutionDecisionAttributes.Result)
+	checksumsBytes := response.Decisions[0].CompleteWorkflowExecutionDecisionAttributes.Result
 	var checksums []string
-	json.Unmarshal([]byte(checksumsJSON), &checksums)
+	json.Unmarshal(checksumsBytes, &checksums)
 	t.Equal(3, len(checksums))
 	t.Equal("chck1", checksums[0])
 	t.Equal("chck2", checksums[1])

@@ -159,17 +159,21 @@ func (r *registry) registerActivityStruct(aStruct interface{}, options RegisterA
 		if method.PkgPath != "" {
 			continue
 		}
-		name := method.Name
+		methodName := method.Name
+		structPrefix := options.Name
 		if err := validateFnFormat(method.Type, false); err != nil {
-			return fmt.Errorf("failed to register activity method %v of %v: %e", name, structType.Name(), err)
+			return fmt.Errorf("failed to register activity method %v of %v: %e", methodName, structType.Name(), err)
 		}
-		registerName := options.Name + name
+		registerName := structPrefix + methodName
 		if !options.DisableAlreadyRegisteredCheck {
 			if _, ok := r.getActivityNoLock(registerName); ok {
 				return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 			}
 		}
 		r.activityFuncMap[registerName] = &activityExecutor{registerName, methodValue.Interface()}
+		if len(structPrefix) > 0 {
+			r.activityAliasMap[methodName] = registerName
+		}
 		count++
 	}
 

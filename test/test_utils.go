@@ -36,7 +36,7 @@ import (
 
 type (
 	// Config contains the integration test configuration
-	 Config struct {
+	Config struct {
 		ServiceAddr string
 		ServiceName string
 		IsStickyOff bool

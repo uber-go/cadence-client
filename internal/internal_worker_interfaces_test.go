@@ -112,13 +112,13 @@ func querySignalWorkflowFunc(ctx Context, numSignals int) error {
 	return nil
 }
 
-func binaryChecksumWorkflowFunc(ctx Context) ([]*string, error) {
-	var result []*string
-	result = append(result, GetWorkflowInfo(ctx).BinaryChecksum)
+func binaryChecksumWorkflowFunc(ctx Context) ([]string, error) {
+	var result []string
+	result = append(result, GetWorkflowInfo(ctx).GetBinaryChecksum())
 	Sleep(ctx, time.Hour)
-	result = append(result, GetWorkflowInfo(ctx).BinaryChecksum)
+	result = append(result, GetWorkflowInfo(ctx).GetBinaryChecksum())
 	Sleep(ctx, time.Hour)
-	result = append(result, GetWorkflowInfo(ctx).BinaryChecksum)
+	result = append(result, GetWorkflowInfo(ctx).GetBinaryChecksum())
 	return result, nil
 }
 

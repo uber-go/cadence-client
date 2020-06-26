@@ -163,7 +163,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 
 	env := s.NewTestWorkflowEnvironment()
 	env.RegisterWorkflow(workflowFn)
-	env.RegisterActivity(testActivityHello)
+	env.RegisterActivityWithOptions(testActivityHello, RegisterActivityOptions{Name: "testActivityHello"})
 
 	var activityCalls []string
 	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
@@ -745,7 +745,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock_Panic_GetChildWorkfl
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
 	env.RegisterWorkflow(workflowFn)
 	env.OnWorkflow(testWorkflowHello, mock.Anything, mock.Anything, mock.Anything).
 		Return("mock_result", nil, "extra_argument") // extra arg causes panic
@@ -803,7 +803,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Listener() {
 
 	env := s.NewTestWorkflowEnvironment()
 	env.RegisterWorkflow(workflowFn)
-	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
 	env.RegisterActivity(testActivityHello)
 
 	var childWorkflowName, childWorkflowResult string
@@ -1524,7 +1524,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFriendlyName() {
 
 	env := s.NewTestWorkflowEnvironment()
 	env.RegisterWorkflow(workflowFn)
-	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
 	env.RegisterActivity(testActivityHello)
 	var called []string
 	env.SetOnChildWorkflowStartedListener(func(workflowInfo *WorkflowInfo, ctx Context, args Values) {

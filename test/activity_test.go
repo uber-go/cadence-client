@@ -150,7 +150,7 @@ func (a *Activities) InspectActivityInfo(ctx context.Context, domain, taskList, 
 
 func (a *Activities) register(worker worker.Worker) {
 	// Kept to verify backward compatibility of activity registration.
-	activity.RegisterWithOptions(a, activity.RegisterOptions{DisableAlreadyRegisteredCheck: true})
+	activity.RegisterWithOptions(a, activity.RegisterOptions{Name: "Activities_", DisableAlreadyRegisteredCheck: true})
 	// Check reregistration
 	worker.RegisterActivityWithOptions(a.fail, activity.RegisterOptions{Name: "Fail", DisableAlreadyRegisteredCheck: true})
 	// Check prefix

@@ -125,6 +125,10 @@ func (r *registry) registerActivityFunction(af interface{}, options RegisterActi
 	fnName := getFunctionName(af)
 	alias := options.Name
 	registerName := fnName
+
+	if options.EnableShortName {
+		registerName = getShortFunctionName(fnName)
+	}
 	if len(alias) > 0 {
 		registerName = alias
 	}
@@ -138,8 +142,8 @@ func (r *registry) registerActivityFunction(af interface{}, options RegisterActi
 		}
 	}
 	r.activityFuncMap[registerName] = &activityExecutor{registerName, af}
-	if len(alias) > 0 {
-		r.activityAliasMap[fnName] = alias
+	if len(alias) > 0 || options.EnableShortName {
+		r.activityAliasMap[fnName] = registerName
 	}
 
 	return nil
@@ -159,19 +163,28 @@ func (r *registry) registerActivityStruct(aStruct interface{}, options RegisterA
 		if method.PkgPath != "" {
 			continue
 		}
-		methodName := method.Name
-		structPrefix := options.Name
+		methodName := getFunctionName(method.Func.Interface())
 		if err := validateFnFormat(method.Type, false); err != nil {
 			return fmt.Errorf("failed to register activity method %v of %v: %e", methodName, structType.Name(), err)
 		}
-		registerName := structPrefix + methodName
+
+		structPrefix := options.Name
+		registerName := methodName
+
+		if options.EnableShortName {
+			registerName = getShortFunctionName(methodName)
+		}
+		if len(structPrefix) > 0 {
+			registerName = structPrefix + getShortFunctionName(methodName)
+		}
+
 		if !options.DisableAlreadyRegisteredCheck {
 			if _, ok := r.getActivityNoLock(registerName); ok {
 				return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 			}
 		}
 		r.activityFuncMap[registerName] = &activityExecutor{registerName, methodValue.Interface()}
-		if len(structPrefix) > 0 {
+		if len(structPrefix) > 0 || options.EnableShortName {
 			r.activityAliasMap[methodName] = registerName
 		}
 		count++
@@ -182,6 +195,11 @@ func (r *registry) registerActivityStruct(aStruct interface{}, options RegisterA
 	}
 
 	return nil
+}
+
+func getShortFunctionName(fnName string) string {
+	elements := strings.Split(fnName, ".")
+	return elements[len(elements)-1]
 }
 
 func (r *registry) getWorkflowAlias(fnName string) (string, bool) {

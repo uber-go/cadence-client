@@ -166,6 +166,7 @@ func returnPanicWorkflow(ctx Context) (err error) {
 
 func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflowWithOptions(splitJoinActivityWorkflow, RegisterWorkflowOptions{Name: "splitJoinActivityWorkflow"})
 	env.RegisterActivityWithOptions(testAct, RegisterActivityOptions{Name: "testActivityWithOptions"})
 	env.OnActivity(testAct, mock.Anything).Return(func(ctx context.Context) (string, error) {
 		activityID := GetActivityInfo(ctx).ActivityID

@@ -28,7 +28,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	s "go.uber.org/cadence/.gen/go/shared"
+	s "github.com/sail1024/cadence/.gen/go/shared"
 	"go.uber.org/zap"
 )
 

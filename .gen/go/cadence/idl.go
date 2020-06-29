@@ -24,14 +24,14 @@
 package cadence
 
 import (
-	"go.uber.org/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/.gen/go/shared"
 	"go.uber.org/thriftrw/thriftreflect"
 )
 
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "cadence",
-	Package:  "go.uber.org/cadence/.gen/go/cadence",
+	Package:  "github.com/sail1024/cadence/.gen/go/cadence",
 	FilePath: "cadence.thrift",
 	SHA1:     "2d75e7300db85eedf440c3e1f8441926c3c6e7d6",
 	Includes: []*thriftreflect.ThriftModule{

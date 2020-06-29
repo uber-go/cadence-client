@@ -23,8 +23,8 @@ package workflow
 import (
 	"time"
 
-	"go.uber.org/cadence/encoded"
-	"go.uber.org/cadence/internal"
+	"github.com/sail1024/cadence/encoded"
+	"github.com/sail1024/cadence/internal"
 )
 
 // WithChildOptions adds all workflow options to the context.

@@ -21,8 +21,8 @@
 package workflow
 
 import (
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal"
+	"github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/internal"
 )
 
 /*

@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/internal/common/metrics"
+	"github.com/sail1024/cadence/internal/common/metrics"
 	"go.uber.org/zap"
 )
 

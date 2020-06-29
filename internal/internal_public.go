@@ -30,7 +30,7 @@ package internal
 import (
 	"time"
 
-	s "go.uber.org/cadence/.gen/go/shared"
+	s "github.com/sail1024/cadence/.gen/go/shared"
 )
 
 type (

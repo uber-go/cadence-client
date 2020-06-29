@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/cadence"
-	"go.uber.org/cadence/activity"
+	"github.com/sail1024/cadence"
+	"github.com/sail1024/cadence/activity"
 )
 
 type Activities struct {

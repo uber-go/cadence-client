@@ -24,7 +24,7 @@
 #   go-tests = true
 #   unused-packages = true
 
-ignored = ["go.uber.org/cadence/.tmp"]
+ignored = ["github.com/sail1024/cadence/.tmp"]
 
 [[constraint]]
   branch = "master"

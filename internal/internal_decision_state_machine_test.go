@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
+	s "github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/internal/common"
 )
 
 func Test_TimerStateMachine_CancelBeforeSent(t *testing.T) {

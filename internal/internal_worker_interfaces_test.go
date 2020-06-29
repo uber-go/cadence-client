@@ -28,8 +28,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	m "go.uber.org/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/.gen/go/cadence/workflowservicetest"
+	m "github.com/sail1024/cadence/.gen/go/shared"
 	"go.uber.org/zap"
 )
 

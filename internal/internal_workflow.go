@@ -35,10 +35,10 @@ import (
 	"github.com/robfig/cron"
 	"github.com/uber-go/tally"
 	"go.uber.org/atomic"
-	"go.uber.org/cadence/.gen/go/shared"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
-	"go.uber.org/cadence/internal/common/metrics"
+	"github.com/sail1024/cadence/.gen/go/shared"
+	s "github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/internal/common"
+	"github.com/sail1024/cadence/internal/common/metrics"
 	"go.uber.org/zap"
 )
 

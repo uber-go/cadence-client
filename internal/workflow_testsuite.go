@@ -28,7 +28,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/.gen/go/shared"
 	"go.uber.org/zap"
 )
 

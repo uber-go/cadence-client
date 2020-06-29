@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/.gen/go/shared"
 )
 
 func TestHeaderWriter(t *testing.T) {

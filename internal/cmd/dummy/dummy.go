@@ -22,13 +22,13 @@
 package main
 
 import (
-	_ "go.uber.org/cadence"
-	_ "go.uber.org/cadence/activity"
-	_ "go.uber.org/cadence/client"
-	_ "go.uber.org/cadence/encoded"
-	_ "go.uber.org/cadence/testsuite"
-	_ "go.uber.org/cadence/worker"
-	_ "go.uber.org/cadence/workflow"
+	_ "github.com/sail1024/cadence"
+	_ "github.com/sail1024/cadence/activity"
+	_ "github.com/sail1024/cadence/client"
+	_ "github.com/sail1024/cadence/encoded"
+	_ "github.com/sail1024/cadence/testsuite"
+	_ "github.com/sail1024/cadence/worker"
+	_ "github.com/sail1024/cadence/workflow"
 )
 
 func main() {

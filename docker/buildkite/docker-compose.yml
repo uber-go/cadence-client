@@ -49,7 +49,7 @@ services:
     depends_on:
       - cadence
     volumes:
-      - ../../:/go/src/go.uber.org/cadence
+      - ../../:/go/src/github.com/sail1024/cadence
     networks:
       services-network:
         aliases:
@@ -60,7 +60,7 @@ services:
       context: ../../
       dockerfile: ./docker/buildkite/Dockerfile
     volumes:
-      - ../../:/go/src/go.uber.org/cadence
+      - ../../:/go/src/github.com/sail1024/cadence
     networks:
       services-network:
         aliases:
@@ -90,7 +90,7 @@ services:
       - BUILDKITE_PULL_REQUEST_REPO
       - COVERALLS_TOKEN
     volumes:
-      - ../../:/go/src/go.uber.org/cadence
+      - ../../:/go/src/github.com/sail1024/cadence
       - /usr/bin/buildkite-agent:/usr/bin/buildkite-agent
 
 networks:

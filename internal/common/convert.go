@@ -23,7 +23,7 @@ package common
 import (
 	"math"
 
-	s "go.uber.org/cadence/.gen/go/shared"
+	s "github.com/sail1024/cadence/.gen/go/shared"
 )
 
 // Int32Ceil return the int32 ceil of a float64

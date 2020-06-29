@@ -30,11 +30,11 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence"
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/client"
-	"go.uber.org/cadence/worker"
-	"go.uber.org/cadence/workflow"
+	"github.com/sail1024/cadence"
+	"github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/client"
+	"github.com/sail1024/cadence/worker"
+	"github.com/sail1024/cadence/workflow"
 	"go.uber.org/goleak"
 	"go.uber.org/zap"
 )
@@ -75,7 +75,7 @@ func (ts *IntegrationTestSuite) TearDownSuite() {
 	// then assert that there are no lingering go routines
 	time.Sleep(20 * time.Second)
 	// https://github.com/uber-go/cadence-client/issues/739
-	goleak.VerifyNoLeaks(ts.T(), goleak.IgnoreTopFunction("go.uber.org/cadence/internal.(*coroutineState).initialYield"))
+	goleak.VerifyNoLeaks(ts.T(), goleak.IgnoreTopFunction("github.com/sail1024/cadence/internal.(*coroutineState).initialYield"))
 }
 
 func (ts *IntegrationTestSuite) SetupTest() {
@@ -187,7 +187,7 @@ func (ts *IntegrationTestSuite) TestStackTraceQuery() {
 	ts.NotNil(value)
 	var trace string
 	ts.Nil(value.Get(&trace))
-	ts.True(strings.Contains(trace, "go.uber.org/cadence/test.(*Workflows).Basic"))
+	ts.True(strings.Contains(trace, "github.com/sail1024/cadence/test.(*Workflows).Basic"))
 }
 
 func (ts *IntegrationTestSuite) TestWorkflowIDReuseRejectDuplicate() {

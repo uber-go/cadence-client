@@ -24,7 +24,7 @@
 package workflowservicefx
 
 import (
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	"github.com/sail1024/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/fx"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/encoding/thrift"

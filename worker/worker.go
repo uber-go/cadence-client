@@ -24,10 +24,10 @@ package worker
 import (
 	"context"
 
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal"
-	"go.uber.org/cadence/workflow"
+	"github.com/sail1024/cadence/.gen/go/cadence/workflowserviceclient"
+	"github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/internal"
+	"github.com/sail1024/cadence/workflow"
 	"go.uber.org/zap"
 )
 

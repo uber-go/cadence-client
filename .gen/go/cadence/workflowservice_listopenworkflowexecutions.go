@@ -26,7 +26,7 @@ package cadence
 import (
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/.gen/go/shared"
 	"go.uber.org/thriftrw/wire"
 	"strings"
 )

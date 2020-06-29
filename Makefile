@@ -3,7 +3,7 @@
 # default target
 default: test
 
-IMPORT_ROOT := go.uber.org/cadence
+IMPORT_ROOT := github.com/sail1024/cadence
 THRIFT_GENDIR := .gen/go
 THRIFTRW_SRC := idl/github.com/uber/cadence/cadence.thrift
 # one or more thriftrw-generated file(s), to create / depend on generated code

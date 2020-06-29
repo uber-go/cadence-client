@@ -22,8 +22,8 @@ package workflow
 
 import (
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/encoded"
-	"go.uber.org/cadence/internal"
+	"github.com/sail1024/cadence/encoded"
+	"github.com/sail1024/cadence/internal"
 	"go.uber.org/zap"
 )
 

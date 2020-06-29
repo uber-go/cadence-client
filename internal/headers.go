@@ -23,7 +23,7 @@ package internal
 import (
 	"context"
 
-	"go.uber.org/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/.gen/go/shared"
 )
 
 // HeaderWriter is an interface to write information to cadence headers

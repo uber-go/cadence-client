@@ -21,8 +21,8 @@
 package cadence
 
 import (
-	"go.uber.org/cadence/internal"
-	"go.uber.org/cadence/workflow"
+	"github.com/sail1024/cadence/internal"
+	"github.com/sail1024/cadence/workflow"
 )
 
 type (

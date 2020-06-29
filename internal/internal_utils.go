@@ -34,9 +34,9 @@ import (
 
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
-	"go.uber.org/cadence/internal/common/metrics"
+	s "github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/internal/common"
+	"github.com/sail1024/cadence/internal/common/metrics"
 	"go.uber.org/yarpc"
 )
 

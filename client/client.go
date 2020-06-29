@@ -26,11 +26,11 @@ package client
 import (
 	"context"
 
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
-	"go.uber.org/cadence/internal"
-	"go.uber.org/cadence/workflow"
+	"github.com/sail1024/cadence/.gen/go/cadence/workflowserviceclient"
+	s "github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/encoded"
+	"github.com/sail1024/cadence/internal"
+	"github.com/sail1024/cadence/workflow"
 )
 
 const (

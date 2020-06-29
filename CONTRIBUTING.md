@@ -13,11 +13,11 @@ This doc is intended for contributors to `cadence-client` (hopefully that's you!
 ## Checking out the code
 
 Make sure the repository is cloned to the correct location:
-(Note: the path is `go.uber.org/cadence/` instead of github repo)
+(Note: the path is `github.com/sail1024/cadence/` instead of github repo)
 
 ```bash
-go get go.uber.org/cadence/...
-cd $GOPATH/src/go.uber.org/cadence
+go get github.com/sail1024/cadence/...
+cd $GOPATH/src/github.com/sail1024/cadence
 ```
 
 ## Dependency management

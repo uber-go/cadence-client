@@ -20,7 +20,7 @@
 
 package cadence
 
-import "go.uber.org/cadence/internal"
+import "github.com/sail1024/cadence/internal"
 
 // LibraryVersion is a semver string that represents
 // the version of this cadence client library

@@ -34,13 +34,13 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
-	"go.uber.org/cadence/internal/common/backoff"
-	"go.uber.org/cadence/internal/common/cache"
-	"go.uber.org/cadence/internal/common/metrics"
-	"go.uber.org/cadence/internal/common/util"
+	"github.com/sail1024/cadence/.gen/go/cadence/workflowserviceclient"
+	s "github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/internal/common"
+	"github.com/sail1024/cadence/internal/common/backoff"
+	"github.com/sail1024/cadence/internal/common/cache"
+	"github.com/sail1024/cadence/internal/common/metrics"
+	"github.com/sail1024/cadence/internal/common/util"
 	"go.uber.org/zap"
 )
 

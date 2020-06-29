@@ -22,13 +22,13 @@ package mocks
 
 import (
 	"context"
-	"go.uber.org/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/.gen/go/shared"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/cadence/client"
-	"go.uber.org/cadence/workflow"
+	"github.com/sail1024/cadence/client"
+	"github.com/sail1024/cadence/workflow"
 )
 
 func Test_MockClient(t *testing.T) {

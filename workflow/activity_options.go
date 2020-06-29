@@ -23,7 +23,7 @@ package workflow
 import (
 	"time"
 
-	"go.uber.org/cadence/internal"
+	"github.com/sail1024/cadence/internal"
 )
 
 // ActivityOptions stores all activity-specific invocation parameters that will be stored inside of a context.

@@ -26,8 +26,8 @@ import (
 	"context"
 	"time"
 
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common/backoff"
+	s "github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/internal/common/backoff"
 )
 
 const (

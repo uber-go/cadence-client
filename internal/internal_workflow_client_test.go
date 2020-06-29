@@ -29,14 +29,14 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
+	"github.com/sail1024/cadence/.gen/go/cadence/workflowservicetest"
+	"github.com/sail1024/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/internal/common"
 
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/internal/common/metrics"
+	"github.com/sail1024/cadence/internal/common/metrics"
 )
 
 const (

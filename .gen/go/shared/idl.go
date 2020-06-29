@@ -28,7 +28,7 @@ import "go.uber.org/thriftrw/thriftreflect"
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "shared",
-	Package:  "go.uber.org/cadence/.gen/go/shared",
+	Package:  "github.com/sail1024/cadence/.gen/go/shared",
 	FilePath: "shared.thrift",
 	SHA1:     "6aca1185122e0dc0e3a2d9be46f15691be4a96ac",
 	Raw:      rawIDL,

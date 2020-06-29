@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"time"
 
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	"github.com/sail1024/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/zap"
 )
 

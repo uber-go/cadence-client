@@ -25,8 +25,8 @@ package workflowserviceclient
 
 import (
 	"context"
-	"go.uber.org/cadence/.gen/go/cadence"
-	"go.uber.org/cadence/.gen/go/shared"
+	"github.com/sail1024/cadence/.gen/go/cadence"
+	"github.com/sail1024/cadence/.gen/go/shared"
 	"go.uber.org/thriftrw/wire"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/api/transport"

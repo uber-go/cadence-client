@@ -20,7 +20,7 @@
 
 package workflow
 
-import "go.uber.org/cadence/internal"
+import "github.com/sail1024/cadence/internal"
 
 type (
 	// HeaderReader is an interface to read information from cadence headers

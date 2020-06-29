@@ -21,7 +21,7 @@
 package mocks
 
 import (
-	"go.uber.org/cadence/client"
+	"github.com/sail1024/cadence/client"
 )
 
 // make sure mocks are in sync with interfaces

@@ -80,6 +80,10 @@ func (r *registry) RegisterWorkflowWithOptions(
 	fnName := getFunctionName(wf)
 	alias := options.Name
 	registerName := fnName
+
+	if options.EnableShortName {
+		registerName = getShortFunctionName(fnName)
+	}
 	if len(alias) > 0 {
 		registerName = alias
 	}
@@ -93,8 +97,8 @@ func (r *registry) RegisterWorkflowWithOptions(
 		}
 	}
 	r.workflowFuncMap[registerName] = wf
-	if len(alias) > 0 {
-		r.workflowAliasMap[fnName] = alias
+	if len(alias) > 0 || options.EnableShortName {
+		r.workflowAliasMap[fnName] = registerName
 	}
 }
 

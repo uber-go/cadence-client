@@ -226,7 +226,10 @@ type (
 
 // RegisterWorkflowOptions consists of options for registering a workflow
 type RegisterWorkflowOptions struct {
-	Name                          string
+	Name string
+	// Workflow type name is equal to function name instead of fully qualified name including function package.
+	// This option has no effect when explicit Name is provided.
+	EnableShortName               bool
 	DisableAlreadyRegisteredCheck bool
 }
 

@@ -6,7 +6,7 @@
     "version": -24,
     "workflowExecutionStartedEventAttributes": {
       "workflowType": {
-        "name": "ActivityCancelRepro"
+        "name": "go.uber.org/cadence/test.(*Workflows).ActivityCancelRepro"
       },
       "taskList": {
         "name": "tl-1"

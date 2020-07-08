@@ -738,6 +738,7 @@ type WorkflowInfo struct {
 	Memo                                *s.Memo             // Value can be decoded using data converter (DefaultDataConverter, or custom one if set).
 	SearchAttributes                    *s.SearchAttributes // Value can be decoded using DefaultDataConverter.
 	BinaryChecksum                      *string
+	RetryPolicy                         *s.RetryPolicy
 }
 
 func (wInfo *WorkflowInfo) GetBinaryChecksum() string {

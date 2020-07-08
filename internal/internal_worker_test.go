@@ -219,7 +219,7 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory() {
 	taskList := "taskList1"
 	testEvents := []*shared.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("testReplayWorkflow")},
+			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
 			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
 			Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 		}),
@@ -261,7 +261,7 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity() {
 	taskList := "taskList1"
 	testEvents := []*shared.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("testReplayWorkflowLocalActivity")},
+			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
 			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
 			Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 		}),
@@ -379,7 +379,7 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 		createTestEventDecisionTaskStarted(3),
 	}
 
-	workflowType := "testReplayWorkflow"
+	workflowType := "go.uber.org/cadence/internal.testReplayWorkflow"
 	workflowID := "testID"
 	runID := "testRunID"
 
@@ -799,30 +799,30 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	require.True(w.t, **rStruct2Ptr == testActivityResult{Index: 10})
 
 	// By names.
-	err = ExecuteActivity(ctx, "testActivityByteArgs", input).Get(ctx, nil)
+	err = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityByteArgs", input).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
 	err = ExecuteActivity(ctx, "testActivityMultipleArgs", 2, []string{"test"}, true).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	err = ExecuteActivity(ctx, "testActivityNoResult", 2, "test").Get(ctx, nil)
+	err = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityNoResult", 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	err = ExecuteActivity(ctx, "testActivityNoContextArg", 2, "test").Get(ctx, nil)
+	err = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityNoContextArg", 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	f = ExecuteActivity(ctx, "testActivityReturnString")
+	f = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityReturnString")
 	err = f.Get(ctx, &rString)
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, "testActivity", rString, rString)
 
-	f = ExecuteActivity(ctx, "testActivityReturnEmptyString")
+	f = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityReturnEmptyString")
 	var r2sString string
 	err = f.Get(ctx, &r2String)
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, "", r2sString)
 
-	f = ExecuteActivity(ctx, "testActivityReturnEmptyStruct")
+	f = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityReturnEmptyStruct")
 	err = f.Get(ctx, &r2Struct)
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, testActivityResult{}, r2Struct)

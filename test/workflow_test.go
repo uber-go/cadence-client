@@ -109,7 +109,7 @@ func (w *Workflows) ActivityRetryOnTimeout(ctx workflow.Context, timeoutType sha
 	ctx = workflow.WithActivityOptions(ctx, opts)
 
 	startTime := workflow.Now(ctx)
-	err := workflow.ExecuteActivity(ctx, "Sleep", 2*time.Second).Get(ctx, nil)
+	err := workflow.ExecuteActivity(ctx, "Activities_Sleep", 2*time.Second).Get(ctx, nil)
 	if err == nil {
 		return nil, fmt.Errorf("expected activity to fail but succeeded")
 	}
@@ -138,7 +138,7 @@ func (w *Workflows) ActivityRetryOnHBTimeout(ctx workflow.Context) ([]string, er
 
 	var result int
 	startTime := workflow.Now(ctx)
-	err := workflow.ExecuteActivity(ctx, "HeartbeatAndSleep", 0, 2*time.Second).Get(ctx, &result)
+	err := workflow.ExecuteActivity(ctx, "Activities_HeartbeatAndSleep", 0, 2*time.Second).Get(ctx, &result)
 	if err == nil {
 		return nil, fmt.Errorf("expected activity to fail but succeeded")
 	}
@@ -489,13 +489,13 @@ func (w *Workflows) childForMemoAndSearchAttr(ctx workflow.Context) (result stri
 		return
 	}
 	ctx = workflow.WithActivityOptions(ctx, w.defaultActivityOptions())
-	err = workflow.ExecuteActivity(ctx, "GetMemoAndSearchAttr", memo, searchAttr).Get(ctx, &result)
+	err = workflow.ExecuteActivity(ctx, "Activities_GetMemoAndSearchAttr", memo, searchAttr).Get(ctx, &result)
 	return
 }
 
 func (w *Workflows) sleep(ctx workflow.Context, d time.Duration) error {
 	ctx = workflow.WithActivityOptions(ctx, w.defaultActivityOptions())
-	return workflow.ExecuteActivity(ctx, "Sleep", d).Get(ctx, nil)
+	return workflow.ExecuteActivity(ctx, "Activities_Sleep", d).Get(ctx, nil)
 }
 
 func (w *Workflows) InspectActivityInfo(ctx workflow.Context) error {

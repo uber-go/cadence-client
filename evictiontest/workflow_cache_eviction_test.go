@@ -130,7 +130,7 @@ func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
 		ret := &m.PollForDecisionTaskResponse{
 			TaskToken:              make([]byte, 5),
 			WorkflowExecution:      &m.WorkflowExecution{WorkflowId: workflowID, RunId: runID},
-			WorkflowType:           &m.WorkflowType{Name: common.StringPtr("testReplayWorkflow")},
+			WorkflowType:           &m.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/evictiontest.testReplayWorkflow")},
 			History:                &m.History{Events: testEvents},
 			PreviousStartedEventId: common.Int64Ptr(5)}
 		return ret, nil

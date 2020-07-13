@@ -629,6 +629,7 @@ func (wth *workflowTaskHandlerImpl) createWorkflowContext(task *s.PollForDecisio
 		ParentWorkflowExecution:             parentWorkflowExecution,
 		Memo:                                attributes.Memo,
 		SearchAttributes:                    attributes.SearchAttributes,
+		RetryPolicy:                         attributes.RetryPolicy,
 	}
 
 	wfStartTime := time.Unix(0, h.Events[0].GetTimestamp())
@@ -1497,6 +1498,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			Header:                              contErr.params.header,
 			Memo:                                workflowContext.workflowInfo.Memo,
 			SearchAttributes:                    workflowContext.workflowInfo.SearchAttributes,
+			RetryPolicy:                         workflowContext.workflowInfo.RetryPolicy,
 		}
 	} else if workflowContext.err != nil {
 		// Workflow failures

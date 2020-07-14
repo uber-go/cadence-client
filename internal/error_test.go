@@ -404,6 +404,13 @@ func TestErrorDetailsValues(t *testing.T) {
 	require.Equal(t, ErrTooManyArg, e.Get(&a1, &a2, &a3, &a3))
 }
 
+func TestErrorDetailsValues_WrongDecodedType(t *testing.T) {
+	e := ErrorDetailsValues{testErrorDetails1}
+	var d1 int // will cause error since it should be of type string
+	err := e.Get(&d1)
+	require.Error(t, err)
+}
+
 func Test_SignalExternalWorkflowExecutionFailedError(t *testing.T) {
 	context := &workflowEnvironmentImpl{
 		decisionsHelper: newDecisionsHelper(),

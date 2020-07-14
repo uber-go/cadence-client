@@ -285,6 +285,19 @@ func Test_CustomError_Pointer(t *testing.T) {
 	require.Equal(t, &testErrorDetails4, b2)
 }
 
+func Test_CustomError_WrongDecodedType(t *testing.T) {
+	err := NewCustomError("reason", testErrorDetails1, testErrorDetails2)
+	var d1 string
+	var d2 string // will cause error since it should be of type int
+	err1 := err.Details(&d1, &d2)
+	require.Error(t, err1)
+
+	err = NewCustomError("reason", testErrorDetails3)
+	var d3 testStruct2 // will cause error since it should be of type testStruct
+	err2 := err.Details(&d3)
+	require.Error(t, err2)
+}
+
 func Test_CanceledError(t *testing.T) {
 	// test ErrorDetailValues as Details
 	var a1 string

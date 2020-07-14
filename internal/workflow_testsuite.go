@@ -101,7 +101,13 @@ func (b ErrorDetailsValues) Get(valuePtr ...interface{}) error {
 		return ErrTooManyArg
 	}
 	for i, item := range valuePtr {
-		reflect.ValueOf(item).Elem().Set(reflect.ValueOf(b[i]))
+		target := reflect.ValueOf(item).Elem()
+		val := reflect.ValueOf(b[i])
+		if target.Type() != val.Type() {
+			return fmt.Errorf(
+				"unable to decode argument: cannot set %v value to %v field", val.Type(), target.Type())
+		}
+		target.Set(val)
 	}
 	return nil
 }

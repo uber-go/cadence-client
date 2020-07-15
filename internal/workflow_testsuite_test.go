@@ -112,3 +112,23 @@ func TestNoExplicitRegistrationRequired(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Hello World!", result)
 }
+
+func TestWorkflowReturnNil(t *testing.T) {
+	testSuite := &WorkflowTestSuite{}
+	env := testSuite.NewTestWorkflowEnvironment()
+
+	var isExecuted bool
+	testWF := func(ctx Context) error {
+		isExecuted = true
+		return nil
+	}
+	env.ExecuteWorkflow(testWF)
+
+	require.True(t, env.IsWorkflowCompleted())
+	require.NoError(t, env.GetWorkflowError())
+	require.True(t, isExecuted)
+
+	var r struct{}
+	err := env.GetWorkflowResult(&r)
+	require.NoError(t, err)
+}

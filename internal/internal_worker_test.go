@@ -132,9 +132,10 @@ func (s *internalWorkerTestSuite) TearDownTest() {
 	s.mockCtrl.Finish() // assert mock’s expectations
 }
 
-func (s *internalWorkerTestSuite) createLocalActivityMarkerDataForTest(activityID string) []byte {
+func (s *internalWorkerTestSuite) createLocalActivityMarkerDataForTest(activityID, activityType string) []byte {
 	lamd := localActivityMarkerData{
 		ActivityID: activityID,
+		ActivityType: activityType,
 		ReplayTime: time.Now(),
 	}
 
@@ -271,7 +272,7 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity() {
 
 		createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
 			MarkerName:                   common.StringPtr(localActivityMarkerName),
-			Details:                      s.createLocalActivityMarkerDataForTest("0"),
+			Details:                      s.createLocalActivityMarkerDataForTest("0", "go.uber.org/cadence/internal.testActivity"),
 			DecisionTaskCompletedEventId: common.Int64Ptr(4),
 		}),
 
@@ -282,8 +283,7 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity() {
 
 	history := &shared.History{Events: testEvents}
 	logger := getLogger()
-	replayer := NewWorkflowReplayer()
-	replayer.RegisterWorkflow(testReplayWorkflowLocalActivity)
+	replayer := &WorkflowReplayer{registry: s.registry}
 	err := replayer.ReplayWorkflowHistory(logger, history)
 	require.NoError(s.T(), err)
 }
@@ -302,7 +302,7 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity_Result
 
 		createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
 			MarkerName:                   common.StringPtr(localActivityMarkerName),
-			Details:                      s.createLocalActivityMarkerDataForTest("0"),
+			Details:                      s.createLocalActivityMarkerDataForTest("0", ""),
 			DecisionTaskCompletedEventId: common.Int64Ptr(4),
 		}),
 
@@ -314,8 +314,7 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity_Result
 
 	history := &shared.History{Events: testEvents}
 	logger := getLogger()
-	replayer := NewWorkflowReplayer()
-	replayer.RegisterWorkflow(testReplayWorkflow)
+	replayer := &WorkflowReplayer{registry: s.registry}
 	err := replayer.ReplayWorkflowHistory(logger, history)
 	require.Error(s.T(), err)
 }
@@ -324,7 +323,7 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity_Activi
 	taskList := "taskList1"
 	testEvents := []*shared.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
+			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
 			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
 			Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 		}),
@@ -334,20 +333,18 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity_Activi
 
 		createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
 			MarkerName:                   common.StringPtr(localActivityMarkerName),
-			Details:                      s.createLocalActivityMarkerDataForTest("0"),
+			Details:                      s.createLocalActivityMarkerDataForTest("0", "different-activity-type"),
 			DecisionTaskCompletedEventId: common.Int64Ptr(4),
 		}),
 
 		createTestEventWorkflowExecutionCompleted(6, &shared.WorkflowExecutionCompletedEventAttributes{
-			Result:                       []byte("some-incorrect-result"),
 			DecisionTaskCompletedEventId: common.Int64Ptr(4),
 		}),
 	}
 
 	history := &shared.History{Events: testEvents}
 	logger := getLogger()
-	replayer := NewWorkflowReplayer()
-	replayer.RegisterWorkflow(testReplayWorkflow)
+	replayer := &WorkflowReplayer{registry: s.registry}
 	err := replayer.ReplayWorkflowHistory(logger, history)
 	require.Error(s.T(), err)
 }

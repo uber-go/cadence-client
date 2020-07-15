@@ -584,7 +584,7 @@ func (t *TestWorkflowEnvironment) GetWorkflowResult(valuePtr interface{}) error 
 	if !t.impl.isTestCompleted {
 		panic("workflow is not completed")
 	}
-	if t.impl.testError != nil || t.impl.testResult == nil || valuePtr == nil {
+	if t.impl.testError != nil || t.impl.testResult == nil || t.impl.testResult.HasValue() == false || valuePtr == nil {
 		return t.impl.testError
 	}
 	return t.impl.testResult.Get(valuePtr)

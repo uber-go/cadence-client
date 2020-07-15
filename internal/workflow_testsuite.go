@@ -101,7 +101,13 @@ func (b ErrorDetailsValues) Get(valuePtr ...interface{}) error {
 		return ErrTooManyArg
 	}
 	for i, item := range valuePtr {
-		reflect.ValueOf(item).Elem().Set(reflect.ValueOf(b[i]))
+		target := reflect.ValueOf(item).Elem()
+		val := reflect.ValueOf(b[i])
+		if target.Type() != val.Type() {
+			return fmt.Errorf(
+				"unable to decode argument: cannot set %v value to %v field", val.Type(), target.Type())
+		}
+		target.Set(val)
 	}
 	return nil
 }
@@ -578,7 +584,7 @@ func (t *TestWorkflowEnvironment) GetWorkflowResult(valuePtr interface{}) error 
 	if !t.impl.isTestCompleted {
 		panic("workflow is not completed")
 	}
-	if t.impl.testError != nil || t.impl.testResult == nil || valuePtr == nil {
+	if t.impl.testError != nil || t.impl.testResult == nil || t.impl.testResult.HasValue() == false || valuePtr == nil {
 		return t.impl.testError
 	}
 	return t.impl.testResult.Get(valuePtr)

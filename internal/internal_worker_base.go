@@ -27,6 +27,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"syscall"
 	"time"
@@ -265,7 +266,8 @@ func (bw *baseWorker) pollTask() {
 		if err != nil {
 			if isNonRetriableError(err) {
 				bw.logger.Error("Worker received non-retriable error. Shutting down.", zap.Error(err))
-				syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+				p, _ := os.FindProcess(os.Getpid())
+				p.Signal(syscall.SIGINT)
 				return
 			}
 			bw.retrier.Failed()

@@ -103,7 +103,7 @@ func (b ErrorDetailsValues) Get(valuePtr ...interface{}) error {
 	for i, item := range valuePtr {
 		target := reflect.ValueOf(item).Elem()
 		val := reflect.ValueOf(b[i])
-		if target.Type() != val.Type() {
+		if !val.Type().AssignableTo(target.Type()) {
 			return fmt.Errorf(
 				"unable to decode argument: cannot set %v value to %v field", val.Type(), target.Type())
 		}

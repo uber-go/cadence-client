@@ -40,9 +40,6 @@ type (
 		dataConverter DataConverter
 	}
 
-	// ErrorDetailsValues is a type alias used hold error details objects.
-	ErrorDetailsValues []interface{}
-
 	// WorkflowTestSuite is the test suite to run unit tests for workflow/activity.
 	WorkflowTestSuite struct {
 		logger   *zap.Logger
@@ -90,31 +87,6 @@ func (b EncodedValues) Get(valuePtr ...interface{}) error {
 // HasValues return whether there are values
 func (b EncodedValues) HasValues() bool {
 	return b.values != nil
-}
-
-// Get extract data from encoded data to desired value type. valuePtr is pointer to the actual value type.
-func (b ErrorDetailsValues) Get(valuePtr ...interface{}) error {
-	if !b.HasValues() {
-		return ErrNoData
-	}
-	if len(valuePtr) > len(b) {
-		return ErrTooManyArg
-	}
-	for i, item := range valuePtr {
-		target := reflect.ValueOf(item).Elem()
-		val := reflect.ValueOf(b[i])
-		if !val.Type().AssignableTo(target.Type()) {
-			return fmt.Errorf(
-				"unable to decode argument: cannot set %v value to %v field", val.Type(), target.Type())
-		}
-		target.Set(val)
-	}
-	return nil
-}
-
-// HasValues return whether there are values.
-func (b ErrorDetailsValues) HasValues() bool {
-	return b != nil && len(b) != 0
 }
 
 // NewTestWorkflowEnvironment creates a new instance of TestWorkflowEnvironment. Use the returned TestWorkflowEnvironment

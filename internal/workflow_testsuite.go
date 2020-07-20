@@ -579,7 +579,7 @@ func (t *TestWorkflowEnvironment) IsWorkflowCompleted() bool {
 	return t.impl.isTestCompleted
 }
 
-// GetWorkflowResult extracts the encoded result from test workflow, it returns error if the extraction failed.
+// GetWorkflowResult extracts the encoded result from test workflow, it also returns error from test workflow.
 func (t *TestWorkflowEnvironment) GetWorkflowResult(valuePtr interface{}) error {
 	if !t.impl.isTestCompleted {
 		panic("workflow is not completed")

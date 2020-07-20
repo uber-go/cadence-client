@@ -47,12 +47,20 @@ type testStruct2 struct {
 	Favorites *[]string
 }
 
+type testErrorStruct struct {
+	message string
+}
+
 var (
 	testErrorDetails1 = "my details"
 	testErrorDetails2 = 123
 	testErrorDetails3 = testStruct{"a string", 321}
 	testErrorDetails4 = testStruct2{"a string", 321, &[]string{"eat", "code"}}
 )
+
+func (tes *testErrorStruct) Error() string{
+	return tes.message
+}
 
 func Test_GenericError(t *testing.T) {
 	// test activity error
@@ -409,6 +417,14 @@ func TestErrorDetailsValues_WrongDecodedType(t *testing.T) {
 	var d1 int // will cause error since it should be of type string
 	err := e.Get(&d1)
 	require.Error(t, err)
+}
+
+func TestErrorDetailsValues_AssignableType(t *testing.T) {
+	e := ErrorDetailsValues{&testErrorStruct{message: "my message"}}
+	var errorOut error
+	err := e.Get(&errorOut)
+	require.NoError(t, err)
+	require.Equal(t, "my message", errorOut.Error())
 }
 
 func Test_SignalExternalWorkflowExecutionFailedError(t *testing.T) {

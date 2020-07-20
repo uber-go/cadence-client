@@ -24,6 +24,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"go.uber.org/cadence/.gen/go/shared"
@@ -133,6 +134,9 @@ type (
 
 	// UnknownExternalWorkflowExecutionError can be returned when external workflow doesn't exist
 	UnknownExternalWorkflowExecutionError struct{}
+
+	// ErrorDetailsValues is a type alias used hold error details objects.
+	ErrorDetailsValues []interface{}
 )
 
 const (
@@ -374,4 +378,29 @@ func newUnknownExternalWorkflowExecutionError() *UnknownExternalWorkflowExecutio
 // Error from error interface
 func (e *UnknownExternalWorkflowExecutionError) Error() string {
 	return "UnknownExternalWorkflowExecution"
+}
+
+// HasValues return whether there are values.
+func (b ErrorDetailsValues) HasValues() bool {
+	return b != nil && len(b) != 0
+}
+
+// Get extract data from encoded data to desired value type. valuePtr is pointer to the actual value type.
+func (b ErrorDetailsValues) Get(valuePtr ...interface{}) error {
+	if !b.HasValues() {
+		return ErrNoData
+	}
+	if len(valuePtr) > len(b) {
+		return ErrTooManyArg
+	}
+	for i, item := range valuePtr {
+		target := reflect.ValueOf(item).Elem()
+		val := reflect.ValueOf(b[i])
+		if !val.Type().AssignableTo(target.Type()) {
+			return fmt.Errorf(
+				"unable to decode argument: cannot set %v value to %v field", val.Type(), target.Type())
+		}
+		target.Set(val)
+	}
+	return nil
 }

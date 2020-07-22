@@ -349,6 +349,15 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity_Activi
 	require.Error(s.T(), err)
 }
 
+func (s *internalWorkerTestSuite) TestReplayWorkflowHistoryFromFileLocalActivities() {
+	logger := getLogger()
+	replayer := NewWorkflowReplayer()
+	wf := localActivitiesCallingOptionsWorkflow{s.T()}
+	replayer.RegisterWorkflow(wf.Execute)
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(logger, "testdata/localActivities.json")
+	require.NoError(s.T(), err)
+}
+
 func (s *internalWorkerTestSuite) TestReplayWorkflowHistoryFromFileParent() {
 	logger := getLogger()
 	replayer := NewWorkflowReplayer()
@@ -716,6 +725,85 @@ func (s *internalWorkerTestSuite) TestRecordActivityHeartbeatByID() {
 	wfClient.RecordActivityHeartbeatByID(context.Background(), domain, "wid", "rid", "aid",
 		"testStack", "customerObjects", 4)
 	require.NotNil(s.T(), heartbeatRequest)
+}
+
+type localActivitiesCallingOptionsWorkflow struct {
+	t *testing.T
+}
+
+func (w localActivitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
+	ao := LocalActivityOptions{
+		ScheduleToCloseTimeout: time.Second,
+	}
+	ctx = WithLocalActivityOptions(ctx, ao)
+
+	// By functions.
+	err = ExecuteLocalActivity(ctx, testActivityByteArgs, input).Get(ctx, nil)
+	require.NoError(w.t, err, err)
+
+	err = ExecuteLocalActivity(ctx, testActivityMultipleArgs, 2, []string{"test"}, true).Get(ctx, nil)
+	require.NoError(w.t, err, err)
+
+	err = ExecuteLocalActivity(ctx, testActivityNoResult, 2, "test").Get(ctx, nil)
+	require.NoError(w.t, err, err)
+
+	err = ExecuteLocalActivity(ctx, testActivityNoContextArg, 2, "test").Get(ctx, nil)
+	require.NoError(w.t, err, err)
+
+	f := ExecuteLocalActivity(ctx, testActivityReturnByteArray)
+	var r []byte
+	err = f.Get(ctx, &r)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, []byte("testActivity"), r)
+
+	f = ExecuteLocalActivity(ctx, testActivityReturnInt)
+	var rInt int
+	err = f.Get(ctx, &rInt)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, 5, rInt)
+
+	f = ExecuteLocalActivity(ctx, testActivityReturnString)
+	var rString string
+	err = f.Get(ctx, &rString)
+
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, "testActivity", rString)
+
+	f = ExecuteLocalActivity(ctx, testActivityReturnEmptyString)
+	var r2String string
+	err = f.Get(ctx, &r2String)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, "", r2String)
+
+	f = ExecuteLocalActivity(ctx, testActivityReturnEmptyStruct)
+	var r2Struct testActivityResult
+	err = f.Get(ctx, &r2Struct)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, testActivityResult{}, r2Struct)
+
+	f = ExecuteLocalActivity(ctx, testActivityReturnNilStructPtr)
+	var rStructPtr *testActivityResult
+	err = f.Get(ctx, &rStructPtr)
+	require.NoError(w.t, err, err)
+	require.True(w.t, rStructPtr == nil)
+
+	f = ExecuteLocalActivity(ctx, testActivityReturnStructPtr)
+	err = f.Get(ctx, &rStructPtr)
+	require.NoError(w.t, err, err)
+	require.Equal(w.t, *rStructPtr, testActivityResult{Index: 10})
+
+	f = ExecuteLocalActivity(ctx, testActivityReturnNilStructPtrPtr)
+	var rStruct2Ptr **testActivityResult
+	err = f.Get(ctx, &rStruct2Ptr)
+	require.NoError(w.t, err, err)
+	require.True(w.t, rStruct2Ptr == nil)
+
+	f = ExecuteLocalActivity(ctx, testActivityReturnStructPtrPtr)
+	err = f.Get(ctx, &rStruct2Ptr)
+	require.NoError(w.t, err, err)
+	require.True(w.t, **rStruct2Ptr == testActivityResult{Index: 10})
+
+	return []byte("Done"), nil
 }
 
 type activitiesCallingOptionsWorkflow struct {

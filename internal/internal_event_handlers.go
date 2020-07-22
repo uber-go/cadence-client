@@ -1104,7 +1104,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleLocalActivityMarker(markerDa
 			lar.attempt = lamd.Attempt
 			lar.backoff = lamd.Backoff
 			lar.err = constructError(lamd.ErrReason, []byte(lamd.ErrJSON), weh.GetDataConverter())
-		} else {
+		} else if len(lamd.ResultJSON) > 0 {
 			lar.result = []byte(lamd.ResultJSON)
 		}
 		la.callback(lar)

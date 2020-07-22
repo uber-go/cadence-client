@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -54,27 +55,27 @@ func TestRetrySuccess(t *testing.T) {
 
 func TestNoRetryAfterContextDone(t *testing.T) {
 	t.Parallel()
-	i := 0
+	retryCounter := 0
 	op := func() error {
-		i++
+		retryCounter++
 
-		if i == 5 {
+		if retryCounter == 5 {
 			return nil
 		}
 
 		return &someError{}
 	}
 
-	policy := NewExponentialRetryPolicy(1 * time.Millisecond)
-	policy.SetMaximumInterval(5 * time.Millisecond)
+	policy := NewExponentialRetryPolicy(10 * time.Millisecond)
+	policy.SetMaximumInterval(50 * time.Millisecond)
 	policy.SetMaximumAttempts(10)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*5)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
 	err := Retry(ctx, op, policy, nil)
 	assert.Error(t, err)
-	assert.True(t, i >= 2) // verify that we did retry
+	assert.True(t, retryCounter >= 2, "retryCounter should be at least 2 but was %d", retryCounter) // verify that we did retry
 }
 
 func TestRetryFailed(t *testing.T) {

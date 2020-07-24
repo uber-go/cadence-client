@@ -27,10 +27,12 @@ import (
 )
 
 func TestWorkflowRegistration(t *testing.T) {
+	w := &testWorkflowStruct{}
 	tests := []struct {
 		msg               string
 		register          func(r *registry)
 		workflowType      string
+		altWorkflowType   string
 		resolveByFunction interface{}
 		resolveByAlias    string
 	}{
@@ -57,6 +59,13 @@ func TestWorkflowRegistration(t *testing.T) {
 			resolveByFunction: testWorkflowFunction,
 			resolveByAlias:    "workflow.alias",
 		},
+		{
+			msg:               "register workflow struct function (backwards compatible)",
+			register:          func(r *registry) { r.RegisterWorkflow(w.Method) },
+			workflowType:      "go.uber.org/cadence/internal.(*testWorkflowStruct).Method",
+			altWorkflowType:   "go.uber.org/cadence/internal.(*testWorkflowStruct).Method-fm",
+			resolveByFunction: w.Method,
+		},
 	}
 
 	for _, tt := range tests {
@@ -71,6 +80,12 @@ func TestWorkflowRegistration(t *testing.T) {
 			// Verify workflow is resolved from workflow type
 			_, ok := r.getWorkflowFn(tt.workflowType)
 			require.True(t, ok)
+
+			// Verify workflow is resolved from alternative (backwards compatible) workflow type
+			if len(tt.altWorkflowType) > 0 {
+				_, ok = r.getWorkflowFn(tt.altWorkflowType)
+				require.True(t, ok)
+			}
 
 			// Verify resolving by function reference
 			workflowType = getWorkflowFunctionName(r, tt.resolveByFunction)
@@ -90,6 +105,7 @@ func TestActivityRegistration(t *testing.T) {
 		msg               string
 		register          func(r *registry)
 		activityType      string
+		altActivityType   string
 		resolveByFunction interface{}
 		resolveByAlias    string
 	}{
@@ -120,6 +136,7 @@ func TestActivityRegistration(t *testing.T) {
 			msg:               "register activity struct",
 			register:          func(r *registry) { r.RegisterActivity(&testActivityStruct{}) },
 			activityType:      "go.uber.org/cadence/internal.(*testActivityStruct).Method",
+			altActivityType:   "go.uber.org/cadence/internal.(*testActivityStruct).Method-fm",
 			resolveByFunction: (&testActivityStruct{}).Method,
 		},
 		{
@@ -153,6 +170,12 @@ func TestActivityRegistration(t *testing.T) {
 			_, ok := r.GetActivity(tt.activityType)
 			require.True(t, ok)
 
+			// Verify activity is resolved from alternative (backwards compatible) activity type
+			if len(tt.altActivityType) > 0 {
+				_, ok = r.GetActivity(tt.altActivityType)
+				require.True(t, ok)
+			}
+
 			// Verify resolving by function reference
 			activityType = getActivityFunctionName(r, tt.resolveByFunction)
 			require.Equal(t, tt.activityType, activityType, "resolve by function reference")
@@ -166,8 +189,10 @@ func TestActivityRegistration(t *testing.T) {
 	}
 }
 
+type testWorkflowStruct struct{}
 type testActivityStruct struct{}
 
+func (ts *testWorkflowStruct) Method(ctx Context) error { return nil }
 func (ts *testActivityStruct) Method() error { return nil }
 
 func testActivityFunction() error            { return nil }

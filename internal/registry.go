@@ -220,6 +220,9 @@ func (r *registry) getWorkflowAlias(fnName string) (string, bool) {
 func (r *registry) getWorkflowFn(fnName string) (interface{}, bool) {
 	r.Lock() // do not defer for Unlock to call next.getWorkflowFn without lock
 	fn, ok := r.workflowFuncMap[fnName]
+	if !ok { // if exact match is not found, check for backwards compatible name without -fm suffix
+		fn, ok = r.workflowFuncMap[strings.TrimSuffix(fnName, "-fm")]
+	}
 	if !ok && r.next != nil {
 		r.Unlock()
 		return r.next.getWorkflowFn(fnName)
@@ -263,6 +266,9 @@ func (r *registry) addActivityWithLock(fnName string, a activity) {
 func (r *registry) GetActivity(fnName string) (activity, bool) {
 	r.Lock() // do not defer for Unlock to call next.GetActivity without lock
 	a, ok := r.activityFuncMap[fnName]
+	if !ok { // if exact match is not found, check for backwards compatible name without -fm suffix
+		a, ok = r.activityFuncMap[strings.TrimSuffix(fnName, "-fm")]
+	}
 	if !ok && r.next != nil {
 		r.Unlock()
 		return r.next.GetActivity(fnName)

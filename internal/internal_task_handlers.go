@@ -1223,6 +1223,7 @@ matchLoop:
 }
 
 func lastPartOfName(name string) string {
+	name = strings.TrimSuffix(name, "-fm")
 	lastDotIdx := strings.LastIndex(name, ".")
 	if lastDotIdx < 0 || lastDotIdx == len(name)-1 {
 		return name

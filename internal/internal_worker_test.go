@@ -219,6 +219,30 @@ func (s *internalWorkerTestSuite) TestReplayWorkflowHistory() {
 	require.NoError(s.T(), err)
 }
 
+func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_Incomplete() {
+	taskList := "taskList1"
+	testEvents := []*shared.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
+			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
+			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
+			Input:        testEncodeFunctionArgs(nil, testReplayWorkflow),
+		}),
+		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
+		createTestEventActivityTaskScheduled(5, &shared.ActivityTaskScheduledEventAttributes{
+			ActivityId:   common.StringPtr("0"),
+			ActivityType: &shared.ActivityType{Name: common.StringPtr("testActivity-fm")},
+			TaskList:     &shared.TaskList{Name: &taskList},
+		}),
+	}
+
+	history := &shared.History{Events: testEvents}
+	logger := getLogger()
+	err := ReplayWorkflowHistory(logger, history)
+	require.NoError(s.T(), err)
+}
+
 func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity() {
 	taskList := "taskList1"
 	testEvents := []*shared.HistoryEvent{

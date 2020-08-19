@@ -500,8 +500,8 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 	}
 
 	if wc.metricsScope != nil {
-		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
-		scope.Counter(metrics.WorkflowSignalWithStartCounter).Inc(1)
+		taggedScope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
+		taggedScope.Counter(metrics.WorkflowSignalWithStartCounter).Inc(1)
 	}
 
 	executionInfo := &WorkflowExecution{

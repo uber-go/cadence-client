@@ -521,6 +521,10 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 		domain:             domain,
 		registry:           newRegistry(),
 		metricsScope:       metrics.NewTaggedScope(metricScope),
+		scope:              &scopeMetricsWrapper{
+			scope: metricScope,
+			childScopes: make(map[string]tally.Scope),
+		},
 		identity:           identity,
 		dataConverter:      dataConverter,
 		contextPropagators: contextPropagators,

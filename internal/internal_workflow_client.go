@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"go.uber.org/cadence/internal/common/serializer"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -48,6 +49,10 @@ var _ DomainClient = (*domainClient)(nil)
 const (
 	defaultDecisionTaskTimeoutInSecs = 10
 	defaultGetHistoryTimeoutInSecs   = 25
+
+	scopeNameStartWorkflowExecutionWithRetry             = metrics.CadenceMetricsPrefix + "StartWorkflowExecutionWithRetry"
+	scopeNameSignalWorkflowExecutionWithRetry            = metrics.CadenceMetricsPrefix + "SignalWorkflowExecutionWithRetry"
+	scopeNameSignalWithStartWorkflowExecutionWithRetry   = metrics.CadenceMetricsPrefix + "SignalWithStartWorkflowExecutionWithRetry"
 )
 
 var (
@@ -61,10 +66,22 @@ type (
 		domain             string
 		registry           *registry
 		metricsScope       *metrics.TaggedScope
+		scope 			   *scopeMetricsWrapper
 		identity           string
 		dataConverter      DataConverter
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
+	}
+
+	scopeMetricsWrapper struct {
+		mutex              sync.Mutex
+		scope       	   tally.Scope
+		childScopes		   map[string]tally.Scope
+	}
+
+	operationScope struct {
+		scope     tally.Scope
+		startTime time.Time
 	}
 
 	// domainClient is the client for managing domains.
@@ -135,6 +152,44 @@ type (
 		paginate func(nexttoken []byte) (*s.GetWorkflowExecutionHistoryResponse, error)
 	}
 )
+
+
+func (sm *scopeMetricsWrapper) getScope(scopeName string) tally.Scope {
+	sm.mutex.Lock()
+	scope, ok := sm.childScopes[scopeName]
+	if ok {
+		sm.mutex.Unlock()
+		return scope
+	}
+	scope = sm.scope.SubScope(scopeName)
+	sm.childScopes[scopeName] = scope
+	sm.mutex.Unlock()
+	return scope
+}
+
+func (sm *scopeMetricsWrapper) getOperationScope(scopeName string) *operationScope {
+	scope := sm.getScope(scopeName)
+	scope.Counter(metrics.CadenceRequest).Inc(1)
+
+	return &operationScope{scope: scope, startTime: time.Now()}
+}
+
+func (op *operationScope) handleError(err error) {
+	op.scope.Timer(metrics.CadenceLatency).Record(time.Now().Sub(op.startTime))
+	if err != nil {
+		switch err.(type) {
+		case *s.EntityNotExistsError,
+			*s.BadRequestError,
+			*s.DomainAlreadyExistsError,
+			*s.WorkflowExecutionAlreadyStartedError,
+			*s.QueryFailedError:
+			op.scope.Counter(metrics.CadenceInvalidRequest).Inc(1)
+		default:
+			op.scope.Counter(metrics.CadenceError).Inc(1)
+		}
+	}
+}
+
 
 // StartWorkflow starts a workflow execution
 // The user can use this to start using a functor like.
@@ -222,6 +277,8 @@ func (wc *workflowClient) StartWorkflow(
 
 	var response *s.StartWorkflowExecutionResponse
 
+	scope := wc.scope.getOperationScope(scopeNameStartWorkflowExecutionWithRetry)
+
 	// Start creating workflow request.
 	err = backoff.Retry(ctx,
 		func() error {
@@ -233,13 +290,15 @@ func (wc *workflowClient) StartWorkflow(
 			return err1
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 
+	scope.handleError(err)
+
 	if err != nil {
 		return nil, err
 	}
 
 	if wc.metricsScope != nil {
-		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
-		scope.Counter(metrics.WorkflowStartCounter).Inc(1)
+		taggedScope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, workflowType.Name)
+		taggedScope.Counter(metrics.WorkflowStartCounter).Inc(1)
 	}
 
 	executionInfo := &WorkflowExecution{
@@ -331,12 +390,18 @@ func (wc *workflowClient) SignalWorkflow(ctx context.Context, workflowID string,
 		Identity:   common.StringPtr(wc.identity),
 	}
 
-	return backoff.Retry(ctx,
+	scope := wc.scope.getOperationScope(scopeNameSignalWorkflowExecutionWithRetry)
+
+	err = backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx)
 			defer cancel()
 			return wc.workflowService.SignalWorkflowExecution(tchCtx, request, opt...)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+
+	scope.handleError(err)
+
+	return err
 }
 
 // SignalWithStartWorkflow sends a signal to a running workflow.
@@ -415,6 +480,8 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 
 	var response *s.StartWorkflowExecutionResponse
 
+	scope := wc.scope.getOperationScope(scopeNameSignalWithStartWorkflowExecutionWithRetry)
+
 	// Start creating workflow request.
 	err = backoff.Retry(ctx,
 		func() error {
@@ -425,6 +492,8 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 			response, err1 = wc.workflowService.SignalWithStartWorkflowExecution(tchCtx, signalWithStartRequest, opt...)
 			return err1
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+
+	scope.handleError(err)
 
 	if err != nil {
 		return nil, err

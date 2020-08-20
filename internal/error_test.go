@@ -58,7 +58,7 @@ var (
 	testErrorDetails4 = testStruct2{"a string", 321, &[]string{"eat", "code"}}
 )
 
-func (tes *testErrorStruct) Error() string{
+func (tes *testErrorStruct) Error() string {
 	return tes.message
 }
 

@@ -1389,6 +1389,24 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockUpsertSearchAttributes() {
 	// mix no-mock and mock is not support
 }
 
+func (s *WorkflowTestSuiteUnitTest) Test_MockUpsertSearchAttributes_OnError() {
+	workflowFn := func(ctx Context) error {
+		attr := map[string]interface{}{}
+		attr["CustomIntField"] = 1
+		err := UpsertSearchAttributes(ctx, attr)
+		s.Error(err)
+		return err
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.OnUpsertSearchAttributes(map[string]interface{}{"CustomIntField": 1}).Return(errors.New("test error")).Once()
+
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
+	env.AssertExpectations(s.T())
+}
+
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithThriftTypes() {
 	actualValues := []string{}
 	retVal := &shared.WorkflowExecution{WorkflowId: common.StringPtr("retwID2"), RunId: common.StringPtr("retrID2")}

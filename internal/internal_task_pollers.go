@@ -779,7 +779,7 @@ func newGetHistoryPageFunc(
 			var err1 error
 			h, err1 = serializer.DeserializeBlobDataToHistoryEvents(resp.RawHistory, s.HistoryEventFilterTypeAllEvent)
 			if err1 != nil {
-				return nil, nil, nil
+				return nil, nil, err1
 			}
 		} else {
 			h = resp.History

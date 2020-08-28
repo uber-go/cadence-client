@@ -300,7 +300,7 @@ func WithActivityTask(
 	tracer opentracing.Tracer,
 ) context.Context {
 	var deadline time.Time
-	scheduled := time.Unix(0, task.GetScheduledTimestamp())
+	scheduled := time.Unix(0, task.GetScheduledTimestampOfThisAttempt())
 	started := time.Unix(0, task.GetStartedTimestamp())
 	scheduleToCloseTimeout := time.Duration(task.GetScheduleToCloseTimeoutSeconds()) * time.Second
 	startToCloseTimeout := time.Duration(task.GetStartToCloseTimeoutSeconds()) * time.Second

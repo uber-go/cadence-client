@@ -1855,10 +1855,10 @@ func (env *testWorkflowEnvironmentImpl) UpsertSearchAttributes(attributes map[st
 		// mock found, check if return is error
 		args := []interface{}{attributes}
 		mockRet := env.mock.MethodCalled(mockMethod, args...)
-		if len(mockRet) != 1 {
+		if len(mockRet) > 1 {
 			panic(fmt.Sprintf("mock of UpsertSearchAttributes should return only one error"))
 		}
-		if mockRet[0] != nil {
+		if len(mockRet) == 1 && mockRet[0] != nil {
 			return mockRet[0].(error)
 		}
 	}

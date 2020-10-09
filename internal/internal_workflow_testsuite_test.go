@@ -1386,6 +1386,16 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockUpsertSearchAttributes() {
 	s.Nil(env.GetWorkflowError())
 	env.AssertExpectations(s.T())
 
+	// mock no return
+	env = s.NewTestWorkflowEnvironment()
+	env.OnUpsertSearchAttributes(map[string]interface{}{}).Once()
+	env.OnUpsertSearchAttributes(map[string]interface{}{"CustomIntField": 1}).Once()
+
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+	env.AssertExpectations(s.T())
+
 	// mix no-mock and mock is not support
 }
 

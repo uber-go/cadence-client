@@ -14,7 +14,7 @@ require (
 	github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568 // indirect
 	github.com/gogo/googleapis v1.3.1 // indirect
 	github.com/gogo/status v1.1.0 // indirect
-	github.com/golang/mock v1.1.1
+	github.com/golang/mock v1.4.4
 	github.com/jessevdk/go-flags v1.4.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect

@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -145,6 +145,132 @@ func (v *AccessDeniedError) Error() string {
 	return v.String()
 }
 
+type ActivityLocalDispatchInfo struct {
+	ActivityId *string `json:"activityId,omitempty"`
+}
+
+// ToWire translates a ActivityLocalDispatchInfo struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *ActivityLocalDispatchInfo) ToWire() (wire.Value, error) {
+	var (
+		fields [1]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.ActivityId != nil {
+		w, err = wire.NewValueString(*(v.ActivityId)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+// FromWire deserializes a ActivityLocalDispatchInfo struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a ActivityLocalDispatchInfo struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v ActivityLocalDispatchInfo
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *ActivityLocalDispatchInfo) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.ActivityId = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a ActivityLocalDispatchInfo
+// struct.
+func (v *ActivityLocalDispatchInfo) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [1]string
+	i := 0
+	if v.ActivityId != nil {
+		fields[i] = fmt.Sprintf("ActivityId: %v", *(v.ActivityId))
+		i++
+	}
+
+	return fmt.Sprintf("ActivityLocalDispatchInfo{%v}", strings.Join(fields[:i], ", "))
+}
+
+func _String_EqualsPtr(lhs, rhs *string) bool {
+	if lhs != nil && rhs != nil {
+
+		x := *lhs
+		y := *rhs
+		return (x == y)
+	}
+	return lhs == nil && rhs == nil
+}
+
+// Equals returns true if all the fields of this ActivityLocalDispatchInfo match the
+// provided ActivityLocalDispatchInfo.
+//
+// This function performs a deep comparison.
+func (v *ActivityLocalDispatchInfo) Equals(rhs *ActivityLocalDispatchInfo) bool {
+	if !_String_EqualsPtr(v.ActivityId, rhs.ActivityId) {
+		return false
+	}
+
+	return true
+}
+
+// GetActivityId returns the value of ActivityId if it is set or its
+// zero value if it is unset.
+func (v *ActivityLocalDispatchInfo) GetActivityId() (o string) {
+	if v.ActivityId != nil {
+		return *v.ActivityId
+	}
+
+	return
+}
+
 type ActivityTaskCancelRequestedEventAttributes struct {
 	ActivityId                   *string `json:"activityId,omitempty"`
 	DecisionTaskCompletedEventId *int64  `json:"decisionTaskCompletedEventId,omitempty"`
@@ -260,16 +386,6 @@ func (v *ActivityTaskCancelRequestedEventAttributes) String() string {
 	}
 
 	return fmt.Sprintf("ActivityTaskCancelRequestedEventAttributes{%v}", strings.Join(fields[:i], ", "))
-}
-
-func _String_EqualsPtr(lhs, rhs *string) bool {
-	if lhs != nil && rhs != nil {
-
-		x := *lhs
-		y := *rhs
-		return (x == y)
-	}
-	return lhs == nil && rhs == nil
 }
 
 func _I64_EqualsPtr(lhs, rhs *int64) bool {
@@ -10400,6 +10516,357 @@ func (v *DescribeHistoryHostResponse) GetAddress() (o string) {
 	}
 
 	return
+}
+
+type DescribeQueueRequest struct {
+	ShardID     *int32  `json:"shardID,omitempty"`
+	ClusterName *string `json:"clusterName,omitempty"`
+	Type        *int32  `json:"type,omitempty"`
+}
+
+// ToWire translates a DescribeQueueRequest struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *DescribeQueueRequest) ToWire() (wire.Value, error) {
+	var (
+		fields [3]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.ShardID != nil {
+		w, err = wire.NewValueI32(*(v.ShardID)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+	if v.ClusterName != nil {
+		w, err = wire.NewValueString(*(v.ClusterName)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
+	if v.Type != nil {
+		w, err = wire.NewValueI32(*(v.Type)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+// FromWire deserializes a DescribeQueueRequest struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a DescribeQueueRequest struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v DescribeQueueRequest
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *DescribeQueueRequest) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.ShardID = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 20:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.ClusterName = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 30:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.Type = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a DescribeQueueRequest
+// struct.
+func (v *DescribeQueueRequest) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [3]string
+	i := 0
+	if v.ShardID != nil {
+		fields[i] = fmt.Sprintf("ShardID: %v", *(v.ShardID))
+		i++
+	}
+	if v.ClusterName != nil {
+		fields[i] = fmt.Sprintf("ClusterName: %v", *(v.ClusterName))
+		i++
+	}
+	if v.Type != nil {
+		fields[i] = fmt.Sprintf("Type: %v", *(v.Type))
+		i++
+	}
+
+	return fmt.Sprintf("DescribeQueueRequest{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this DescribeQueueRequest match the
+// provided DescribeQueueRequest.
+//
+// This function performs a deep comparison.
+func (v *DescribeQueueRequest) Equals(rhs *DescribeQueueRequest) bool {
+	if !_I32_EqualsPtr(v.ShardID, rhs.ShardID) {
+		return false
+	}
+	if !_String_EqualsPtr(v.ClusterName, rhs.ClusterName) {
+		return false
+	}
+	if !_I32_EqualsPtr(v.Type, rhs.Type) {
+		return false
+	}
+
+	return true
+}
+
+// GetShardID returns the value of ShardID if it is set or its
+// zero value if it is unset.
+func (v *DescribeQueueRequest) GetShardID() (o int32) {
+	if v.ShardID != nil {
+		return *v.ShardID
+	}
+
+	return
+}
+
+// GetClusterName returns the value of ClusterName if it is set or its
+// zero value if it is unset.
+func (v *DescribeQueueRequest) GetClusterName() (o string) {
+	if v.ClusterName != nil {
+		return *v.ClusterName
+	}
+
+	return
+}
+
+// GetType returns the value of Type if it is set or its
+// zero value if it is unset.
+func (v *DescribeQueueRequest) GetType() (o int32) {
+	if v.Type != nil {
+		return *v.Type
+	}
+
+	return
+}
+
+type DescribeQueueResponse struct {
+	ProcessingQueueStates []string `json:"processingQueueStates,omitempty"`
+}
+
+type _List_String_ValueList []string
+
+func (v _List_String_ValueList) ForEach(f func(wire.Value) error) error {
+	for _, x := range v {
+		w, err := wire.NewValueString(x), error(nil)
+		if err != nil {
+			return err
+		}
+		err = f(w)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v _List_String_ValueList) Size() int {
+	return len(v)
+}
+
+func (_List_String_ValueList) ValueType() wire.Type {
+	return wire.TBinary
+}
+
+func (_List_String_ValueList) Close() {}
+
+// ToWire translates a DescribeQueueResponse struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *DescribeQueueResponse) ToWire() (wire.Value, error) {
+	var (
+		fields [1]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.ProcessingQueueStates != nil {
+		w, err = wire.NewValueList(_List_String_ValueList(v.ProcessingQueueStates)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _List_String_Read(l wire.ValueList) ([]string, error) {
+	if l.ValueType() != wire.TBinary {
+		return nil, nil
+	}
+
+	o := make([]string, 0, l.Size())
+	err := l.ForEach(func(x wire.Value) error {
+		i, err := x.GetString(), error(nil)
+		if err != nil {
+			return err
+		}
+		o = append(o, i)
+		return nil
+	})
+	l.Close()
+	return o, err
+}
+
+// FromWire deserializes a DescribeQueueResponse struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a DescribeQueueResponse struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v DescribeQueueResponse
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *DescribeQueueResponse) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TList {
+				v.ProcessingQueueStates, err = _List_String_Read(field.Value.GetList())
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a DescribeQueueResponse
+// struct.
+func (v *DescribeQueueResponse) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [1]string
+	i := 0
+	if v.ProcessingQueueStates != nil {
+		fields[i] = fmt.Sprintf("ProcessingQueueStates: %v", v.ProcessingQueueStates)
+		i++
+	}
+
+	return fmt.Sprintf("DescribeQueueResponse{%v}", strings.Join(fields[:i], ", "))
+}
+
+func _List_String_Equals(lhs, rhs []string) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+
+	for i, lv := range lhs {
+		rv := rhs[i]
+		if !(lv == rv) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Equals returns true if all the fields of this DescribeQueueResponse match the
+// provided DescribeQueueResponse.
+//
+// This function performs a deep comparison.
+func (v *DescribeQueueResponse) Equals(rhs *DescribeQueueResponse) bool {
+	if !((v.ProcessingQueueStates == nil && rhs.ProcessingQueueStates == nil) || (v.ProcessingQueueStates != nil && rhs.ProcessingQueueStates != nil && _List_String_Equals(v.ProcessingQueueStates, rhs.ProcessingQueueStates))) {
+		return false
+	}
+
+	return true
 }
 
 type DescribeTaskListRequest struct {
@@ -26051,6 +26518,116 @@ func (v *RegisterDomainRequest) GetVisibilityArchivalURI() (o string) {
 	return
 }
 
+type RemoteSyncMatchedError struct {
+	Message string `json:"message,required"`
+}
+
+// ToWire translates a RemoteSyncMatchedError struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *RemoteSyncMatchedError) ToWire() (wire.Value, error) {
+	var (
+		fields [1]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	w, err = wire.NewValueString(v.Message), error(nil)
+	if err != nil {
+		return w, err
+	}
+	fields[i] = wire.Field{ID: 10, Value: w}
+	i++
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+// FromWire deserializes a RemoteSyncMatchedError struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a RemoteSyncMatchedError struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v RemoteSyncMatchedError
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *RemoteSyncMatchedError) FromWire(w wire.Value) error {
+	var err error
+
+	messageIsSet := false
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TBinary {
+				v.Message, err = field.Value.GetString(), error(nil)
+				if err != nil {
+					return err
+				}
+				messageIsSet = true
+			}
+		}
+	}
+
+	if !messageIsSet {
+		return errors.New("field Message of RemoteSyncMatchedError is required")
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a RemoteSyncMatchedError
+// struct.
+func (v *RemoteSyncMatchedError) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [1]string
+	i := 0
+	fields[i] = fmt.Sprintf("Message: %v", v.Message)
+	i++
+
+	return fmt.Sprintf("RemoteSyncMatchedError{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this RemoteSyncMatchedError match the
+// provided RemoteSyncMatchedError.
+//
+// This function performs a deep comparison.
+func (v *RemoteSyncMatchedError) Equals(rhs *RemoteSyncMatchedError) bool {
+	if !(v.Message == rhs.Message) {
+		return false
+	}
+
+	return true
+}
+
+func (v *RemoteSyncMatchedError) Error() string {
+	return v.String()
+}
+
 type RemoveTaskRequest struct {
 	ShardID             *int32 `json:"shardID,omitempty"`
 	Type                *int32 `json:"type,omitempty"`
@@ -26270,158 +26847,6 @@ func (v *RemoveTaskRequest) GetTaskID() (o int64) {
 func (v *RemoveTaskRequest) GetVisibilityTimestamp() (o int64) {
 	if v.VisibilityTimestamp != nil {
 		return *v.VisibilityTimestamp
-	}
-
-	return
-}
-
-type ReplicationInfo struct {
-	Version     *int64 `json:"version,omitempty"`
-	LastEventId *int64 `json:"lastEventId,omitempty"`
-}
-
-// ToWire translates a ReplicationInfo struct into a Thrift-level intermediate
-// representation. This intermediate representation may be serialized
-// into bytes using a ThriftRW protocol implementation.
-//
-// An error is returned if the struct or any of its fields failed to
-// validate.
-//
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
-//
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
-func (v *ReplicationInfo) ToWire() (wire.Value, error) {
-	var (
-		fields [2]wire.Field
-		i      int = 0
-		w      wire.Value
-		err    error
-	)
-
-	if v.Version != nil {
-		w, err = wire.NewValueI64(*(v.Version)), error(nil)
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 10, Value: w}
-		i++
-	}
-	if v.LastEventId != nil {
-		w, err = wire.NewValueI64(*(v.LastEventId)), error(nil)
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 20, Value: w}
-		i++
-	}
-
-	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
-}
-
-// FromWire deserializes a ReplicationInfo struct from its Thrift-level
-// representation. The Thrift-level representation may be obtained
-// from a ThriftRW protocol implementation.
-//
-// An error is returned if we were unable to build a ReplicationInfo struct
-// from the provided intermediate representation.
-//
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
-//
-//   var v ReplicationInfo
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
-func (v *ReplicationInfo) FromWire(w wire.Value) error {
-	var err error
-
-	for _, field := range w.GetStruct().Fields {
-		switch field.ID {
-		case 10:
-			if field.Value.Type() == wire.TI64 {
-				var x int64
-				x, err = field.Value.GetI64(), error(nil)
-				v.Version = &x
-				if err != nil {
-					return err
-				}
-
-			}
-		case 20:
-			if field.Value.Type() == wire.TI64 {
-				var x int64
-				x, err = field.Value.GetI64(), error(nil)
-				v.LastEventId = &x
-				if err != nil {
-					return err
-				}
-
-			}
-		}
-	}
-
-	return nil
-}
-
-// String returns a readable string representation of a ReplicationInfo
-// struct.
-func (v *ReplicationInfo) String() string {
-	if v == nil {
-		return "<nil>"
-	}
-
-	var fields [2]string
-	i := 0
-	if v.Version != nil {
-		fields[i] = fmt.Sprintf("Version: %v", *(v.Version))
-		i++
-	}
-	if v.LastEventId != nil {
-		fields[i] = fmt.Sprintf("LastEventId: %v", *(v.LastEventId))
-		i++
-	}
-
-	return fmt.Sprintf("ReplicationInfo{%v}", strings.Join(fields[:i], ", "))
-}
-
-// Equals returns true if all the fields of this ReplicationInfo match the
-// provided ReplicationInfo.
-//
-// This function performs a deep comparison.
-func (v *ReplicationInfo) Equals(rhs *ReplicationInfo) bool {
-	if !_I64_EqualsPtr(v.Version, rhs.Version) {
-		return false
-	}
-	if !_I64_EqualsPtr(v.LastEventId, rhs.LastEventId) {
-		return false
-	}
-
-	return true
-}
-
-// GetVersion returns the value of Version if it is set or its
-// zero value if it is unset.
-func (v *ReplicationInfo) GetVersion() (o int64) {
-	if v.Version != nil {
-		return *v.Version
-	}
-
-	return
-}
-
-// GetLastEventId returns the value of LastEventId if it is set or its
-// zero value if it is unset.
-func (v *ReplicationInfo) GetLastEventId() (o int64) {
-	if v.LastEventId != nil {
-		return *v.LastEventId
 	}
 
 	return
@@ -28181,6 +28606,194 @@ func (v *ResetPoints) Equals(rhs *ResetPoints) bool {
 	}
 
 	return true
+}
+
+type ResetQueueRequest struct {
+	ShardID     *int32  `json:"shardID,omitempty"`
+	ClusterName *string `json:"clusterName,omitempty"`
+	Type        *int32  `json:"type,omitempty"`
+}
+
+// ToWire translates a ResetQueueRequest struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *ResetQueueRequest) ToWire() (wire.Value, error) {
+	var (
+		fields [3]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.ShardID != nil {
+		w, err = wire.NewValueI32(*(v.ShardID)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+	if v.ClusterName != nil {
+		w, err = wire.NewValueString(*(v.ClusterName)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
+	if v.Type != nil {
+		w, err = wire.NewValueI32(*(v.Type)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+// FromWire deserializes a ResetQueueRequest struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a ResetQueueRequest struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v ResetQueueRequest
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *ResetQueueRequest) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.ShardID = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 20:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.ClusterName = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 30:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.Type = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a ResetQueueRequest
+// struct.
+func (v *ResetQueueRequest) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [3]string
+	i := 0
+	if v.ShardID != nil {
+		fields[i] = fmt.Sprintf("ShardID: %v", *(v.ShardID))
+		i++
+	}
+	if v.ClusterName != nil {
+		fields[i] = fmt.Sprintf("ClusterName: %v", *(v.ClusterName))
+		i++
+	}
+	if v.Type != nil {
+		fields[i] = fmt.Sprintf("Type: %v", *(v.Type))
+		i++
+	}
+
+	return fmt.Sprintf("ResetQueueRequest{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this ResetQueueRequest match the
+// provided ResetQueueRequest.
+//
+// This function performs a deep comparison.
+func (v *ResetQueueRequest) Equals(rhs *ResetQueueRequest) bool {
+	if !_I32_EqualsPtr(v.ShardID, rhs.ShardID) {
+		return false
+	}
+	if !_String_EqualsPtr(v.ClusterName, rhs.ClusterName) {
+		return false
+	}
+	if !_I32_EqualsPtr(v.Type, rhs.Type) {
+		return false
+	}
+
+	return true
+}
+
+// GetShardID returns the value of ShardID if it is set or its
+// zero value if it is unset.
+func (v *ResetQueueRequest) GetShardID() (o int32) {
+	if v.ShardID != nil {
+		return *v.ShardID
+	}
+
+	return
+}
+
+// GetClusterName returns the value of ClusterName if it is set or its
+// zero value if it is unset.
+func (v *ResetQueueRequest) GetClusterName() (o string) {
+	if v.ClusterName != nil {
+		return *v.ClusterName
+	}
+
+	return
+}
+
+// GetType returns the value of Type if it is set or its
+// zero value if it is unset.
+func (v *ResetQueueRequest) GetType() (o int32) {
+	if v.Type != nil {
+		return *v.Type
+	}
+
+	return
 }
 
 type ResetStickyTaskListRequest struct {
@@ -30687,8 +31300,47 @@ func (v *RespondDecisionTaskCompletedRequest) GetBinaryChecksum() (o string) {
 }
 
 type RespondDecisionTaskCompletedResponse struct {
-	DecisionTask *PollForDecisionTaskResponse `json:"decisionTask,omitempty"`
+	DecisionTask                *PollForDecisionTaskResponse          `json:"decisionTask,omitempty"`
+	ActivitiesToDispatchLocally map[string]*ActivityLocalDispatchInfo `json:"activitiesToDispatchLocally,omitempty"`
 }
+
+type _Map_String_ActivityLocalDispatchInfo_MapItemList map[string]*ActivityLocalDispatchInfo
+
+func (m _Map_String_ActivityLocalDispatchInfo_MapItemList) ForEach(f func(wire.MapItem) error) error {
+	for k, v := range m {
+		if v == nil {
+			return fmt.Errorf("invalid [%v]: value is nil", k)
+		}
+		kw, err := wire.NewValueString(k), error(nil)
+		if err != nil {
+			return err
+		}
+
+		vw, err := v.ToWire()
+		if err != nil {
+			return err
+		}
+		err = f(wire.MapItem{Key: kw, Value: vw})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m _Map_String_ActivityLocalDispatchInfo_MapItemList) Size() int {
+	return len(m)
+}
+
+func (_Map_String_ActivityLocalDispatchInfo_MapItemList) KeyType() wire.Type {
+	return wire.TBinary
+}
+
+func (_Map_String_ActivityLocalDispatchInfo_MapItemList) ValueType() wire.Type {
+	return wire.TStruct
+}
+
+func (_Map_String_ActivityLocalDispatchInfo_MapItemList) Close() {}
 
 // ToWire translates a RespondDecisionTaskCompletedResponse struct into a Thrift-level intermediate
 // representation. This intermediate representation may be serialized
@@ -30707,7 +31359,7 @@ type RespondDecisionTaskCompletedResponse struct {
 //   }
 func (v *RespondDecisionTaskCompletedResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [1]wire.Field
+		fields [2]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -30721,6 +31373,14 @@ func (v *RespondDecisionTaskCompletedResponse) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 10, Value: w}
 		i++
 	}
+	if v.ActivitiesToDispatchLocally != nil {
+		w, err = wire.NewValueMap(_Map_String_ActivityLocalDispatchInfo_MapItemList(v.ActivitiesToDispatchLocally)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
 
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
 }
@@ -30729,6 +31389,40 @@ func _PollForDecisionTaskResponse_Read(w wire.Value) (*PollForDecisionTaskRespon
 	var v PollForDecisionTaskResponse
 	err := v.FromWire(w)
 	return &v, err
+}
+
+func _ActivityLocalDispatchInfo_Read(w wire.Value) (*ActivityLocalDispatchInfo, error) {
+	var v ActivityLocalDispatchInfo
+	err := v.FromWire(w)
+	return &v, err
+}
+
+func _Map_String_ActivityLocalDispatchInfo_Read(m wire.MapItemList) (map[string]*ActivityLocalDispatchInfo, error) {
+	if m.KeyType() != wire.TBinary {
+		return nil, nil
+	}
+
+	if m.ValueType() != wire.TStruct {
+		return nil, nil
+	}
+
+	o := make(map[string]*ActivityLocalDispatchInfo, m.Size())
+	err := m.ForEach(func(x wire.MapItem) error {
+		k, err := x.Key.GetString(), error(nil)
+		if err != nil {
+			return err
+		}
+
+		v, err := _ActivityLocalDispatchInfo_Read(x.Value)
+		if err != nil {
+			return err
+		}
+
+		o[k] = v
+		return nil
+	})
+	m.Close()
+	return o, err
 }
 
 // FromWire deserializes a RespondDecisionTaskCompletedResponse struct from its Thrift-level
@@ -30761,6 +31455,14 @@ func (v *RespondDecisionTaskCompletedResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 20:
+			if field.Value.Type() == wire.TMap {
+				v.ActivitiesToDispatchLocally, err = _Map_String_ActivityLocalDispatchInfo_Read(field.Value.GetMap())
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -30774,14 +31476,35 @@ func (v *RespondDecisionTaskCompletedResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [1]string
+	var fields [2]string
 	i := 0
 	if v.DecisionTask != nil {
 		fields[i] = fmt.Sprintf("DecisionTask: %v", v.DecisionTask)
 		i++
 	}
+	if v.ActivitiesToDispatchLocally != nil {
+		fields[i] = fmt.Sprintf("ActivitiesToDispatchLocally: %v", v.ActivitiesToDispatchLocally)
+		i++
+	}
 
 	return fmt.Sprintf("RespondDecisionTaskCompletedResponse{%v}", strings.Join(fields[:i], ", "))
+}
+
+func _Map_String_ActivityLocalDispatchInfo_Equals(lhs, rhs map[string]*ActivityLocalDispatchInfo) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+
+	for lk, lv := range lhs {
+		rv, ok := rhs[lk]
+		if !ok {
+			return false
+		}
+		if !lv.Equals(rv) {
+			return false
+		}
+	}
+	return true
 }
 
 // Equals returns true if all the fields of this RespondDecisionTaskCompletedResponse match the
@@ -30790,6 +31513,9 @@ func (v *RespondDecisionTaskCompletedResponse) String() string {
 // This function performs a deep comparison.
 func (v *RespondDecisionTaskCompletedResponse) Equals(rhs *RespondDecisionTaskCompletedResponse) bool {
 	if !((v.DecisionTask == nil && rhs.DecisionTask == nil) || (v.DecisionTask != nil && rhs.DecisionTask != nil && v.DecisionTask.Equals(rhs.DecisionTask))) {
+		return false
+	}
+	if !((v.ActivitiesToDispatchLocally == nil && rhs.ActivitiesToDispatchLocally == nil) || (v.ActivitiesToDispatchLocally != nil && rhs.ActivitiesToDispatchLocally != nil && _Map_String_ActivityLocalDispatchInfo_Equals(v.ActivitiesToDispatchLocally, rhs.ActivitiesToDispatchLocally))) {
 		return false
 	}
 
@@ -31287,32 +32013,6 @@ type RetryPolicy struct {
 	ExpirationIntervalInSeconds *int32   `json:"expirationIntervalInSeconds,omitempty"`
 }
 
-type _List_String_ValueList []string
-
-func (v _List_String_ValueList) ForEach(f func(wire.Value) error) error {
-	for _, x := range v {
-		w, err := wire.NewValueString(x), error(nil)
-		if err != nil {
-			return err
-		}
-		err = f(w)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (v _List_String_ValueList) Size() int {
-	return len(v)
-}
-
-func (_List_String_ValueList) ValueType() wire.Type {
-	return wire.TBinary
-}
-
-func (_List_String_ValueList) Close() {}
-
 // ToWire translates a RetryPolicy struct into a Thrift-level intermediate
 // representation. This intermediate representation may be serialized
 // into bytes using a ThriftRW protocol implementation.
@@ -31386,24 +32086,6 @@ func (v *RetryPolicy) ToWire() (wire.Value, error) {
 	}
 
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
-}
-
-func _List_String_Read(l wire.ValueList) ([]string, error) {
-	if l.ValueType() != wire.TBinary {
-		return nil, nil
-	}
-
-	o := make([]string, 0, l.Size())
-	err := l.ForEach(func(x wire.Value) error {
-		i, err := x.GetString(), error(nil)
-		if err != nil {
-			return err
-		}
-		o = append(o, i)
-		return nil
-	})
-	l.Close()
-	return o, err
 }
 
 // FromWire deserializes a RetryPolicy struct from its Thrift-level
@@ -31529,21 +32211,6 @@ func (v *RetryPolicy) String() string {
 	return fmt.Sprintf("RetryPolicy{%v}", strings.Join(fields[:i], ", "))
 }
 
-func _List_String_Equals(lhs, rhs []string) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-
-	for i, lv := range lhs {
-		rv := rhs[i]
-		if !(lv == rv) {
-			return false
-		}
-	}
-
-	return true
-}
-
 // Equals returns true if all the fields of this RetryPolicy match the
 // provided RetryPolicy.
 //
@@ -31619,260 +32286,6 @@ func (v *RetryPolicy) GetExpirationIntervalInSeconds() (o int32) {
 	}
 
 	return
-}
-
-type RetryTaskError struct {
-	Message     string  `json:"message,required"`
-	DomainId    *string `json:"domainId,omitempty"`
-	WorkflowId  *string `json:"workflowId,omitempty"`
-	RunId       *string `json:"runId,omitempty"`
-	NextEventId *int64  `json:"nextEventId,omitempty"`
-}
-
-// ToWire translates a RetryTaskError struct into a Thrift-level intermediate
-// representation. This intermediate representation may be serialized
-// into bytes using a ThriftRW protocol implementation.
-//
-// An error is returned if the struct or any of its fields failed to
-// validate.
-//
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
-//
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
-func (v *RetryTaskError) ToWire() (wire.Value, error) {
-	var (
-		fields [5]wire.Field
-		i      int = 0
-		w      wire.Value
-		err    error
-	)
-
-	w, err = wire.NewValueString(v.Message), error(nil)
-	if err != nil {
-		return w, err
-	}
-	fields[i] = wire.Field{ID: 1, Value: w}
-	i++
-	if v.DomainId != nil {
-		w, err = wire.NewValueString(*(v.DomainId)), error(nil)
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 2, Value: w}
-		i++
-	}
-	if v.WorkflowId != nil {
-		w, err = wire.NewValueString(*(v.WorkflowId)), error(nil)
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 3, Value: w}
-		i++
-	}
-	if v.RunId != nil {
-		w, err = wire.NewValueString(*(v.RunId)), error(nil)
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 4, Value: w}
-		i++
-	}
-	if v.NextEventId != nil {
-		w, err = wire.NewValueI64(*(v.NextEventId)), error(nil)
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 5, Value: w}
-		i++
-	}
-
-	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
-}
-
-// FromWire deserializes a RetryTaskError struct from its Thrift-level
-// representation. The Thrift-level representation may be obtained
-// from a ThriftRW protocol implementation.
-//
-// An error is returned if we were unable to build a RetryTaskError struct
-// from the provided intermediate representation.
-//
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
-//
-//   var v RetryTaskError
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
-func (v *RetryTaskError) FromWire(w wire.Value) error {
-	var err error
-
-	messageIsSet := false
-
-	for _, field := range w.GetStruct().Fields {
-		switch field.ID {
-		case 1:
-			if field.Value.Type() == wire.TBinary {
-				v.Message, err = field.Value.GetString(), error(nil)
-				if err != nil {
-					return err
-				}
-				messageIsSet = true
-			}
-		case 2:
-			if field.Value.Type() == wire.TBinary {
-				var x string
-				x, err = field.Value.GetString(), error(nil)
-				v.DomainId = &x
-				if err != nil {
-					return err
-				}
-
-			}
-		case 3:
-			if field.Value.Type() == wire.TBinary {
-				var x string
-				x, err = field.Value.GetString(), error(nil)
-				v.WorkflowId = &x
-				if err != nil {
-					return err
-				}
-
-			}
-		case 4:
-			if field.Value.Type() == wire.TBinary {
-				var x string
-				x, err = field.Value.GetString(), error(nil)
-				v.RunId = &x
-				if err != nil {
-					return err
-				}
-
-			}
-		case 5:
-			if field.Value.Type() == wire.TI64 {
-				var x int64
-				x, err = field.Value.GetI64(), error(nil)
-				v.NextEventId = &x
-				if err != nil {
-					return err
-				}
-
-			}
-		}
-	}
-
-	if !messageIsSet {
-		return errors.New("field Message of RetryTaskError is required")
-	}
-
-	return nil
-}
-
-// String returns a readable string representation of a RetryTaskError
-// struct.
-func (v *RetryTaskError) String() string {
-	if v == nil {
-		return "<nil>"
-	}
-
-	var fields [5]string
-	i := 0
-	fields[i] = fmt.Sprintf("Message: %v", v.Message)
-	i++
-	if v.DomainId != nil {
-		fields[i] = fmt.Sprintf("DomainId: %v", *(v.DomainId))
-		i++
-	}
-	if v.WorkflowId != nil {
-		fields[i] = fmt.Sprintf("WorkflowId: %v", *(v.WorkflowId))
-		i++
-	}
-	if v.RunId != nil {
-		fields[i] = fmt.Sprintf("RunId: %v", *(v.RunId))
-		i++
-	}
-	if v.NextEventId != nil {
-		fields[i] = fmt.Sprintf("NextEventId: %v", *(v.NextEventId))
-		i++
-	}
-
-	return fmt.Sprintf("RetryTaskError{%v}", strings.Join(fields[:i], ", "))
-}
-
-// Equals returns true if all the fields of this RetryTaskError match the
-// provided RetryTaskError.
-//
-// This function performs a deep comparison.
-func (v *RetryTaskError) Equals(rhs *RetryTaskError) bool {
-	if !(v.Message == rhs.Message) {
-		return false
-	}
-	if !_String_EqualsPtr(v.DomainId, rhs.DomainId) {
-		return false
-	}
-	if !_String_EqualsPtr(v.WorkflowId, rhs.WorkflowId) {
-		return false
-	}
-	if !_String_EqualsPtr(v.RunId, rhs.RunId) {
-		return false
-	}
-	if !_I64_EqualsPtr(v.NextEventId, rhs.NextEventId) {
-		return false
-	}
-
-	return true
-}
-
-// GetDomainId returns the value of DomainId if it is set or its
-// zero value if it is unset.
-func (v *RetryTaskError) GetDomainId() (o string) {
-	if v.DomainId != nil {
-		return *v.DomainId
-	}
-
-	return
-}
-
-// GetWorkflowId returns the value of WorkflowId if it is set or its
-// zero value if it is unset.
-func (v *RetryTaskError) GetWorkflowId() (o string) {
-	if v.WorkflowId != nil {
-		return *v.WorkflowId
-	}
-
-	return
-}
-
-// GetRunId returns the value of RunId if it is set or its
-// zero value if it is unset.
-func (v *RetryTaskError) GetRunId() (o string) {
-	if v.RunId != nil {
-		return *v.RunId
-	}
-
-	return
-}
-
-// GetNextEventId returns the value of NextEventId if it is set or its
-// zero value if it is unset.
-func (v *RetryTaskError) GetNextEventId() (o int64) {
-	if v.NextEventId != nil {
-		return *v.NextEventId
-	}
-
-	return
-}
-
-func (v *RetryTaskError) Error() string {
-	return v.String()
 }
 
 type RetryTaskV2Error struct {
@@ -32249,6 +32662,7 @@ type ScheduleActivityTaskDecisionAttributes struct {
 	HeartbeatTimeoutSeconds       *int32        `json:"heartbeatTimeoutSeconds,omitempty"`
 	RetryPolicy                   *RetryPolicy  `json:"retryPolicy,omitempty"`
 	Header                        *Header       `json:"header,omitempty"`
+	RequestLocalDispatch          *bool         `json:"requestLocalDispatch,omitempty"`
 }
 
 // ToWire translates a ScheduleActivityTaskDecisionAttributes struct into a Thrift-level intermediate
@@ -32268,7 +32682,7 @@ type ScheduleActivityTaskDecisionAttributes struct {
 //   }
 func (v *ScheduleActivityTaskDecisionAttributes) ToWire() (wire.Value, error) {
 	var (
-		fields [11]wire.Field
+		fields [12]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -32360,6 +32774,14 @@ func (v *ScheduleActivityTaskDecisionAttributes) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 80, Value: w}
+		i++
+	}
+	if v.RequestLocalDispatch != nil {
+		w, err = wire.NewValueBool(*(v.RequestLocalDispatch)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 90, Value: w}
 		i++
 	}
 
@@ -32488,6 +32910,16 @@ func (v *ScheduleActivityTaskDecisionAttributes) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 90:
+			if field.Value.Type() == wire.TBool {
+				var x bool
+				x, err = field.Value.GetBool(), error(nil)
+				v.RequestLocalDispatch = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -32501,7 +32933,7 @@ func (v *ScheduleActivityTaskDecisionAttributes) String() string {
 		return "<nil>"
 	}
 
-	var fields [11]string
+	var fields [12]string
 	i := 0
 	if v.ActivityId != nil {
 		fields[i] = fmt.Sprintf("ActivityId: %v", *(v.ActivityId))
@@ -32547,6 +32979,10 @@ func (v *ScheduleActivityTaskDecisionAttributes) String() string {
 		fields[i] = fmt.Sprintf("Header: %v", v.Header)
 		i++
 	}
+	if v.RequestLocalDispatch != nil {
+		fields[i] = fmt.Sprintf("RequestLocalDispatch: %v", *(v.RequestLocalDispatch))
+		i++
+	}
 
 	return fmt.Sprintf("ScheduleActivityTaskDecisionAttributes{%v}", strings.Join(fields[:i], ", "))
 }
@@ -32587,6 +33023,9 @@ func (v *ScheduleActivityTaskDecisionAttributes) Equals(rhs *ScheduleActivityTas
 		return false
 	}
 	if !((v.Header == nil && rhs.Header == nil) || (v.Header != nil && rhs.Header != nil && v.Header.Equals(rhs.Header))) {
+		return false
+	}
+	if !_Bool_EqualsPtr(v.RequestLocalDispatch, rhs.RequestLocalDispatch) {
 		return false
 	}
 
@@ -32648,6 +33087,16 @@ func (v *ScheduleActivityTaskDecisionAttributes) GetStartToCloseTimeoutSeconds()
 func (v *ScheduleActivityTaskDecisionAttributes) GetHeartbeatTimeoutSeconds() (o int32) {
 	if v.HeartbeatTimeoutSeconds != nil {
 		return *v.HeartbeatTimeoutSeconds
+	}
+
+	return
+}
+
+// GetRequestLocalDispatch returns the value of RequestLocalDispatch if it is set or its
+// zero value if it is unset.
+func (v *ScheduleActivityTaskDecisionAttributes) GetRequestLocalDispatch() (o bool) {
+	if v.RequestLocalDispatch != nil {
+		return *v.RequestLocalDispatch
 	}
 
 	return

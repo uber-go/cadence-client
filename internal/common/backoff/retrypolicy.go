@@ -32,7 +32,8 @@ const (
 	done              time.Duration = -1
 	noMaximumAttempts               = 0
 
-	defaultBackoffCoefficient = 2.0
+	// DefaultBackoffCoefficient is default backOffCoefficient for retryPolicy
+	DefaultBackoffCoefficient = 2.0
 	defaultMaximumInterval    = 10 * time.Second
 	defaultExpirationInterval = time.Minute
 	defaultMaximumAttempts    = noMaximumAttempts
@@ -82,7 +83,7 @@ var SystemClock = systemClock{}
 func NewExponentialRetryPolicy(initialInterval time.Duration) *ExponentialRetryPolicy {
 	p := &ExponentialRetryPolicy{
 		initialInterval:    initialInterval,
-		backoffCoefficient: defaultBackoffCoefficient,
+		backoffCoefficient: DefaultBackoffCoefficient,
 		maximumInterval:    defaultMaximumInterval,
 		expirationInterval: defaultExpirationInterval,
 		maximumAttempts:    defaultMaximumAttempts,

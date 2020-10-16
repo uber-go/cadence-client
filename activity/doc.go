@@ -88,7 +88,7 @@ the Cadence managed service.
     progress := 0
     for hasWork {
         // send heartbeat message to the server
-        activity.RecordActivityHeartbeat(ctx, progress)
+        activity.RecordHeartbeat(ctx, progress)
         // do some work
         ...
         progress++
@@ -103,21 +103,19 @@ It is also possible to heartbeat an activity from an external source:
     client.Client client = client.NewClient(...)
 
     // record heartbeat
-    err := client.RecordActivityHeartbeat(taskToken, details)
+    err := client.RecordActivityHeartbeat(ctx, taskToken, details)
 
-The parameters of the RecordActivityHeartbeat function are:
-
-  - taskToken: This is the value of the binary “TaskToken” field of the
-    “ActivityInfo” struct retrieved inside the activity
-  - details: This is the serializable payload containing progress information
+It expects an additional parameter, "taskToken", which is the value of the binary "TaskToken" field of the
+"ActivityInfo" struct retrieved inside the activity (GetActivityInfo(ctx).TaskToken). "details" is the serializable
+payload containing progress information.
 
 Activity Cancellation
 
 When an activity is cancelled (or its workflow execution is completed or failed) the context passed into its function
 is cancelled which sets its Done channel’s closed state. So an activity can use that to perform any necessary cleanup
-and abort its execution. Currently cancellation is delivered only to activities that call RecordActivityHeartbeat.
+and abort its execution. Currently cancellation is delivered only to activities that call RecordHeartbeat.
 
-Async/“Manual” Activity Completion
+Async/Manual Activity Completion
 
 In certain scenarios completing an activity upon completion of its function is not possible or desirable.
 
@@ -140,7 +138,7 @@ the information necessary to be able to be completed from an external system and
 waiting for that outside callback:
 
     // retrieve activity information needed to complete activity asynchronously
-    activityInfo := activity.GetActivityInfo(ctx)
+    activityInfo := activity.GetInfo(ctx)
     taskToken := activityInfo.TaskToken
 
     // send the taskToken to external service that will complete the activity
@@ -183,7 +181,7 @@ Registration
 In order to for some workflow execution to be able to invoke an activity type, the worker process needs to be aware of
 all the implementations it has access to. An activity is registered with the following call:
 
-    activity.RegisterActivity(SimpleActivity)
+    activity.Register(SimpleActivity)
 
 This call essentially creates an in-memory mapping inside the worker process between the fully qualified function name
 and the implementation. Unlike in Amazon SWF, workflow and activity types are not registered with the managed service.

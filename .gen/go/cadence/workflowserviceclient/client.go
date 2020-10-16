@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,12 @@ import (
 
 // Interface is a client for the WorkflowService service.
 type Interface interface {
+	CountWorkflowExecutions(
+		ctx context.Context,
+		CountRequest *shared.CountWorkflowExecutionsRequest,
+		opts ...yarpc.CallOption,
+	) (*shared.CountWorkflowExecutionsResponse, error)
+
 	DeprecateDomain(
 		ctx context.Context,
 		DeprecateRequest *shared.DeprecateDomainRequest,
@@ -60,11 +66,27 @@ type Interface interface {
 		opts ...yarpc.CallOption,
 	) (*shared.DescribeWorkflowExecutionResponse, error)
 
+	GetClusterInfo(
+		ctx context.Context,
+		opts ...yarpc.CallOption,
+	) (*shared.ClusterInfo, error)
+
+	GetSearchAttributes(
+		ctx context.Context,
+		opts ...yarpc.CallOption,
+	) (*shared.GetSearchAttributesResponse, error)
+
 	GetWorkflowExecutionHistory(
 		ctx context.Context,
 		GetRequest *shared.GetWorkflowExecutionHistoryRequest,
 		opts ...yarpc.CallOption,
 	) (*shared.GetWorkflowExecutionHistoryResponse, error)
+
+	ListArchivedWorkflowExecutions(
+		ctx context.Context,
+		ListRequest *shared.ListArchivedWorkflowExecutionsRequest,
+		opts ...yarpc.CallOption,
+	) (*shared.ListArchivedWorkflowExecutionsResponse, error)
 
 	ListClosedWorkflowExecutions(
 		ctx context.Context,
@@ -83,6 +105,18 @@ type Interface interface {
 		ListRequest *shared.ListOpenWorkflowExecutionsRequest,
 		opts ...yarpc.CallOption,
 	) (*shared.ListOpenWorkflowExecutionsResponse, error)
+
+	ListTaskListPartitions(
+		ctx context.Context,
+		Request *shared.ListTaskListPartitionsRequest,
+		opts ...yarpc.CallOption,
+	) (*shared.ListTaskListPartitionsResponse, error)
+
+	ListWorkflowExecutions(
+		ctx context.Context,
+		ListRequest *shared.ListWorkflowExecutionsRequest,
+		opts ...yarpc.CallOption,
+	) (*shared.ListWorkflowExecutionsResponse, error)
 
 	PollForActivityTask(
 		ctx context.Context,
@@ -192,6 +226,12 @@ type Interface interface {
 		opts ...yarpc.CallOption,
 	) error
 
+	ScanWorkflowExecutions(
+		ctx context.Context,
+		ListRequest *shared.ListWorkflowExecutionsRequest,
+		opts ...yarpc.CallOption,
+	) (*shared.ListWorkflowExecutionsResponse, error)
+
 	SignalWithStartWorkflowExecution(
 		ctx context.Context,
 		SignalWithStartRequest *shared.SignalWithStartWorkflowExecutionRequest,
@@ -245,6 +285,29 @@ func init() {
 
 type client struct {
 	c thrift.Client
+}
+
+func (c client) CountWorkflowExecutions(
+	ctx context.Context,
+	_CountRequest *shared.CountWorkflowExecutionsRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.CountWorkflowExecutionsResponse, err error) {
+
+	args := cadence.WorkflowService_CountWorkflowExecutions_Helper.Args(_CountRequest)
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_CountWorkflowExecutions_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_CountWorkflowExecutions_Helper.UnwrapResponse(&result)
+	return
 }
 
 func (c client) DeprecateDomain(
@@ -339,6 +402,50 @@ func (c client) DescribeWorkflowExecution(
 	return
 }
 
+func (c client) GetClusterInfo(
+	ctx context.Context,
+	opts ...yarpc.CallOption,
+) (success *shared.ClusterInfo, err error) {
+
+	args := cadence.WorkflowService_GetClusterInfo_Helper.Args()
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_GetClusterInfo_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_GetClusterInfo_Helper.UnwrapResponse(&result)
+	return
+}
+
+func (c client) GetSearchAttributes(
+	ctx context.Context,
+	opts ...yarpc.CallOption,
+) (success *shared.GetSearchAttributesResponse, err error) {
+
+	args := cadence.WorkflowService_GetSearchAttributes_Helper.Args()
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_GetSearchAttributes_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_GetSearchAttributes_Helper.UnwrapResponse(&result)
+	return
+}
+
 func (c client) GetWorkflowExecutionHistory(
 	ctx context.Context,
 	_GetRequest *shared.GetWorkflowExecutionHistoryRequest,
@@ -359,6 +466,29 @@ func (c client) GetWorkflowExecutionHistory(
 	}
 
 	success, err = cadence.WorkflowService_GetWorkflowExecutionHistory_Helper.UnwrapResponse(&result)
+	return
+}
+
+func (c client) ListArchivedWorkflowExecutions(
+	ctx context.Context,
+	_ListRequest *shared.ListArchivedWorkflowExecutionsRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.ListArchivedWorkflowExecutionsResponse, err error) {
+
+	args := cadence.WorkflowService_ListArchivedWorkflowExecutions_Helper.Args(_ListRequest)
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_ListArchivedWorkflowExecutions_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_ListArchivedWorkflowExecutions_Helper.UnwrapResponse(&result)
 	return
 }
 
@@ -428,6 +558,52 @@ func (c client) ListOpenWorkflowExecutions(
 	}
 
 	success, err = cadence.WorkflowService_ListOpenWorkflowExecutions_Helper.UnwrapResponse(&result)
+	return
+}
+
+func (c client) ListTaskListPartitions(
+	ctx context.Context,
+	_Request *shared.ListTaskListPartitionsRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.ListTaskListPartitionsResponse, err error) {
+
+	args := cadence.WorkflowService_ListTaskListPartitions_Helper.Args(_Request)
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_ListTaskListPartitions_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_ListTaskListPartitions_Helper.UnwrapResponse(&result)
+	return
+}
+
+func (c client) ListWorkflowExecutions(
+	ctx context.Context,
+	_ListRequest *shared.ListWorkflowExecutionsRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.ListWorkflowExecutionsResponse, err error) {
+
+	args := cadence.WorkflowService_ListWorkflowExecutions_Helper.Args(_ListRequest)
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_ListWorkflowExecutions_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_ListWorkflowExecutions_Helper.UnwrapResponse(&result)
 	return
 }
 
@@ -842,6 +1018,29 @@ func (c client) RespondQueryTaskCompleted(
 	}
 
 	err = cadence.WorkflowService_RespondQueryTaskCompleted_Helper.UnwrapResponse(&result)
+	return
+}
+
+func (c client) ScanWorkflowExecutions(
+	ctx context.Context,
+	_ListRequest *shared.ListWorkflowExecutionsRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.ListWorkflowExecutionsResponse, err error) {
+
+	args := cadence.WorkflowService_ScanWorkflowExecutions_Helper.Args(_ListRequest)
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_ScanWorkflowExecutions_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_ScanWorkflowExecutions_Helper.UnwrapResponse(&result)
 	return
 }
 

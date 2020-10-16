@@ -109,7 +109,7 @@ type (
 // If the workflow main function returns this error then the current execution is ended and
 // the new execution with same workflow ID is started automatically with options
 // provided to this function.
-//  ctx - use context to override any options for the new workflow like execution time out, decision task time out, task list.
+//  ctx - use context to override any options for the new workflow like execution timeout, decision task timeout, task list.
 //	  if not mentioned it would use the defaults that the current workflow is using.
 //        ctx := WithExecutionStartToCloseTimeout(ctx, 30 * time.Minute)
 //        ctx := WithWorkflowTaskStartToCloseTimeout(ctx, time.Minute)
@@ -125,8 +125,8 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *C
 // Use NewHeartbeatTimeoutError to create heartbeat TimeoutError
 // WARNING: This function is public only to support unit testing of workflows.
 // It shouldn't be used by application level code.
-func NewTimeoutError(timeoutType shared.TimeoutType) *TimeoutError {
-	return internal.NewTimeoutError(timeoutType)
+func NewTimeoutError(timeoutType shared.TimeoutType, details ...interface{}) *TimeoutError {
+	return internal.NewTimeoutError(timeoutType, details...)
 }
 
 // NewHeartbeatTimeoutError creates TimeoutError instance

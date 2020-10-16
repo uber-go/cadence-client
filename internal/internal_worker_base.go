@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,13 +25,15 @@ package internal
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os"
 	"sync"
+	"syscall"
 	"time"
 
-	"fmt"
-
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/encoded"
+	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
@@ -46,6 +49,8 @@ const (
 var (
 	pollOperationRetryPolicy = createPollRetryPolicy()
 )
+
+var errShutdown = errors.New("worker shutting down")
 
 type (
 	// resultHandler that returns result
@@ -79,13 +84,19 @@ type (
 		SignalExternalWorkflow(domainName, workflowID, runID, signalName string, input []byte, arg interface{}, childWorkflowOnly bool, callback resultHandler)
 		RegisterQueryHandler(handler func(queryType string, queryArgs []byte) ([]byte, error))
 		IsReplaying() bool
-		MutableSideEffect(id string, f func() interface{}, equals func(a, b interface{}) bool) encoded.Value
-		GetDataConverter() encoded.DataConverter
+		MutableSideEffect(id string, f func() interface{}, equals func(a, b interface{}) bool) Value
+		GetDataConverter() DataConverter
+		AddSession(sessionInfo *SessionInfo)
+		RemoveSession(sessionID string)
+		GetContextPropagators() []ContextPropagator
+		UpsertSearchAttributes(attributes map[string]interface{}) error
+		GetRegistry() *registry
+		GetWorkflowInterceptors() []WorkflowInterceptorFactory
 	}
 
 	// WorkflowDefinition wraps the code that can execute a workflow.
 	workflowDefinition interface {
-		Execute(env workflowEnvironment, input []byte)
+		Execute(env workflowEnvironment, header *shared.Header, input []byte)
 		// Called for each non timed out startDecision event.
 		// Executed after all history events since the previous decision are applied to workflowDefinition
 		OnDecisionTaskStarted()
@@ -110,8 +121,7 @@ type (
 	baseWorker struct {
 		options              baseWorkerOptions
 		isWorkerStarted      bool
-		shutdownCh           chan struct{} // Channel used to shut down the go routines.
-		workerStopCh         chan struct{}
+		shutdownCh           chan struct{}  // Channel used to shut down the go routines.
 		shutdownWG           sync.WaitGroup // The WaitGroup for shutting down existing routines.
 		pollLimiter          *rate.Limiter
 		taskLimiter          *rate.Limiter
@@ -121,8 +131,9 @@ type (
 		logger               *zap.Logger
 		metricsScope         tally.Scope
 
-		pollerRequestCh chan struct{}
-		taskQueueCh     chan interface{}
+		pollerRequestCh    chan struct{}
+		taskQueueCh        chan interface{}
+		sessionTokenBucket *sessionTokenBucket
 	}
 
 	polledTask struct {
@@ -142,21 +153,21 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 	return policy
 }
 
-func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, workerStopCh chan struct{}) *baseWorker {
+func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, sessionTokenBucket *sessionTokenBucket) *baseWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 	bw := &baseWorker{
-		options:            options,
-		shutdownCh:         make(chan struct{}),
-		workerStopCh:       workerStopCh,
-		taskLimiter:        rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
-		retrier:            backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
-		logger:             logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
-		metricsScope:       tagScope(metricsScope, tagWorkerType, options.workerType),
-		pollerRequestCh:    make(chan struct{}, options.maxConcurrentTask),
-		taskQueueCh:        make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
+		options:         options,
+		shutdownCh:      make(chan struct{}),
+		taskLimiter:     rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
+		retrier:         backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
+		logger:          logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
+		metricsScope:    tagScope(metricsScope, tagWorkerType, options.workerType),
+		pollerRequestCh: make(chan struct{}, options.maxConcurrentTask),
+		taskQueueCh:     make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
 
 		limiterContext:       ctx,
 		limiterContextCancel: cancel,
+		sessionTokenBucket:   sessionTokenBucket,
 	}
 	if options.pollerRate > 0 {
 		bw.pollLimiter = rate.NewLimiter(rate.Limit(options.pollerRate), 1)
@@ -209,18 +220,10 @@ func (bw *baseWorker) runPoller() {
 		case <-bw.shutdownCh:
 			return
 		case <-bw.pollerRequestCh:
-			ch := make(chan struct{})
-			go func(ch chan struct{}) {
-				bw.pollTask()
-				close(ch)
-			}(ch)
-
-			// block until previous poll completed or return immediately when shutdown
-			select {
-			case <-bw.shutdownCh:
-				return
-			case <-ch:
+			if bw.sessionTokenBucket != nil {
+				bw.sessionTokenBucket.waitForAvailableToken()
 			}
+			bw.pollTask()
 		}
 	}
 }
@@ -260,7 +263,13 @@ func (bw *baseWorker) pollTask() {
 		if err != nil && enableVerboseLogging {
 			bw.logger.Debug("Failed to poll for task.", zap.Error(err))
 		}
-		if err != nil && isServiceTransientError(err) {
+		if err != nil {
+			if isNonRetriableError(err) {
+				bw.logger.Error("Worker received non-retriable error. Shutting down.", zap.Error(err))
+				p, _ := os.FindProcess(os.Getpid())
+				p.Signal(syscall.SIGINT)
+				return
+			}
 			bw.retrier.Failed()
 		} else {
 			bw.retrier.Succeeded()
@@ -268,10 +277,25 @@ func (bw *baseWorker) pollTask() {
 	}
 
 	if task != nil {
-		bw.taskQueueCh <- &polledTask{task}
+		select {
+		case bw.taskQueueCh <- &polledTask{task}:
+		case <-bw.shutdownCh:
+		}
 	} else {
 		bw.pollerRequestCh <- struct{}{} // poll failed, trigger a new poll
 	}
+}
+
+func isNonRetriableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	switch err.(type) {
+	case *shared.BadRequestError,
+		*shared.ClientVersionNotSupportedError:
+		return true
+	}
+	return false
 }
 
 func (bw *baseWorker) processTask(task interface{}) {
@@ -322,11 +346,6 @@ func (bw *baseWorker) Stop() {
 	}
 	close(bw.shutdownCh)
 	bw.limiterContextCancel()
-
-	// Close activity channel
-	if bw.workerStopCh != nil {
-		close(bw.workerStopCh)
-	}
 
 	if success := awaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {
 		traceLog(func() {

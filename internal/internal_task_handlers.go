@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -31,11 +32,12 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/cache"
@@ -91,7 +93,10 @@ type (
 		workflowInfo      *WorkflowInfo
 		wth               *workflowTaskHandlerImpl
 
-		eventHandler *workflowExecutionEventHandlerImpl
+		// eventHandler is changed to a atomic.Value as a temporally bug fix for local activity
+		// retry issue (github issue #915). Therefore, when accessing/modifying this field, the
+		// mutex should still be held.
+		eventHandler atomic.Value
 
 		isWorkflowCompleted bool
 		result              []byte
@@ -114,34 +119,47 @@ type (
 		identity                       string
 		enableLoggingInReplay          bool
 		disableStickyExecution         bool
-		hostEnv                        *hostEnvImpl
+		registry                       *registry
 		laTunnel                       *localActivityTunnel
 		nonDeterministicWorkflowPolicy NonDeterministicWorkflowPolicy
-		dataConverter                  encoded.DataConverter
+		dataConverter                  DataConverter
+		contextPropagators             []ContextPropagator
+		tracer                         opentracing.Tracer
+		workflowInterceptors           []WorkflowInterceptorFactory
 	}
 
 	activityProvider func(name string) activity
+
 	// activityTaskHandlerImpl is the implementation of ActivityTaskHandler
 	activityTaskHandlerImpl struct {
-		taskListName     string
-		identity         string
-		service          workflowserviceclient.Interface
-		metricsScope     *metrics.TaggedScope
-		logger           *zap.Logger
-		userContext      context.Context
-		hostEnv          *hostEnvImpl
-		activityProvider activityProvider
-		dataConverter    encoded.DataConverter
-		workerStopCh     <-chan struct{}
+		taskListName       string
+		identity           string
+		service            workflowserviceclient.Interface
+		metricsScope       *metrics.TaggedScope
+		logger             *zap.Logger
+		userContext        context.Context
+		registry           *registry
+		activityProvider   activityProvider
+		dataConverter      DataConverter
+		workerStopCh       <-chan struct{}
+		contextPropagators []ContextPropagator
+		tracer             opentracing.Tracer
 	}
 
 	// history wrapper method to help information about events.
 	history struct {
-		workflowTask  *workflowTask
-		eventsHandler *workflowExecutionEventHandlerImpl
-		loadedEvents  []*s.HistoryEvent
-		currentIndex  int
-		next          []*s.HistoryEvent
+		workflowTask   *workflowTask
+		eventsHandler  *workflowExecutionEventHandlerImpl
+		loadedEvents   []*s.HistoryEvent
+		currentIndex   int
+		nextEventID    int64 // next expected eventID for sanity
+		lastEventID    int64 // last expected eventID, zero indicates read until end of stream
+		next           []*s.HistoryEvent
+		binaryChecksum *string
+	}
+
+	decisionHeartbeatError struct {
+		Message string
 	}
 )
 
@@ -151,9 +169,16 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 		eventsHandler: eventsHandler,
 		loadedEvents:  task.task.History.Events,
 		currentIndex:  0,
+		lastEventID:   task.task.GetStartedEventId(),
 	}
-
+	if len(result.loadedEvents) > 0 {
+		result.nextEventID = result.loadedEvents[0].GetEventId()
+	}
 	return result
+}
+
+func (e decisionHeartbeatError) Error() string {
+	return e.Message
 }
 
 // Get workflow start event.
@@ -169,22 +194,26 @@ func (eh *history) IsReplayEvent(event *s.HistoryEvent) bool {
 	return event.GetEventId() <= eh.workflowTask.task.GetPreviousStartedEventId() || isDecisionEvent(event.GetEventType())
 }
 
-func (eh *history) IsNextDecisionFailed() (bool, error) {
+func (eh *history) IsNextDecisionFailed() (isFailed bool, binaryChecksum *string, err error) {
 
 	nextIndex := eh.currentIndex + 1
 	if nextIndex >= len(eh.loadedEvents) && eh.hasMoreEvents() { // current page ends and there is more pages
 		if err := eh.loadMoreEvents(); err != nil {
-			return false, err
+			return false, nil, err
 		}
 	}
 
 	if nextIndex < len(eh.loadedEvents) {
-		nextEventType := eh.loadedEvents[nextIndex].GetEventType()
+		nextEvent := eh.loadedEvents[nextIndex]
+		nextEventType := nextEvent.GetEventType()
 		isFailed := nextEventType == s.EventTypeDecisionTaskTimedOut || nextEventType == s.EventTypeDecisionTaskFailed
-		return isFailed, nil
+		var binaryChecksum *string
+		if nextEventType == s.EventTypeDecisionTaskCompleted {
+			binaryChecksum = nextEvent.DecisionTaskCompletedEventAttributes.BinaryChecksum
+		}
+		return isFailed, binaryChecksum, nil
 	}
-
-	return false, nil
+	return false, nil, nil
 }
 
 func (eh *history) loadMoreEvents() error {
@@ -193,6 +222,9 @@ func (eh *history) loadMoreEvents() error {
 		return err
 	}
 	eh.loadedEvents = append(eh.loadedEvents, historyPage.Events...)
+	if eh.nextEventID == 0 && len(eh.loadedEvents) > 0 {
+		eh.nextEventID = eh.loadedEvents[0].GetEventId()
+	}
 	return nil
 }
 
@@ -210,7 +242,8 @@ func isDecisionEvent(eventType s.EventType) bool {
 		s.EventTypeMarkerRecorded,
 		s.EventTypeStartChildWorkflowExecutionInitiated,
 		s.EventTypeRequestCancelExternalWorkflowExecutionInitiated,
-		s.EventTypeSignalExternalWorkflowExecutionInitiated:
+		s.EventTypeSignalExternalWorkflowExecutionInitiated,
+		s.EventTypeUpsertWorkflowSearchAttributes:
 		return true
 	default:
 		return false
@@ -218,19 +251,21 @@ func isDecisionEvent(eventType s.EventType) bool {
 }
 
 // NextDecisionEvents returns events that there processed as new by the next decision.
-func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
+// TODO(maxim): Refactor to return a struct instead of multiple parameters
+func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent, binaryChecksum *string, err error) {
 	if eh.next == nil {
 		eh.next, _, err = eh.nextDecisionEvents()
 		if err != nil {
-			return result, markers, err
+			return result, markers, eh.binaryChecksum, err
 		}
 	}
 
 	result = eh.next
+	checksum := eh.binaryChecksum
 	if len(result) > 0 {
 		eh.next, markers, err = eh.nextDecisionEvents()
 	}
-	return result, markers, err
+	return result, markers, checksum, err
 }
 
 func (eh *history) hasMoreEvents() bool {
@@ -242,8 +277,27 @@ func (eh *history) getMoreEvents() (*s.History, error) {
 	return eh.workflowTask.historyIterator.GetNextPage()
 }
 
+func (eh *history) verifyAllEventsProcessed() error {
+	if eh.lastEventID > 0 && eh.nextEventID <= eh.lastEventID {
+		return fmt.Errorf(
+			"history_events: premature end of stream, expectedLastEventID=%v but no more events after eventID=%v",
+			eh.lastEventID,
+			eh.nextEventID-1)
+	}
+	if eh.lastEventID > 0 && eh.nextEventID != (eh.lastEventID+1) {
+		eh.eventsHandler.logger.Warn(
+			"history_events: processed events past the expected lastEventID",
+			zap.Int64("expectedLastEventID", eh.lastEventID),
+			zap.Int64("processedLastEventID", eh.nextEventID-1))
+	}
+	return nil
+}
+
 func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
 	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMoreEvents() {
+		if err := eh.verifyAllEventsProcessed(); err != nil {
+			return nil, nil, err
+		}
 		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, nil
 	}
 
@@ -254,30 +308,41 @@ OrderEvents:
 		// load more history events if needed
 		for eh.currentIndex == len(eh.loadedEvents) {
 			if !eh.hasMoreEvents() {
+				if err = eh.verifyAllEventsProcessed(); err != nil {
+					return
+				}
 				break OrderEvents
 			}
-			if err1 := eh.loadMoreEvents(); err1 != nil {
-				err = err1
+			if err = eh.loadMoreEvents(); err != nil {
 				return
 			}
 		}
 
 		event := eh.loadedEvents[eh.currentIndex]
+		eventID := event.GetEventId()
+		if eventID != eh.nextEventID {
+			err = fmt.Errorf(
+				"missing history events, expectedNextEventID=%v but receivedNextEventID=%v",
+				eh.nextEventID, eventID)
+			return
+		}
+
+		eh.nextEventID++
+
 		switch event.GetEventType() {
 		case s.EventTypeDecisionTaskStarted:
-			isFailed, err1 := eh.IsNextDecisionFailed()
+			isFailed, binaryChecksum, err1 := eh.IsNextDecisionFailed()
 			if err1 != nil {
 				err = err1
 				return
 			}
 			if !isFailed {
+				eh.binaryChecksum = binaryChecksum
 				eh.currentIndex++
 				nextEvents = append(nextEvents, event)
 				break OrderEvents
 			}
-
-		case s.EventTypeDecisionTaskCompleted,
-			s.EventTypeDecisionTaskScheduled,
+		case s.EventTypeDecisionTaskScheduled,
 			s.EventTypeDecisionTaskTimedOut,
 			s.EventTypeDecisionTaskFailed:
 			// Skip
@@ -306,7 +371,7 @@ func newWorkflowTaskHandler(
 	domain string,
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
-	hostEnv *hostEnvImpl,
+	registry *registry,
 ) WorkflowTaskHandler {
 	ensureRequiredParams(&params)
 	return &workflowTaskHandlerImpl{
@@ -317,9 +382,12 @@ func newWorkflowTaskHandler(
 		identity:                       params.Identity,
 		enableLoggingInReplay:          params.EnableLoggingInReplay,
 		disableStickyExecution:         params.DisableStickyExecution,
-		hostEnv:                        hostEnv,
+		registry:                       registry,
 		nonDeterministicWorkflowPolicy: params.NonDeterministicWorkflowPolicy,
 		dataConverter:                  params.DataConverter,
+		contextPropagators:             params.ContextPropagators,
+		tracer:                         params.Tracer,
+		workflowInterceptors:           params.WorkflowInterceptors,
 	}
 }
 
@@ -380,6 +448,20 @@ func removeWorkflowContext(runID string) {
 	getWorkflowCache().Delete(runID)
 }
 
+func newWorkflowExecutionContext(
+	startTime time.Time,
+	workflowInfo *WorkflowInfo,
+	taskHandler *workflowTaskHandlerImpl,
+) *workflowExecutionContextImpl {
+	workflowContext := &workflowExecutionContextImpl{
+		workflowStartTime: startTime,
+		workflowInfo:      workflowInfo,
+		wth:               taskHandler,
+	}
+	workflowContext.createEventHandler()
+	return workflowContext
+}
+
 func (w *workflowExecutionContextImpl) Lock() {
 	w.mutex.Lock()
 }
@@ -389,10 +471,27 @@ func (w *workflowExecutionContextImpl) Unlock(err error) {
 		// TODO: in case of closed, it asumes the close decision always succeed. need server side change to return
 		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
 		// if the close decision failed, the next decision will have to rebuild the state.
-		removeWorkflowContext(w.workflowInfo.WorkflowExecution.RunID)
+		if getWorkflowCache().Exist(w.workflowInfo.WorkflowExecution.RunID) {
+			removeWorkflowContext(w.workflowInfo.WorkflowExecution.RunID)
+		} else {
+			// sticky is disabled, manually clear the workflow state.
+			w.clearState()
+		}
 	}
 
 	w.mutex.Unlock()
+}
+
+func (w *workflowExecutionContextImpl) getEventHandler() *workflowExecutionEventHandlerImpl {
+	eventHandler := w.eventHandler.Load()
+	if eventHandler == nil {
+		return nil
+	}
+	eventHandlerImpl, ok := eventHandler.(*workflowExecutionEventHandlerImpl)
+	if !ok {
+		panic("unknown type for workflow execution event handler")
+	}
+	return eventHandlerImpl
 }
 
 func (w *workflowExecutionContextImpl) completeWorkflow(result []byte, err error) {
@@ -427,7 +526,7 @@ func (w *workflowExecutionContextImpl) onEviction() {
 }
 
 func (w *workflowExecutionContextImpl) IsDestroyed() bool {
-	return w.eventHandler == nil
+	return w.getEventHandler() == nil
 }
 
 func (w *workflowExecutionContextImpl) queueResetStickinessTask() {
@@ -439,7 +538,11 @@ func (w *workflowExecutionContextImpl) queueResetStickinessTask() {
 			RunId:      common.StringPtr(w.workflowInfo.WorkflowExecution.RunID),
 		},
 	}
-	w.laTunnel.resultCh <- &task
+	// w.laTunnel could be nil for worker.ReplayHistory() because there is no worker started, in that case we don't
+	// care about resetStickinessTask.
+	if w.laTunnel != nil && w.laTunnel.resultCh != nil {
+		w.laTunnel.resultCh <- &task
+	}
 }
 
 func (w *workflowExecutionContextImpl) clearState() {
@@ -449,22 +552,31 @@ func (w *workflowExecutionContextImpl) clearState() {
 	w.err = nil
 	w.previousStartedEventID = 0
 	w.newDecisions = nil
-	if w.eventHandler != nil {
-		w.eventHandler.Close()
-		w.eventHandler = nil
+
+	eventHandler := w.getEventHandler()
+	if eventHandler != nil {
+		// Set isReplay to true to prevent user code in defer guarded by !isReplaying() from running
+		eventHandler.isReplay = true
+		eventHandler.Close()
+		w.eventHandler.Store((*workflowExecutionEventHandlerImpl)(nil))
 	}
 }
 
 func (w *workflowExecutionContextImpl) createEventHandler() {
 	w.clearState()
-	w.eventHandler = newWorkflowExecutionEventHandler(
+	eventHandler := newWorkflowExecutionEventHandler(
 		w.workflowInfo,
 		w.completeWorkflow,
 		w.wth.logger,
 		w.wth.enableLoggingInReplay,
 		w.wth.metricsScope,
-		w.wth.hostEnv,
-		w.wth.dataConverter).(*workflowExecutionEventHandlerImpl)
+		w.wth.registry,
+		w.wth.dataConverter,
+		w.wth.contextPropagators,
+		w.wth.tracer,
+		w.wth.workflowInterceptors,
+	)
+	w.eventHandler.Store(eventHandler)
 }
 
 func resetHistory(task *s.PollForDecisionTaskResponse, historyIterator HistoryIterator) (*s.History, error) {
@@ -500,32 +612,34 @@ func (wth *workflowTaskHandlerImpl) createWorkflowContext(task *s.PollForDecisio
 		}
 	}
 	workflowInfo := &WorkflowInfo{
-		WorkflowType: flowWorkflowTypeFrom(*task.WorkflowType),
-		TaskListName: taskList.GetName(),
 		WorkflowExecution: WorkflowExecution{
 			ID:    workflowID,
 			RunID: runID,
 		},
+		WorkflowType:                        flowWorkflowTypeFrom(*task.WorkflowType),
+		TaskListName:                        taskList.GetName(),
 		ExecutionStartToCloseTimeoutSeconds: attributes.GetExecutionStartToCloseTimeoutSeconds(),
 		TaskStartToCloseTimeoutSeconds:      attributes.GetTaskStartToCloseTimeoutSeconds(),
 		Domain:                              wth.domain,
 		Attempt:                             attributes.GetAttempt(),
+		lastCompletionResult:                attributes.LastCompletionResult,
 		CronSchedule:                        attributes.CronSchedule,
 		ContinuedExecutionRunID:             attributes.ContinuedExecutionRunId,
 		ParentWorkflowDomain:                attributes.ParentWorkflowDomain,
 		ParentWorkflowExecution:             parentWorkflowExecution,
-		lastCompletionResult:                attributes.LastCompletionResult,
+		Memo:                                attributes.Memo,
+		SearchAttributes:                    attributes.SearchAttributes,
+		RetryPolicy:                         attributes.RetryPolicy,
 	}
 
 	wfStartTime := time.Unix(0, h.Events[0].GetTimestamp())
-	workflowContext := &workflowExecutionContextImpl{workflowStartTime: wfStartTime, workflowInfo: workflowInfo, wth: wth}
-	workflowContext.createEventHandler()
-
-	return workflowContext, nil
+	return newWorkflowExecutionContext(wfStartTime, workflowInfo, wth), nil
 }
 
-func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(task *s.PollForDecisionTaskResponse,
-	historyIterator HistoryIterator) (workflowContext *workflowExecutionContextImpl, err error) {
+func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
+	task *s.PollForDecisionTaskResponse,
+	historyIterator HistoryIterator,
+) (workflowContext *workflowExecutionContextImpl, err error) {
 	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
 	defer func() {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
@@ -577,6 +691,9 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(task *s.PollForDe
 	}
 
 	err = workflowContext.resetStateIfDestroyed(task, historyIterator)
+	if err != nil {
+		workflowContext.Unlock(err)
+	}
 
 	return
 }
@@ -607,9 +724,10 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *s.PollForDeci
 // ProcessWorkflowTask processes all the events of the workflow task.
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
-) (completeRequest interface{}, context WorkflowExecutionContext, errRet error) {
+	heartbeatFunc decisionHeartbeatFunc,
+) (completeRequest interface{}, errRet error) {
 	if workflowTask == nil || workflowTask.task == nil {
-		return nil, nil, errors.New("nil workflow task provided")
+		return nil, errors.New("nil workflow task provided")
 	}
 	task := workflowTask.task
 	if task.History == nil || len(task.History.Events) == 0 {
@@ -618,7 +736,11 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		}
 	}
 	if task.Query == nil && len(task.History.Events) == 0 {
-		return nil, nil, errors.New("nil or empty history")
+		return nil, errors.New("nil or empty history")
+	}
+
+	if task.Query != nil && len(task.Queries) != 0 {
+		return nil, errors.New("invalid query decision task")
 	}
 
 	runID := task.WorkflowExecution.GetRunId()
@@ -633,15 +755,53 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 
 	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	defer func() {
 		workflowContext.Unlock(errRet)
 	}()
 
-	response, err := workflowContext.ProcessWorkflowTask(workflowTask)
-	return response, workflowContext, err
+	var response interface{}
+process_Workflow_Loop:
+	for {
+		startTime := time.Now()
+		response, err = workflowContext.ProcessWorkflowTask(workflowTask)
+		if err == nil && response == nil {
+		wait_LocalActivity_Loop:
+			for {
+				deadlineToTrigger := time.Duration(float32(ratioToForceCompleteDecisionTaskComplete) * float32(workflowContext.GetDecisionTimeout()))
+				delayDuration := startTime.Add(deadlineToTrigger).Sub(time.Now())
+				select {
+				case <-time.After(delayDuration):
+					// force complete, call the decision heartbeat function
+					workflowTask, err = heartbeatFunc(
+						workflowContext.CompleteDecisionTask(workflowTask, false),
+						startTime,
+					)
+					if err != nil {
+						return nil, &decisionHeartbeatError{Message: fmt.Sprintf("error sending decision heartbeat %v", err)}
+					}
+					if workflowTask == nil {
+						return nil, nil
+					}
+					continue process_Workflow_Loop
+
+				case lar := <-workflowTask.laResultCh:
+					// local activity result ready
+					response, err = workflowContext.ProcessLocalActivityResult(workflowTask, lar)
+					if err == nil && response == nil {
+						// decision task is not done yet, still waiting for more local activities
+						continue wait_LocalActivity_Loop
+					}
+					break process_Workflow_Loop
+				}
+			}
+		} else {
+			break process_Workflow_Loop
+		}
+	}
+	return response, err
 }
 
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflowTask) (interface{}, error) {
@@ -652,7 +812,7 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	}
 	w.SetCurrentTask(task)
 
-	eventHandler := w.eventHandler
+	eventHandler := w.getEventHandler()
 	reorderedHistory := newHistory(workflowTask, eventHandler)
 	var replayDecisions []*s.Decision
 	var respondEvents []*s.HistoryEvent
@@ -661,13 +821,18 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	// Process events
 ProcessEvents:
 	for {
-		reorderedEvents, markers, err := reorderedHistory.NextDecisionEvents()
+		reorderedEvents, markers, binaryChecksum, err := reorderedHistory.NextDecisionEvents()
 		if err != nil {
 			return nil, err
 		}
 
 		if len(reorderedEvents) == 0 {
 			break ProcessEvents
+		}
+		if binaryChecksum == nil {
+			w.workflowInfo.BinaryChecksum = common.StringPtr(getBinaryChecksum())
+		} else {
+			w.workflowInfo.BinaryChecksum = binaryChecksum
 		}
 		// Markers are from the events that are produced from the current decision
 		for _, m := range markers {
@@ -784,7 +949,7 @@ func (w *workflowExecutionContextImpl) ProcessLocalActivityResult(workflowTask *
 		return nil, nil // nothing to do here as we are retrying...
 	}
 
-	err := w.eventHandler.ProcessLocalActivityResult(lar)
+	err := w.getEventHandler().ProcessLocalActivityResult(lar)
 	if err != nil {
 		return nil, err
 	}
@@ -793,7 +958,7 @@ func (w *workflowExecutionContextImpl) ProcessLocalActivityResult(workflowTask *
 }
 
 func (w *workflowExecutionContextImpl) retryLocalActivity(lar *localActivityResult) bool {
-	if lar.task.retryPolicy == nil || lar.err == nil || lar.err == ErrCanceled {
+	if lar.task.retryPolicy == nil || lar.err == nil || IsCanceledError(lar.err) {
 		return false
 	}
 
@@ -801,19 +966,25 @@ func (w *workflowExecutionContextImpl) retryLocalActivity(lar *localActivityResu
 	if backoff > 0 && backoff <= w.GetDecisionTimeout() {
 		// we need a local retry
 		time.AfterFunc(backoff, func() {
-			w.Lock()
-			defer w.Unlock(nil)
+			// TODO: this should not be a separate goroutine as it introduces race condition when accessing eventHandler.
+			// currently this is solved by changing eventHandler to an atomic.Value. Ideally, this retry timer should be
+			// part of the event loop for processing the workflow task.
+			eventHandler := w.getEventHandler()
 
-			// after backoff, check if it is still relevant
-			if w.IsDestroyed() {
+			// if decision heartbeat failed, the workflow execution context will be cleared and eventHandler will be nil
+			if eventHandler == nil {
 				return
 			}
-			if _, ok := w.eventHandler.pendingLaTasks[lar.task.activityID]; !ok {
+
+			if _, ok := eventHandler.pendingLaTasks[lar.task.activityID]; !ok {
 				return
 			}
 
 			lar.task.attempt++
-			w.laTunnel.sendTask(lar.task)
+
+			if !w.laTunnel.sendTask(lar.task) {
+				lar.task.attempt--
+			}
 		})
 		return true
 	}
@@ -885,18 +1056,25 @@ func (w *workflowExecutionContextImpl) CompleteDecisionTask(workflowTask *workfl
 	if w.currentDecisionTask == nil {
 		return nil
 	}
+	eventHandler := w.getEventHandler()
+
 	// w.laTunnel could be nil for worker.ReplayHistory() because there is no worker started, in that case we don't
 	// care about the pending local activities, and just return because the result is ignored anyway by the caller.
 	if w.hasPendingLocalActivityWork() && w.laTunnel != nil {
-		if len(w.eventHandler.unstartedLaTasks) > 0 {
+		if len(eventHandler.unstartedLaTasks) > 0 {
 			// start new local activity tasks
-			for activityID := range w.eventHandler.unstartedLaTasks {
-				task := w.eventHandler.pendingLaTasks[activityID]
+			unstartedLaTasks := make(map[string]struct{})
+			for activityID := range eventHandler.unstartedLaTasks {
+				task := eventHandler.pendingLaTasks[activityID]
 				task.wc = w
 				task.workflowTask = workflowTask
-				w.laTunnel.sendTask(task)
+				if !w.laTunnel.sendTask(task) {
+					unstartedLaTasks[activityID] = struct{}{}
+					task.wc = nil
+					task.workflowTask = nil
+				}
 			}
-			w.eventHandler.unstartedLaTasks = make(map[string]struct{})
+			eventHandler.unstartedLaTasks = unstartedLaTasks
 		}
 		// cannot complete decision task as there are pending local activities
 		if waitLocalActivities {
@@ -904,23 +1082,24 @@ func (w *workflowExecutionContextImpl) CompleteDecisionTask(workflowTask *workfl
 		}
 	}
 
-	eventDecisions := w.eventHandler.decisionsHelper.getDecisions(true)
+	eventDecisions := eventHandler.decisionsHelper.getDecisions(true)
 	if len(eventDecisions) > 0 {
 		w.newDecisions = append(w.newDecisions, eventDecisions...)
 	}
 
-	completeRequest := w.wth.completeWorkflow(w.eventHandler, w.currentDecisionTask, w, w.newDecisions, !waitLocalActivities)
+	completeRequest := w.wth.completeWorkflow(eventHandler, w.currentDecisionTask, w, w.newDecisions, !waitLocalActivities)
 	w.clearCurrentTask()
 
 	return completeRequest
 }
 
 func (w *workflowExecutionContextImpl) hasPendingLocalActivityWork() bool {
+	eventHandler := w.getEventHandler()
 	return !w.isWorkflowCompleted &&
 		w.currentDecisionTask != nil &&
 		w.currentDecisionTask.Query == nil && // don't run local activity for query task
-		w.eventHandler != nil &&
-		len(w.eventHandler.pendingLaTasks) > 0
+		eventHandler != nil &&
+		len(eventHandler.pendingLaTasks) > 0
 }
 
 func (w *workflowExecutionContextImpl) clearCurrentTask() {
@@ -930,10 +1109,6 @@ func (w *workflowExecutionContextImpl) clearCurrentTask() {
 
 func (w *workflowExecutionContextImpl) skipReplayCheck() bool {
 	return w.currentDecisionTask.Query != nil || !isFullHistory(w.currentDecisionTask.History)
-}
-
-func (w *workflowExecutionContextImpl) GetCurrentDecisionTask() *s.PollForDecisionTaskResponse {
-	return w.currentDecisionTask
 }
 
 func (w *workflowExecutionContextImpl) SetCurrentTask(task *s.PollForDecisionTaskResponse) {
@@ -969,13 +1144,6 @@ func (w *workflowExecutionContextImpl) GetDecisionTimeout() time.Duration {
 	return time.Second * time.Duration(w.workflowInfo.TaskStartToCloseTimeoutSeconds)
 }
 
-func (w *workflowExecutionContextImpl) StackTrace() string {
-	if w.eventHandler == nil {
-		return "eventHandler is closed"
-	}
-	return w.eventHandler.StackTrace()
-}
-
 func skipDeterministicCheckForDecision(d *s.Decision) bool {
 	if d.GetDecisionType() == s.DecisionTypeRecordMarker {
 		markerName := d.RecordMarkerDecisionAttributes.GetMarkerName()
@@ -996,6 +1164,20 @@ func skipDeterministicCheckForEvent(e *s.HistoryEvent) bool {
 	return false
 }
 
+// special check for upsert change version event
+func skipDeterministicCheckForUpsertChangeVersion(events []*s.HistoryEvent, idx int) bool {
+	e := events[idx]
+	if e.GetEventType() == s.EventTypeMarkerRecorded &&
+		e.MarkerRecordedEventAttributes.GetMarkerName() == versionMarkerName &&
+		idx < len(events)-1 &&
+		events[idx+1].GetEventType() == s.EventTypeUpsertWorkflowSearchAttributes {
+		if _, ok := events[idx+1].UpsertWorkflowSearchAttributesEventAttributes.SearchAttributes.IndexedFields[CadenceChangeVersion]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func matchReplayWithHistory(replayDecisions []*s.Decision, historyEvents []*s.HistoryEvent) error {
 	di := 0
 	hi := 0
@@ -1006,6 +1188,10 @@ matchLoop:
 		var e *s.HistoryEvent
 		if hi < hSize {
 			e = historyEvents[hi]
+			if skipDeterministicCheckForUpsertChangeVersion(historyEvents, hi) {
+				hi += 2
+				continue matchLoop
+			}
 			if skipDeterministicCheckForEvent(e) {
 				hi++
 				continue matchLoop
@@ -1041,6 +1227,7 @@ matchLoop:
 }
 
 func lastPartOfName(name string) string {
+	name = strings.TrimSuffix(name, "-fm")
 	lastDotIdx := strings.LastIndex(name, ".")
 	if lastDotIdx < 0 || lastDotIdx == len(name)-1 {
 		return name
@@ -1160,7 +1347,7 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 		eventAttributes := e.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes
 		decisionAttributes := d.RequestCancelExternalWorkflowExecutionDecisionAttributes
-		if eventAttributes.GetDomain() != decisionAttributes.GetDomain() ||
+		if checkDomainsInDecisionAndEvent(eventAttributes.GetDomain(), decisionAttributes.GetDomain()) ||
 			eventAttributes.WorkflowExecution.GetWorkflowId() != decisionAttributes.GetWorkflowId() {
 			return false
 		}
@@ -1173,7 +1360,7 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		}
 		eventAttributes := e.SignalExternalWorkflowExecutionInitiatedEventAttributes
 		decisionAttributes := d.SignalExternalWorkflowExecutionDecisionAttributes
-		if eventAttributes.GetDomain() != decisionAttributes.GetDomain() ||
+		if checkDomainsInDecisionAndEvent(eventAttributes.GetDomain(), decisionAttributes.GetDomain()) ||
 			eventAttributes.GetSignalName() != decisionAttributes.GetSignalName() ||
 			eventAttributes.WorkflowExecution.GetWorkflowId() != decisionAttributes.Execution.GetWorkflowId() {
 			return false
@@ -1208,15 +1395,44 @@ func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) boo
 		eventAttributes := e.StartChildWorkflowExecutionInitiatedEventAttributes
 		decisionAttributes := d.StartChildWorkflowExecutionDecisionAttributes
 		if lastPartOfName(eventAttributes.WorkflowType.GetName()) != lastPartOfName(decisionAttributes.WorkflowType.GetName()) ||
-			(strictMode && eventAttributes.GetDomain() != decisionAttributes.GetDomain()) ||
+			(strictMode && checkDomainsInDecisionAndEvent(eventAttributes.GetDomain(), decisionAttributes.GetDomain())) ||
 			(strictMode && eventAttributes.TaskList.GetName() != decisionAttributes.TaskList.GetName()) {
 			return false
 		}
 
 		return true
+
+	case s.DecisionTypeUpsertWorkflowSearchAttributes:
+		if e.GetEventType() != s.EventTypeUpsertWorkflowSearchAttributes {
+			return false
+		}
+		eventAttributes := e.UpsertWorkflowSearchAttributesEventAttributes
+		decisionAttributes := d.UpsertWorkflowSearchAttributesDecisionAttributes
+		if strictMode && !isSearchAttributesMatched(eventAttributes.SearchAttributes, decisionAttributes.SearchAttributes) {
+			return false
+		}
+		return true
 	}
 
 	return false
+}
+
+func isSearchAttributesMatched(attrFromEvent, attrFromDecision *s.SearchAttributes) bool {
+	if attrFromEvent != nil && attrFromDecision != nil {
+		return reflect.DeepEqual(attrFromEvent.IndexedFields, attrFromDecision.IndexedFields)
+	}
+	return attrFromEvent == nil && attrFromDecision == nil
+}
+
+// return true if the check fails:
+//    domain is not empty in decision
+//    and domain is not replayDomain
+//    and domains unmatch in decision and events
+func checkDomainsInDecisionAndEvent(eventDomainName, decisionDomainName string) bool {
+	if decisionDomainName == "" || IsReplayDomain(decisionDomainName) {
+		return false
+	}
+	return eventDomainName != decisionDomainName
 }
 
 func (wth *workflowTaskHandlerImpl) completeWorkflow(
@@ -1280,6 +1496,10 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			TaskList:                            common.TaskListPtr(s.TaskList{Name: contErr.params.taskListName}),
 			ExecutionStartToCloseTimeoutSeconds: contErr.params.executionStartToCloseTimeoutSeconds,
 			TaskStartToCloseTimeoutSeconds:      contErr.params.taskStartToCloseTimeoutSeconds,
+			Header:                              contErr.params.header,
+			Memo:                                workflowContext.workflowInfo.Memo,
+			SearchAttributes:                    workflowContext.workflowInfo.SearchAttributes,
+			RetryPolicy:                         workflowContext.workflowInfo.RetryPolicy,
 		}
 	} else if workflowContext.err != nil {
 		// Workflow failures
@@ -1306,6 +1526,25 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		forceNewDecision = false
 	}
 
+	var queryResults map[string]*s.WorkflowQueryResult
+	if len(task.Queries) != 0 {
+		queryResults = make(map[string]*s.WorkflowQueryResult)
+		for queryID, query := range task.Queries {
+			result, err := eventHandler.ProcessQuery(query.GetQueryType(), query.QueryArgs)
+			if err != nil {
+				queryResults[queryID] = &s.WorkflowQueryResult{
+					ResultType:   common.QueryResultTypePtr(s.QueryResultTypeFailed),
+					ErrorMessage: common.StringPtr(err.Error()),
+				}
+			} else {
+				queryResults[queryID] = &s.WorkflowQueryResult{
+					ResultType: common.QueryResultTypePtr(s.QueryResultTypeAnswered),
+					Answer:     result,
+				}
+			}
+		}
+	}
+
 	return &s.RespondDecisionTaskCompletedRequest{
 		TaskToken:                  task.TaskToken,
 		Decisions:                  decisions,
@@ -1313,6 +1552,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		ReturnNewDecisionTask:      common.BoolPtr(true),
 		ForceCreateNewDecisionTask: common.BoolPtr(forceNewDecision),
 		BinaryChecksum:             common.StringPtr(getBinaryChecksum()),
+		QueryResults:               queryResults,
 	}
 }
 
@@ -1320,10 +1560,11 @@ func errorToFailDecisionTask(taskToken []byte, err error, identity string) *s.Re
 	failedCause := s.DecisionTaskFailedCauseWorkflowWorkerUnhandledFailure
 	_, details := getErrorDetails(err, nil)
 	return &s.RespondDecisionTaskFailedRequest{
-		TaskToken: taskToken,
-		Cause:     &failedCause,
-		Details:   details,
-		Identity:  common.StringPtr(identity),
+		TaskToken:      taskToken,
+		Cause:          &failedCause,
+		Details:        details,
+		Identity:       common.StringPtr(identity),
+		BinaryChecksum: common.StringPtr(getBinaryChecksum()),
 	}
 }
 
@@ -1346,28 +1587,30 @@ func (wth *workflowTaskHandlerImpl) executeAnyPressurePoints(event *s.HistoryEve
 func newActivityTaskHandler(
 	service workflowserviceclient.Interface,
 	params workerExecutionParameters,
-	env *hostEnvImpl,
+	registry *registry,
 ) ActivityTaskHandler {
-	return newActivityTaskHandlerWithCustomProvider(service, params, env, nil)
+	return newActivityTaskHandlerWithCustomProvider(service, params, registry, nil)
 }
 
 func newActivityTaskHandlerWithCustomProvider(
 	service workflowserviceclient.Interface,
 	params workerExecutionParameters,
-	env *hostEnvImpl,
+	registry *registry,
 	activityProvider activityProvider,
 ) ActivityTaskHandler {
 	return &activityTaskHandlerImpl{
-		taskListName:     params.TaskList,
-		identity:         params.Identity,
-		service:          service,
-		logger:           params.Logger,
-		metricsScope:     metrics.NewTaggedScope(params.MetricsScope),
-		userContext:      params.UserContext,
-		hostEnv:          env,
-		activityProvider: activityProvider,
-		dataConverter:    params.DataConverter,
-		workerStopCh:     params.WorkerStopChannel,
+		taskListName:       params.TaskList,
+		identity:           params.Identity,
+		service:            service,
+		logger:             params.Logger,
+		metricsScope:       metrics.NewTaggedScope(params.MetricsScope),
+		userContext:        params.UserContext,
+		registry:           registry,
+		activityProvider:   activityProvider,
+		dataConverter:      params.DataConverter,
+		workerStopCh:       params.WorkerStopChannel,
+		contextPropagators: params.ContextPropagators,
+		tracer:             params.Tracer,
 	}
 }
 
@@ -1384,11 +1627,11 @@ type cadenceInvoker struct {
 	workerStopChannel     <-chan struct{}
 }
 
-func (i *cadenceInvoker) Heartbeat(details []byte) error {
+func (i *cadenceInvoker) Heartbeat(details []byte, skipBatching bool) error {
 	i.Lock()
 	defer i.Unlock()
 
-	if i.hbBatchEndTimer != nil {
+	if i.hbBatchEndTimer != nil && !skipBatching {
 		// If we have started batching window, keep track of last reported progress.
 		i.lastDetailsToReport = &details
 		return nil
@@ -1398,7 +1641,7 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 
 	// If the activity is cancelled, the activity can ignore the cancellation and do its work
 	// and complete. Our cancellation is co-operative, so we will try to heartbeat.
-	if err == nil || isActivityCancelled {
+	if (err == nil || isActivityCancelled) && !skipBatching {
 		// We have successfully sent heartbeat, start next batching window.
 		i.lastDetailsToReport = nil
 
@@ -1434,7 +1677,11 @@ func (i *cadenceInvoker) Heartbeat(details []byte) error {
 			i.Unlock()
 
 			if detailsToReport != nil {
-				i.Heartbeat(*detailsToReport)
+				// TODO: there is a potential race condition here as the lock is released here and
+				// locked again in the Hearbeat() method. This possible that a heartbeat call from
+				// user activity grabs the lock first and calls internalHeartBeat before this
+				// batching goroutine, which means some activity progress will be lost.
+				i.Heartbeat(*detailsToReport, false)
 			}
 		}()
 	}
@@ -1484,6 +1731,10 @@ func (i *cadenceInvoker) Close(flushBufferedHeartbeat bool) {
 	}
 }
 
+func (i *cadenceInvoker) GetClient(domain string, options *ClientOptions) Client {
+	return NewClient(i.service, domain, options)
+}
+
 func newServiceInvoker(
 	taskToken []byte,
 	identity string,
@@ -1517,6 +1768,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 		rootCtx = context.Background()
 	}
 	canCtx, cancel := context.WithCancel(rootCtx)
+	defer cancel()
 
 	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh)
 	defer func() {
@@ -1527,7 +1779,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	workflowType := t.WorkflowType.GetName()
 	activityType := t.ActivityType.GetName()
 	metricsScope := getMetricsScopeForActivity(ath.metricsScope, workflowType, activityType)
-	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, ath.workerStopCh)
+	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, ath.workerStopCh, ath.contextPropagators, ath.tracer)
 
 	activityImplementation := ath.getActivity(activityType)
 	if activityImplementation == nil {
@@ -1552,16 +1804,35 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr, ath.dataConverter), nil
 		}
 	}()
+
+	// propagate context information into the activity context from the headers
+	for _, ctxProp := range ath.contextPropagators {
+		var err error
+		if ctx, err = ctxProp.Extract(ctx, NewHeaderReader(t.Header)); err != nil {
+			return nil, fmt.Errorf("unable to propagate context %v", err)
+		}
+	}
+
 	info := ctx.Value(activityEnvContextKey).(*activityEnvironment)
 	ctx, dlCancelFunc := context.WithDeadline(ctx, info.deadline)
+	defer dlCancelFunc()
 
+	ctx, span := createOpenTracingActivitySpan(ctx, ath.tracer, time.Now(), activityType, t.WorkflowExecution.GetWorkflowId(), t.WorkflowExecution.GetRunId())
+	defer span.Finish()
 	output, err := activityImplementation.Execute(ctx, t.Input)
 
 	dlCancelFunc()
 	if <-ctx.Done(); ctx.Err() == context.DeadlineExceeded {
 		return nil, ctx.Err()
 	}
-
+	if err != nil && err != ErrActivityResultPending {
+		ath.logger.Error("Activity error.",
+			zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
+			zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
+			zap.String(tagActivityType, activityType),
+			zap.Error(err),
+		)
+	}
 	return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, output, err, ath.dataConverter), nil
 }
 
@@ -1570,7 +1841,7 @@ func (ath *activityTaskHandlerImpl) getActivity(name string) activity {
 		return ath.activityProvider(name)
 	}
 
-	if a, ok := ath.hostEnv.getActivity(name); ok {
+	if a, ok := ath.registry.GetActivity(name); ok {
 		return a
 	}
 
@@ -1578,7 +1849,7 @@ func (ath *activityTaskHandlerImpl) getActivity(name string) activity {
 }
 
 func (ath *activityTaskHandlerImpl) getRegisteredActivityNames() (activityNames []string) {
-	for _, a := range ath.hostEnv.activityFuncMap {
+	for _, a := range ath.registry.getRegisteredActivities() {
 		activityNames = append(activityNames, a.ActivityType().Name)
 	}
 	return

@@ -33,9 +33,15 @@ import (
 	"go.uber.org/cadence/workflow"
 )
 
-// QueryTypeStackTrace is the build in query type for Client.QueryWorkflow() call. Use this query type to get the call
-// stack of the workflow. The result will be a string encoded in the encoded.Value.
-const QueryTypeStackTrace string = internal.QueryTypeStackTrace
+const (
+	// QueryTypeStackTrace is the build in query type for Client.QueryWorkflow() call. Use this query type to get the call
+	// stack of the workflow. The result will be a string encoded in the encoded.Value.
+	QueryTypeStackTrace string = internal.QueryTypeStackTrace
+
+	// QueryTypeOpenSessions is the build in query type for Client.QueryWorkflow() call. Use this query type to get all open
+	// sessions in the workflow. The result will be a list of SessionInfo encoded in the encoded.Value.
+	QueryTypeOpenSessions string = internal.QueryTypeOpenSessions
+)
 
 type (
 	// Options are optional parameters for Client creation.
@@ -53,6 +59,15 @@ type (
 	// WorkflowIDReusePolicy defines workflow ID reuse behavior.
 	WorkflowIDReusePolicy = internal.WorkflowIDReusePolicy
 
+	// QueryWorkflowWithOptionsRequest defines the request to QueryWorkflowWithOptions
+	QueryWorkflowWithOptionsRequest = internal.QueryWorkflowWithOptionsRequest
+
+	// QueryWorkflowWithOptionsResponse defines the response to QueryWorkflowWithOptions
+	QueryWorkflowWithOptionsResponse = internal.QueryWorkflowWithOptionsResponse
+
+	// ParentClosePolicy defines the behavior performed on a child workflow when its parent is closed
+	ParentClosePolicy = internal.ParentClosePolicy
+
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.
 	Client interface {
@@ -67,7 +82,7 @@ type (
 		//	- BadRequestError
 		//	- WorkflowExecutionAlreadyStartedError
 		//	- InternalServiceError
-		StartWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*workflow.Execution, error)
+		StartWorkflow(ctx context.Context, options StartWorkflowOptions, workflowFunc interface{}, args ...interface{}) (*workflow.Execution, error)
 
 		// ExecuteWorkflow starts a workflow execution and return a WorkflowRun instance and error
 		// The user can use this to start using a function or workflow type name.
@@ -78,7 +93,6 @@ type (
 		// The errors it can return:
 		//	- EntityNotExistsError, if domain does not exists
 		//	- BadRequestError
-		//	- WorkflowExecutionAlreadyStartedError
 		//	- InternalServiceError
 		//
 		// WorkflowRun has 2 methods:
@@ -95,6 +109,24 @@ type (
 		// NOTE: DO NOT USE THIS API INSIDE A WORKFLOW, USE workflow.ExecuteChildWorkflow instead
 		ExecuteWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (WorkflowRun, error)
 
+		// GetWorkflow retrieves a workflow execution and return a WorkflowRun instance (described above)
+		// - workflow ID of the workflow.
+		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
+		//
+		// WorkflowRun has 2 methods:
+		//  - GetRunID() string: which return the first started workflow run ID (please see below)
+		//  - Get(ctx context.Context, valuePtr interface{}) error: which will fill the workflow
+		//    execution result to valuePtr, if workflow execution is a success, or return corresponding
+		//    error. This is a blocking API.
+		// If workflow not found, the Get() will return EntityNotExistsError.
+		// NOTE: if the started workflow return ContinueAsNewError during the workflow execution, the
+		// return result of GetRunID() will be the started workflow run ID, not the new run ID caused by ContinueAsNewError,
+		// however, Get(ctx context.Context, valuePtr interface{}) will return result from the run which did not return ContinueAsNewError.
+		// Say ExecuteWorkflow started a workflow, in its first run, has run ID "run ID 1", and returned ContinueAsNewError,
+		// the second run has run ID "run ID 2" and return some result other than ContinueAsNewError:
+		// GetRunID() will always return "run ID 1" and  Get(ctx context.Context, valuePtr interface{}) will return the result of second run.
+		GetWorkflow(ctx context.Context, workflowID string, runID string) WorkflowRun
+
 		// SignalWorkflow sends a signals to a workflow in execution
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
@@ -108,14 +140,12 @@ type (
 		// If the workflow is not running or not found, it starts the workflow and then sends the signal in transaction.
 		// - workflowID, signalName, signalArg are same as SignalWorkflow's parameters
 		// - options, workflow, workflowArgs are same as StartWorkflow's parameters
-		// Note: options.WorkflowIDReusePolicy is default to WorkflowIDReusePolicyAllowDuplicate in this API;
-		// while in StartWorkflow/ExecuteWorkflow APIs it is default to WorkflowIdReusePolicyAllowDuplicateFailedOnly.
 		// The errors it can return:
 		//  - EntityNotExistsError, if domain does not exist
 		//  - BadRequestError
 		//	- InternalServiceError
 		SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
-			options StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (*workflow.Execution, error)
+			options StartWorkflowOptions, workflowFunc interface{}, workflowArgs ...interface{}) (*workflow.Execution, error)
 
 		// CancelWorkflow cancels a workflow in execution
 		// - workflow ID of the workflow.
@@ -145,7 +175,7 @@ type (
 		// - whether return all history events or just the last event, which contains the workflow execution end result
 		// Example:-
 		//	To iterate all events,
-		//		iter := GetWorkflowHistory(ctx, workflowID, runID, isLongPoll, filterType)
+		// 		iter := GetWorkflowHistory(ctx, workflowID, runID, isLongPoll, filterType)
 		//		events := []*shared.HistoryEvent{}
 		//		for iter.HasNext() {
 		//			event, err := iter.Next()
@@ -187,6 +217,7 @@ type (
 		CompleteActivityByID(ctx context.Context, domain, workflowID, runID, activityID string, result interface{}, err error) error
 
 		// RecordActivityHeartbeat records heartbeat for an activity.
+		// taskToken - is the value of the binary "TaskToken" field of the "ActivityInfo" struct retrieved inside the activity.
 		// details - is the progress you want to record along with heart beat for this activity.
 		// The errors it can return:
 		//	- EntityNotExistsError
@@ -220,6 +251,52 @@ type (
 		//  - EntityNotExistError
 		ListOpenWorkflow(ctx context.Context, request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error)
 
+		// ListWorkflow gets workflow executions based on query. This API only works with ElasticSearch,
+		// and will return BadRequestError when using Cassandra or MySQL. The query is basically the SQL WHERE clause,
+		// examples:
+		//  - "(WorkflowID = 'wid1' or (WorkflowType = 'type2' and WorkflowID = 'wid2'))".
+		//  - "CloseTime between '2019-08-27T15:04:05+00:00' and '2019-08-28T15:04:05+00:00'".
+		//  - to list only open workflow use "CloseTime = missing"
+		// Retrieved workflow executions are sorted by StartTime in descending order when list open workflow,
+		// and sorted by CloseTime in descending order for other queries.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		ListWorkflow(ctx context.Context, request *s.ListWorkflowExecutionsRequest) (*s.ListWorkflowExecutionsResponse, error)
+
+		// ListArchivedWorkflow gets archived workflow executions based on query. This API will return BadRequest if Cadence
+		// cluster or target domain is not configured for visibility archival or read is not enabled. The query is basically the SQL WHERE clause.
+		// However, different visibility archivers have different limitations on the query. Please check the documentation of the visibility archiver used
+		// by your domain to see what kind of queries are accept and whether retrieved workflow executions are ordered or not.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		ListArchivedWorkflow(ctx context.Context, request *s.ListArchivedWorkflowExecutionsRequest) (*s.ListArchivedWorkflowExecutionsResponse, error)
+
+		// ScanWorkflow gets workflow executions based on query. This API only works with ElasticSearch,
+		// and will return BadRequestError when using Cassandra or MySQL. The query is basically the SQL WHERE clause
+		// (see ListWorkflow for query examples).
+		// ScanWorkflow should be used when retrieving large amount of workflows and order is not needed.
+		// It will use more ElasticSearch resources than ListWorkflow, but will be several times faster
+		// when retrieving millions of workflows.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		ScanWorkflow(ctx context.Context, request *s.ListWorkflowExecutionsRequest) (*s.ListWorkflowExecutionsResponse, error)
+
+		// CountWorkflow gets number of workflow executions based on query. This API only works with ElasticSearch,
+		// and will return BadRequestError when using Cassandra or MySQL. The query is basically the SQL WHERE clause
+		// (see ListWorkflow for query examples).
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		CountWorkflow(ctx context.Context, request *s.CountWorkflowExecutionsRequest) (*s.CountWorkflowExecutionsResponse, error)
+
+		// GetSearchAttributes returns valid search attributes keys and value types.
+		// The search attributes can be used in query of List/Scan/Count APIs. Adding new search attributes requires cadence server
+		// to update dynamic config ValidSearchAttributes.
+		GetSearchAttributes(ctx context.Context) (*s.GetSearchAttributesResponse, error)
+
 		// QueryWorkflow queries a given workflow's last execution and returns the query result synchronously. Parameter workflowID
 		// and queryType are required, other parameters are optional. The workflowID and runID (optional) identify the
 		// target workflow execution that this query will be send to. If runID is not specified (empty string), server will
@@ -239,6 +316,15 @@ type (
 		//  - EntityNotExistError
 		//  - QueryFailError
 		QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (encoded.Value, error)
+
+		// QueryWorkflowWithOptions queries a given workflow execution and returns the query result synchronously.
+		// See QueryWorkflowWithOptionsRequest and QueryWorkflowWithOptionsResponse for more information.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		//  - EntityNotExistError
+		//  - QueryFailError
+		QueryWorkflowWithOptions(ctx context.Context, request *QueryWorkflowWithOptionsRequest) (*QueryWorkflowWithOptionsResponse, error)
 
 		// DescribeWorkflowExecution returns information about the specified workflow execution.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
@@ -299,6 +385,19 @@ const (
 
 	// WorkflowIDReusePolicyRejectDuplicate do not allow start a workflow execution using the same workflow ID at all
 	WorkflowIDReusePolicyRejectDuplicate WorkflowIDReusePolicy = internal.WorkflowIDReusePolicyRejectDuplicate
+
+	// WorkflowIDReusePolicyTerminateIfRunning terminate current running workflow using the same workflow ID if exist,
+	// then start a new run in one transaction
+	WorkflowIDReusePolicyTerminateIfRunning = internal.WorkflowIDReusePolicyTerminateIfRunning
+)
+
+const (
+	// ParentClosePolicyTerminate means terminating the child workflow
+	ParentClosePolicyTerminate = internal.ParentClosePolicyTerminate
+	// ParentClosePolicyRequestCancel means requesting cancellation on the child workflow
+	ParentClosePolicyRequestCancel = internal.ParentClosePolicyRequestCancel
+	// ParentClosePolicyAbandon means not doing anything on the child workflow
+	ParentClosePolicyAbandon = internal.ParentClosePolicyAbandon
 )
 
 // NewClient creates an instance of a workflow client

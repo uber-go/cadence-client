@@ -42,35 +42,11 @@ type WorkflowUnitTest struct {
 }
 
 func (s *WorkflowUnitTest) SetupSuite() {
-	RegisterWorkflow(worldWorkflow)
-	RegisterWorkflow(helloWorldActivityWorkflow)
-	RegisterWorkflow(testClockWorkflow)
-	RegisterWorkflow(greetingsWorkflow)
-	RegisterWorkflow(continueAsNewWorkflowTest)
-	RegisterWorkflow(cancelWorkflowTest)
-	RegisterWorkflow(cancelWorkflowAfterActivityTest)
-	RegisterWorkflow(signalWorkflowTest)
-	RegisterWorkflow(receiveCorruptSignalWorkflowTest)
-	RegisterWorkflow(receiveAsyncCorruptSignalWorkflowTest)
-	RegisterWorkflow(receiveWithSelectorCorruptSignalWorkflowTest)
-	RegisterWorkflow(splitJoinActivityWorkflow)
-	RegisterWorkflow(returnPanicWorkflow)
-	RegisterWorkflow(activityOptionsWorkflow)
-	RegisterWorkflow(receiveAsyncCorruptSignalOnClosedChannelWorkflowTest)
-	RegisterWorkflow(receiveCorruptSignalOnClosedChannelWorkflowTest)
-	RegisterWorkflow(bufferedChanWorkflowTest)
-	RegisterWorkflow(bufferedChanWithSelectorWorkflowTest)
-
 	s.activityOptions = ActivityOptions{
 		ScheduleToStartTimeout: time.Minute,
 		StartToCloseTimeout:    time.Minute,
 		HeartbeatTimeout:       20 * time.Second,
 	}
-	RegisterActivity(testAct)
-	RegisterActivity(helloWorldAct)
-	RegisterActivity(getGreetingActivity)
-	RegisterActivity(getNameActivity)
-	RegisterActivity(sayGreetingActivity)
 }
 
 func TestWorkflowUnitTest(t *testing.T) {
@@ -122,6 +98,7 @@ func (s *WorkflowUnitTest) Test_SingleActivityWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
 	ctx := context.WithValue(context.Background(), unitTestKey, s)
 	env.SetWorkerOptions(WorkerOptions{BackgroundActivityContext: ctx})
+	env.RegisterActivity(helloWorldAct)
 	env.ExecuteWorkflow(helloWorldActivityWorkflow, "Hello")
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -189,6 +166,8 @@ func returnPanicWorkflow(ctx Context) (err error) {
 
 func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflowWithOptions(splitJoinActivityWorkflow, RegisterWorkflowOptions{Name: "splitJoinActivityWorkflow"})
+	env.RegisterActivityWithOptions(testAct, RegisterActivityOptions{Name: "testActivityWithOptions"})
 	env.OnActivity(testAct, mock.Anything).Return(func(ctx context.Context) (string, error) {
 		activityID := GetActivityInfo(ctx).ActivityID
 		switch activityID {
@@ -200,6 +179,8 @@ func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 			panic(fmt.Sprintf("Unexpected activityID: %v", activityID))
 		}
 	}).Twice()
+	tracer := tracingInterceptorFactory{}
+	env.SetWorkerOptions(WorkerOptions{WorkflowInterceptorChainFactories: []WorkflowInterceptorFactory{&tracer}})
 	env.ExecuteWorkflow(splitJoinActivityWorkflow, false)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -207,12 +188,21 @@ func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 	var result string
 	env.GetWorkflowResult(&result)
 	s.Equal("Hello Flow!", result)
+	s.Equal(1, len(tracer.instances))
+	trace := tracer.instances[len(tracer.instances)-1].trace
+	s.Equal([]string{
+		"ExecuteWorkflow splitJoinActivityWorkflow begin",
+		"ExecuteActivity testActivityWithOptions",
+		"ExecuteActivity testActivityWithOptions",
+		"ExecuteWorkflow splitJoinActivityWorkflow end",
+	}, trace)
 }
 
 func TestWorkflowPanic(t *testing.T) {
 	ts := &WorkflowTestSuite{}
 	ts.SetLogger(zap.NewNop()) // this test simulate panic, use nop logger to avoid logging noise
 	env := ts.NewTestWorkflowEnvironment()
+	env.RegisterActivity(testAct)
 	env.ExecuteWorkflow(splitJoinActivityWorkflow, true)
 	require.True(t, env.IsWorkflowCompleted())
 	require.NotNil(t, env.GetWorkflowError())
@@ -297,7 +287,7 @@ func TestTimerWorkflow(t *testing.T) {
 	ts := &WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
 	w := &testTimerWorkflow{t: t}
-	RegisterWorkflow(w.Execute)
+	env.RegisterWorkflow(w.Execute)
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
 	require.True(t, env.IsWorkflowCompleted())
 	require.NoError(t, env.GetWorkflowError())
@@ -347,8 +337,9 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 func TestActivityCancellation(t *testing.T) {
 	ts := &WorkflowTestSuite{}
 	env := ts.NewTestWorkflowEnvironment()
+	env.RegisterActivity(testAct)
 	w := &testActivityCancelWorkflow{t: t}
-	RegisterWorkflow(w.Execute)
+	env.RegisterWorkflow(w.Execute)
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
 	require.True(t, env.IsWorkflowCompleted())
 	require.NoError(t, env.GetWorkflowError())
@@ -404,7 +395,12 @@ func greetingsWorkflow(ctx Context) (result string, err error) {
 
 func (s *WorkflowUnitTest) Test_ExternalExampleWorkflow() {
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterActivity(getGreetingActivity)
+	env.RegisterActivity(getNameActivity)
+	env.RegisterActivity(sayGreetingActivity)
+
 	env.ExecuteWorkflow(greetingsWorkflow)
+
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 	var result string
@@ -486,7 +482,10 @@ func signalWorkflowTest(ctx Context) ([]byte, error) {
 	var result string
 	ch := GetSignalChannel(ctx, "testSig1")
 	var v string
-	ch.Receive(ctx, &v)
+	ok := ch.ReceiveAsync(&v)
+	if !ok {
+		return nil, errors.New("testSig1 not received")
+	}
 	result += v
 	ch.Receive(ctx, &v)
 	result += v
@@ -546,9 +545,13 @@ func (s *WorkflowUnitTest) Test_SignalWorkflow() {
 	// Setup signals.
 	for i := 0; i < 2; i++ {
 		msg := expected[i]
+		var delay time.Duration
+		if i > 0 {
+			delay = time.Second
+		}
 		env.RegisterDelayedCallback(func() {
 			env.SignalWorkflow("testSig1", msg)
-		}, time.Second)
+		}, delay)
 	}
 	env.RegisterDelayedCallback(func() {
 		env.SignalWorkflow("testSig3", expected[9])
@@ -586,8 +589,9 @@ func receiveCorruptSignalOnClosedChannelWorkflowTest(ctx Context) ([]message, er
 	var result []message
 	var m message
 	ch.Close()
-	ch.Receive(ctx, &m)
-	result = append(result, m)
+	more := ch.Receive(ctx, &m)
+
+	result = append(result, message{Value: fmt.Sprintf("%v", more)})
 	return result, nil
 }
 
@@ -750,13 +754,65 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalOnClosedChannelWorkflow_Receive_S
 		env.SignalWorkflow("channelExpectingTypeMessage", "wrong")
 	}, time.Second)
 
-	env.ExecuteWorkflow(receiveAsyncCorruptSignalOnClosedChannelWorkflowTest)
+	env.ExecuteWorkflow(receiveCorruptSignalOnClosedChannelWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 
 	var result []message
 	env.GetWorkflowResult(&result)
-	s.EqualValues(0, len(result))
+	s.EqualValues(1, len(result))
+	s.Equal("false", result[0].Value)
+}
+
+func closeChannelTest(ctx Context) error {
+	ch := NewChannel(ctx)
+	Go(ctx, func(ctx Context) {
+		var dummy struct{}
+		ch.Receive(ctx, &dummy)
+		ch.Close()
+	})
+
+	ch.Send(ctx, struct{}{})
+	return nil
+}
+
+func (s *WorkflowUnitTest) Test_CloseChannelWorkflow() {
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(closeChannelTest)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+}
+
+func closeChannelInSelectTest(ctx Context) error {
+	s := NewSelector(ctx)
+	sendCh := NewChannel(ctx)
+	receiveCh := NewChannel(ctx)
+	expectedValue := "expected value"
+
+	Go(ctx, func(ctx Context) {
+		sendCh.Close()
+		receiveCh.Send(ctx, expectedValue)
+	})
+
+	var v string
+	s.AddSend(sendCh, struct{}{}, func() {
+		panic("callback for sendCh should not be executed")
+	})
+	s.AddReceive(receiveCh, func(c Channel, m bool) {
+		c.Receive(ctx, &v)
+	})
+	s.Select(ctx)
+	if v != expectedValue {
+		panic("callback for receiveCh is not executed")
+	}
+	return nil
+}
+
+func (s *WorkflowUnitTest) Test_CloseChannelInSelectWorkflow() {
+	env := s.NewTestWorkflowEnvironment()
+	env.ExecuteWorkflow(closeChannelInSelectTest)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 }
 
 func bufferedChanWorkflowTest(ctx Context, bufferSize int) error {
@@ -861,4 +917,299 @@ func (s *WorkflowUnitTest) Test_ActivityOptionsWorkflow() {
 	var result string
 	env.GetWorkflowResult(&result)
 	s.Equal("id1 id2", result)
+}
+
+const (
+	memoTestKey = "testKey"
+	memoTestVal = "testVal"
+)
+
+func getMemoTest(ctx Context) (result string, err error) {
+	info := GetWorkflowInfo(ctx)
+	val, ok := info.Memo.Fields[memoTestKey]
+	if !ok {
+		return "", errors.New("no memo found")
+	}
+	err = NewValue(val).Get(&result)
+	return result, err
+}
+
+func (s *WorkflowUnitTest) Test_MemoWorkflow() {
+	env := s.NewTestWorkflowEnvironment()
+	memo := map[string]interface{}{
+		memoTestKey: memoTestVal,
+	}
+	err := env.SetMemoOnStart(memo)
+	s.NoError(err)
+
+	env.ExecuteWorkflow(getMemoTest)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var result string
+	env.GetWorkflowResult(&result)
+	s.Equal(memoTestVal, result)
+}
+
+func sleepWorkflow(ctx Context, input time.Duration) (int, error) {
+	if err := Sleep(ctx, input); err != nil {
+		return 0, err
+	}
+
+	return 1, nil
+}
+
+func waitGroupWorkflowTest(ctx Context, n int) (int, error) {
+	ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
+		ExecutionStartToCloseTimeout: time.Second * 30,
+	})
+
+	var err error
+	results := make([]int, 0, n)
+	waitGroup := NewWaitGroup(ctx)
+	for i := 0; i < n; i++ {
+		waitGroup.Add(1)
+		t := time.Second * time.Duration(i+1)
+		Go(ctx, func(ctx Context) {
+			var result int
+			err = ExecuteChildWorkflow(ctx, sleepWorkflow, t).Get(ctx, &result)
+			results = append(results, result)
+			waitGroup.Done()
+		})
+	}
+
+	waitGroup.Wait(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	sum := 0
+	for _, v := range results {
+		sum = sum + v
+	}
+
+	return sum, nil
+}
+
+func waitGroupWaitForMWorkflowTest(ctx Context, n int, m int) (int, error) {
+	ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
+		ExecutionStartToCloseTimeout: time.Second * 30,
+	})
+
+	var err error
+	results := make([]int, 0, n)
+	waitGroup := NewWaitGroup(ctx)
+	waitGroup.Add(m)
+	for i := 0; i < n; i++ {
+		t := time.Second * time.Duration(i+1)
+		Go(ctx, func(ctx Context) {
+			var result int
+			err = ExecuteChildWorkflow(ctx, sleepWorkflow, t).Get(ctx, &result)
+			results = append(results, result)
+			waitGroup.Done()
+		})
+	}
+
+	waitGroup.Wait(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	sum := 0
+	for _, v := range results {
+		sum = sum + v
+	}
+
+	return sum, nil
+}
+
+func waitGroupMultipleWaitsWorkflowTest(ctx Context) (int, error) {
+	ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
+		ExecutionStartToCloseTimeout: time.Second * 30,
+	})
+
+	n := 10
+	var err error
+	results := make([]int, 0, n)
+	waitGroup := NewWaitGroup(ctx)
+	waitGroup.Add(4)
+	for i := 0; i < n; i++ {
+		t := time.Second * time.Duration(i+1)
+		Go(ctx, func(ctx Context) {
+			var result int
+			err = ExecuteChildWorkflow(ctx, sleepWorkflow, t).Get(ctx, &result)
+			results = append(results, result)
+			waitGroup.Done()
+		})
+	}
+
+	waitGroup.Wait(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	waitGroup.Add(6)
+	waitGroup.Wait(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	sum := 0
+	for _, v := range results {
+		sum = sum + v
+	}
+
+	return sum, nil
+}
+
+func waitGroupMultipleConcurrentWaitsPanicsWorkflowTest(ctx Context) (int, error) {
+	ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
+		ExecutionStartToCloseTimeout: time.Second * 30,
+	})
+
+	var err error
+	var result1 int
+	var result2 int
+
+	waitGroup := NewWaitGroup(ctx)
+	waitGroup.Add(2)
+
+	Go(ctx, func(ctx Context) {
+		err = ExecuteChildWorkflow(ctx, sleepWorkflow, time.Second*5).Get(ctx, &result1)
+		waitGroup.Done()
+	})
+
+	Go(ctx, func(ctx Context) {
+		err = ExecuteChildWorkflow(ctx, sleepWorkflow, time.Second*10).Get(ctx, &result2)
+		waitGroup.Wait(ctx)
+	})
+
+	waitGroup.Wait(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return result1 + result2, nil
+}
+
+func waitGroupNegativeCounterPanicsWorkflowTest(ctx Context) (int, error) {
+	ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
+		ExecutionStartToCloseTimeout: time.Second * 30,
+	})
+
+	var err error
+	var result int
+	waitGroup := NewWaitGroup(ctx)
+
+	Go(ctx, func(ctx Context) {
+		waitGroup.Done()
+		err = ExecuteChildWorkflow(ctx, sleepWorkflow, time.Second*5).Get(ctx, &result)
+	})
+
+	waitGroup.Wait(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return result, nil
+}
+
+func (s *WorkflowUnitTest) Test_waitGroupNegativeCounterPanicsWorkflowTest() {
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(waitGroupNegativeCounterPanicsWorkflowTest)
+	env.ExecuteWorkflow(waitGroupNegativeCounterPanicsWorkflowTest)
+	s.True(env.IsWorkflowCompleted())
+
+	resultErr := env.GetWorkflowError().(*PanicError)
+	s.EqualValues("negative WaitGroup counter", resultErr.Error())
+	s.Contains(resultErr.StackTrace(), "cadence/internal.waitGroupNegativeCounterPanicsWorkflowTest")
+}
+
+func (s *WorkflowUnitTest) Test_WaitGroupMultipleConcurrentWaitsPanicsWorkflowTest() {
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(waitGroupMultipleConcurrentWaitsPanicsWorkflowTest)
+	env.RegisterWorkflow(sleepWorkflow)
+	env.ExecuteWorkflow(waitGroupMultipleConcurrentWaitsPanicsWorkflowTest)
+	s.True(env.IsWorkflowCompleted())
+
+	resultErr := env.GetWorkflowError().(*PanicError)
+	s.EqualValues("WaitGroup is reused before previous Wait has returned", resultErr.Error())
+	s.Contains(resultErr.StackTrace(), "cadence/internal.waitGroupMultipleConcurrentWaitsPanicsWorkflowTest")
+}
+
+func (s *WorkflowUnitTest) Test_WaitGroupMultipleWaitsWorkflowTest() {
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(waitGroupMultipleWaitsWorkflowTest)
+	env.RegisterWorkflow(sleepWorkflow)
+	env.ExecuteWorkflow(waitGroupMultipleWaitsWorkflowTest)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+
+	var total int
+	env.GetWorkflowResult(&total)
+	s.Equal(10, total)
+}
+
+func (s *WorkflowUnitTest) Test_WaitGroupWaitForMWorkflowTest() {
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(waitGroupWaitForMWorkflowTest)
+	env.RegisterWorkflow(sleepWorkflow)
+
+	n := 10
+	m := 5
+	env.ExecuteWorkflow(waitGroupWaitForMWorkflowTest, n, m)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+
+	var total int
+	env.GetWorkflowResult(&total)
+	s.Equal(m, total)
+}
+
+func (s *WorkflowUnitTest) Test_WaitGroupWorkflowTest() {
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(waitGroupWorkflowTest)
+	env.RegisterWorkflow(sleepWorkflow)
+
+	n := 10
+	env.ExecuteWorkflow(waitGroupWorkflowTest, n)
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+	s.NoError(env.GetWorkflowError())
+
+	var total int
+	env.GetWorkflowResult(&total)
+	s.Equal(n, total)
+}
+
+var _ WorkflowInterceptorFactory = (*tracingInterceptorFactory)(nil)
+
+type tracingInterceptorFactory struct {
+	instances []*tracingInterceptor
+}
+
+func (t *tracingInterceptorFactory) NewInterceptor(info *WorkflowInfo, next WorkflowInterceptor) WorkflowInterceptor {
+	result := &tracingInterceptor{
+		WorkflowInterceptorBase: WorkflowInterceptorBase{Next: next},
+	}
+	t.instances = append(t.instances, result)
+	return result
+}
+
+var _ WorkflowInterceptor = (*tracingInterceptor)(nil)
+
+type tracingInterceptor struct {
+	WorkflowInterceptorBase
+	trace []string
+}
+
+func (t *tracingInterceptor) ExecuteActivity(ctx Context, activityType string, args ...interface{}) Future {
+	t.trace = append(t.trace, "ExecuteActivity "+activityType)
+	return t.Next.ExecuteActivity(ctx, activityType, args...)
+}
+
+func (t *tracingInterceptor) ExecuteWorkflow(ctx Context, workflowType string, args ...interface{}) []interface{} {
+	t.trace = append(t.trace, "ExecuteWorkflow "+workflowType+" begin")
+	result := t.Next.ExecuteWorkflow(ctx, workflowType, args...)
+	t.trace = append(t.trace, "ExecuteWorkflow "+workflowType+" end")
+	return result
 }

@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -42,7 +43,24 @@ type (
 	// Settable is used to set value or error on a future.
 	// See more: workflow.NewFuture(ctx).
 	Settable = internal.Settable
+
+	// WaitGroup is used to wait for a collection of
+	// coroutines to finish
+	WaitGroup = internal.WaitGroup
 )
+
+// Blocks the calling thread until condition() returns true.
+// Do not mutate values or trigger side effects inside condition.
+// Returns CanceledError if the ctx is canceled.
+// The following code is going to block until the captured count
+// variable is set to 5.
+//
+// workflow.Await(ctx, func() bool {
+//   return count == 5
+// })
+func Await(ctx Context, condition func() bool) error {
+	return internal.Await(ctx, condition)
+}
 
 // NewChannel create new Channel instance
 func NewChannel(ctx Context) Channel {
@@ -75,6 +93,11 @@ func NewSelector(ctx Context) Selector {
 // Name appears in stack traces that are blocked on this Selector.
 func NewNamedSelector(ctx Context, name string) Selector {
 	return internal.NewNamedSelector(ctx, name)
+}
+
+// NewWaitGroup creates a new WaitGroup instance.
+func NewWaitGroup(ctx Context) WaitGroup {
+	return internal.NewWaitGroup(ctx)
 }
 
 // Go creates a new coroutine. It has similar semantic to goroutine in a context of the workflow.

@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,10 +24,10 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 )
 
 /*
@@ -88,7 +89,7 @@ type (
 	// CustomError returned from workflow and activity implementations with reason and optional details.
 	CustomError struct {
 		reason  string
-		details encoded.Values
+		details Values
 	}
 
 	// GenericError returned from workflow/workflow when the implementations return errors other than from NewCustomError() API.
@@ -99,12 +100,12 @@ type (
 	// TimeoutError returned when activity or child workflow timed out.
 	TimeoutError struct {
 		timeoutType shared.TimeoutType
-		details     encoded.Values
+		details     Values
 	}
 
 	// CanceledError returned when operation was canceled.
 	CanceledError struct {
-		details encoded.Values
+		details Values
 	}
 
 	// TerminatedError returned when workflow was terminated.
@@ -133,6 +134,9 @@ type (
 
 	// UnknownExternalWorkflowExecutionError can be returned when external workflow doesn't exist
 	UnknownExternalWorkflowExecutionError struct{}
+
+	// ErrorDetailsValues is a type alias used hold error details objects.
+	ErrorDetailsValues []interface{}
 )
 
 const (
@@ -172,18 +176,18 @@ func NewCustomError(reason string, details ...interface{}) *CustomError {
 
 // NewTimeoutError creates TimeoutError instance.
 // Use NewHeartbeatTimeoutError to create heartbeat TimeoutError
-func NewTimeoutError(timeoutType shared.TimeoutType) *TimeoutError {
-	return &TimeoutError{timeoutType: timeoutType}
+func NewTimeoutError(timeoutType shared.TimeoutType, details ...interface{}) *TimeoutError {
+	if len(details) == 1 {
+		if d, ok := details[0].(*EncodedValues); ok {
+			return &TimeoutError{timeoutType: timeoutType, details: d}
+		}
+	}
+	return &TimeoutError{timeoutType: timeoutType, details: ErrorDetailsValues(details)}
 }
 
 // NewHeartbeatTimeoutError creates TimeoutError instance
 func NewHeartbeatTimeoutError(details ...interface{}) *TimeoutError {
-	if len(details) == 1 {
-		if d, ok := details[0].(*EncodedValues); ok {
-			return &TimeoutError{timeoutType: shared.TimeoutTypeHeartbeat, details: d}
-		}
-	}
-	return &TimeoutError{timeoutType: shared.TimeoutTypeHeartbeat, details: ErrorDetailsValues(details)}
+	return NewTimeoutError(shared.TimeoutTypeHeartbeat, details...)
 }
 
 // NewCanceledError creates CanceledError instance
@@ -196,11 +200,17 @@ func NewCanceledError(details ...interface{}) *CanceledError {
 	return &CanceledError{details: ErrorDetailsValues(details)}
 }
 
+// IsCanceledError return whether error in CanceledError
+func IsCanceledError(err error) bool {
+	_, ok := err.(*CanceledError)
+	return ok
+}
+
 // NewContinueAsNewError creates ContinueAsNewError instance
 // If the workflow main function returns this error then the current execution is ended and
 // the new execution with same workflow ID is started automatically with options
 // provided to this function.
-//  ctx - use context to override any options for the new workflow like execution time out, decision task time out, task list.
+//  ctx - use context to override any options for the new workflow like execution timeout, decision task timeout, task list.
 //	  if not mentioned it would use the defaults that the current workflow is using.
 //        ctx := WithExecutionStartToCloseTimeout(ctx, 30 * time.Minute)
 //        ctx := WithWorkflowTaskStartToCloseTimeout(ctx, time.Minute)
@@ -214,7 +224,8 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *C
 	if options == nil {
 		panic("context is missing required options for continue as new")
 	}
-	workflowType, input, err := getValidatedWorkflowFunction(wfn, args, options.dataConverter)
+	env := getWorkflowEnvironment(ctx)
+	workflowType, input, err := getValidatedWorkflowFunction(wfn, args, options.dataConverter, env.GetRegistry())
 	if err != nil {
 		panic(err)
 	}
@@ -232,6 +243,7 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *C
 		workflowOptions: *options,
 		workflowType:    workflowType,
 		input:           input,
+		header:          getWorkflowHeader(ctx, options.contextPropagators),
 	}
 	return &ContinueAsNewError{wfn: wfn, args: args, params: params}
 }
@@ -338,6 +350,16 @@ func (e *ContinueAsNewError) Error() string {
 	return "ContinueAsNew"
 }
 
+// WorkflowType return workflowType of the new run
+func (e *ContinueAsNewError) WorkflowType() *WorkflowType {
+	return e.params.workflowType
+}
+
+// Args return workflow argument of the new run
+func (e *ContinueAsNewError) Args() []interface{} {
+	return e.args
+}
+
 // newTerminatedError creates NewTerminatedError instance
 func newTerminatedError() *TerminatedError {
 	return &TerminatedError{}
@@ -356,4 +378,29 @@ func newUnknownExternalWorkflowExecutionError() *UnknownExternalWorkflowExecutio
 // Error from error interface
 func (e *UnknownExternalWorkflowExecutionError) Error() string {
 	return "UnknownExternalWorkflowExecution"
+}
+
+// HasValues return whether there are values.
+func (b ErrorDetailsValues) HasValues() bool {
+	return b != nil && len(b) != 0
+}
+
+// Get extract data from encoded data to desired value type. valuePtr is pointer to the actual value type.
+func (b ErrorDetailsValues) Get(valuePtr ...interface{}) error {
+	if !b.HasValues() {
+		return ErrNoData
+	}
+	if len(valuePtr) > len(b) {
+		return ErrTooManyArg
+	}
+	for i, item := range valuePtr {
+		target := reflect.ValueOf(item).Elem()
+		val := reflect.ValueOf(b[i])
+		if !val.Type().AssignableTo(target.Type()) {
+			return fmt.Errorf(
+				"unable to decode argument: cannot set %v value to %v field", val.Type(), target.Type())
+		}
+		target.Set(val)
+	}
+	return nil
 }

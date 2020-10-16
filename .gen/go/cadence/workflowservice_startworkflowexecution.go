@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -217,8 +217,6 @@ func init() {
 		switch err.(type) {
 		case *shared.BadRequestError:
 			return true
-		case *shared.InternalServiceError:
-			return true
 		case *shared.WorkflowExecutionAlreadyStartedError:
 			return true
 		case *shared.ServiceBusyError:
@@ -228,6 +226,8 @@ func init() {
 		case *shared.LimitExceededError:
 			return true
 		case *shared.EntityNotExistsError:
+			return true
+		case *shared.ClientVersionNotSupportedError:
 			return true
 		default:
 			return false
@@ -245,11 +245,6 @@ func init() {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecution_Result.BadRequestError")
 			}
 			return &WorkflowService_StartWorkflowExecution_Result{BadRequestError: e}, nil
-		case *shared.InternalServiceError:
-			if e == nil {
-				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecution_Result.InternalServiceError")
-			}
-			return &WorkflowService_StartWorkflowExecution_Result{InternalServiceError: e}, nil
 		case *shared.WorkflowExecutionAlreadyStartedError:
 			if e == nil {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecution_Result.SessionAlreadyExistError")
@@ -275,6 +270,11 @@ func init() {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecution_Result.EntityNotExistError")
 			}
 			return &WorkflowService_StartWorkflowExecution_Result{EntityNotExistError: e}, nil
+		case *shared.ClientVersionNotSupportedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecution_Result.ClientVersionNotSupportedError")
+			}
+			return &WorkflowService_StartWorkflowExecution_Result{ClientVersionNotSupportedError: e}, nil
 		}
 
 		return nil, err
@@ -282,10 +282,6 @@ func init() {
 	WorkflowService_StartWorkflowExecution_Helper.UnwrapResponse = func(result *WorkflowService_StartWorkflowExecution_Result) (success *shared.StartWorkflowExecutionResponse, err error) {
 		if result.BadRequestError != nil {
 			err = result.BadRequestError
-			return
-		}
-		if result.InternalServiceError != nil {
-			err = result.InternalServiceError
 			return
 		}
 		if result.SessionAlreadyExistError != nil {
@@ -308,6 +304,10 @@ func init() {
 			err = result.EntityNotExistError
 			return
 		}
+		if result.ClientVersionNotSupportedError != nil {
+			err = result.ClientVersionNotSupportedError
+			return
+		}
 
 		if result.Success != nil {
 			success = result.Success
@@ -327,14 +327,14 @@ func init() {
 // Success is set only if the function did not throw an exception.
 type WorkflowService_StartWorkflowExecution_Result struct {
 	// Value returned by StartWorkflowExecution after a successful execution.
-	Success                  *shared.StartWorkflowExecutionResponse       `json:"success,omitempty"`
-	BadRequestError          *shared.BadRequestError                      `json:"badRequestError,omitempty"`
-	InternalServiceError     *shared.InternalServiceError                 `json:"internalServiceError,omitempty"`
-	SessionAlreadyExistError *shared.WorkflowExecutionAlreadyStartedError `json:"sessionAlreadyExistError,omitempty"`
-	ServiceBusyError         *shared.ServiceBusyError                     `json:"serviceBusyError,omitempty"`
-	DomainNotActiveError     *shared.DomainNotActiveError                 `json:"domainNotActiveError,omitempty"`
-	LimitExceededError       *shared.LimitExceededError                   `json:"limitExceededError,omitempty"`
-	EntityNotExistError      *shared.EntityNotExistsError                 `json:"entityNotExistError,omitempty"`
+	Success                        *shared.StartWorkflowExecutionResponse       `json:"success,omitempty"`
+	BadRequestError                *shared.BadRequestError                      `json:"badRequestError,omitempty"`
+	SessionAlreadyExistError       *shared.WorkflowExecutionAlreadyStartedError `json:"sessionAlreadyExistError,omitempty"`
+	ServiceBusyError               *shared.ServiceBusyError                     `json:"serviceBusyError,omitempty"`
+	DomainNotActiveError           *shared.DomainNotActiveError                 `json:"domainNotActiveError,omitempty"`
+	LimitExceededError             *shared.LimitExceededError                   `json:"limitExceededError,omitempty"`
+	EntityNotExistError            *shared.EntityNotExistsError                 `json:"entityNotExistError,omitempty"`
+	ClientVersionNotSupportedError *shared.ClientVersionNotSupportedError       `json:"clientVersionNotSupportedError,omitempty"`
 }
 
 // ToWire translates a WorkflowService_StartWorkflowExecution_Result struct into a Thrift-level intermediate
@@ -376,14 +376,6 @@ func (v *WorkflowService_StartWorkflowExecution_Result) ToWire() (wire.Value, er
 		fields[i] = wire.Field{ID: 1, Value: w}
 		i++
 	}
-	if v.InternalServiceError != nil {
-		w, err = v.InternalServiceError.ToWire()
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 2, Value: w}
-		i++
-	}
 	if v.SessionAlreadyExistError != nil {
 		w, err = v.SessionAlreadyExistError.ToWire()
 		if err != nil {
@@ -422,6 +414,14 @@ func (v *WorkflowService_StartWorkflowExecution_Result) ToWire() (wire.Value, er
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 7, Value: w}
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		w, err = v.ClientVersionNotSupportedError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 8, Value: w}
 		i++
 	}
 
@@ -470,14 +470,6 @@ func (v *WorkflowService_StartWorkflowExecution_Result) FromWire(w wire.Value) e
 				}
 
 			}
-		case 2:
-			if field.Value.Type() == wire.TStruct {
-				v.InternalServiceError, err = _InternalServiceError_Read(field.Value)
-				if err != nil {
-					return err
-				}
-
-			}
 		case 3:
 			if field.Value.Type() == wire.TStruct {
 				v.SessionAlreadyExistError, err = _WorkflowExecutionAlreadyStartedError_Read(field.Value)
@@ -518,6 +510,14 @@ func (v *WorkflowService_StartWorkflowExecution_Result) FromWire(w wire.Value) e
 				}
 
 			}
+		case 8:
+			if field.Value.Type() == wire.TStruct {
+				v.ClientVersionNotSupportedError, err = _ClientVersionNotSupportedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -526,9 +526,6 @@ func (v *WorkflowService_StartWorkflowExecution_Result) FromWire(w wire.Value) e
 		count++
 	}
 	if v.BadRequestError != nil {
-		count++
-	}
-	if v.InternalServiceError != nil {
 		count++
 	}
 	if v.SessionAlreadyExistError != nil {
@@ -544,6 +541,9 @@ func (v *WorkflowService_StartWorkflowExecution_Result) FromWire(w wire.Value) e
 		count++
 	}
 	if v.EntityNotExistError != nil {
+		count++
+	}
+	if v.ClientVersionNotSupportedError != nil {
 		count++
 	}
 	if count != 1 {
@@ -570,10 +570,6 @@ func (v *WorkflowService_StartWorkflowExecution_Result) String() string {
 		fields[i] = fmt.Sprintf("BadRequestError: %v", v.BadRequestError)
 		i++
 	}
-	if v.InternalServiceError != nil {
-		fields[i] = fmt.Sprintf("InternalServiceError: %v", v.InternalServiceError)
-		i++
-	}
 	if v.SessionAlreadyExistError != nil {
 		fields[i] = fmt.Sprintf("SessionAlreadyExistError: %v", v.SessionAlreadyExistError)
 		i++
@@ -594,6 +590,10 @@ func (v *WorkflowService_StartWorkflowExecution_Result) String() string {
 		fields[i] = fmt.Sprintf("EntityNotExistError: %v", v.EntityNotExistError)
 		i++
 	}
+	if v.ClientVersionNotSupportedError != nil {
+		fields[i] = fmt.Sprintf("ClientVersionNotSupportedError: %v", v.ClientVersionNotSupportedError)
+		i++
+	}
 
 	return fmt.Sprintf("WorkflowService_StartWorkflowExecution_Result{%v}", strings.Join(fields[:i], ", "))
 }
@@ -609,9 +609,6 @@ func (v *WorkflowService_StartWorkflowExecution_Result) Equals(rhs *WorkflowServ
 	if !((v.BadRequestError == nil && rhs.BadRequestError == nil) || (v.BadRequestError != nil && rhs.BadRequestError != nil && v.BadRequestError.Equals(rhs.BadRequestError))) {
 		return false
 	}
-	if !((v.InternalServiceError == nil && rhs.InternalServiceError == nil) || (v.InternalServiceError != nil && rhs.InternalServiceError != nil && v.InternalServiceError.Equals(rhs.InternalServiceError))) {
-		return false
-	}
 	if !((v.SessionAlreadyExistError == nil && rhs.SessionAlreadyExistError == nil) || (v.SessionAlreadyExistError != nil && rhs.SessionAlreadyExistError != nil && v.SessionAlreadyExistError.Equals(rhs.SessionAlreadyExistError))) {
 		return false
 	}
@@ -625,6 +622,9 @@ func (v *WorkflowService_StartWorkflowExecution_Result) Equals(rhs *WorkflowServ
 		return false
 	}
 	if !((v.EntityNotExistError == nil && rhs.EntityNotExistError == nil) || (v.EntityNotExistError != nil && rhs.EntityNotExistError != nil && v.EntityNotExistError.Equals(rhs.EntityNotExistError))) {
+		return false
+	}
+	if !((v.ClientVersionNotSupportedError == nil && rhs.ClientVersionNotSupportedError == nil) || (v.ClientVersionNotSupportedError != nil && rhs.ClientVersionNotSupportedError != nil && v.ClientVersionNotSupportedError.Equals(rhs.ClientVersionNotSupportedError))) {
 		return false
 	}
 

@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,17 +26,23 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/cadence/encoded"
-
+	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/metrics"
+	"go.uber.org/zap"
 )
 
-// QueryTypeStackTrace is the build in query type for Client.QueryWorkflow() call. Use this query type to get the call
-// stack of the workflow. The result will be a string encoded in the EncodedValue.
-const QueryTypeStackTrace string = "__stack_trace"
+const (
+	// QueryTypeStackTrace is the build in query type for Client.QueryWorkflow() call. Use this query type to get the call
+	// stack of the workflow. The result will be a string encoded in the EncodedValue.
+	QueryTypeStackTrace string = "__stack_trace"
+
+	// QueryTypeOpenSessions is the build in query type for Client.QueryWorkflow() call. Use this query type to get all open
+	// sessions in the workflow. The result will be a list of SessionInfo encoded in the EncodedValue.
+	QueryTypeOpenSessions string = "__open_sessions"
+)
 
 type (
 	// Client is the client for starting and getting information about a workflow executions as well as
@@ -65,7 +72,6 @@ type (
 		// The errors it can return:
 		//	- EntityNotExistsError, if domain does not exists
 		//	- BadRequestError
-		//	- WorkflowExecutionAlreadyStartedError
 		//	- InternalServiceError
 		//
 		// The current timeout resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
@@ -85,6 +91,21 @@ type (
 		// GetRunID() will always return "run ID 1" and  Get(ctx context.Context, valuePtr interface{}) will return the result of second run.
 		// NOTE: DO NOT USE THIS API INSIDE A WORKFLOW, USE workflow.ExecuteChildWorkflow instead
 		ExecuteWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (WorkflowRun, error)
+
+		// GetWorkfow retrieves a workflow execution and return a WorkflowRun instance
+		// - workflow ID of the workflow.
+		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.
+		//
+		// WorkflowRun has three methods:
+		//  - GetID() string: which return workflow ID (which is same as StartWorkflowOptions.ID if provided)
+		//  - GetRunID() string: which return the first started workflow run ID (please see below)
+		//  - Get(ctx context.Context, valuePtr interface{}) error: which will fill the workflow
+		//    execution result to valuePtr, if workflow execution is a success, or return corresponding
+		//    error. This is a blocking API.
+		// NOTE: if the retrieved workflow returned ContinueAsNewError during the workflow execution, the
+		// return result of GetRunID() will be the retrieved workflow run ID, not the new run ID caused by ContinueAsNewError,
+		// however, Get(ctx context.Context, valuePtr interface{}) will return result from the run which did not return ContinueAsNewError.
+		GetWorkflow(ctx context.Context, workflowID string, runID string) WorkflowRun
 
 		// SignalWorkflow sends a signals to a workflow in execution
 		// - workflow ID of the workflow.
@@ -163,7 +184,7 @@ type (
 		CompleteActivity(ctx context.Context, taskToken []byte, result interface{}, err error) error
 
 		// CompleteActivityById reports activity completed.
-		// Similar to CompleteActivity, but may save cadence user from keeping taskToken info.
+		// Similar to CompleteActivity, but may save user from keeping taskToken info.
 		// activity Execute method can return activity.ErrResultPending to
 		// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivityById() method
 		// should be called when that activity is completed with the actual result and error. If err is nil, activity task
@@ -205,6 +226,52 @@ type (
 		//  - EntityNotExistError
 		ListOpenWorkflow(ctx context.Context, request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error)
 
+		// ListWorkflow gets workflow executions based on query. This API only works with ElasticSearch,
+		// and will return BadRequestError when using Cassandra or MySQL. The query is basically the SQL WHERE clause,
+		// examples:
+		//  - "(WorkflowID = 'wid1' or (WorkflowType = 'type2' and WorkflowID = 'wid2'))".
+		//  - "CloseTime between '2019-08-27T15:04:05+00:00' and '2019-08-28T15:04:05+00:00'".
+		//  - to list only open workflow use "CloseTime = missing"
+		// Retrieved workflow executions are sorted by StartTime in descending order when list open workflow,
+		// and sorted by CloseTime in descending order for other queries.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		ListWorkflow(ctx context.Context, request *s.ListWorkflowExecutionsRequest) (*s.ListWorkflowExecutionsResponse, error)
+
+		// ListArchivedWorkflow gets archived workflow executions based on query. This API will return BadRequest if Cadence
+		// cluster or target domain is not configured for visibility archival or read is not enabled. The query is basically the SQL WHERE clause.
+		// However, different visibility archivers have different limitations on the query. Please check the documentation of the visibility archiver used
+		// by your domain to see what kind of queries are accept and whether retrieved workflow executions are ordered or not.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		ListArchivedWorkflow(ctx context.Context, request *s.ListArchivedWorkflowExecutionsRequest) (*s.ListArchivedWorkflowExecutionsResponse, error)
+
+		// ScanWorkflow gets workflow executions based on query. This API only works with ElasticSearch,
+		// and will return BadRequestError when using Cassandra or MySQL. The query is basically the SQL WHERE clause
+		// (see ListWorkflow for query examples).
+		// ScanWorkflow should be used when retrieving large amount of workflows and order is not needed.
+		// It will use more ElasticSearch resources than ListWorkflow, but will be several times faster
+		// when retrieving millions of workflows.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		ScanWorkflow(ctx context.Context, request *s.ListWorkflowExecutionsRequest) (*s.ListWorkflowExecutionsResponse, error)
+
+		// CountWorkflow gets number of workflow executions based on query. This API only works with ElasticSearch,
+		// and will return BadRequestError when using Cassandra or MySQL. The query is basically the SQL WHERE clause
+		// (see ListWorkflow for query examples).
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		CountWorkflow(ctx context.Context, request *s.CountWorkflowExecutionsRequest) (*s.CountWorkflowExecutionsResponse, error)
+
+		// GetSearchAttributes returns valid search attributes keys and value types.
+		// The search attributes can be used in query of List/Scan/Count APIs. Adding new search attributes requires cadence server
+		// to update dynamic config ValidSearchAttributes.
+		GetSearchAttributes(ctx context.Context) (*s.GetSearchAttributesResponse, error)
+
 		// QueryWorkflow queries a given workflow execution and returns the query result synchronously. Parameter workflowID
 		// and queryType are required, other parameters are optional. The workflowID and runID (optional) identify the
 		// target workflow execution that this query will be send to. If runID is not specified (empty string), server will
@@ -223,7 +290,16 @@ type (
 		//  - InternalServiceError
 		//  - EntityNotExistError
 		//  - QueryFailError
-		QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (encoded.Value, error)
+		QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (Value, error)
+
+		// QueryWorkflowWithOptions queries a given workflow execution and returns the query result synchronously.
+		// See QueryWorkflowWithOptionsRequest and QueryWorkflowWithOptionsResponse for more information.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		//  - EntityNotExistError
+		//  - QueryFailError
+		QueryWorkflowWithOptions(ctx context.Context, request *QueryWorkflowWithOptionsRequest) (*QueryWorkflowWithOptionsResponse, error)
 
 		// DescribeWorkflowExecution returns information about the specified workflow execution.
 		// The errors it can return:
@@ -243,9 +319,11 @@ type (
 
 	// ClientOptions are optional parameters for Client creation.
 	ClientOptions struct {
-		MetricsScope  tally.Scope
-		Identity      string
-		DataConverter encoded.DataConverter
+		MetricsScope       tally.Scope
+		Identity           string
+		DataConverter      DataConverter
+		Tracer             opentracing.Tracer
+		ContextPropagators []ContextPropagator
 	}
 
 	// StartWorkflowOptions configuration parameters for starting a workflow execution.
@@ -262,12 +340,12 @@ type (
 		// Mandatory: No default.
 		TaskList string
 
-		// ExecutionStartToCloseTimeout - The time out for duration of workflow execution.
+		// ExecutionStartToCloseTimeout - The timeout for duration of workflow execution.
 		// The resolution is seconds.
 		// Mandatory: No default.
 		ExecutionStartToCloseTimeout time.Duration
 
-		// DecisionTaskStartToCloseTimeout - The time out for processing decision task from the time the worker
+		// DecisionTaskStartToCloseTimeout - The timeout for processing decision task from the time the worker
 		// pulled this task. If a decision task is lost, it is retried after this timeout.
 		// The resolution is seconds.
 		// Optional: defaulted to 10 secs.
@@ -298,9 +376,22 @@ type (
 		// │ │ │ │ │
 		// * * * * *
 		CronSchedule string
+
+		// Memo - Optional non-indexed info that will be shown in list workflow.
+		Memo map[string]interface{}
+
+		// SearchAttributes - Optional indexed info that can be used in query of List/Scan/Count workflow APIs (only
+		// supported when Cadence server is using ElasticSearch). The key and value type must be registered on Cadence server side.
+		// Use GetSearchAttributes API to get valid key and corresponding value type.
+		SearchAttributes map[string]interface{}
 	}
 
-	// RetryPolicy defines the retry policy
+	// RetryPolicy defines the retry policy.
+	// Note that the history of activity with retry policy will be different: the started event will be written down into
+	// history only when the activity completes or "finally" timeouts/fails. And the started event only records the last
+	// started time. Because of that, to check an activity has started or not, you cannot rely on history events. Instead,
+	// you can use CLI to describe the workflow to see the status of the activity:
+	//     cadence --do <domain> wf desc -w <wf-id>
 	RetryPolicy struct {
 		// Backoff interval for the first retry. If coefficient is 1.0 then it is used for all retries.
 		// Required, no default value.
@@ -363,6 +454,18 @@ type (
 
 	// WorkflowIDReusePolicy defines workflow ID reuse behavior.
 	WorkflowIDReusePolicy int
+
+	// ParentClosePolicy defines the action on children when parent is closed
+	ParentClosePolicy int
+)
+
+const (
+	// ParentClosePolicyTerminate means terminating the child workflow
+	ParentClosePolicyTerminate ParentClosePolicy = iota
+	// ParentClosePolicyRequestCancel means requesting cancellation on the child workflow
+	ParentClosePolicyRequestCancel
+	// ParentClosePolicyAbandon means not doing anything on the child workflow
+	ParentClosePolicyAbandon
 )
 
 const (
@@ -372,11 +475,15 @@ const (
 	WorkflowIDReusePolicyAllowDuplicateFailedOnly WorkflowIDReusePolicy = iota
 
 	// WorkflowIDReusePolicyAllowDuplicate allow start a workflow execution using
-	// the same workflow ID,when workflow not running.
+	// the same workflow ID, when workflow not running.
 	WorkflowIDReusePolicyAllowDuplicate
 
 	// WorkflowIDReusePolicyRejectDuplicate do not allow start a workflow execution using the same workflow ID at all
 	WorkflowIDReusePolicyRejectDuplicate
+
+	// WorkflowIDReusePolicyTerminateIfRunning terminate current running workflow using the same workflow ID if exist,
+	// then start a new run in one transaction
+	WorkflowIDReusePolicyTerminateIfRunning
 )
 
 // NewClient creates an instance of a workflow client
@@ -392,18 +499,32 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 		metricScope = options.MetricsScope
 	}
 	metricScope = tagScope(metricScope, tagDomain, domain, clientImplHeaderName, clientImplHeaderValue)
-	var dataConverter encoded.DataConverter
+	var dataConverter DataConverter
 	if options != nil && options.DataConverter != nil {
 		dataConverter = options.DataConverter
 	} else {
 		dataConverter = getDefaultDataConverter()
 	}
+	var contextPropagators []ContextPropagator
+	if options != nil {
+		contextPropagators = options.ContextPropagators
+	}
+	var tracer opentracing.Tracer
+	if options != nil && options.Tracer != nil {
+		tracer = options.Tracer
+		contextPropagators = append(contextPropagators, NewTracingContextPropagator(zap.NewNop(), tracer))
+	} else {
+		tracer = opentracing.NoopTracer{}
+	}
 	return &workflowClient{
-		workflowService: metrics.NewWorkflowServiceWrapper(service, metricScope),
-		domain:          domain,
-		metricsScope:    metrics.NewTaggedScope(metricScope),
-		identity:        identity,
-		dataConverter:   dataConverter,
+		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),
+		domain:             domain,
+		registry:           newRegistry(),
+		metricsScope:       metrics.NewTaggedScope(metricScope),
+		identity:           identity,
+		dataConverter:      dataConverter,
+		contextPropagators: contextPropagators,
+		tracer:             tracer,
 	}
 }
 
@@ -436,8 +557,25 @@ func (p WorkflowIDReusePolicy) toThriftPtr() *s.WorkflowIdReusePolicy {
 		policy = s.WorkflowIdReusePolicyAllowDuplicateFailedOnly
 	case WorkflowIDReusePolicyRejectDuplicate:
 		policy = s.WorkflowIdReusePolicyRejectDuplicate
+	case WorkflowIDReusePolicyTerminateIfRunning:
+		policy = s.WorkflowIdReusePolicyTerminateIfRunning
 	default:
 		panic(fmt.Sprintf("unknown workflow reuse policy %v", p))
+	}
+	return &policy
+}
+
+func (p ParentClosePolicy) toThriftPtr() *s.ParentClosePolicy {
+	var policy s.ParentClosePolicy
+	switch p {
+	case ParentClosePolicyAbandon:
+		policy = s.ParentClosePolicyAbandon
+	case ParentClosePolicyRequestCancel:
+		policy = s.ParentClosePolicyRequestCancel
+	case ParentClosePolicyTerminate:
+		policy = s.ParentClosePolicyTerminate
+	default:
+		panic(fmt.Sprintf("unknown workflow parent close policy %v", p))
 	}
 	return &policy
 }
@@ -448,7 +586,7 @@ func (p WorkflowIDReusePolicy) toThriftPtr() *s.WorkflowIdReusePolicy {
 // which can be decoded by using:
 //   var result string // This need to be same type as the one passed to RecordHeartbeat
 //   NewValue(data).Get(&result)
-func NewValue(data []byte) encoded.Value {
+func NewValue(data []byte) Value {
 	return newEncodedValue(data, nil)
 }
 
@@ -459,6 +597,6 @@ func NewValue(data []byte) encoded.Value {
 //   var result1 string
 //   var result2 int // These need to be same type as those arguments passed to RecordHeartbeat
 //   NewValues(data).Get(&result1, &result2)
-func NewValues(data []byte) encoded.Values {
+func NewValues(data []byte) Values {
 	return newEncodedValues(data, nil)
 }

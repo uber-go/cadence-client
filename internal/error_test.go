@@ -47,6 +47,10 @@ type testStruct2 struct {
 	Favorites *[]string
 }
 
+type testErrorStruct struct {
+	message string
+}
+
 var (
 	testErrorDetails1 = "my details"
 	testErrorDetails2 = 123
@@ -54,14 +58,18 @@ var (
 	testErrorDetails4 = testStruct2{"a string", 321, &[]string{"eat", "code"}}
 )
 
+func (tes *testErrorStruct) Error() string {
+	return tes.message
+}
+
 func Test_GenericError(t *testing.T) {
 	// test activity error
 	errorActivityFn := func() error {
 		return errors.New("error:foo")
 	}
-	RegisterActivity(errorActivityFn)
 	s := &WorkflowTestSuite{}
 	env := s.NewTestActivityEnvironment()
+	env.RegisterActivity(errorActivityFn)
 	_, err := env.ExecuteActivity(errorActivityFn)
 	require.Error(t, err)
 	require.Equal(t, &GenericError{"error:foo"}, err)
@@ -70,8 +78,8 @@ func Test_GenericError(t *testing.T) {
 	errorWorkflowFn := func(ctx Context) error {
 		return errors.New("error:foo")
 	}
-	RegisterWorkflow(errorWorkflowFn)
 	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv.RegisterWorkflow(errorWorkflowFn)
 	wfEnv.ExecuteWorkflow(errorWorkflowFn)
 	err = wfEnv.GetWorkflowError()
 	require.Error(t, err)
@@ -80,10 +88,10 @@ func Test_GenericError(t *testing.T) {
 
 func Test_ActivityNotRegistered(t *testing.T) {
 	registeredActivityFn, unregisteredActivitFn := "RegisteredActivity", "UnregisteredActivityFn"
-	RegisterActivityWithOptions(func() error { return nil }, RegisterActivityOptions{Name: registeredActivityFn})
 	s := &WorkflowTestSuite{}
 	s.SetLogger(zap.NewNop())
 	env := s.NewTestActivityEnvironment()
+	env.RegisterActivityWithOptions(func() error { return nil }, RegisterActivityOptions{Name: registeredActivityFn})
 	_, err := env.ExecuteActivity(unregisteredActivitFn)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), fmt.Sprintf("unable to find activityType=%v", unregisteredActivitFn))
@@ -100,8 +108,15 @@ func Test_TimeoutError(t *testing.T) {
 	require.True(t, heartbeatErr.HasDetails())
 	require.NoError(t, heartbeatErr.Details(&data))
 	require.Equal(t, testErrorDetails1, data)
+}
 
-	// test heartbeatTimeout inside internal_event_handlers
+func Test_TimeoutError_WithDetails(t *testing.T) {
+	testTimeoutErrorDetails(t, shared.TimeoutTypeHeartbeat)
+	testTimeoutErrorDetails(t, shared.TimeoutTypeScheduleToClose)
+	testTimeoutErrorDetails(t, shared.TimeoutTypeStartToClose)
+}
+
+func testTimeoutErrorDetails(t *testing.T, timeoutType shared.TimeoutType) {
 	context := &workflowEnvironmentImpl{
 		decisionsHelper: newDecisionsHelper(),
 		dataConverter:   getDefaultDataConverter(),
@@ -119,7 +134,6 @@ func Test_TimeoutError(t *testing.T) {
 		},
 	})
 	context.decisionsHelper.addDecision(di)
-	timeoutType := shared.TimeoutTypeHeartbeat
 	encodedDetails1, _ := context.dataConverter.ToData(testErrorDetails1)
 	event := createTestEventActivityTaskTimedOut(7, &shared.ActivityTaskTimedOutEventAttributes{
 		Details:          encodedDetails1,
@@ -132,7 +146,7 @@ func Test_TimeoutError(t *testing.T) {
 	err, ok := actualErr.(*TimeoutError)
 	require.True(t, ok)
 	require.True(t, err.HasDetails())
-	data = ""
+	data := ""
 	require.NoError(t, err.Details(&data))
 	require.Equal(t, testErrorDetails1, data)
 }
@@ -158,9 +172,9 @@ func Test_CustomError(t *testing.T) {
 	errorActivityFn := func() error {
 		return err0
 	}
-	RegisterActivity(errorActivityFn)
 	s := &WorkflowTestSuite{}
 	env := s.NewTestActivityEnvironment()
+	env.RegisterActivity(errorActivityFn)
 	_, err := env.ExecuteActivity(errorActivityFn)
 	require.Error(t, err)
 	err1, ok := err.(*CustomError)
@@ -189,8 +203,8 @@ func Test_CustomError(t *testing.T) {
 	errorWorkflowFn := func(ctx Context) error {
 		return err0
 	}
-	RegisterWorkflow(errorWorkflowFn)
 	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv.RegisterWorkflow(errorWorkflowFn)
 	wfEnv.ExecuteWorkflow(errorWorkflowFn)
 	err = wfEnv.GetWorkflowError()
 	require.Error(t, err)
@@ -222,9 +236,9 @@ func Test_CustomError_Pointer(t *testing.T) {
 	errorActivityFn := func() error {
 		return err1
 	}
-	RegisterActivity(errorActivityFn)
 	s := &WorkflowTestSuite{}
 	env := s.NewTestActivityEnvironment()
+	env.RegisterActivity(errorActivityFn)
 	_, err = env.ExecuteActivity(errorActivityFn)
 	require.Error(t, err)
 	err3, ok := err.(*CustomError)
@@ -237,7 +251,7 @@ func Test_CustomError_Pointer(t *testing.T) {
 	errorActivityFn2 := func() error {
 		return err2 // pointer in details
 	}
-	RegisterActivity(errorActivityFn2)
+	env.RegisterActivity(errorActivityFn2)
 	_, err = env.ExecuteActivity(errorActivityFn2)
 	require.Error(t, err)
 	err4, ok := err.(*CustomError)
@@ -251,8 +265,8 @@ func Test_CustomError_Pointer(t *testing.T) {
 	errorWorkflowFn := func(ctx Context) error {
 		return err1
 	}
-	RegisterWorkflow(errorWorkflowFn)
 	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv.RegisterWorkflow(errorWorkflowFn)
 	wfEnv.ExecuteWorkflow(errorWorkflowFn)
 	err = wfEnv.GetWorkflowError()
 	require.Error(t, err)
@@ -266,8 +280,8 @@ func Test_CustomError_Pointer(t *testing.T) {
 	errorWorkflowFn2 := func(ctx Context) error {
 		return err2 // pointer in details
 	}
-	RegisterWorkflow(errorWorkflowFn2)
 	wfEnv = s.NewTestWorkflowEnvironment()
+	wfEnv.RegisterWorkflow(errorWorkflowFn2)
 	wfEnv.ExecuteWorkflow(errorWorkflowFn2)
 	err = wfEnv.GetWorkflowError()
 	require.Error(t, err)
@@ -277,6 +291,19 @@ func Test_CustomError_Pointer(t *testing.T) {
 	err6.Details(&b2)
 	require.NoError(t, err6.Details(&b2))
 	require.Equal(t, &testErrorDetails4, b2)
+}
+
+func Test_CustomError_WrongDecodedType(t *testing.T) {
+	err := NewCustomError("reason", testErrorDetails1, testErrorDetails2)
+	var d1 string
+	var d2 string // will cause error since it should be of type int
+	err1 := err.Details(&d1, &d2)
+	require.Error(t, err1)
+
+	err = NewCustomError("reason", testErrorDetails3)
+	var d3 testStruct2 // will cause error since it should be of type testStruct
+	err2 := err.Details(&d3)
+	require.Error(t, err2)
 }
 
 func Test_CanceledError(t *testing.T) {
@@ -300,9 +327,9 @@ func Test_CanceledError(t *testing.T) {
 	errorActivityFn := func() error {
 		return err0
 	}
-	RegisterActivity(errorActivityFn)
 	s := &WorkflowTestSuite{}
 	env := s.NewTestActivityEnvironment()
+	env.RegisterActivity(errorActivityFn)
 	_, err := env.ExecuteActivity(errorActivityFn)
 	require.Error(t, err)
 	err1, ok := err.(*CanceledError)
@@ -323,8 +350,8 @@ func Test_CanceledError(t *testing.T) {
 	errorWorkflowFn := func(ctx Context) error {
 		return err0
 	}
-	RegisterWorkflow(errorWorkflowFn)
 	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv.RegisterWorkflow(errorWorkflowFn)
 	wfEnv.ExecuteWorkflow(errorWorkflowFn)
 	err = wfEnv.GetWorkflowError()
 	require.Error(t, err)
@@ -335,6 +362,35 @@ func Test_CanceledError(t *testing.T) {
 	require.Equal(t, testErrorDetails1, b1)
 	require.Equal(t, testErrorDetails2, b2)
 	require.Equal(t, testErrorDetails3, b3)
+}
+
+func Test_IsCanceledError(t *testing.T) {
+
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "empty detail",
+			err:      NewCanceledError(),
+			expected: true,
+		},
+		{
+			name:     "with detail",
+			err:      NewCanceledError("details"),
+			expected: true,
+		},
+		{
+			name:     "not canceled error",
+			err:      errors.New("details"),
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		require.Equal(t, test.expected, IsCanceledError(test.err))
+	}
 }
 
 func TestErrorDetailsValues(t *testing.T) {
@@ -354,6 +410,21 @@ func TestErrorDetailsValues(t *testing.T) {
 	require.Equal(t, testErrorDetails3, a3)
 
 	require.Equal(t, ErrTooManyArg, e.Get(&a1, &a2, &a3, &a3))
+}
+
+func TestErrorDetailsValues_WrongDecodedType(t *testing.T) {
+	e := ErrorDetailsValues{testErrorDetails1}
+	var d1 int // will cause error since it should be of type string
+	err := e.Get(&d1)
+	require.Error(t, err)
+}
+
+func TestErrorDetailsValues_AssignableType(t *testing.T) {
+	e := ErrorDetailsValues{&testErrorStruct{message: "my message"}}
+	var errorOut error
+	err := e.Get(&errorOut)
+	require.NoError(t, err)
+	require.Equal(t, "my message", errorOut.Error())
 }
 
 func Test_SignalExternalWorkflowExecutionFailedError(t *testing.T) {
@@ -385,4 +456,43 @@ func Test_SignalExternalWorkflowExecutionFailedError(t *testing.T) {
 	require.NoError(t, weh.handleSignalExternalWorkflowExecutionFailed(event))
 	_, ok := actualErr.(*UnknownExternalWorkflowExecutionError)
 	require.True(t, ok)
+}
+
+func Test_ContinueAsNewError(t *testing.T) {
+	var a1 = 1234
+	var a2 = "some random input"
+
+	continueAsNewWfName := "continueAsNewWorkflowFn"
+	continueAsNewWorkflowFn := func(ctx Context, testInt int, testString string) error {
+		return NewContinueAsNewError(ctx, continueAsNewWfName, a1, a2)
+	}
+
+	header := &shared.Header{
+		Fields: map[string][]byte{"test": []byte("test-data")},
+	}
+
+	s := &WorkflowTestSuite{
+		header:   header,
+		ctxProps: []ContextPropagator{NewStringMapPropagator([]string{"test"})},
+	}
+	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv.RegisterWorkflowWithOptions(continueAsNewWorkflowFn, RegisterWorkflowOptions{
+		Name: continueAsNewWfName,
+	})
+	wfEnv.ExecuteWorkflow(continueAsNewWorkflowFn, 101, "another random string")
+	err := wfEnv.GetWorkflowError()
+
+	require.Error(t, err)
+	continueAsNewErr, ok := err.(*ContinueAsNewError)
+	require.True(t, ok)
+	require.Equal(t, continueAsNewWfName, continueAsNewErr.WorkflowType().Name)
+
+	args := continueAsNewErr.Args()
+	intArg, ok := args[0].(int)
+	require.True(t, ok)
+	require.Equal(t, a1, intArg)
+	stringArg, ok := args[1].(string)
+	require.True(t, ok)
+	require.Equal(t, a2, stringArg)
+	require.Equal(t, header, continueAsNewErr.params.header)
 }

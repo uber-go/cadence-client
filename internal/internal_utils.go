@@ -23,21 +23,20 @@ package internal
 // All code in this file is private to the package.
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
 	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/yarpc"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -61,7 +60,7 @@ const (
 	//minRPCTimeout is minimum rpc call timeout allowed
 	minRPCTimeout = 1 * time.Second
 	//maxRPCTimeout is maximum rpc call timeout allowed
-	maxRPCTimeout = 20 * time.Second
+	maxRPCTimeout = 5 * time.Second
 )
 
 var (
@@ -141,12 +140,9 @@ func getHostName() string {
 	return hostName
 }
 
-// worker uuid per process
-var workerUUID = uuid.New()
-
-func getWorkerTaskList() string {
-	// includes hostname for debuggability, workerUUID guarantees the uniqueness
-	return fmt.Sprintf("%s:%s", getHostName(), workerUUID)
+func getWorkerTaskList(stickyUUID string) string {
+	// includes hostname for debuggability, stickyUUID guarantees the uniqueness
+	return fmt.Sprintf("%s:%s", getHostName(), stickyUUID)
 }
 
 // ActivityTypePtr makes a copy and returns the pointer to a ActivityType.
@@ -164,7 +160,7 @@ func workflowTypePtr(t WorkflowType) *s.WorkflowType {
 }
 
 // getErrorDetails gets reason and details.
-func getErrorDetails(err error, dataConverter encoded.DataConverter) (string, []byte) {
+func getErrorDetails(err error, dataConverter DataConverter) (string, []byte) {
 	switch err := err.(type) {
 	case *CustomError:
 		var data []byte
@@ -203,11 +199,20 @@ func getErrorDetails(err error, dataConverter encoded.DataConverter) (string, []
 		}
 		return errReasonPanic, data
 	case *TimeoutError:
-		data, err0 := encodeArgs(dataConverter, []interface{}{err.timeoutType})
+		var data []byte
+		var err0 error
+		switch details := err.details.(type) {
+		case ErrorDetailsValues:
+			data, err0 = encodeArgs(dataConverter, details)
+		case *EncodedValues:
+			data = details.values
+		default:
+			panic("unknown error type")
+		}
 		if err0 != nil {
 			panic(err0)
 		}
-		return errReasonTimeout, data
+		return fmt.Sprintf("%v %v", errReasonTimeout, err.timeoutType), data
 	default:
 		// will be convert to GenericError when receiving from server.
 		return errReasonGeneric, []byte(err.Error())
@@ -215,7 +220,20 @@ func getErrorDetails(err error, dataConverter encoded.DataConverter) (string, []
 }
 
 // constructError construct error from reason and details sending down from server.
-func constructError(reason string, details []byte, dataConverter encoded.DataConverter) error {
+func constructError(reason string, details []byte, dataConverter DataConverter) error {
+	if strings.HasPrefix(reason, errReasonTimeout) {
+		details := newEncodedValues(details, dataConverter)
+		timeoutType, err := getTimeoutTypeFromErrReason(reason)
+		if err != nil {
+			// prior client version uses details to indicate timeoutType
+			if err := details.Get(&timeoutType); err != nil {
+				panic(err)
+			}
+			return NewTimeoutError(timeoutType)
+		}
+		return NewTimeoutError(timeoutType, details)
+	}
+
 	switch reason {
 	case errReasonPanic:
 		// panic error
@@ -229,11 +247,6 @@ func constructError(reason string, details []byte, dataConverter encoded.DataCon
 	case errReasonCanceled:
 		details := newEncodedValues(details, dataConverter)
 		return NewCanceledError(details)
-	case errReasonTimeout:
-		var timeoutType s.TimeoutType
-		details := newEncodedValues(details, dataConverter)
-		details.Get(&timeoutType)
-		return NewTimeoutError(timeoutType)
 	default:
 		details := newEncodedValues(details, dataConverter)
 		err := NewCustomError(reason, details)
@@ -262,7 +275,7 @@ func awaitWaitGroup(wg *sync.WaitGroup, timeout time.Duration) bool {
 
 func getKillSignal() <-chan os.Signal {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	return c
 }
 
@@ -274,4 +287,14 @@ func getMetricsScopeForActivity(ts *metrics.TaggedScope, workflowType, activityT
 // getMetricsScopeForLocalActivity return properly tagged tally scope for local activity
 func getMetricsScopeForLocalActivity(ts *metrics.TaggedScope, workflowType, localActivityType string) tally.Scope {
 	return ts.GetTaggedScope(tagWorkflowType, workflowType, tagLocalActivityType, localActivityType)
+}
+
+func getTimeoutTypeFromErrReason(reason string) (s.TimeoutType, error) {
+	timeoutTypeStr := reason[strings.Index(reason, " ")+1:]
+	var timeoutType s.TimeoutType
+	if err := timeoutType.UnmarshalText([]byte(timeoutTypeStr)); err != nil {
+		// this happens when the timeout error reason is constructed by an prior constructed by prior client version
+		return 0, err
+	}
+	return timeoutType, nil
 }

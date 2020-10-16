@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -217,8 +217,6 @@ func init() {
 		switch err.(type) {
 		case *shared.BadRequestError:
 			return true
-		case *shared.InternalServiceError:
-			return true
 		case *shared.EntityNotExistsError:
 			return true
 		case *shared.DomainNotActiveError:
@@ -226,6 +224,8 @@ func init() {
 		case *shared.LimitExceededError:
 			return true
 		case *shared.ServiceBusyError:
+			return true
+		case *shared.ClientVersionNotSupportedError:
 			return true
 		default:
 			return false
@@ -243,11 +243,6 @@ func init() {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RespondDecisionTaskCompleted_Result.BadRequestError")
 			}
 			return &WorkflowService_RespondDecisionTaskCompleted_Result{BadRequestError: e}, nil
-		case *shared.InternalServiceError:
-			if e == nil {
-				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RespondDecisionTaskCompleted_Result.InternalServiceError")
-			}
-			return &WorkflowService_RespondDecisionTaskCompleted_Result{InternalServiceError: e}, nil
 		case *shared.EntityNotExistsError:
 			if e == nil {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RespondDecisionTaskCompleted_Result.EntityNotExistError")
@@ -268,6 +263,11 @@ func init() {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RespondDecisionTaskCompleted_Result.ServiceBusyError")
 			}
 			return &WorkflowService_RespondDecisionTaskCompleted_Result{ServiceBusyError: e}, nil
+		case *shared.ClientVersionNotSupportedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RespondDecisionTaskCompleted_Result.ClientVersionNotSupportedError")
+			}
+			return &WorkflowService_RespondDecisionTaskCompleted_Result{ClientVersionNotSupportedError: e}, nil
 		}
 
 		return nil, err
@@ -275,10 +275,6 @@ func init() {
 	WorkflowService_RespondDecisionTaskCompleted_Helper.UnwrapResponse = func(result *WorkflowService_RespondDecisionTaskCompleted_Result) (success *shared.RespondDecisionTaskCompletedResponse, err error) {
 		if result.BadRequestError != nil {
 			err = result.BadRequestError
-			return
-		}
-		if result.InternalServiceError != nil {
-			err = result.InternalServiceError
 			return
 		}
 		if result.EntityNotExistError != nil {
@@ -295,6 +291,10 @@ func init() {
 		}
 		if result.ServiceBusyError != nil {
 			err = result.ServiceBusyError
+			return
+		}
+		if result.ClientVersionNotSupportedError != nil {
+			err = result.ClientVersionNotSupportedError
 			return
 		}
 
@@ -316,13 +316,13 @@ func init() {
 // Success is set only if the function did not throw an exception.
 type WorkflowService_RespondDecisionTaskCompleted_Result struct {
 	// Value returned by RespondDecisionTaskCompleted after a successful execution.
-	Success              *shared.RespondDecisionTaskCompletedResponse `json:"success,omitempty"`
-	BadRequestError      *shared.BadRequestError                      `json:"badRequestError,omitempty"`
-	InternalServiceError *shared.InternalServiceError                 `json:"internalServiceError,omitempty"`
-	EntityNotExistError  *shared.EntityNotExistsError                 `json:"entityNotExistError,omitempty"`
-	DomainNotActiveError *shared.DomainNotActiveError                 `json:"domainNotActiveError,omitempty"`
-	LimitExceededError   *shared.LimitExceededError                   `json:"limitExceededError,omitempty"`
-	ServiceBusyError     *shared.ServiceBusyError                     `json:"serviceBusyError,omitempty"`
+	Success                        *shared.RespondDecisionTaskCompletedResponse `json:"success,omitempty"`
+	BadRequestError                *shared.BadRequestError                      `json:"badRequestError,omitempty"`
+	EntityNotExistError            *shared.EntityNotExistsError                 `json:"entityNotExistError,omitempty"`
+	DomainNotActiveError           *shared.DomainNotActiveError                 `json:"domainNotActiveError,omitempty"`
+	LimitExceededError             *shared.LimitExceededError                   `json:"limitExceededError,omitempty"`
+	ServiceBusyError               *shared.ServiceBusyError                     `json:"serviceBusyError,omitempty"`
+	ClientVersionNotSupportedError *shared.ClientVersionNotSupportedError       `json:"clientVersionNotSupportedError,omitempty"`
 }
 
 // ToWire translates a WorkflowService_RespondDecisionTaskCompleted_Result struct into a Thrift-level intermediate
@@ -364,14 +364,6 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) ToWire() (wire.Val
 		fields[i] = wire.Field{ID: 1, Value: w}
 		i++
 	}
-	if v.InternalServiceError != nil {
-		w, err = v.InternalServiceError.ToWire()
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 2, Value: w}
-		i++
-	}
 	if v.EntityNotExistError != nil {
 		w, err = v.EntityNotExistError.ToWire()
 		if err != nil {
@@ -402,6 +394,14 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) ToWire() (wire.Val
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 6, Value: w}
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		w, err = v.ClientVersionNotSupportedError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 7, Value: w}
 		i++
 	}
 
@@ -456,14 +456,6 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) FromWire(w wire.Va
 				}
 
 			}
-		case 2:
-			if field.Value.Type() == wire.TStruct {
-				v.InternalServiceError, err = _InternalServiceError_Read(field.Value)
-				if err != nil {
-					return err
-				}
-
-			}
 		case 3:
 			if field.Value.Type() == wire.TStruct {
 				v.EntityNotExistError, err = _EntityNotExistsError_Read(field.Value)
@@ -496,6 +488,14 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) FromWire(w wire.Va
 				}
 
 			}
+		case 7:
+			if field.Value.Type() == wire.TStruct {
+				v.ClientVersionNotSupportedError, err = _ClientVersionNotSupportedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -504,9 +504,6 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) FromWire(w wire.Va
 		count++
 	}
 	if v.BadRequestError != nil {
-		count++
-	}
-	if v.InternalServiceError != nil {
 		count++
 	}
 	if v.EntityNotExistError != nil {
@@ -519,6 +516,9 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) FromWire(w wire.Va
 		count++
 	}
 	if v.ServiceBusyError != nil {
+		count++
+	}
+	if v.ClientVersionNotSupportedError != nil {
 		count++
 	}
 	if count != 1 {
@@ -545,10 +545,6 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) String() string {
 		fields[i] = fmt.Sprintf("BadRequestError: %v", v.BadRequestError)
 		i++
 	}
-	if v.InternalServiceError != nil {
-		fields[i] = fmt.Sprintf("InternalServiceError: %v", v.InternalServiceError)
-		i++
-	}
 	if v.EntityNotExistError != nil {
 		fields[i] = fmt.Sprintf("EntityNotExistError: %v", v.EntityNotExistError)
 		i++
@@ -563,6 +559,10 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) String() string {
 	}
 	if v.ServiceBusyError != nil {
 		fields[i] = fmt.Sprintf("ServiceBusyError: %v", v.ServiceBusyError)
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		fields[i] = fmt.Sprintf("ClientVersionNotSupportedError: %v", v.ClientVersionNotSupportedError)
 		i++
 	}
 
@@ -580,9 +580,6 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) Equals(rhs *Workfl
 	if !((v.BadRequestError == nil && rhs.BadRequestError == nil) || (v.BadRequestError != nil && rhs.BadRequestError != nil && v.BadRequestError.Equals(rhs.BadRequestError))) {
 		return false
 	}
-	if !((v.InternalServiceError == nil && rhs.InternalServiceError == nil) || (v.InternalServiceError != nil && rhs.InternalServiceError != nil && v.InternalServiceError.Equals(rhs.InternalServiceError))) {
-		return false
-	}
 	if !((v.EntityNotExistError == nil && rhs.EntityNotExistError == nil) || (v.EntityNotExistError != nil && rhs.EntityNotExistError != nil && v.EntityNotExistError.Equals(rhs.EntityNotExistError))) {
 		return false
 	}
@@ -593,6 +590,9 @@ func (v *WorkflowService_RespondDecisionTaskCompleted_Result) Equals(rhs *Workfl
 		return false
 	}
 	if !((v.ServiceBusyError == nil && rhs.ServiceBusyError == nil) || (v.ServiceBusyError != nil && rhs.ServiceBusyError != nil && v.ServiceBusyError.Equals(rhs.ServiceBusyError))) {
+		return false
+	}
+	if !((v.ClientVersionNotSupportedError == nil && rhs.ClientVersionNotSupportedError == nil) || (v.ClientVersionNotSupportedError != nil && rhs.ClientVersionNotSupportedError != nil && v.ClientVersionNotSupportedError.Equals(rhs.ClientVersionNotSupportedError))) {
 		return false
 	}
 

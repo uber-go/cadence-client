@@ -1,28 +1,35 @@
-.PHONY: test bins clean cover cover_ci
+.PHONY: git-submodules test bins clean cover cover_ci
 
 # default target
 default: test
 
 IMPORT_ROOT := go.uber.org/cadence
 THRIFT_GENDIR := .gen/go
-THRIFTRW_SRC := idl/github.com/uber/cadence/cadence.thrift
+THRIFTRW_SRC := idls/thrift/cadence.thrift
 # one or more thriftrw-generated file(s), to create / depend on generated code
 THRIFTRW_OUT := $(THRIFT_GENDIR)/cadence/idl.go
-TEST_ARG ?= -coverprofile=$(BUILD)/cover.out -race
+TEST_ARG ?= -v -race
 
 # general build-product folder, cleaned as part of `make clean`
 BUILD := .build
 # general bins folder.  NOT cleaned via `make clean`
 BINS := .bins
 
+INTEG_TEST_ROOT := ./test
+COVER_ROOT := $(BUILD)/coverage
+UT_COVER_FILE := $(COVER_ROOT)/unit_test_cover.out
+INTEG_STICKY_OFF_COVER_FILE := $(COVER_ROOT)/integ_test_sticky_off_cover.out
+INTEG_STICKY_ON_COVER_FILE := $(COVER_ROOT)/integ_test_sticky_on_cover.out
+
 # Automatically gather all srcs + a "sentinel" thriftrw output file (which forces generation).
 ALL_SRC := $(THRIFTRW_OUT) $(shell \
 	find . -name "*.go" | \
 	grep -v \
-	-e vendor/ \
 	-e .gen/ \
 	-e .build/ \
 )
+
+UT_DIRS := $(filter-out $(INTEG_TEST_ROOT)%, $(sort $(dir $(filter %_test.go,$(ALL_SRC)))))
 
 # Files that needs to run lint.  excludes testify mocks and the thrift sentinel.
 LINT_SRC := $(filter-out ./mock% $(THRIFTRW_OUT),$(ALL_SRC))
@@ -30,6 +37,8 @@ LINT_SRC := $(filter-out ./mock% $(THRIFTRW_OUT),$(ALL_SRC))
 THRIFTRW_VERSION := v1.11.0
 YARPC_VERSION := v1.29.1
 GOLINT_VERSION := 470b6b0bb3005eda157f0275e2e4895055396a81
+STATICCHECK_VERSION := 2019.2.3
+ERRCHECK_VERSION := v1.2.0
 
 # versioned tools.  just change the version vars above, it'll automatically trigger a rebuild.
 $(BINS)/versions/thriftrw-$(THRIFTRW_VERSION):
@@ -40,6 +49,12 @@ $(BINS)/versions/yarpc-$(YARPC_VERSION):
 
 $(BINS)/versions/golint-$(GOLINT_VERSION):
 	./versioned_go_build.sh golang.org/x/lint $(GOLINT_VERSION) golint $@
+
+$(BINS)/versions/staticcheck-$(STATICCHECK_VERSION):
+	./versioned_go_build.sh honnef.co/go/tools $(STATICCHECK_VERSION) cmd/staticcheck $@
+
+$(BINS)/versions/errcheck-$(ERRCHECK_VERSION):
+	./versioned_go_build.sh github.com/kisielk/errcheck $(ERRCHECK_VERSION) $@
 
 # stable tool targets.  depend on / execute these instead of the versioned ones.
 # this versioned-to-nice-name thing is mostly because thriftrw depends on the yarpc
@@ -53,13 +68,11 @@ $(BINS)/thriftrw-plugin-yarpc: $(BINS)/versions/yarpc-$(YARPC_VERSION)
 $(BINS)/golint: $(BINS)/versions/golint-$(GOLINT_VERSION)
 	@ln -fs $(CURDIR)/$< $@
 
-vendor: vendor/dep.updated
+$(BINS)/staticcheck: $(BINS)/versions/staticcheck-$(STATICCHECK_VERSION)
+	@ln -fs $(CURDIR)/$< $@
 
-DEP ?= $(shell which dep)
-
-vendor/dep.updated: Gopkg.lock
-	${DEP} ensure
-	touch vendor/dep.updated
+$(BINS)/errcheck: $(BINS)/versions/errcheck-$(ERRCHECK_VERSION)
+	@ln -fs $(CURDIR)/$< $@
 
 $(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 	@echo 'thriftrw: $(THRIFTRW_SRC)'
@@ -72,6 +85,16 @@ $(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 		        --pkg-prefix=$(IMPORT_ROOT)/$(THRIFT_GENDIR) \
 		        --out=$(THRIFT_GENDIR) $(source);)
 
+git-submodules:
+	git submodule update --init --recursive
+
+yarpc-install:
+	GO111MODULE=off go get -u github.com/myitcv/gobin
+	GOOS= GOARCH= gobin -mod=readonly go.uber.org/thriftrw
+	GOOS= GOARCH= gobin -mod=readonly go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc
+
+thriftc: git-submodules yarpc-install $(THRIFTRW_OUT) copyright
+
 clean_thrift:
 	rm -rf .gen
 
@@ -82,19 +105,41 @@ copyright $(BUILD)/copyright: $(ALL_SRC)
 	go run ./internal/cmd/tools/copyright/licensegen.go --verifyOnly
 	@touch $(BUILD)/copyright
 
-$(BUILD)/dummy: vendor/dep.updated $(ALL_SRC)
+$(BUILD)/dummy:
 	go build -i -o $@ internal/cmd/dummy/dummy.go
 
-test $(BUILD)/cover.out: $(BUILD)/copyright $(BUILD)/dummy $(ALL_SRC)
-	go test ./... $(TEST_ARG)
+bins: thriftc $(ALL_SRC) $(BUILD)/copyright lint $(BUILD)/dummy
 
-bins: $(ALL_SRC) $(BUILD)/copyright lint $(BUILD)/dummy
+unit_test: $(BUILD)/dummy
+	@mkdir -p $(COVER_ROOT)
+	@echo "mode: atomic" > $(UT_COVER_FILE)
+	@for dir in $(UT_DIRS); do \
+		mkdir -p $(COVER_ROOT)/"$$dir"; \
+		go test "$$dir" $(TEST_ARG) -coverprofile=$(COVER_ROOT)/"$$dir"/cover.out || exit 1; \
+		cat $(COVER_ROOT)/"$$dir"/cover.out | grep -v "mode: atomic" >> $(UT_COVER_FILE); \
+	done;
 
-cover: $(BUILD)/cover.out
-	go tool cover -html=$(BUILD)/cover.out;
+integ_test_sticky_off: $(BUILD)/dummy
+	@mkdir -p $(COVER_ROOT)
+	STICKY_OFF=true go test $(TEST_ARG) ./test -coverprofile=$(INTEG_STICKY_OFF_COVER_FILE) -coverpkg=./...
 
-cover_ci: $(BUILD)/cover.out
-	goveralls -coverprofile=$(BUILD)/cover.out -service=travis-ci || echo -e "\x1b[31mCoveralls failed\x1b[m";
+integ_test_sticky_on: $(BUILD)/dummy
+	@mkdir -p $(COVER_ROOT)
+	STICKY_OFF=false go test $(TEST_ARG) ./test -coverprofile=$(INTEG_STICKY_ON_COVER_FILE) -coverpkg=./...
+
+test: thriftc unit_test integ_test_sticky_off integ_test_sticky_on
+
+$(COVER_ROOT)/cover.out: $(UT_COVER_FILE) $(INTEG_STICKY_OFF_COVER_FILE) $(INTEG_STICKY_ON_COVER_FILE)
+	@echo "mode: atomic" > $(COVER_ROOT)/cover.out
+	cat $(UT_COVER_FILE) | grep -v "mode: atomic" | grep -v ".gen" >> $(COVER_ROOT)/cover.out
+	cat $(INTEG_STICKY_OFF_COVER_FILE) | grep -v "mode: atomic" | grep -v ".gen" >> $(COVER_ROOT)/cover.out
+	cat $(INTEG_STICKY_ON_COVER_FILE) | grep -v "mode: atomic" | grep -v ".gen" >> $(COVER_ROOT)/cover.out
+
+cover: $(COVER_ROOT)/cover.out
+	go tool cover -html=$(COVER_ROOT)/cover.out;
+
+cover_ci: $(COVER_ROOT)/cover.out
+	goveralls -coverprofile=$(COVER_ROOT)/cover.out -service=buildkite || echo -e "\x1b[31mCoveralls failed\x1b[m";
 
 # golint fails to report many lint failures if it is only given a single file
 # to work on at a time, and it can't handle multiple packages at once, *and*
@@ -121,6 +166,12 @@ lint: $(BINS)/golint $(ALL_SRC)
 		echo "$$OUTPUT"; \
 		exit 1; \
 	fi
+
+staticcheck: $(BINS)/staticcheck $(ALL_SRC)
+	$(BINS)/staticcheck ./...
+
+errcheck: $(BINS)/errcheck $(ALL_SRC)
+	$(BINS)/errcheck ./...
 
 fmt:
 	@gofmt -w $(ALL_SRC)

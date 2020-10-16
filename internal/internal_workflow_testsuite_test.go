@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,6 +23,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
@@ -32,7 +34,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
 )
@@ -55,10 +56,10 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 	s.localActivityOptions = LocalActivityOptions{
 		ScheduleToCloseTimeout: time.Second * 3,
 	}
-	RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
-	RegisterWorkflow(testWorkflowHeartbeat)
-	RegisterActivityWithOptions(testActivityHello, RegisterActivityOptions{Name: "testActivityHello"})
-	RegisterActivity(testActivityHeartbeat)
+	s.header = &shared.Header{
+		Fields: map[string][]byte{"test": []byte("test-data")},
+	}
+	s.ctxProps = []ContextPropagator{NewStringMapPropagator([]string{"test"})}
 }
 
 func TestUnitTestSuite(t *testing.T) {
@@ -71,8 +72,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockFunction() {
 	}
 
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterActivity(testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return(mockActivity).Once()
-
+	env.RegisterWorkflow(testWorkflowHello)
 	env.ExecuteWorkflow(testWorkflowHello)
 
 	s.True(env.IsWorkflowCompleted())
@@ -112,8 +114,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockFunction_WithDataConverter(
 		return result + "," + result1, nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHello)
 
 	env.SetWorkerOptions(WorkerOptions{DataConverter: newTestDataConverter()})
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return(mockActivity).Twice()
@@ -130,8 +133,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockFunction_WithDataConverter(
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityMockValues() {
 	env := s.NewTestWorkflowEnvironment()
-	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("mock_value", nil).Once()
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
 
+	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("mock_value", nil).Once()
 	env.ExecuteWorkflow(testWorkflowHello)
 
 	s.True(env.IsWorkflowCompleted())
@@ -156,16 +161,17 @@ func (s *WorkflowTestSuiteUnitTest) Test_OnActivityStartedListener() {
 		return nil
 	} // END of workflow code
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivityWithOptions(testActivityHello, RegisterActivityOptions{Name: "testActivityHello"})
 
 	var activityCalls []string
-	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values) {
+	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		var input string
 		s.NoError(args.Get(&input))
 		activityCalls = append(activityCalls, fmt.Sprintf("%s:%s", activityInfo.ActivityType.Name, input))
 	})
-	expectedCalls := []string{}
+	var expectedCalls []string
 	for i := 1; i <= runCount; i++ {
 		expectedCalls = append(expectedCalls, fmt.Sprintf("testActivityHello:msg%v", i))
 	}
@@ -203,8 +209,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_TimerWorkflow_ClockAutoFastForward() {
 		return nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -241,8 +247,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowAutoForwardClock() {
 		return activityResult, nil
 	} // END of workflow code
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHello)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -282,8 +289,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowMixedClock() {
 		return "expected", nil
 	} // END of workflow code
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHeartbeat)
+	env.RegisterActivity(testActivityHello)
+
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -314,16 +324,17 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowActivityCancellation() {
 		return nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHeartbeat)
 	activityMap := make(map[string]string) // msg -> activityID
 	var completedActivityID, cancelledActivityID string
-	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values) {
+	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		var msg string
 		s.NoError(args.Get(&msg))
 		activityMap[msg] = activityInfo.ActivityID
 	})
-	env.SetOnActivityCompletedListener(func(activityInfo *ActivityInfo, result encoded.Value, err error) {
+	env.SetOnActivityCompletedListener(func(activityInfo *ActivityInfo, result Value, err error) {
 		completedActivityID = activityInfo.ActivityID
 	})
 	env.SetOnActivityCanceledListener(func(activityInfo *ActivityInfo) {
@@ -351,15 +362,45 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithUserContext() {
 		}
 		return "", errors.New("value not found from ctx")
 	}
-	RegisterActivity(activityWithUserContext)
 
 	env := s.NewTestActivityEnvironment()
+	env.RegisterActivity(activityWithUserContext)
 	env.SetWorkerOptions(workerOptions)
 	blob, err := env.ExecuteActivity(activityWithUserContext, testKey)
 	s.NoError(err)
 	var value string
 	blob.Get(&value)
 	s.Equal(testValue, value)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithHeaderContext() {
+	workerOptions := WorkerOptions{
+		ContextPropagators: []ContextPropagator{NewStringMapPropagator([]string{testHeader})},
+	}
+
+	// inline activity using value passing through user context.
+	activityWithUserContext := func(ctx context.Context) (string, error) {
+		value := ctx.Value(contextKey(testHeader))
+		if val, ok := value.(string); ok {
+			return val, nil
+		}
+		return "", errors.New("value not found from ctx")
+	}
+
+	s.SetHeader(&shared.Header{
+		Fields: map[string][]byte{
+			testHeader: []byte("test-data"),
+		},
+	})
+
+	env := s.NewTestActivityEnvironment()
+	env.RegisterActivity(activityWithUserContext)
+	env.SetWorkerOptions(workerOptions)
+	blob, err := env.ExecuteActivity(activityWithUserContext)
+	s.NoError(err)
+	var value string
+	blob.Get(&value)
+	s.Equal("test-data", value)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
@@ -374,8 +415,12 @@ func (s *WorkflowTestSuiteUnitTest) Test_CompleteActivity() {
 		return "", ErrActivityResultPending
 	}
 
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return(mockActivity).Once()
+
 	env.ExecuteWorkflow(testWorkflowHello)
+
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
 	env.AssertExpectations(s.T())
@@ -390,7 +435,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityReturnsErrActivityResultPending
 	activityFn := func(ctx context.Context) (string, error) {
 		return "", ErrActivityResultPending
 	}
-	RegisterActivity(activityFn)
+	env.RegisterActivity(activityFn)
 	_, err := env.ExecuteActivity(activityFn)
 	s.Equal(ErrActivityResultPending, err)
 }
@@ -403,7 +448,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowCancellation() {
 		return err
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
 	// Register a delayed callback using workflow timer internally. The callback will be called when workflow clock passed
 	// by the specified delay duration. The test suite enables the auto clock forwarding when workflow is blocked and no
@@ -413,6 +457,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowCancellation() {
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
 	}, time.Millisecond)
+
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHeartbeat)
 
 	env.ExecuteWorkflow(workflowFn)
 
@@ -438,8 +485,32 @@ func testWorkflowHello(ctx Context) (string, error) {
 	return result, nil
 }
 
-func testActivityHello(ctx context.Context, msg string) (string, error) {
+func testWorkflowContext(ctx Context) (string, error) {
+	value := ctx.Value(contextKey(testHeader))
+	if val, ok := value.(string); ok {
+		return val, nil
+	}
+	return "", fmt.Errorf("context did not propagate to workflow")
+}
+
+func testActivityHello(_ context.Context, msg string) (string, error) {
 	return "hello" + "_" + msg, nil
+}
+
+func testActivityContext(ctx context.Context) (string, error) {
+	value := ctx.Value(contextKey(testHeader))
+	if val, ok := value.(string); ok {
+		return val, nil
+	}
+	return "", fmt.Errorf("context did not propagate to workflow")
+}
+
+func testActivityCanceled(ctx context.Context) (int32, error) {
+	info := GetActivityInfo(ctx)
+	if info.Attempt < 2 {
+		return int32(-1), NewCanceledError("details")
+	}
+	return info.Attempt, nil
 }
 
 func testWorkflowHeartbeat(ctx Context, msg string, waitTime time.Duration) (string, error) {
@@ -503,8 +574,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_SideEffect() {
 		return err
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHello)
 
 	env.ExecuteWorkflow(workflowFn)
 
@@ -532,8 +604,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Basic() {
 		return helloActivityResult + " " + helloWorkflowResult, nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -564,8 +638,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Basic_WithDataConverter()
 		return helloActivityResult + " " + helloWorkflowResult, nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
+
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -596,8 +673,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowCancel() {
 		return nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHeartbeat)
+	env.RegisterActivity(testActivityHeartbeat)
+
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -629,8 +709,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock() {
 		return helloActivityResult + " " + helloWorkflowResult + " " + heartbeatWorkflowResult, nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterWorkflow(testWorkflowHeartbeat)
+	env.RegisterActivity(testActivityHeartbeat)
+	env.RegisterActivity(testActivityHello)
+
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("mock_msg", nil)
 	env.OnWorkflow(testWorkflowHeartbeat, mock.Anything, mock.Anything, mock.Anything).
 		Return("mock_heartbeat", nil)
@@ -659,8 +744,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock_Panic_GetChildWorkfl
 		return helloWorkflowResult, nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
+	env.RegisterWorkflow(workflowFn)
 	env.OnWorkflow(testWorkflowHello, mock.Anything, mock.Anything, mock.Anything).
 		Return("mock_result", nil, "extra_argument") // extra arg causes panic
 	env.ExecuteWorkflow(workflowFn)
@@ -684,8 +770,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_StartFailed() {
 		return "should-not-go-here", nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHello)
 	env.OnWorkflow(testWorkflowHello, mock.Anything).Return("", ErrMockStartChildWorkflowFailed)
 	env.ExecuteWorkflow(workflowFn)
 
@@ -714,13 +801,16 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Listener() {
 		return helloActivityResult + " " + helloWorkflowResult, nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
+	env.RegisterActivity(testActivityHello)
+
 	var childWorkflowName, childWorkflowResult string
-	env.SetOnChildWorkflowStartedListener(func(workflowInfo *WorkflowInfo, ctx Context, args encoded.Values) {
+	env.SetOnChildWorkflowStartedListener(func(workflowInfo *WorkflowInfo, ctx Context, args Values) {
 		childWorkflowName = workflowInfo.WorkflowType.Name
 	})
-	env.SetOnChildWorkflowCompletedListener(func(workflowInfo *WorkflowInfo, result encoded.Value, err error) {
+	env.SetOnChildWorkflowCompletedListener(func(workflowInfo *WorkflowInfo, result Value, err error) {
 		s.NoError(err)
 		s.NoError(result.Get(&childWorkflowResult))
 	})
@@ -796,9 +886,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Clock() {
 		return nil
 	}
 
-	RegisterWorkflow(workflowFn)
-	RegisterWorkflow(childWorkflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(childWorkflowFn)
+	env.RegisterActivity(testActivityHello)
 
 	env.ExecuteWorkflow(workflowFn)
 
@@ -829,9 +920,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWait() {
 	}
 
 	// no delay to the mock call, workflow should return no error
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("hello_mock_delayed", nil).Once()
+
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -839,6 +932,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWait() {
 
 	// delay 10 minutes, which is shorter than the 1 hour timer, so workflow should return no error.
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterActivity(testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).After(time.Minute*10).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
@@ -847,6 +941,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWait() {
 
 	// delay 2 hours, which is longer than the 1 hour timer, and workflow should return error.
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterActivity(testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).After(time.Hour*2).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
@@ -855,6 +950,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWait() {
 
 	// no mock
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterActivity(testActivityHello)
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -889,10 +985,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWaitFn() {
 			"Expected %v to be %v after %v, real diff: %v", after, expected, before, after.Sub(before))
 	}
 
-	RegisterWorkflow(workflowFn)
-
 	// multiple different mocked delays and values should work
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHello)
 	env.OnActivity(testActivityHello, mock.Anything, "mock_delay_1").After(time.Second).Return("one", nil).Once()
 	env.OnActivity(testActivityHello, mock.Anything, "mock_delay_2").After(time.Minute).Return("two", nil).Once()
 	expectDuration(env, 61, func() {
@@ -905,6 +1001,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockActivityWaitFn() {
 
 	// multiple different dynamically mocked delays and values should work
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHello)
+
 	afterCount, returnCount := 0, 0
 	afters := []time.Duration{time.Second, time.Minute}
 	returns := []string{"first", "second"}
@@ -948,10 +1047,12 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockWorkflowWait() {
 		return errors.New("child workflow takes too long")
 	}
 
-	RegisterWorkflow(workflowFn)
 	// no delay to the mock call, workflow should return no error
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHello)
 	env.OnWorkflow(testWorkflowHello, mock.Anything).Return("hello_mock_delayed", nil).Once()
+	env.RegisterActivity(testActivityHello)
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -959,7 +1060,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockWorkflowWait() {
 
 	// delay 10 minutes, which is shorter than the 1 hour timer, so workflow should return no error.
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHello)
 	env.OnWorkflow(testWorkflowHello, mock.Anything).After(time.Minute*10).Return("hello_mock_delayed", nil).Once()
+	env.RegisterActivity(testActivityHello)
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -967,7 +1071,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockWorkflowWait() {
 
 	// delay 2 hours, which is longer than the 1 hour timer, and workflow should return error.
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHello)
 	env.OnWorkflow(testWorkflowHello, mock.Anything).After(time.Hour*2).Return("hello_mock_delayed", nil).Once()
+	env.RegisterActivity(testActivityHello)
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.Error(env.GetWorkflowError())
@@ -975,6 +1082,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockWorkflowWait() {
 
 	// no mock
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -990,6 +1100,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockPanic() {
 		Run(func(args mock.Arguments) {
 			panic("mock-panic")
 		})
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
 	env.ExecuteWorkflow(testWorkflowHello)
 	s.True(env.IsWorkflowCompleted())
 	err := env.GetWorkflowError()
@@ -1000,6 +1112,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockPanic() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWithChild() {
+	env := s.NewTestWorkflowEnvironment()
 	childWorkflowFn := func(ctx Context) error {
 		t1 := NewTimer(ctx, time.Hour)
 		cwo := ChildWorkflowOptions{ExecutionStartToCloseTimeout: time.Hour /* this is currently ignored by test suite */}
@@ -1042,11 +1155,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWithChild() {
 		return errors.New("child workflow takes too long")
 	}
 
-	RegisterWorkflow(workflowFn)
-	RegisterWorkflow(childWorkflowFn)
-
+	env.RegisterWorkflow(childWorkflowFn)
+	env.RegisterWorkflow(workflowFn)
 	// no delay to the mock call, workflow should return no error
-	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
 	env.OnWorkflow(testWorkflowHello, mock.Anything).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
@@ -1055,6 +1168,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWithChild() {
 
 	// delay 10 minutes, which is shorter than the 1 hour timer, so workflow should return no error.
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(childWorkflowFn)
+
+	// no delay to the mock call, workflow should return no error
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
+
 	env.OnWorkflow(testWorkflowHello, mock.Anything).After(time.Minute*10).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
@@ -1063,6 +1183,12 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWithChild() {
 
 	// delay 2 hours, which is longer than the 1 hour timer, and workflow should return error.
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(childWorkflowFn)
+	// no delay to the mock call, workflow should return no error
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
+
 	env.OnWorkflow(testWorkflowHello, mock.Anything).After(time.Hour*2).Return("hello_mock_delayed", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
@@ -1071,6 +1197,12 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWithChild() {
 
 	// no mock
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(childWorkflowFn)
+	// no delay to the mock call, workflow should return no error
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
+
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -1093,13 +1225,28 @@ func (s *WorkflowTestSuiteUnitTest) Test_GetVersion() {
 			f = ExecuteActivity(ctx, newActivity, "new_msg")
 		}
 		err := f.Get(ctx, nil) // wait for result
+		if err != nil {
+			return err
+		}
+
+		// test searchable change version
+		wfInfo := GetWorkflowInfo(ctx)
+		s.NotNil(wfInfo.SearchAttributes)
+		changeVersionsBytes, ok := wfInfo.SearchAttributes.IndexedFields[CadenceChangeVersion]
+		s.True(ok)
+		var changeVersions []string
+		err = json.Unmarshal(changeVersionsBytes, &changeVersions)
+		s.NoError(err)
+		s.Equal(1, len(changeVersions))
+		s.Equal("test_change_id-2", changeVersions[0])
+
 		return err
 	}
 
-	RegisterWorkflow(workflowFn)
-	RegisterActivity(oldActivity)
-	RegisterActivity(newActivity)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(oldActivity)
+	env.RegisterActivity(newActivity)
 	env.OnActivity(newActivity, mock.Anything, "new_msg").Return("hello new_mock_msg", nil).Once()
 	env.ExecuteWorkflow(workflowFn)
 
@@ -1126,6 +1273,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockGetVersion() {
 		}
 		var ret1 string
 		err := f.Get(ctx, &ret1) // wait for result
+		if err != nil {
+			return "", err
+		}
 
 		v2 := GetVersion(ctx, "change_2", DefaultVersion, 2)
 		if v2 == DefaultVersion {
@@ -1135,14 +1285,29 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockGetVersion() {
 		}
 		var ret2 string
 		err = f.Get(ctx, &ret2) // wait for result
+		if err != nil {
+			return "", err
+		}
+
+		// test searchable change version
+		wfInfo := GetWorkflowInfo(ctx)
+		s.NotNil(wfInfo.SearchAttributes)
+		changeVersionsBytes, ok := wfInfo.SearchAttributes.IndexedFields[CadenceChangeVersion]
+		s.True(ok)
+		var changeVersions []string
+		err = json.Unmarshal(changeVersionsBytes, &changeVersions)
+		s.NoError(err)
+		s.Equal(2, len(changeVersions))
+		s.Equal("change_2-2", changeVersions[0])
+		s.Equal("change_1--1", changeVersions[1])
 
 		return ret1 + ret2, err
 	}
 
-	RegisterWorkflow(workflowFn)
-	RegisterActivity(oldActivity)
-	RegisterActivity(newActivity)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(oldActivity)
+	env.RegisterActivity(newActivity)
 
 	env.OnGetVersion("change_1", DefaultVersion, 2).Return(func(string, Version, Version) Version {
 		return DefaultVersion
@@ -1158,6 +1323,100 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockGetVersion() {
 	env.AssertExpectations(s.T())
 }
 
+func (s *WorkflowTestSuiteUnitTest) Test_UpsertSearchAttributes_ReservedKey() {
+	workflowFn := func(ctx Context) error {
+		attr := map[string]interface{}{
+			CadenceChangeVersion: "some change version",
+		}
+		err := UpsertSearchAttributes(ctx, attr)
+		s.Error(err)
+
+		wfInfo := GetWorkflowInfo(ctx)
+		s.Nil(wfInfo.SearchAttributes)
+		return nil
+	}
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+	env.AssertExpectations(s.T())
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_MockUpsertSearchAttributes() {
+	workflowFn := func(ctx Context) error {
+		attr := map[string]interface{}{}
+		err := UpsertSearchAttributes(ctx, attr)
+		s.Error(err)
+
+		wfInfo := GetWorkflowInfo(ctx)
+		s.Nil(wfInfo.SearchAttributes)
+
+		attr["CustomIntField"] = 1
+		err = UpsertSearchAttributes(ctx, attr)
+		s.NoError(err)
+
+		wfInfo = GetWorkflowInfo(ctx)
+		s.NotNil(wfInfo.SearchAttributes)
+		valBytes := wfInfo.SearchAttributes.IndexedFields["CustomIntField"]
+		var result int
+		NewValue(valBytes).Get(&result)
+		s.Equal(1, result)
+
+		return nil
+	}
+
+	// no mock
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+	env.AssertExpectations(s.T())
+
+	// has mock
+	env = s.NewTestWorkflowEnvironment()
+	env.OnUpsertSearchAttributes(map[string]interface{}{}).Return(errors.New("empty")).Once()
+	env.OnUpsertSearchAttributes(map[string]interface{}{"CustomIntField": 1}).Return(nil).Once()
+
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+	env.AssertExpectations(s.T())
+
+	// mock no return
+	env = s.NewTestWorkflowEnvironment()
+	env.OnUpsertSearchAttributes(map[string]interface{}{}).Once()
+	env.OnUpsertSearchAttributes(map[string]interface{}{"CustomIntField": 1}).Once()
+
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.Nil(env.GetWorkflowError())
+	env.AssertExpectations(s.T())
+
+	// mix no-mock and mock is not support
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_MockUpsertSearchAttributes_OnError() {
+	workflowFn := func(ctx Context) error {
+		attr := map[string]interface{}{}
+		attr["CustomIntField"] = 1
+		err := UpsertSearchAttributes(ctx, attr)
+		s.Error(err)
+		return err
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.OnUpsertSearchAttributes(map[string]interface{}{"CustomIntField": 1}).Return(errors.New("test error")).Once()
+
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
+	env.AssertExpectations(s.T())
+}
+
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithThriftTypes() {
 	actualValues := []string{}
 	retVal := &shared.WorkflowExecution{WorkflowId: common.StringPtr("retwID2"), RunId: common.StringPtr("retrID2")}
@@ -1168,10 +1427,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithThriftTypes() {
 		actualValues = append(actualValues, wf.GetRunId())
 		return retVal, nil
 	}
-	RegisterActivity(activitySingleFn)
 
 	input := &shared.WorkflowExecution{WorkflowId: common.StringPtr("wID1"), RunId: common.StringPtr("rID1")}
 	env := s.NewTestActivityEnvironment()
+	env.RegisterActivity(activitySingleFn)
 	blob, err := env.ExecuteActivity(activitySingleFn, input)
 	s.NoError(err)
 	var ret *shared.WorkflowExecution
@@ -1185,11 +1444,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithThriftTypes() {
 		actualValues = append(actualValues, t.GetName())
 		return retVal, nil
 	}
-	RegisterActivity(activityDoubleArgFn)
 
 	input = &shared.WorkflowExecution{WorkflowId: common.StringPtr("wID2"), RunId: common.StringPtr("rID3")}
 	wt := &shared.WorkflowType{Name: common.StringPtr("wType")}
 	env = s.NewTestActivityEnvironment()
+	env.RegisterActivity(activityDoubleArgFn)
 	blob, err = env.ExecuteActivity(activityDoubleArgFn, input, wt)
 	s.NoError(err)
 	blob.Get(&ret)
@@ -1211,8 +1470,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityRegistration() {
 	}
 	activityAlias := "some-random-activity-alias"
 
-	RegisterActivityWithOptions(activityFn, RegisterActivityOptions{Name: activityAlias})
 	env := s.NewTestActivityEnvironment()
+	env.RegisterActivityWithOptions(activityFn, RegisterActivityOptions{Name: activityAlias})
 	input := "some random input"
 
 	encodedValue, err := env.ExecuteActivity(activityFn, input)
@@ -1234,11 +1493,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowRegistration() {
 	}
 	workflowAlias := "some-random-workflow-alias"
 
-	RegisterWorkflowWithOptions(workflowFn, RegisterWorkflowOptions{Name: workflowAlias})
 	env := s.NewTestWorkflowEnvironment()
 
 	env.ExecuteWorkflow(workflowFn)
+
 	env = s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflowWithOptions(workflowFn, RegisterWorkflowOptions{Name: workflowAlias})
+
 	env.ExecuteWorkflow(workflowAlias)
 }
 
@@ -1258,11 +1519,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityFriendlyName() {
 		return err
 	}
 
-	RegisterActivityWithOptions(activityFn, RegisterActivityOptions{Name: "foo"})
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivityWithOptions(activityFn, RegisterActivityOptions{Name: "foo"})
 	var called []string
-	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values) {
+	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		called = append(called, activityInfo.ActivityType.Name)
 	})
 
@@ -1289,10 +1550,12 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFriendlyName() {
 		return err
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflowWithOptions(testWorkflowHello, RegisterWorkflowOptions{Name: "testWorkflowHello"})
+	env.RegisterActivity(testActivityHello)
 	var called []string
-	env.SetOnChildWorkflowStartedListener(func(workflowInfo *WorkflowInfo, ctx Context, args encoded.Values) {
+	env.SetOnChildWorkflowStartedListener(func(workflowInfo *WorkflowInfo, ctx Context, args Values) {
 		called = append(called, workflowInfo.WorkflowType.Name)
 	})
 
@@ -1303,6 +1566,97 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFriendlyName() {
 	s.Equal(2, len(called))
 	s.Equal("testWorkflowHello", called[0])
 	s.Equal("testWorkflowHello", called[1])
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_WorkflowHeaderContext() {
+
+	workflowFn := func(ctx Context) error {
+		value := ctx.Value(contextKey(testHeader))
+		if val, ok := value.(string); ok {
+			s.Equal("test-data", val)
+		} else {
+			return fmt.Errorf("context did not propagate to workflow")
+		}
+
+		cwo := ChildWorkflowOptions{ExecutionStartToCloseTimeout: time.Hour /* this is currently ignored by test suite */}
+		ctx = WithChildWorkflowOptions(ctx, cwo)
+		var result string
+		if err := ExecuteChildWorkflow(ctx, testWorkflowContext).Get(ctx, &result); err != nil {
+			return err
+		}
+		s.Equal("test-data", result)
+
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    time.Minute,
+			HeartbeatTimeout:       20 * time.Second,
+		}
+		ctx = WithActivityOptions(ctx, ao)
+		if err := ExecuteActivity(ctx, testActivityContext).Get(ctx, &result); err != nil {
+			return err
+		}
+		s.Equal("test-data", result)
+		return nil
+	}
+
+	s.SetContextPropagators([]ContextPropagator{NewStringMapPropagator([]string{testHeader})})
+	s.SetHeader(&shared.Header{
+		Fields: map[string][]byte{
+			testHeader: []byte("test-data"),
+		},
+	})
+
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.ExecuteWorkflow(testWorkflowContext)
+
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowContextPropagation() {
+
+	childWorkflowFn := func(ctx Context) error {
+		value := ctx.Value(contextKey(testHeader))
+		if val, ok := value.(string); ok {
+			s.Equal("test-data-for-child", val)
+		} else {
+			return fmt.Errorf("context did not propagate to child workflow")
+		}
+		return nil
+	}
+
+	workflowFn := func(ctx Context) error {
+		value := ctx.Value(contextKey(testHeader))
+		if val, ok := value.(string); ok {
+			s.Equal("test-data", val)
+		} else {
+			return fmt.Errorf("context did not propagate to workflow")
+		}
+
+		cwo := ChildWorkflowOptions{ExecutionStartToCloseTimeout: time.Hour /* this is currently ignored by test suite */}
+		ctx = WithChildWorkflowOptions(ctx, cwo)
+		childCtx := WithValue(ctx, contextKey(testHeader), "test-data-for-child")
+		if err := ExecuteChildWorkflow(childCtx, childWorkflowFn).Get(childCtx, nil); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	s.SetContextPropagators([]ContextPropagator{NewStringMapPropagator([]string{testHeader})})
+	s.SetHeader(&shared.Header{
+		Fields: map[string][]byte{
+			testHeader: []byte("test-data"),
+		},
+	})
+
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(childWorkflowFn)
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityFullyQualifiedName() {
@@ -1317,20 +1671,21 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityFullyQualifiedName() {
 		return err
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 	s.False(env.IsWorkflowCompleted())
 	s.Contains(env.GetWorkflowError().Error(), "Unable to find activityType")
 }
 
-func (s *WorkflowTestSuiteUnitTest) Test_WorkflowFullyQualifiedName() {
+func (s *WorkflowTestSuiteUnitTest) Test_WorkflowUnknownName() {
 	defer func() {
 		if r := recover(); r != nil {
-			s.Contains(r.(error).Error(), "Unable to find workflow type")
+			s.Contains(r.(error).Error(), "unable to find workflow type")
 		}
 	}()
 	env := s.NewTestWorkflowEnvironment()
+
 	env.ExecuteWorkflow(getFunctionName(testWorkflowHello))
 	s.Fail("Should have panic'ed at ExecuteWorkflow")
 }
@@ -1360,9 +1715,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_QueryWorkflow() {
 		state = stateDone
 		return err
 	}
-	RegisterWorkflow(workflowFn)
 
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHello)
+
 	verifyStateWithQuery := func(expected string) {
 		encodedValue, err := env.QueryWorkflow(queryType, "input")
 		s.NoError(err)
@@ -1377,7 +1734,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_QueryWorkflow() {
 		env.SignalWorkflow("query-signal", "hello-query")
 	}, time.Hour)
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).After(time.Hour).Return("hello_mock", nil)
-	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args encoded.Values) {
+	env.SetOnActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args Values) {
 		verifyStateWithQuery(stateWaitActivity)
 	})
 	env.ExecuteWorkflow(workflowFn)
@@ -1401,8 +1758,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowWithLocalActivity() {
 		return result, err
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -1458,15 +1815,15 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowLocalActivityWithMockAndListene
 		return result, err
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
 	env.OnActivity(localActivityFn, mock.Anything, "local_activity").Return("hello mock", nil).Once()
 	var startedCount, completedCount, canceledCount int
 	env.SetOnLocalActivityStartedListener(func(activityInfo *ActivityInfo, ctx context.Context, args []interface{}) {
 		startedCount++
 	})
 
-	env.SetOnLocalActivityCompletedListener(func(activityInfo *ActivityInfo, result encoded.Value, err error) {
+	env.SetOnLocalActivityCompletedListener(func(activityInfo *ActivityInfo, result Value, err error) {
 		s.NoError(err)
 		var resultValue string
 		err = result.Get(&resultValue)
@@ -1537,9 +1894,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_SignalChildWorkflow() {
 		return nil
 	}
 
-	RegisterWorkflow(childWorkflowFn)
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(childWorkflowFn)
+	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -1589,8 +1946,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_SignalExternalWorkflow() {
 		return nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
 
 	// signal1 should succeed
 	env.OnSignalExternalWorkflow("test-domain", "test-workflow-id1", "test-runid1", signalName, signalData).Return(nil).Once()
@@ -1645,9 +2002,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_CancelChildWorkflow() {
 		return nil
 	}
 
-	RegisterWorkflow(childWorkflowFn)
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(childWorkflowFn)
+	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -1675,8 +2032,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_CancelExternalWorkflow() {
 		return nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
 
 	// cancellation 1 should succeed
 	env.OnRequestCancelExternalWorkflow("test-domain", "test-workflow-id1", "test-runid1").Return(nil).Once()
@@ -1727,10 +2084,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_DisconnectedContext() {
 		return result, err
 	}
 
-	RegisterWorkflow(workflowFn)
-	RegisterWorkflow(childWorkflowFn)
-
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(childWorkflowFn)
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityHello)
+
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -1775,8 +2133,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowIDReusePolicy() {
 		return helloWorkflowResult, nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHello)
+	env.RegisterActivity(testActivityHello)
 	env.ExecuteWorkflow(workflowFn)
 	var actualResult string
 	s.NoError(env.GetWorkflowResult(&actualResult))
@@ -1815,7 +2175,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_Channel() {
 				}
 
 				// continue as new
-				return NewContinueAsNewError(ctx, "this-workflow-fn")
+				return NewContinueAsNewError(ctx, "this-workflow")
 			}
 
 			for i := range fanoutChs {
@@ -1833,8 +2193,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_Channel() {
 		return nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
 
 	env.RegisterDelayedCallback(func() {
 		env.SignalWorkflow("test-signal", "s1")
@@ -1865,12 +2225,44 @@ func (s *WorkflowTestSuiteUnitTest) Test_ContextMisuse() {
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
 	s.Error(env.GetWorkflowError())
 	s.Contains(env.GetWorkflowError().Error(), "block on coroutine which is already blocked")
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_DrainSignalChannel() {
+	workflowFn := func(ctx Context) (string, error) {
+
+		signalCh := GetSignalChannel(ctx, "test-signal")
+		var s1, s2, s3 string
+		signalCh.Receive(ctx, &s1)
+		if !signalCh.ReceiveAsync(&s2) {
+			return "", errors.New("expected signal")
+		}
+		if signalCh.ReceiveAsync(&s3) {
+			return "", errors.New("unexpected signal")
+		}
+		return s1 + s2, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflowSkippingDecision("test-signal", "s1")
+		env.SignalWorkflow("test-signal", "s2")
+	}, time.Minute)
+
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	var result string
+	env.GetWorkflowResult(&result)
+	s.Equal("s1s2", result)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetry() {
@@ -1919,9 +2311,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetry() {
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	RegisterWorkflow(workflowFn)
-	RegisterActivity(activityFailedFn)
-	RegisterActivity(activityFn)
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(activityFailedFn)
+	env.RegisterActivity(activityFn)
+
+	// set a workflow timeout timer to test
+	// if the timer will fire during activity retry
+	env.SetWorkflowTimeout(10 * time.Second)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -1981,8 +2377,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityHeartbeatRetry() {
 
 	env := s.NewTestWorkflowEnvironment()
 	env.SetTestTimeout(time.Hour)
-	RegisterWorkflow(workflowFn)
-	RegisterActivity(activityHeartBeatFn)
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(activityHeartBeatFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -1993,15 +2389,15 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityHeartbeatRetry() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
 
-	localActivityFn := func(ctx context.Context) (string, error) {
+	localActivityFn := func(ctx context.Context) (int32, error) {
 		info := GetActivityInfo(ctx)
 		if info.Attempt < 2 {
-			return "", NewCustomError("bad-luck")
+			return int32(-1), NewCustomError("bad-luck")
 		}
-		return "retry-done", nil
+		return info.Attempt, nil
 	}
 
-	workflowFn := func(ctx Context) (string, error) {
+	workflowFn := func(ctx Context) (int32, error) {
 		lao := LocalActivityOptions{
 			ScheduleToCloseTimeout: time.Minute,
 			RetryPolicy: &RetryPolicy{
@@ -2015,23 +2411,101 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
 		}
 		ctx = WithLocalActivityOptions(ctx, lao)
 
-		var result string
+		var result int32
 		err := ExecuteLocalActivity(ctx, localActivityFn).Get(ctx, &result)
 		if err != nil {
-			return "", err
+			return int32(-1), err
 		}
 		return result, nil
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
-	var result string
+	var result int32
 	s.NoError(env.GetWorkflowResult(&result))
-	s.Equal("retry-done", result)
+	s.Equal(int32(2), result)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetryOnCancel() {
+	attempts := 0
+	localActivityFn := func(ctx context.Context) (int32, error) {
+		attempts++
+		info := GetActivityInfo(ctx)
+		if info.Attempt < 2 {
+			return int32(-1), NewCanceledError("details")
+		}
+		return info.Attempt, nil
+	}
+
+	workflowFn := func(ctx Context) (int32, error) {
+		lao := LocalActivityOptions{
+			ScheduleToCloseTimeout: time.Minute,
+			RetryPolicy: &RetryPolicy{
+				MaximumAttempts:          3,
+				InitialInterval:          time.Second,
+				MaximumInterval:          time.Second * 10,
+				BackoffCoefficient:       2,
+				NonRetriableErrorReasons: []string{"bad-bug"},
+				ExpirationInterval:       time.Minute,
+			},
+		}
+		ctx = WithLocalActivityOptions(ctx, lao)
+
+		var result int32
+		err := ExecuteLocalActivity(ctx, localActivityFn).Get(ctx, &result)
+		if err != nil {
+			return int32(-1), err
+		}
+		return result, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
+	s.True(IsCanceledError(env.GetWorkflowError()))
+	s.Equal(1, attempts)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_ActivityRetryOnCancel() {
+	workflowFn := func(ctx Context) (int32, error) {
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    time.Minute,
+			RetryPolicy: &RetryPolicy{
+				MaximumAttempts:          3,
+				InitialInterval:          time.Second,
+				MaximumInterval:          time.Second * 10,
+				BackoffCoefficient:       2,
+				NonRetriableErrorReasons: []string{"bad-bug"},
+				ExpirationInterval:       time.Minute,
+			},
+		}
+		ctx = WithActivityOptions(ctx, ao)
+
+		var result int32
+		err := ExecuteActivity(ctx, testActivityCanceled).Get(ctx, &result)
+		if err != nil {
+			return int32(-1), err
+		}
+		return result, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterActivity(testActivityCanceled)
+
+	env.ExecuteWorkflow(workflowFn)
+
+	s.True(env.IsWorkflowCompleted())
+	s.Error(env.GetWorkflowError())
+	s.True(IsCanceledError(env.GetWorkflowError()))
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowRetry() {
@@ -2067,8 +2541,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowRetry() {
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	RegisterWorkflow(childWorkflowFn)
-	RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(childWorkflowFn)
+	env.RegisterWorkflow(workflowFn)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -2122,8 +2596,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_SignalChildWorkflowRetry() {
 	}
 
 	env := s.NewTestWorkflowEnvironment()
-	RegisterWorkflow(childWorkflowFn)
-	RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(childWorkflowFn)
+	env.RegisterWorkflow(workflowFn)
 
 	env.RegisterDelayedCallback(func() {
 		env.SignalWorkflowByID("test-retry-signal-child-workflow", "test-signal-name", "test-signal-data")
@@ -2151,7 +2625,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_TestWorkflowTimeoutInBusyLoop() {
 	env.SetOnTimerFiredListener(func(timerID string) {
 		timerFiredCount++
 	})
-	RegisterWorkflow(neverEndingWorkflow)
+	env.RegisterWorkflow(neverEndingWorkflow)
 
 	env.ExecuteWorkflow(neverEndingWorkflow)
 	s.Equal(10, timerFiredCount)
@@ -2186,8 +2660,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_TestChildWorkflowTimeout() {
 	env.SetOnTimerFiredListener(func(timerID string) {
 		timerFiredCount++
 	})
-	RegisterWorkflow(childWorkflowFn)
-	RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(childWorkflowFn)
+	env.RegisterWorkflow(workflowFn)
 
 	env.ExecuteWorkflow(workflowFn)
 	s.NoError(env.GetWorkflowError())
@@ -2237,9 +2711,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_SameActivityIDFromDifferentChildWorkflo
 		return result1 + " " + result2, nil
 	}
 
-	RegisterWorkflow(workflowFn)
-	RegisterWorkflow(childWorkflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(childWorkflowFn)
+	env.RegisterActivity(testActivityHello)
+
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -2247,6 +2723,40 @@ func (s *WorkflowTestSuiteUnitTest) Test_SameActivityIDFromDifferentChildWorkflo
 	var actualResult string
 	s.NoError(env.GetWorkflowResult(&actualResult))
 	s.Equal("hello_child_1 hello_child_2", actualResult)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_MockChildWorkflowAlreadyRunning() {
+	childWorkflowFn := func(ctx Context) error {
+		return nil
+	}
+
+	runID := "run-id"
+	workflowFn := func(ctx Context) error {
+		cwo := ChildWorkflowOptions{
+			ExecutionStartToCloseTimeout: time.Minute,
+		}
+		ctx = WithChildWorkflowOptions(ctx, cwo)
+		err := ExecuteChildWorkflow(ctx, childWorkflowFn).Get(ctx, nil)
+		s.Error(err)
+
+		alreadySytartedErr, ok := err.(*shared.WorkflowExecutionAlreadyStartedError)
+		s.True(ok)
+		s.Equal(runID, *alreadySytartedErr.RunId)
+
+		return nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	RegisterWorkflow(childWorkflowFn)
+	RegisterWorkflow(workflowFn)
+
+	env.OnWorkflow(childWorkflowFn, mock.Anything).
+		Return(&shared.WorkflowExecutionAlreadyStartedError{
+			RunId: &runID,
+		})
+
+	env.ExecuteWorkflow(workflowFn)
+	s.NoError(env.GetWorkflowError())
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowAlreadyRunning() {
@@ -2271,8 +2781,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowAlreadyRunning() {
 		return result1 + " " + result2, nil
 	}
 
-	RegisterWorkflow(workflowFn)
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.RegisterWorkflow(testWorkflowHeartbeat)
+	env.RegisterActivity(testActivityHeartbeat)
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
@@ -2332,10 +2844,10 @@ func (s *WorkflowTestSuiteUnitTest) Test_CronWorkflow() {
 		return err
 	}
 
-	RegisterWorkflow(cronWorkflow)
-	RegisterWorkflow(testWorkflow)
-
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(cronWorkflow)
+	env.RegisterWorkflow(testWorkflow)
+
 	startTime, _ := time.Parse(time.RFC3339, "2018-12-20T16:30:00+08:00")
 	env.SetStartTime(startTime)
 	env.ExecuteWorkflow(testWorkflow)
@@ -2359,9 +2871,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_CronHasLastResult() {
 		return result + 1, nil
 	}
 
-	RegisterWorkflow(cronWorkflow)
-
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(cronWorkflow)
 	lastResult := 3
 	env.SetLastCompletionResult(lastResult)
 	env.ExecuteWorkflow(cronWorkflow)
@@ -2386,9 +2897,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithProgress() {
 		return progress + 1, nil
 	}
 
-	RegisterActivity(activityFn)
-
 	env := s.NewTestActivityEnvironment()
+	env.RegisterActivity(activityFn)
 	lastProgress := 3
 	env.SetHeartbeatDetails(lastProgress)
 	result, err := env.ExecuteActivity(activityFn)
@@ -2418,18 +2928,121 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityGoexit() {
 		return err
 	}
 
-	RegisterActivity(fn)
-	RegisterWorkflow(wf)
-
 	env := s.NewTestWorkflowEnvironment()
+	env.RegisterActivity(fn)
+	env.RegisterWorkflow(wf)
 	env.ExecuteWorkflow(wf)
 	err := env.GetWorkflowError()
 	s.EqualError(err, "activity called runtime.Goexit")
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_SetWorkerStopChannel() {
-	env := newTestWorkflowEnvironmentImpl(&s.WorkflowTestSuite)
+	env := newTestWorkflowEnvironmentImpl(&s.WorkflowTestSuite, nil)
 	c := make(chan struct{})
 	env.setWorkerStopChannel(c)
 	s.NotNil(env.workerStopChannel)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_ActivityTimeoutWithDetails() {
+	count := 0
+	timeoutFn := func() error {
+		count++
+		return NewTimeoutError(shared.TimeoutTypeStartToClose, testErrorDetails1)
+	}
+
+	timeoutWf := func(ctx Context) error {
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    5 * time.Second,
+			RetryPolicy: &RetryPolicy{
+				InitialInterval:          time.Second,
+				BackoffCoefficient:       1.1,
+				MaximumAttempts:          3,
+				NonRetriableErrorReasons: []string{"cadenceInternal:Timeout START_TO_CLOSE"},
+			},
+		}
+		ctx = WithActivityOptions(ctx, ao)
+		err := ExecuteActivity(ctx, timeoutFn).Get(ctx, nil)
+		return err
+	}
+
+	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv.RegisterWorkflow(timeoutWf)
+	wfEnv.RegisterActivity(timeoutFn)
+
+	wfEnv.ExecuteWorkflow(timeoutWf)
+	err := wfEnv.GetWorkflowError()
+	s.Error(err)
+	timeoutErr, ok := err.(*TimeoutError)
+	s.True(ok)
+	s.Equal(shared.TimeoutTypeStartToClose, timeoutErr.TimeoutType())
+	s.True(timeoutErr.HasDetails())
+	var details string
+	err = timeoutErr.Details(&details)
+	s.NoError(err)
+	s.Equal(testErrorDetails1, details)
+	s.Equal(1, count)
+
+	activityEnv := s.NewTestActivityEnvironment()
+	activityEnv.RegisterActivity(timeoutFn)
+
+	_, err = activityEnv.ExecuteActivity(timeoutFn)
+	s.Error(err)
+	timeoutErr, ok = err.(*TimeoutError)
+	s.True(ok)
+	s.Equal(shared.TimeoutTypeStartToClose, timeoutErr.TimeoutType())
+	s.True(timeoutErr.HasDetails())
+	err = timeoutErr.Details(&details)
+	s.NoError(err)
+	s.Equal(testErrorDetails1, details)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_ActivityDeadlineExceeded() {
+	timeoutFn := func(ctx context.Context) error {
+		<-ctx.Done()
+		return nil
+	}
+
+	timeoutWf := func(ctx Context) error {
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: time.Minute,
+			StartToCloseTimeout:    1 * time.Second,
+		}
+		ctx = WithActivityOptions(ctx, ao)
+		err := ExecuteActivity(ctx, timeoutFn).Get(ctx, nil)
+		return err
+	}
+
+	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv.RegisterActivity(timeoutFn)
+	wfEnv.RegisterWorkflow(timeoutWf)
+	wfEnv.ExecuteWorkflow(timeoutWf)
+	err := wfEnv.GetWorkflowError()
+	s.Error(err)
+	timeoutErr, ok := err.(*TimeoutError)
+	s.True(ok)
+	s.Equal(shared.TimeoutTypeStartToClose, timeoutErr.TimeoutType())
+	s.True(timeoutErr.HasDetails())
+	var details string
+	err = timeoutErr.Details(&details)
+	s.NoError(err)
+	s.Equal("context deadline exceeded", details)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_AwaitWithTimeout() {
+	workflowFn := func(ctx Context) (bool, error) {
+		t := NewTimer(ctx, time.Second)
+		value := false
+		err := Await(ctx, func() bool { return t.IsReady() || value })
+		return value, err
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.RegisterWorkflow(workflowFn)
+	env.ExecuteWorkflow(workflowFn)
+	s.True(env.IsWorkflowCompleted())
+	s.NoError(env.GetWorkflowError())
+	result := true
+	_ = env.GetWorkflowResult(&result)
+	s.False(result)
 }

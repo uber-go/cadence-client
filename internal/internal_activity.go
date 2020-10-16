@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,9 +30,9 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
 )
@@ -74,7 +75,8 @@ type (
 		activityOptions
 		ActivityType  ActivityType
 		Input         []byte
-		DataConverter encoded.DataConverter
+		DataConverter DataConverter
+		Header        *shared.Header
 	}
 
 	executeLocalActivityParams struct {
@@ -83,9 +85,10 @@ type (
 		ActivityType  string      // local activity type
 		InputArgs     []interface{}
 		WorkflowInfo  *WorkflowInfo
-		DataConverter encoded.DataConverter
+		DataConverter DataConverter
 		Attempt       int32
 		ScheduledTime time.Time
+		Header        *shared.Header
 	}
 
 	// asyncActivityClient for requesting activity execution
@@ -122,12 +125,14 @@ type (
 		scheduledTimestamp time.Time
 		startedTimestamp   time.Time
 		taskList           string
-		dataConverter      encoded.DataConverter
+		dataConverter      DataConverter
 		attempt            int32 // starts from 0.
 		heartbeatDetails   []byte
 		workflowType       *WorkflowType
 		workflowDomain     string
 		workerStopChannel  <-chan struct{}
+		contextPropagators []ContextPropagator
+		tracer             opentracing.Tracer
 	}
 
 	// context.WithValue need this type instead of basic type string to avoid lint error
@@ -190,7 +195,6 @@ func getValidatedActivityOptions(ctx Context) (*activityOptions, error) {
 	if p.HeartbeatTimeoutSeconds < 0 {
 		return nil, errors.New("invalid negative HeartbeatTimeoutSeconds")
 	}
-
 	if err := validateRetryPolicy(p.RetryPolicy); err != nil {
 		return nil, err
 	}
@@ -280,32 +284,27 @@ func validateFunctionArgs(f interface{}, args []interface{}, isWorkflow bool) er
 	return nil
 }
 
-func getValidatedActivityFunction(f interface{}, args []interface{}, dataConverter encoded.DataConverter) (*ActivityType, []byte, error) {
+func getValidatedActivityFunction(f interface{}, args []interface{}, registry *registry) (*ActivityType, error) {
 	fnName := ""
 	fType := reflect.TypeOf(f)
 	switch getKind(fType) {
 	case reflect.String:
 		fnName = reflect.ValueOf(f).String()
-
 	case reflect.Func:
 		if err := validateFunctionArgs(f, args, false); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		fnName = getFunctionName(f)
-		if alias, ok := getHostEnvironment().getActivityAlias(fnName); ok {
+		if alias, ok := registry.getActivityAlias(fnName); ok {
 			fnName = alias
 		}
 
 	default:
-		return nil, nil, fmt.Errorf(
-			"Invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
+		return nil, fmt.Errorf(
+			"invalid type 'f' parameter provided, it can be either activity function or name of the activity: %v", f)
 	}
 
-	input, err := encodeArgs(dataConverter, args)
-	if err != nil {
-		return nil, nil, err
-	}
-	return &ActivityType{Name: fnName}, input, nil
+	return &ActivityType{Name: fnName}, nil
 }
 
 func getKind(fType reflect.Type) reflect.Kind {
@@ -320,13 +319,13 @@ func isActivityContext(inType reflect.Type) bool {
 	return inType != nil && inType.Implements(contextElem)
 }
 
-func validateFunctionAndGetResults(f interface{}, values []reflect.Value, dataConverter encoded.DataConverter) ([]byte, error) {
-	fnName := getFunctionName(f)
+func validateFunctionAndGetResults(f interface{}, values []reflect.Value, dataConverter DataConverter) ([]byte, error) {
 	resultSize := len(values)
 
 	if resultSize < 1 || resultSize > 2 {
+		fnName := getFunctionName(f)
 		return nil, fmt.Errorf(
-			"The function: %v signature returns %d results, it is expecting to return either error or (result, error)",
+			"the function: %v signature returns %d results, it is expecting to return either error or (result, error)",
 			fnName, resultSize)
 	}
 
@@ -358,7 +357,40 @@ func validateFunctionAndGetResults(f interface{}, values []reflect.Value, dataCo
 	return result, errInterface
 }
 
-func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interface{}, dataConverter encoded.DataConverter) error {
+func serializeResults(f interface{}, results []interface{}, dataConverter DataConverter) (result []byte, err error) {
+	// results contain all results including error
+	resultSize := len(results)
+
+	if resultSize < 1 || resultSize > 2 {
+		fnName := getFunctionName(f)
+		err = fmt.Errorf(
+			"the function: %v signature returns %d results, it is expecting to return either error or (result, error)",
+			fnName, resultSize)
+		return
+	}
+	if resultSize > 1 {
+		retValue := results[0]
+		if retValue != nil {
+			result, err = encodeArg(dataConverter, retValue)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	errResult := results[resultSize-1]
+	if errResult != nil {
+		var ok bool
+		err, ok = errResult.(error)
+		if !ok {
+			err = fmt.Errorf(
+				"failed to serialize error result as it is not of error interface: %v",
+				errResult)
+		}
+	}
+	return
+}
+
+func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interface{}, dataConverter DataConverter) error {
 	if fnType.Kind() != reflect.Func {
 		return fmt.Errorf("expecting only function type but got type: %v", fnType)
 	}
@@ -378,7 +410,7 @@ func deSerializeFnResultFromFnType(fnType reflect.Type, result []byte, to interf
 	return nil
 }
 
-func deSerializeFunctionResult(f interface{}, result []byte, to interface{}, dataConverter encoded.DataConverter) error {
+func deSerializeFunctionResult(f interface{}, result []byte, to interface{}, dataConverter DataConverter, registry *registry) error {
 	fType := reflect.TypeOf(f)
 	if dataConverter == nil {
 		dataConverter = getDefaultDataConverter()
@@ -392,8 +424,8 @@ func deSerializeFunctionResult(f interface{}, result []byte, to interface{}, dat
 	case reflect.String:
 		// If we know about this function through registration then we will try to return corresponding result type.
 		fnName := reflect.ValueOf(f).String()
-		if fnRegistered, ok := getHostEnvironment().getActivityFn(fnName); ok {
-			return deSerializeFnResultFromFnType(reflect.TypeOf(fnRegistered), result, to, dataConverter)
+		if activity, ok := registry.GetActivity(fnName); ok {
+			return deSerializeFnResultFromFnType(reflect.TypeOf(activity.GetFunction()), result, to, dataConverter)
 		}
 	}
 

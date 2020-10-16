@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -218,11 +218,11 @@ func init() {
 		switch err.(type) {
 		case *shared.BadRequestError:
 			return true
-		case *shared.InternalServiceError:
-			return true
 		case *shared.DomainAlreadyExistsError:
 			return true
 		case *shared.ServiceBusyError:
+			return true
+		case *shared.ClientVersionNotSupportedError:
 			return true
 		default:
 			return false
@@ -240,11 +240,6 @@ func init() {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RegisterDomain_Result.BadRequestError")
 			}
 			return &WorkflowService_RegisterDomain_Result{BadRequestError: e}, nil
-		case *shared.InternalServiceError:
-			if e == nil {
-				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RegisterDomain_Result.InternalServiceError")
-			}
-			return &WorkflowService_RegisterDomain_Result{InternalServiceError: e}, nil
 		case *shared.DomainAlreadyExistsError:
 			if e == nil {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RegisterDomain_Result.DomainExistsError")
@@ -255,6 +250,11 @@ func init() {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RegisterDomain_Result.ServiceBusyError")
 			}
 			return &WorkflowService_RegisterDomain_Result{ServiceBusyError: e}, nil
+		case *shared.ClientVersionNotSupportedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RegisterDomain_Result.ClientVersionNotSupportedError")
+			}
+			return &WorkflowService_RegisterDomain_Result{ClientVersionNotSupportedError: e}, nil
 		}
 
 		return nil, err
@@ -264,16 +264,16 @@ func init() {
 			err = result.BadRequestError
 			return
 		}
-		if result.InternalServiceError != nil {
-			err = result.InternalServiceError
-			return
-		}
 		if result.DomainExistsError != nil {
 			err = result.DomainExistsError
 			return
 		}
 		if result.ServiceBusyError != nil {
 			err = result.ServiceBusyError
+			return
+		}
+		if result.ClientVersionNotSupportedError != nil {
+			err = result.ClientVersionNotSupportedError
 			return
 		}
 		return
@@ -285,10 +285,10 @@ func init() {
 //
 // The result of a RegisterDomain execution is sent and received over the wire as this struct.
 type WorkflowService_RegisterDomain_Result struct {
-	BadRequestError      *shared.BadRequestError          `json:"badRequestError,omitempty"`
-	InternalServiceError *shared.InternalServiceError     `json:"internalServiceError,omitempty"`
-	DomainExistsError    *shared.DomainAlreadyExistsError `json:"domainExistsError,omitempty"`
-	ServiceBusyError     *shared.ServiceBusyError         `json:"serviceBusyError,omitempty"`
+	BadRequestError                *shared.BadRequestError                `json:"badRequestError,omitempty"`
+	DomainExistsError              *shared.DomainAlreadyExistsError       `json:"domainExistsError,omitempty"`
+	ServiceBusyError               *shared.ServiceBusyError               `json:"serviceBusyError,omitempty"`
+	ClientVersionNotSupportedError *shared.ClientVersionNotSupportedError `json:"clientVersionNotSupportedError,omitempty"`
 }
 
 // ToWire translates a WorkflowService_RegisterDomain_Result struct into a Thrift-level intermediate
@@ -322,14 +322,6 @@ func (v *WorkflowService_RegisterDomain_Result) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 1, Value: w}
 		i++
 	}
-	if v.InternalServiceError != nil {
-		w, err = v.InternalServiceError.ToWire()
-		if err != nil {
-			return w, err
-		}
-		fields[i] = wire.Field{ID: 2, Value: w}
-		i++
-	}
 	if v.DomainExistsError != nil {
 		w, err = v.DomainExistsError.ToWire()
 		if err != nil {
@@ -344,6 +336,14 @@ func (v *WorkflowService_RegisterDomain_Result) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 4, Value: w}
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		w, err = v.ClientVersionNotSupportedError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 5, Value: w}
 		i++
 	}
 
@@ -390,14 +390,6 @@ func (v *WorkflowService_RegisterDomain_Result) FromWire(w wire.Value) error {
 				}
 
 			}
-		case 2:
-			if field.Value.Type() == wire.TStruct {
-				v.InternalServiceError, err = _InternalServiceError_Read(field.Value)
-				if err != nil {
-					return err
-				}
-
-			}
 		case 3:
 			if field.Value.Type() == wire.TStruct {
 				v.DomainExistsError, err = _DomainAlreadyExistsError_Read(field.Value)
@@ -414,6 +406,14 @@ func (v *WorkflowService_RegisterDomain_Result) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 5:
+			if field.Value.Type() == wire.TStruct {
+				v.ClientVersionNotSupportedError, err = _ClientVersionNotSupportedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -421,13 +421,13 @@ func (v *WorkflowService_RegisterDomain_Result) FromWire(w wire.Value) error {
 	if v.BadRequestError != nil {
 		count++
 	}
-	if v.InternalServiceError != nil {
-		count++
-	}
 	if v.DomainExistsError != nil {
 		count++
 	}
 	if v.ServiceBusyError != nil {
+		count++
+	}
+	if v.ClientVersionNotSupportedError != nil {
 		count++
 	}
 	if count > 1 {
@@ -450,16 +450,16 @@ func (v *WorkflowService_RegisterDomain_Result) String() string {
 		fields[i] = fmt.Sprintf("BadRequestError: %v", v.BadRequestError)
 		i++
 	}
-	if v.InternalServiceError != nil {
-		fields[i] = fmt.Sprintf("InternalServiceError: %v", v.InternalServiceError)
-		i++
-	}
 	if v.DomainExistsError != nil {
 		fields[i] = fmt.Sprintf("DomainExistsError: %v", v.DomainExistsError)
 		i++
 	}
 	if v.ServiceBusyError != nil {
 		fields[i] = fmt.Sprintf("ServiceBusyError: %v", v.ServiceBusyError)
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		fields[i] = fmt.Sprintf("ClientVersionNotSupportedError: %v", v.ClientVersionNotSupportedError)
 		i++
 	}
 
@@ -474,13 +474,13 @@ func (v *WorkflowService_RegisterDomain_Result) Equals(rhs *WorkflowService_Regi
 	if !((v.BadRequestError == nil && rhs.BadRequestError == nil) || (v.BadRequestError != nil && rhs.BadRequestError != nil && v.BadRequestError.Equals(rhs.BadRequestError))) {
 		return false
 	}
-	if !((v.InternalServiceError == nil && rhs.InternalServiceError == nil) || (v.InternalServiceError != nil && rhs.InternalServiceError != nil && v.InternalServiceError.Equals(rhs.InternalServiceError))) {
-		return false
-	}
 	if !((v.DomainExistsError == nil && rhs.DomainExistsError == nil) || (v.DomainExistsError != nil && rhs.DomainExistsError != nil && v.DomainExistsError.Equals(rhs.DomainExistsError))) {
 		return false
 	}
 	if !((v.ServiceBusyError == nil && rhs.ServiceBusyError == nil) || (v.ServiceBusyError != nil && rhs.ServiceBusyError != nil && v.ServiceBusyError.Equals(rhs.ServiceBusyError))) {
+		return false
+	}
+	if !((v.ClientVersionNotSupportedError == nil && rhs.ClientVersionNotSupportedError == nil) || (v.ClientVersionNotSupportedError != nil && rhs.ClientVersionNotSupportedError != nil && v.ClientVersionNotSupportedError.Equals(rhs.ClientVersionNotSupportedError))) {
 		return false
 	}
 

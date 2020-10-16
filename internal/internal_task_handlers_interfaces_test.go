@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,6 +22,8 @@
 package internal
 
 import (
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/tchannel-go/thrift"
@@ -28,7 +31,6 @@ import (
 	m "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"golang.org/x/net/context"
-	"testing"
 )
 
 type (
@@ -44,10 +46,12 @@ type sampleWorkflowTaskHandler struct {
 }
 
 func (wth sampleWorkflowTaskHandler) ProcessWorkflowTask(
-	workflowTask *workflowTask) (interface{}, WorkflowExecutionContext, error) {
+	workflowTask *workflowTask,
+	d decisionHeartbeatFunc,
+) (interface{}, error) {
 	return &m.RespondDecisionTaskCompletedRequest{
 		TaskToken: workflowTask.task.TaskToken,
-	}, nil, nil
+	}, nil
 }
 
 func newSampleWorkflowTaskHandler() *sampleWorkflowTaskHandler {
@@ -93,7 +97,8 @@ func (s *PollLayerInterfacesTestSuite) TearDownTest() {
 }
 
 func (s *PollLayerInterfacesTestSuite) TestProcessWorkflowTaskInterface() {
-	ctx, _ := thrift.NewContext(10)
+	ctx, cancel := thrift.NewContext(10)
+	defer cancel()
 
 	// mocks
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any()).Return(&m.PollForDecisionTaskResponse{}, nil)
@@ -104,7 +109,7 @@ func (s *PollLayerInterfacesTestSuite) TestProcessWorkflowTaskInterface() {
 
 	// Process task and respond to the service.
 	taskHandler := newSampleWorkflowTaskHandler()
-	request, _, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: response})
+	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: response}, nil)
 	completionRequest := request.(*m.RespondDecisionTaskCompletedRequest)
 	s.NoError(err)
 
@@ -113,7 +118,8 @@ func (s *PollLayerInterfacesTestSuite) TestProcessWorkflowTaskInterface() {
 }
 
 func (s *PollLayerInterfacesTestSuite) TestProcessActivityTaskInterface() {
-	ctx, _ := thrift.NewContext(10)
+	ctx, cancel := thrift.NewContext(10)
+	defer cancel()
 
 	// mocks
 	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any()).Return(&m.PollForActivityTaskResponse{}, nil)
@@ -169,7 +175,7 @@ func (s *PollLayerInterfacesTestSuite) TestGetNextDecisions() {
 
 	eh := newHistory(workflowTask, nil)
 
-	events, _, err := eh.NextDecisionEvents()
+	events, _, _, err := eh.NextDecisionEvents()
 
 	s.NoError(err)
 	s.Equal(3, len(events))

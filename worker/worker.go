@@ -1,4 +1,5 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Portions of the Software are attributed to Copyright (c) 2020 Temporal Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,14 +27,135 @@ import (
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/activity"
 	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
 )
 
 type (
-	// Worker represents objects that can be started and stopped.
-	Worker = internal.Worker
+	// Worker hosts workflow and activity implementations.
+	// Use worker.New(...) to create an instance.
+	Worker interface {
+		// RegisterWorkflow - registers a workflow function with the worker.
+		// A workflow takes a workflow.Context and input and returns a (result, error) or just error.
+		// Examples:
+		//	func sampleWorkflow(ctx workflow.Context, input []byte) (result []byte, err error)
+		//	func sampleWorkflow(ctx workflow.Context, arg1 int, arg2 string) (result []byte, err error)
+		//	func sampleWorkflow(ctx workflow.Context) (result []byte, err error)
+		//	func sampleWorkflow(ctx workflow.Context, arg1 int) (result string, err error)
+		// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
+		// For global registration consider workflow.Register
+		// This method panics if workflowFunc doesn't comply with the expected format or tries to register the same workflow
+		RegisterWorkflow(w interface{})
+
+		// RegisterWorkflowWithOptions registers the workflow function with options.
+		// The user can use options to provide an external name for the workflow or leave it empty if no
+		// external name is required. This can be used as
+		//  worker.RegisterWorkflowWithOptions(sampleWorkflow, RegisterWorkflowOptions{})
+		//  worker.RegisterWorkflowWithOptions(sampleWorkflow, RegisterWorkflowOptions{Name: "foo"})
+		// This method panics if workflowFunc doesn't comply with the expected format or tries to register the same workflow
+		// type name twice. Use workflow.RegisterOptions.DisableAlreadyRegisteredCheck to allow multiple registrations.
+		RegisterWorkflowWithOptions(w interface{}, options workflow.RegisterOptions)
+
+		// RegisterActivity - register an activity function or a pointer to a structure with the worker.
+		// An activity function takes a context and input and returns a (result, error) or just error.
+		//
+		// And activity struct is a structure with all its exported methods treated as activities. The default
+		// name of each activity is the method name.
+		//
+		// Examples:
+		//	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
+		//	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error)
+		//	func sampleActivity(ctx context.Context) (err error)
+		//	func sampleActivity() (result string, err error)
+		//	func sampleActivity(arg1 bool) (result int, err error)
+		//	func sampleActivity(arg1 bool) (err error)
+		//
+		//  type Activities struct {
+		//     // fields
+		//  }
+		//  func (a *Activities) SampleActivity1(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error) {
+		//    ...
+		//  }
+		//
+		//  func (a *Activities) SampleActivity2(ctx context.Context, arg1 int, arg2 *customerStruct) (result string, err error) {
+		//    ...
+		//  }
+		//
+		// Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
+		// This method panics if activityFunc doesn't comply with the expected format or an activity with the same
+		// type name is registered more than once.
+		// For global registration consider activity.Register
+		RegisterActivity(a interface{})
+
+		// RegisterActivityWithOptions registers the activity function or struct pointer with options.
+		// The user can use options to provide an external name for the activity or leave it empty if no
+		// external name is required. This can be used as
+		//  worker.RegisterActivityWithOptions(barActivity, RegisterActivityOptions{})
+		//  worker.RegisterActivityWithOptions(barActivity, RegisterActivityOptions{Name: "barExternal"})
+		// When registering the structure that implements activities the name is used as a prefix that is
+		// prepended to the activity method name.
+		//  worker.RegisterActivityWithOptions(&Activities{ ... }, RegisterActivityOptions{Name: "MyActivities_"})
+		// To override each name of activities defined through a structure register the methods one by one:
+		// activities := &Activities{ ... }
+		// worker.RegisterActivityWithOptions(activities.SampleActivity1, RegisterActivityOptions{Name: "Sample1"})
+		// worker.RegisterActivityWithOptions(activities.SampleActivity2, RegisterActivityOptions{Name: "Sample2"})
+		// See RegisterActivity function for more info.
+		// The other use of options is to disable duplicated activity registration check
+		// which might be useful for integration tests.
+		// worker.RegisterActivityWithOptions(barActivity, RegisterActivityOptions{DisableAlreadyRegisteredCheck: true})
+		RegisterActivityWithOptions(a interface{}, options activity.RegisterOptions)
+
+		// Start starts the worker in a non-blocking fashion
+		Start() error
+		// Run is a blocking start and cleans up resources when killed
+		// returns error only if it fails to start the worker
+		Run() error
+		// Stop cleans up any resources opened by worker
+		Stop()
+	}
+
+	// WorkflowReplayer supports replaying a workflow from its event history.
+	// Use for troubleshooting and backwards compatibility unit tests.
+	// For example if a workflow failed in production then its history can be downloaded through UI or CLI
+	// and replayed in a debugger as many times as necessary.
+	// Use this class to create unit tests that check if workflow changes are backwards compatible.
+	// It is important to maintain backwards compatibility through use of workflow.GetVersion
+	// to ensure that new deployments are not going to break open workflows.
+	WorkflowReplayer interface {
+
+		// RegisterWorkflow registers workflow that is going to be replayed
+		RegisterWorkflow(w interface{})
+
+		// RegisterWorkflowWithOptions registers workflow that is going to be replayed with user provided name
+		RegisterWorkflowWithOptions(w interface{}, options workflow.RegisterOptions)
+
+		// ReplayWorkflowHistory executes a single decision task for the given json history file.
+		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+		// The logger is an optional parameter. Defaults to the noop logger.
+		ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error
+
+		// ReplayWorkflowHistoryFromJSONFile executes a single decision task for the json history file downloaded from the cli.
+		// To download the history file: cadence workflow showid <workflow_id> -of <output_filename>
+		// See https://github.com/uber/cadence/blob/master/tools/cli/README.md for full documentation
+		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+		// The logger is an optional parameter. Defaults to the noop logger.
+		ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string) error
+
+		// ReplayPartialWorkflowHistoryFromJSONFile executes a single decision task for the json history file upto provided
+		// lastEventID(inclusive), downloaded from the cli.
+		// To download the history file: cadence workflow showid <workflow_id> -of <output_filename>
+		// See https://github.com/uber/cadence/blob/master/tools/cli/README.md for full documentation
+		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+		// The logger is an optional parameter. Defaults to the noop logger.
+		ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string, lastEventID int64) error
+
+		// ReplayWorkflowExecution loads a workflow execution history from the Cadence service and executes a single decision task for it.
+		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+		// The logger is the only optional parameter. Defaults to the noop logger.
+		ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.Interface, logger *zap.Logger, domain string, execution workflow.Execution) error
+	}
 
 	// Options is used to configure a worker instance.
 	Options = internal.WorkerOptions
@@ -59,11 +181,12 @@ const (
 )
 
 // New creates an instance of worker for managing workflow and activity executions.
-// service 	- thrift connection to the cadence server.
-// domain - the name of the cadence domain.
-// taskList 	- is the task list name you use to identify your client worker, also
-// 		  identifies group of workflow and activity implementations that are hosted by a single worker process.
-// options 	-  configure any worker specific options like logger, metrics, identity.
+//    service  - thrift connection to the cadence server
+//    domain   - the name of the cadence domain
+//    taskList - is the task list name you use to identify your client worker, also
+//               identifies group of workflow and activity implementations that are
+//               hosted by a single worker process
+//    options  - configure any worker specific options like logger, metrics, identity
 func New(
 	service workflowserviceclient.Interface,
 	domain string,
@@ -71,6 +194,11 @@ func New(
 	options Options,
 ) Worker {
 	return internal.NewWorker(service, domain, taskList, options)
+}
+
+// NewWorkflowReplayer creates a WorkflowReplayer instance.
+func NewWorkflowReplayer() WorkflowReplayer {
+	return internal.NewWorkflowReplayer()
 }
 
 // EnableVerboseLogging enable or disable verbose logging of internal Cadence library components.
@@ -96,6 +224,16 @@ func ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string) 
 	return internal.ReplayWorkflowHistoryFromJSONFile(logger, jsonfileName)
 }
 
+// ReplayPartialWorkflowHistoryFromJSONFile executes a single decision task for the json history file upto provided
+//// lastEventID(inclusive), downloaded from the cli.
+// To download the history file: cadence workflow showid <workflow_id> -of <output_filename>
+// See https://github.com/uber/cadence/blob/master/tools/cli/README.md for full documentation
+// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
+// The logger is an optional parameter. Defaults to the noop logger.
+func ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string, lastEventID int64) error {
+	return internal.ReplayPartialWorkflowHistoryFromJSONFile(logger, jsonfileName, lastEventID)
+}
+
 // ReplayWorkflowExecution loads a workflow execution history from the Cadence service and executes a single decision task for it.
 // Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is the only optional parameter. Defaults to the noop logger.
@@ -112,4 +250,14 @@ func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.
 // default size of 10K (might change in future) will be used.
 func SetStickyWorkflowCacheSize(cacheSize int) {
 	internal.SetStickyWorkflowCacheSize(cacheSize)
+}
+
+// SetBinaryChecksum sets the identifier of the binary(aka BinaryChecksum).
+// The identifier is mainly used in recording reset points when respondDecisionTaskCompleted. For each workflow, the very first
+// decision completed by a binary will be associated as a auto-reset point for the binary. So that when a customer wants to
+// mark the binary as bad, the workflow will be reset to that point -- which means workflow will forget all progress generated
+// by the binary.
+// On another hand, once the binary is marked as bad, the bad binary cannot poll decision and make any progress any more.
+func SetBinaryChecksum(checksum string) {
+	internal.SetBinaryChecksum(checksum)
 }

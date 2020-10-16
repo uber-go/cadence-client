@@ -224,10 +224,10 @@ for an activity it invoked.
 		WorkflowID:                   "BID-SIMPLE-CHILD-WORKFLOW",
 		ExecutionStartToCloseTimeout: time.Minute * 30,
 	}
-	ctx = workflow.WithChildWorkflowOptions(ctx, cwo)
+	childCtx = workflow.WithChildOptions(ctx, cwo)
 
 	var result string
-	future := workflow.ExecuteChildWorkflow(ctx, SimpleChildWorkflow, value)
+	future := workflow.ExecuteChildWorkflow(childCtx, SimpleChildWorkflow, value)
 	if err := future.Get(ctx, &result); err != nil {
 		workflow.GetLogger(ctx).Error("SimpleChildWorkflow failed.", zap.Error(err))
 		return err
@@ -261,6 +261,27 @@ are available.
 The workflow.ExecuteChildWorkflow() function is very similar to the workflow.ExecuteActivity() function. All the
 patterns described for using the workflow.ExecuteActivity() apply to the workflow.ExecuteChildWorkflow() function as
 well.
+
+Child workflows can also be configured to continue to exist once their parent workflow is closed. When using this
+pattern, extra care needs to be taken to ensure the child workflow is started before the parent workflow finishes.
+
+	cwo := workflow.ChildWorkflowOptions{
+		// Do not specify WorkflowID if you want cadence to generate a unique ID for child execution
+		WorkflowID:                   "BID-SIMPLE-CHILD-WORKFLOW",
+		ExecutionStartToCloseTimeout: time.Minute * 30,
+
+		// Do not terminate when parent closes.
+		ParentClosePolicy: client.ParentClosePolicyAbandon,
+	}
+	childCtx = workflow.WithChildOptions(ctx, cwo)
+
+	future := workflow.ExecuteChildWorkflow(childCtx, SimpleChildWorkflow, value)
+
+	// Wait for the child workflow to start
+	if err := future.GetChildWorkflowExecution().Get(ctx, nil); err != nil {
+		// Problem starting workflow.
+		return err
+	}
 
 Error Handling
 
@@ -348,7 +369,7 @@ workflow also has the option to stop execution by blocking on a signal channel.
 In the example above, the workflow code uses workflow.GetSignalChannel to open a workflow.Channel for the named signal.
 We then use a workflow.Selector to wait on this channel and process the payload received with the signal.
 
-“ContinueAsNew” Workflow Completion
+ContinueAsNew Workflow Completion
 
 Workflows that need to rerun periodically could naively be implemented as a big for loop with a sleep where the entire
 logic of the workflow is inside the body of the for loop. The problem with this approach is that the history for that
@@ -366,7 +387,7 @@ workflow function should terminate by returning the special ContinueAsNewError e
 
 For a complete example implementing this pattern please refer to the Cron example.
 
-"SideEffect" API
+SideEffect API
 
 workflow.SideEffect executes the provided function once, records its result into the workflow history, and doesn't
 re-execute upon replay. Instead, it returns the recorded result. Use it only for short, nondeterministic code snippets,
@@ -391,7 +412,7 @@ SideEffect function any other way than through its recorded return value.
 		....
 	}
 
-"Query" API
+Query API
 
 A workflow execution could be stuck at some state for longer than expected period. Cadence provide facilities to query
 the current call stack of a workflow execution. You can use cadence-cli to do the query, for example:

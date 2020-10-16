@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2017-2020 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -44,9 +44,6 @@ type (
 	// ChildWorkflowOptions stores all child workflow specific parameters that will be stored inside of a Context.
 	ChildWorkflowOptions = internal.ChildWorkflowOptions
 
-	// ChildWorkflowPolicy defines child workflow behavior when parent workflow is terminated.
-	ChildWorkflowPolicy = internal.ChildWorkflowPolicy
-
 	// RegisterOptions consists of options for registering a workflow
 	RegisterOptions = internal.RegisterWorkflowOptions
 
@@ -54,17 +51,8 @@ type (
 	Info = internal.WorkflowInfo
 )
 
-const (
-	// ChildWorkflowPolicyTerminate is policy that will terminate all child workflows when parent workflow is terminated.
-	ChildWorkflowPolicyTerminate ChildWorkflowPolicy = internal.ChildWorkflowPolicyTerminate
-	// ChildWorkflowPolicyRequestCancel is policy that will send cancel request to all open child workflows when parent
-	// workflow is terminated.
-	ChildWorkflowPolicyRequestCancel ChildWorkflowPolicy = internal.ChildWorkflowPolicyRequestCancel
-	// ChildWorkflowPolicyAbandon is policy that will have no impact to child workflow execution when parent workflow is
-	// terminated.
-	ChildWorkflowPolicyAbandon ChildWorkflowPolicy = internal.ChildWorkflowPolicyAbandon
-)
-
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 // Register - registers a workflow function with the framework.
 // A workflow takes a workflow context and input and returns a (result, error) or just error.
 // Examples:
@@ -78,6 +66,8 @@ func Register(workflowFunc interface{}) {
 	internal.RegisterWorkflow(workflowFunc)
 }
 
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 // RegisterWithOptions registers the workflow function with options
 // The user can use options to provide an external name for the workflow or leave it empty if no
 // external name is required. This can be used as
@@ -124,19 +114,25 @@ func ExecuteActivity(ctx Context, activity interface{}, args ...interface{}) Fut
 
 // ExecuteLocalActivity requests to run a local activity. A local activity is like a regular activity with some key
 // differences:
-// * Local activity is scheduled and run by the workflow worker locally.
-// * Local activity does not need Cadence server to schedule activity task and does not rely on activity worker.
-// * No need to register local activity.
-// * The parameter activity to ExecuteLocalActivity() must be a function.
-// * Local activity is for short living activities (usually finishes within seconds).
-// * Local activity cannot heartbeat.
+//
+// • Local activity is scheduled and run by the workflow worker locally.
+//
+// • Local activity does not need Cadence server to schedule activity task and does not rely on activity worker.
+//
+// • No need to register local activity.
+//
+// • The parameter activity to ExecuteLocalActivity() must be a function.
+//
+// • Local activity is for short living activities (usually finishes within seconds).
+//
+// • Local activity cannot heartbeat.
 //
 // Context can be used to pass the settings for this local activity.
 // For now there is only one setting for timeout to be set:
 //  lao := LocalActivityOptions{
-// 	    ScheduleToCloseTimeout: 5 * time.Second,
-// 	}
-//	ctx := WithLocalActivityOptions(ctx, lao)
+//  	ScheduleToCloseTimeout: 5 * time.Second,
+//  }
+//  ctx := WithLocalActivityOptions(ctx, lao)
 // The timeout here should be relative shorter than the DecisionTaskStartToCloseTimeout of the workflow. If you need a
 // longer timeout, you probably should not use local activity and instead should use regular activity. Local activity is
 // designed to be used for short living activities (usually finishes within seconds).
@@ -420,4 +416,34 @@ func HasLastCompletionResult(ctx Context) bool {
 // See TestWorkflowEnvironment.SetLastCompletionResult() for unit test support.
 func GetLastCompletionResult(ctx Context, d ...interface{}) error {
 	return internal.GetLastCompletionResult(ctx, d...)
+}
+
+// UpsertSearchAttributes is used to add or update workflow search attributes.
+// The search attributes can be used in query of List/Scan/Count workflow APIs.
+// The key and value type must be registered on cadence server side;
+// The value has to deterministic when replay;
+// The value has to be Json serializable.
+// UpsertSearchAttributes will merge attributes to existing map in workflow, for example workflow code:
+//   func MyWorkflow(ctx workflow.Context, input string) error {
+//	   attr1 := map[string]interface{}{
+//		   "CustomIntField": 1,
+//		   "CustomBoolField": true,
+//	   }
+//	   workflow.UpsertSearchAttributes(ctx, attr1)
+//
+//	   attr2 := map[string]interface{}{
+//		   "CustomIntField": 2,
+//		   "CustomKeywordField": "seattle",
+//	   }
+//	   workflow.UpsertSearchAttributes(ctx, attr2)
+//   }
+// will eventually have search attributes:
+//   map[string]interface{}{
+//   	"CustomIntField": 2,
+//   	"CustomBoolField": true,
+//   	"CustomKeywordField": "seattle",
+//   }
+// This is only supported when using ElasticSearch.
+func UpsertSearchAttributes(ctx Context, attributes map[string]interface{}) error {
+	return internal.UpsertSearchAttributes(ctx, attributes)
 }

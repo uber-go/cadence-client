@@ -70,7 +70,12 @@ func isServiceTransientError(err error) bool {
 		*s.DomainAlreadyExistsError,
 		*s.QueryFailedError,
 		*s.DomainNotActiveError,
-		*s.CancellationAlreadyRequestedError:
+		*s.CancellationAlreadyRequestedError,
+		*s.ClientVersionNotSupportedError:
+		return false
+	}
+
+	if err == errShutdown {
 		return false
 	}
 

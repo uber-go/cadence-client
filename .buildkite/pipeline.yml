@@ -1,0 +1,59 @@
+steps:
+  - label: "fossa analyze"
+    agents:
+      queue: "init"
+      docker: "*"
+    command: ".buildkite/scripts/fossa.sh"
+  - label: ":golang: unit-test"
+    agents:
+      queue: "workers"
+      docker: "*"
+    command: "make unit_test"
+    artifact_paths:
+      - ".build/coverage/*.out"
+    plugins:
+      - docker-compose#v3.0.0:
+          run: unit-test
+          config: docker/buildkite/docker-compose.yml
+
+  - label: ":golang: integration-test-sticky-off"
+    agents:
+      queue: "workers"
+      docker: "*"
+    command: "make integ_test_sticky_off"
+    artifact_paths:
+      - ".build/coverage/*.out"
+    retry:
+      automatic:
+        limit: 1
+    plugins:
+      - docker-compose#v3.0.0:
+          run: integ-test
+          config: docker/buildkite/docker-compose.yml
+
+  - label: ":golang: integration-test-sticky-on"
+    agents:
+      queue: "workers"
+      docker: "*"
+    command: "make integ_test_sticky_on"
+    artifact_paths:
+      - ".build/coverage/*.out"
+    retry:
+      automatic:
+        limit: 1
+    plugins:
+      - docker-compose#v3.0.0:
+          run: integ-test
+          config: docker/buildkite/docker-compose.yml
+
+  - wait
+
+  - label: ":golang: code-coverage"
+    agents:
+      queue: "workers"
+      docker: "*"
+    command: ".buildkite/scripts/gocov.sh"
+    plugins:
+      - docker-compose#v3.0.0:
+          run: coverage-report
+          config: docker/buildkite/docker-compose.yml

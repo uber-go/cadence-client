@@ -21,23 +21,15 @@
 // Package encoded contains wrappers that are used for binary payloads deserialization.
 package encoded
 
+import "go.uber.org/cadence/internal"
+
 type (
 
 	// Value is used to encapsulate/extract encoded value from workflow/activity.
-	Value interface {
-		// HasValue return whether there is value encoded.
-		HasValue() bool
-		// Get extract the encoded value into strong typed value pointer.
-		Get(valuePtr interface{}) error
-	}
+	Value = internal.Value
 
 	// Values is used to encapsulate/extract encoded one or more values from workflow/activity.
-	Values interface {
-		// HasValues return whether there are values encoded.
-		HasValues() bool
-		// Get extract the encoded values into strong typed value pointers.
-		Get(valuePtr ...interface{}) error
-	}
+	Values = internal.Values
 
 	// DataConverter is used by the framework to serialize/deserialize input and output of activity/workflow
 	// that need to be sent over the wire.
@@ -49,11 +41,10 @@ type (
 	// and pass that context to ExecuteActivity/ExecuteChildWorkflow calls.
 	// Cadence support using different DataConverters for different activity/childWorkflow in same workflow.
 	//   2. Activity/Workflow worker that run these activity/childWorkflow, through worker.Options.
-	DataConverter interface {
-		// ToData implements conversion of a list of values.
-		ToData(value ...interface{}) ([]byte, error)
-		// FromData implements conversion of an array of values of different types.
-		// Useful for deserializing arguments of function invocations.
-		FromData(input []byte, valuePtr ...interface{}) error
-	}
+	DataConverter = internal.DataConverter
 )
+
+// GetDefaultDataConverter return default data converter used by Cadence worker
+func GetDefaultDataConverter() DataConverter {
+	return internal.DefaultDataConverter
+}

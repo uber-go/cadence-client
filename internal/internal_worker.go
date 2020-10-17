@@ -78,14 +78,15 @@ type (
 	// And worker is mapped 1:1 with task list. If the user want's to poll multiple
 	// task list names they might have to manage 'n' workers for 'n' task lists.
 	workflowWorker struct {
-		executionParameters workerExecutionParameters
-		workflowService     workflowserviceclient.Interface
-		domain              string
-		poller              taskPoller // taskPoller to poll and process the tasks.
-		worker              *baseWorker
-		localActivityWorker *baseWorker
-		identity            string
-		stopC               chan struct{}
+		executionParameters             workerExecutionParameters
+		workflowService                 workflowserviceclient.Interface
+		domain                          string
+		poller                          taskPoller // taskPoller to poll and process the tasks.
+		worker                          *baseWorker
+		localActivityWorker             *baseWorker
+		locallyDispatchedActivityWorker *baseWorker
+		identity                        string
+		stopC                           chan struct{}
 	}
 
 	// ActivityWorker wraps the code for hosting activity types.
@@ -122,11 +123,20 @@ type (
 		// Defines how many concurrent activity executions by this worker.
 		ConcurrentActivityExecutionSize int
 
+		// Defines how many concurrent locally dispatched activity executions by this worker.
+		ConcurrentLocallyDispatchedActivityExecutionSize int
+
 		// Defines rate limiting on number of activity tasks that can be executed per second per worker.
 		WorkerActivitiesPerSecond float64
 
+		// Defines rate limiting on number of locally dispatched tasks that can be executed per second per worker.
+		WorkerLocallyDispatchedActivitiesPerSecond float64
+
 		// MaxConcurrentActivityPollers is the max number of pollers for activity task list
 		MaxConcurrentActivityPollers int
+
+		// MaxConcurrentLocallyDispatchedActivityPollers is the max number of pollers for activity task dispatched locally
+		MaxConcurrentLocallyDispatchedActivityPollers int
 
 		// Defines how many concurrent decision task executions by this worker.
 		ConcurrentDecisionTaskExecutionSize int
@@ -145,6 +155,10 @@ type (
 
 		// TaskListActivitiesPerSecond is the throttling limit for activity tasks controlled by the server
 		TaskListActivitiesPerSecond float64
+
+		// EnableActivityLocalDispatch allows workflow worker to dispatch activity tasks through local tunnel after decisions are made.
+		// This is an performance optimization to skip activity scheduling efforts.
+		EnableActivityLocalDispatch bool
 
 		// User can provide an identity for the debuggability. If not provided the framework has
 		// a default option.
@@ -276,7 +290,7 @@ func newWorkflowWorkerInternal(
 	} else {
 		taskHandler = newWorkflowTaskHandler(domain, params, ppMgr, registry)
 	}
-	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params, workerStopChannel)
+	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params, workerStopChannel, registry)
 }
 
 func newWorkflowTaskWorkerInternal(
@@ -285,6 +299,7 @@ func newWorkflowTaskWorkerInternal(
 	domain string,
 	params workerExecutionParameters,
 	stopC chan struct{},
+	registry *registry,
 ) *workflowWorker {
 	ensureRequiredParams(&params)
 	poller := newWorkflowTaskPoller(
@@ -333,15 +348,37 @@ func newWorkflowTaskWorkerInternal(
 	// 3) the result pushed to laTunnel will be send as task to workflow worker to process.
 	worker.taskQueueCh = laTunnel.resultCh
 
+	var locallyDispatchedActivityWorker *baseWorker
+	if params.EnableActivityLocalDispatch {
+		// ldaTunnel is a one way tunnel to dispatch activity tasks from workflow poller to activity poller
+		ldaTunnel := newLocallyDispatchedActivityTunnel(params.WorkerStopChannel)
+		poller.enableActivityLocalDispatch = true
+		poller.ldaTunnel = ldaTunnel
+		locallyDispatchedActivityTaskPoller := newLocallyDispatchedActivityTaskPoller(service, domain, params, registry, ldaTunnel)
+		locallyDispatchedActivityWorker = newBaseWorker(baseWorkerOptions{
+			pollerCount:       params.MaxConcurrentLocallyDispatchedActivityPollers,
+			maxConcurrentTask: params.ConcurrentLocallyDispatchedActivityExecutionSize,
+			maxTaskPerSecond:  params.WorkerLocallyDispatchedActivitiesPerSecond,
+			taskWorker:        locallyDispatchedActivityTaskPoller,
+			identity:          params.Identity,
+			workerType:        "LocallyDispatchedActivityWorker",
+			shutdownTimeout:   params.WorkerStopTimeout},
+			params.Logger,
+			params.MetricsScope,
+			nil,
+		)
+	}
+
 	return &workflowWorker{
-		executionParameters: params,
-		workflowService:     service,
-		poller:              poller,
-		worker:              worker,
-		localActivityWorker: localActivityWorker,
-		identity:            params.Identity,
-		domain:              domain,
-		stopC:               stopC,
+		executionParameters:             params,
+		workflowService:                 service,
+		poller:                          poller,
+		worker:                          worker,
+		localActivityWorker:             localActivityWorker,
+		locallyDispatchedActivityWorker: locallyDispatchedActivityWorker,
+		identity:                        params.Identity,
+		domain:                          domain,
+		stopC:                           stopC,
 	}
 }
 
@@ -352,6 +389,9 @@ func (ww *workflowWorker) Start() error {
 		return err
 	}
 	ww.localActivityWorker.Start()
+	if ww.locallyDispatchedActivityWorker != nil {
+		ww.locallyDispatchedActivityWorker.Start()
+	}
 	ww.worker.Start()
 	return nil // TODO: propagate error
 }
@@ -362,6 +402,9 @@ func (ww *workflowWorker) Run() error {
 		return err
 	}
 	ww.localActivityWorker.Start()
+	if ww.locallyDispatchedActivityWorker != nil {
+		ww.locallyDispatchedActivityWorker.Start()
+	}
 	ww.worker.Run()
 	return nil
 }
@@ -377,6 +420,9 @@ func (ww *workflowWorker) Stop() {
 
 	// TODO: remove the stop methods in favor of the workerStopChannel
 	ww.localActivityWorker.Stop()
+	if ww.locallyDispatchedActivityWorker != nil {
+		ww.locallyDispatchedActivityWorker.Stop()
+	}
 	ww.worker.Stop()
 }
 
@@ -941,31 +987,36 @@ func newAggregatedWorker(
 	}
 	backgroundActivityContext, backgroundActivityContextCancel := context.WithCancel(ctx)
 
+	// TODO add wOptions for local activity dispatch and use here
 	workerParams := workerExecutionParameters{
-		TaskList:                             taskList,
-		ConcurrentActivityExecutionSize:      wOptions.MaxConcurrentActivityExecutionSize,
-		WorkerActivitiesPerSecond:            wOptions.WorkerActivitiesPerSecond,
-		MaxConcurrentActivityPollers:         wOptions.MaxConcurrentActivityTaskPollers,
-		ConcurrentLocalActivityExecutionSize: wOptions.MaxConcurrentLocalActivityExecutionSize,
-		WorkerLocalActivitiesPerSecond:       wOptions.WorkerLocalActivitiesPerSecond,
-		ConcurrentDecisionTaskExecutionSize:  wOptions.MaxConcurrentDecisionTaskExecutionSize,
-		WorkerDecisionTasksPerSecond:         wOptions.WorkerDecisionTasksPerSecond,
-		MaxConcurrentDecisionPollers:         wOptions.MaxConcurrentDecisionTaskPollers,
-		Identity:                             wOptions.Identity,
-		MetricsScope:                         wOptions.MetricsScope,
-		Logger:                               wOptions.Logger,
-		EnableLoggingInReplay:                wOptions.EnableLoggingInReplay,
-		UserContext:                          backgroundActivityContext,
-		UserContextCancel:                    backgroundActivityContextCancel,
-		DisableStickyExecution:               wOptions.DisableStickyExecution,
-		StickyScheduleToStartTimeout:         wOptions.StickyScheduleToStartTimeout,
-		TaskListActivitiesPerSecond:          wOptions.TaskListActivitiesPerSecond,
-		NonDeterministicWorkflowPolicy:       wOptions.NonDeterministicWorkflowPolicy,
-		DataConverter:                        wOptions.DataConverter,
-		WorkerStopTimeout:                    wOptions.WorkerStopTimeout,
-		ContextPropagators:                   wOptions.ContextPropagators,
-		Tracer:                               wOptions.Tracer,
-		WorkflowInterceptors:                 wOptions.WorkflowInterceptorChainFactories,
+		TaskList:                        taskList,
+		ConcurrentActivityExecutionSize: wOptions.MaxConcurrentActivityExecutionSize,
+		ConcurrentLocallyDispatchedActivityExecutionSize: wOptions.MaxConcurrentActivityExecutionSize,
+		WorkerActivitiesPerSecond:                        wOptions.WorkerActivitiesPerSecond,
+		WorkerLocallyDispatchedActivitiesPerSecond:       wOptions.WorkerActivitiesPerSecond,
+		MaxConcurrentActivityPollers:                     wOptions.MaxConcurrentActivityTaskPollers,
+		MaxConcurrentLocallyDispatchedActivityPollers:    wOptions.MaxConcurrentActivityTaskPollers,
+		ConcurrentLocalActivityExecutionSize:             wOptions.MaxConcurrentLocalActivityExecutionSize,
+		WorkerLocalActivitiesPerSecond:                   wOptions.WorkerLocalActivitiesPerSecond,
+		ConcurrentDecisionTaskExecutionSize:              wOptions.MaxConcurrentDecisionTaskExecutionSize,
+		WorkerDecisionTasksPerSecond:                     wOptions.WorkerDecisionTasksPerSecond,
+		MaxConcurrentDecisionPollers:                     wOptions.MaxConcurrentDecisionTaskPollers,
+		Identity:                                         wOptions.Identity,
+		MetricsScope:                                     wOptions.MetricsScope,
+		Logger:                                           wOptions.Logger,
+		EnableLoggingInReplay:                            wOptions.EnableLoggingInReplay,
+		UserContext:                                      backgroundActivityContext,
+		UserContextCancel:                                backgroundActivityContextCancel,
+		DisableStickyExecution:                           wOptions.DisableStickyExecution,
+		StickyScheduleToStartTimeout:                     wOptions.StickyScheduleToStartTimeout,
+		TaskListActivitiesPerSecond:                      wOptions.TaskListActivitiesPerSecond,
+		EnableActivityLocalDispatch:                      wOptions.EnableActivityLocalDispatch && !wOptions.DisableActivityWorker,
+		NonDeterministicWorkflowPolicy:                   wOptions.NonDeterministicWorkflowPolicy,
+		DataConverter:                                    wOptions.DataConverter,
+		WorkerStopTimeout:                                wOptions.WorkerStopTimeout,
+		ContextPropagators:                               wOptions.ContextPropagators,
+		Tracer:                                           wOptions.Tracer,
+		WorkflowInterceptors:                             wOptions.WorkflowInterceptorChainFactories,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -1142,6 +1193,9 @@ func getReadOnlyChannel(c chan struct{}) <-chan struct{} {
 }
 
 func augmentWorkerOptions(options WorkerOptions) WorkerOptions {
+	if options.MaxConcurrentActivityExecutionSize == 0 {
+		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
+	}
 	if options.MaxConcurrentActivityExecutionSize == 0 {
 		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
 	}

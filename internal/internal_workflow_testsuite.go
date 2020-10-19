@@ -264,8 +264,8 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *regist
 
 	// put current workflow as a running workflow so child can send signal to parent
 	testWorkflowHandle := &testWorkflowHandle{env: env, callback: func(result []byte, err error) {}}
-	if len(env.cronSchedule) > 0 {
-		testWorkflowHandle.params.cronSchedule = env.cronSchedule
+	if env.workflowInfo.CronSchedule != nil && len(*env.workflowInfo.CronSchedule) > 0 {
+		testWorkflowHandle.params.cronSchedule = *env.workflowInfo.CronSchedule
 	}
 	env.runningWorkflows[env.workflowInfo.WorkflowExecution.ID] = testWorkflowHandle
 
@@ -348,7 +348,6 @@ func (env *testWorkflowEnvironmentImpl) setStartTime(startTime time.Time) {
 
 func (env *testWorkflowEnvironmentImpl) setCronSchedule(cronSchedule string) {
 	env.workflowInfo.CronSchedule = &cronSchedule
-	env.cronSchedule = cronSchedule
 }
 
 func (env *testWorkflowEnvironmentImpl) setCronMaxIterationas(cronMaxIterations int) {
@@ -831,7 +830,7 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 	// Only close on:
 	// 1. Child-Workflows
 	// 2. non-cron Workflows
-	if !env.isChildWorkflow() && !env.IsCron() {
+	if env.isChildWorkflow() && !env.IsCron() {
 	  close(env.doneChannel)
 	}
 
@@ -998,7 +997,7 @@ func (env *testWorkflowEnvironmentImpl) GetLogger() *zap.Logger {
 	return env.logger
 }
 
- func (env *testWorkflowEnvironmentImpl) GetMetricsScope() tally.Scope {
+func (env *testWorkflowEnvironmentImpl) GetMetricsScope() tally.Scope {
 	return env.workerOptions.MetricsScope
 }
 

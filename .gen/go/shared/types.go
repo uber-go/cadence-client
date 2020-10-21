@@ -146,7 +146,11 @@ func (v *AccessDeniedError) Error() string {
 }
 
 type ActivityLocalDispatchInfo struct {
-	ActivityId *string `json:"activityId,omitempty"`
+	ActivityId                      *string `json:"activityId,omitempty"`
+	ScheduledTimestamp              *int64  `json:"scheduledTimestamp,omitempty"`
+	StartedTimestamp                *int64  `json:"startedTimestamp,omitempty"`
+	ScheduledTimestampOfThisAttempt *int64  `json:"scheduledTimestampOfThisAttempt,omitempty"`
+	TaskToken                       []byte  `json:"taskToken,omitempty"`
 }
 
 // ToWire translates a ActivityLocalDispatchInfo struct into a Thrift-level intermediate
@@ -166,7 +170,7 @@ type ActivityLocalDispatchInfo struct {
 //   }
 func (v *ActivityLocalDispatchInfo) ToWire() (wire.Value, error) {
 	var (
-		fields [1]wire.Field
+		fields [5]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -178,6 +182,38 @@ func (v *ActivityLocalDispatchInfo) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+	if v.ScheduledTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.ScheduledTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
+	if v.StartedTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.StartedTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+	if v.ScheduledTimestampOfThisAttempt != nil {
+		w, err = wire.NewValueI64(*(v.ScheduledTimestampOfThisAttempt)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.TaskToken != nil {
+		w, err = wire.NewValueBinary(v.TaskToken), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
 
@@ -216,6 +252,44 @@ func (v *ActivityLocalDispatchInfo) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 20:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.ScheduledTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 30:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.StartedTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 40:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.ScheduledTimestampOfThisAttempt = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 50:
+			if field.Value.Type() == wire.TBinary {
+				v.TaskToken, err = field.Value.GetBinary(), error(nil)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -229,10 +303,26 @@ func (v *ActivityLocalDispatchInfo) String() string {
 		return "<nil>"
 	}
 
-	var fields [1]string
+	var fields [5]string
 	i := 0
 	if v.ActivityId != nil {
 		fields[i] = fmt.Sprintf("ActivityId: %v", *(v.ActivityId))
+		i++
+	}
+	if v.ScheduledTimestamp != nil {
+		fields[i] = fmt.Sprintf("ScheduledTimestamp: %v", *(v.ScheduledTimestamp))
+		i++
+	}
+	if v.StartedTimestamp != nil {
+		fields[i] = fmt.Sprintf("StartedTimestamp: %v", *(v.StartedTimestamp))
+		i++
+	}
+	if v.ScheduledTimestampOfThisAttempt != nil {
+		fields[i] = fmt.Sprintf("ScheduledTimestampOfThisAttempt: %v", *(v.ScheduledTimestampOfThisAttempt))
+		i++
+	}
+	if v.TaskToken != nil {
+		fields[i] = fmt.Sprintf("TaskToken: %v", v.TaskToken)
 		i++
 	}
 
@@ -240,6 +330,16 @@ func (v *ActivityLocalDispatchInfo) String() string {
 }
 
 func _String_EqualsPtr(lhs, rhs *string) bool {
+	if lhs != nil && rhs != nil {
+
+		x := *lhs
+		y := *rhs
+		return (x == y)
+	}
+	return lhs == nil && rhs == nil
+}
+
+func _I64_EqualsPtr(lhs, rhs *int64) bool {
 	if lhs != nil && rhs != nil {
 
 		x := *lhs
@@ -257,6 +357,18 @@ func (v *ActivityLocalDispatchInfo) Equals(rhs *ActivityLocalDispatchInfo) bool 
 	if !_String_EqualsPtr(v.ActivityId, rhs.ActivityId) {
 		return false
 	}
+	if !_I64_EqualsPtr(v.ScheduledTimestamp, rhs.ScheduledTimestamp) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.StartedTimestamp, rhs.StartedTimestamp) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.ScheduledTimestampOfThisAttempt, rhs.ScheduledTimestampOfThisAttempt) {
+		return false
+	}
+	if !((v.TaskToken == nil && rhs.TaskToken == nil) || (v.TaskToken != nil && rhs.TaskToken != nil && bytes.Equal(v.TaskToken, rhs.TaskToken))) {
+		return false
+	}
 
 	return true
 }
@@ -266,6 +378,36 @@ func (v *ActivityLocalDispatchInfo) Equals(rhs *ActivityLocalDispatchInfo) bool 
 func (v *ActivityLocalDispatchInfo) GetActivityId() (o string) {
 	if v.ActivityId != nil {
 		return *v.ActivityId
+	}
+
+	return
+}
+
+// GetScheduledTimestamp returns the value of ScheduledTimestamp if it is set or its
+// zero value if it is unset.
+func (v *ActivityLocalDispatchInfo) GetScheduledTimestamp() (o int64) {
+	if v.ScheduledTimestamp != nil {
+		return *v.ScheduledTimestamp
+	}
+
+	return
+}
+
+// GetStartedTimestamp returns the value of StartedTimestamp if it is set or its
+// zero value if it is unset.
+func (v *ActivityLocalDispatchInfo) GetStartedTimestamp() (o int64) {
+	if v.StartedTimestamp != nil {
+		return *v.StartedTimestamp
+	}
+
+	return
+}
+
+// GetScheduledTimestampOfThisAttempt returns the value of ScheduledTimestampOfThisAttempt if it is set or its
+// zero value if it is unset.
+func (v *ActivityLocalDispatchInfo) GetScheduledTimestampOfThisAttempt() (o int64) {
+	if v.ScheduledTimestampOfThisAttempt != nil {
+		return *v.ScheduledTimestampOfThisAttempt
 	}
 
 	return
@@ -386,16 +528,6 @@ func (v *ActivityTaskCancelRequestedEventAttributes) String() string {
 	}
 
 	return fmt.Sprintf("ActivityTaskCancelRequestedEventAttributes{%v}", strings.Join(fields[:i], ", "))
-}
-
-func _I64_EqualsPtr(lhs, rhs *int64) bool {
-	if lhs != nil && rhs != nil {
-
-		x := *lhs
-		y := *rhs
-		return (x == y)
-	}
-	return lhs == nil && rhs == nil
 }
 
 // Equals returns true if all the fields of this ActivityTaskCancelRequestedEventAttributes match the

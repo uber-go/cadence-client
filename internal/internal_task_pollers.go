@@ -66,15 +66,14 @@ type (
 	// workflowTaskPoller implements polling/processing a workflow task
 	workflowTaskPoller struct {
 		basePoller
-		domain                      string
-		taskListName                string
-		identity                    string
-		service                     workflowserviceclient.Interface
-		taskHandler                 WorkflowTaskHandler
-		ldaTunnel                   *locallyDispatchedActivityTunnel
-		enableActivityLocalDispatch bool
-		metricsScope                tally.Scope
-		logger                      *zap.Logger
+		domain       string
+		taskListName string
+		identity     string
+		service      workflowserviceclient.Interface
+		taskHandler  WorkflowTaskHandler
+		ldaTunnel    *locallyDispatchedActivityTunnel
+		metricsScope tally.Scope
+		logger       *zap.Logger
 
 		stickyUUID                   string
 		disableStickyExecution       bool
@@ -97,7 +96,6 @@ type (
 		metricsScope        *metrics.TaggedScope
 		logger              *zap.Logger
 		activitiesPerSecond float64
-		pollFunc            func(ctx context.Context) (interface{}, error)
 		ldaTunnel           *locallyDispatchedActivityTunnel
 	}
 
@@ -147,19 +145,6 @@ type (
 	}
 )
 
-func newLocallyDispatchedActivityTaskPoller(service workflowserviceclient.Interface,
-	domain string, params workerExecutionParameters, registry *registry, ldaTunnel *locallyDispatchedActivityTunnel) *activityTaskPoller {
-	locallyDispatchedActivityTaskPoller := newActivityTaskPoller(
-		newActivityTaskHandler(service, params, registry),
-		service,
-		domain,
-		params,
-	)
-	locallyDispatchedActivityTaskPoller.ldaTunnel = ldaTunnel
-	locallyDispatchedActivityTaskPoller.pollFunc = locallyDispatchedActivityTaskPoller.pollLocallyDispatchedTask
-	return locallyDispatchedActivityTaskPoller
-}
-
 func newLocalActivityTunnel(stopCh <-chan struct{}) *localActivityTunnel {
 	return &localActivityTunnel{
 		taskCh:   make(chan *localActivityTask, 1000),
@@ -186,10 +171,9 @@ func (lat *localActivityTunnel) sendTask(task *localActivityTask) bool {
 	}
 }
 
-func newLocallyDispatchedActivityTunnel(stopCh <-chan struct{}) *locallyDispatchedActivityTunnel {
+func newLocallyDispatchedActivityTunnel() *locallyDispatchedActivityTunnel {
 	return &locallyDispatchedActivityTunnel{
-		taskCh: make(chan *locallyDispatchedActivityTask, 1000),
-		stopCh: stopCh,
+		taskCh: make(chan *locallyDispatchedActivityTask, 5),
 	}
 }
 
@@ -272,9 +256,11 @@ func (bp *basePoller) doPoll(pollFunc func(ctx context.Context) (interface{}, er
 // newWorkflowTaskPoller creates a new workflow task poller which must have a one to one relationship to workflow worker
 func newWorkflowTaskPoller(
 	taskHandler WorkflowTaskHandler,
+	ldaTunnel *locallyDispatchedActivityTunnel,
 	service workflowserviceclient.Interface,
 	domain string,
-	params workerExecutionParameters) *workflowTaskPoller {
+	params workerExecutionParameters,
+) *workflowTaskPoller {
 	return &workflowTaskPoller{
 		basePoller:                   basePoller{shutdownC: params.WorkerStopChannel},
 		service:                      service,
@@ -282,6 +268,7 @@ func newWorkflowTaskPoller(
 		taskListName:                 params.TaskList,
 		identity:                     params.Identity,
 		taskHandler:                  taskHandler,
+		ldaTunnel:                    ldaTunnel,
 		metricsScope:                 params.MetricsScope,
 		logger:                       params.Logger,
 		stickyUUID:                   uuid.New(),
@@ -447,7 +434,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 				}
 
 				var activityTasks []*locallyDispatchedActivityTask
-				if wtp.enableActivityLocalDispatch {
+				if wtp.ldaTunnel != nil {
 					for _, decision := range request.Decisions {
 						attr := decision.ScheduleActivityTaskDecisionAttributes
 						if attr != nil {
@@ -485,12 +472,11 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 				}
 
 				for _, at := range activityTasks {
-					if _, ok := response.ActivitiesToDispatchLocally[*at.ActivityId]; err1 == nil && ok {
-						// TODO get below values from the server response
-						at.ScheduledTimestamp = common.Int64Ptr(time.Now().UnixNano())
-						at.StartedTimestamp = common.Int64Ptr(time.Now().UnixNano())
-						at.ScheduledTimestampOfThisAttempt = common.Int64Ptr(time.Now().UnixNano())
-						at.TaskToken = []byte{}
+					if adl, ok := response.ActivitiesToDispatchLocally[*at.ActivityId]; err1 == nil && ok {
+						at.ScheduledTimestamp = adl.ScheduledTimestamp
+						at.StartedTimestamp = adl.StartedTimestamp
+						at.ScheduledTimestampOfThisAttempt = adl.ScheduledTimestampOfThisAttempt
+						at.TaskToken = adl.TaskToken
 						at.readyCh <- true
 					} else {
 						at.readyCh <- false
@@ -905,7 +891,8 @@ func newGetHistoryPageFunc(
 }
 
 func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserviceclient.Interface,
-	domain string, params workerExecutionParameters) *activityTaskPoller {
+	domain string, params workerExecutionParameters, ldaTunnel *locallyDispatchedActivityTunnel) *activityTaskPoller {
+
 	activityTaskPoller := &activityTaskPoller{
 		basePoller:          basePoller{shutdownC: params.WorkerStopChannel},
 		taskHandler:         taskHandler,
@@ -916,81 +903,112 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserv
 		logger:              params.Logger,
 		metricsScope:        metrics.NewTaggedScope(params.MetricsScope),
 		activitiesPerSecond: params.TaskListActivitiesPerSecond,
+		ldaTunnel:           ldaTunnel,
 	}
-	activityTaskPoller.pollFunc = activityTaskPoller.poll
 	return activityTaskPoller
+}
+
+type PollResult struct {
+	task *activityTask
+	err  error
 }
 
 // Poll for a single activity task from the service
 func (atp *activityTaskPoller) poll(ctx context.Context) (interface{}, error) {
-	startTime := time.Now()
-
-	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
-
-	traceLog(func() {
-		atp.logger.Debug("activityTaskPoller::Poll")
-	})
-	request := &s.PollForActivityTaskRequest{
-		Domain:           common.StringPtr(atp.domain),
-		TaskList:         common.TaskListPtr(s.TaskList{Name: common.StringPtr(atp.taskListName)}),
-		Identity:         common.StringPtr(atp.identity),
-		TaskListMetadata: &s.TaskListMetadata{MaxTasksPerSecond: &atp.activitiesPerSecond},
+	pollFromServerCtx, cancelServerPoll := context.WithCancel(ctx)
+	var result *PollResult
+	// pick the first available poll above, the second one might be lost and so should rely on retry policy
+	select {
+	case result = <-atp.pollLocallyDispatchedTask(ctx):
+		cancelServerPoll()
+	case result = <-atp.pollFromServer(pollFromServerCtx):
 	}
-
-	response, err := atp.service.PollForActivityTask(ctx, request, yarpcCallOptions...)
-	if err != nil {
-		if isServiceTransientError(err) {
-			atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
-		} else {
-			atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
-		}
-		return nil, err
-	}
-	if response == nil || len(response.TaskToken) == 0 {
-		atp.metricsScope.Counter(metrics.ActivityPollNoTaskCounter).Inc(1)
-		return &activityTask{}, nil
-	}
-
-	atp.metricsScope.Counter(metrics.ActivityPollSucceedCounter).Inc(1)
-	atp.metricsScope.Timer(metrics.ActivityPollLatency).Record(time.Now().Sub(startTime))
-
-	scheduledToStartLatency := time.Duration(response.GetStartedTimestamp() - response.GetScheduledTimestampOfThisAttempt())
-	atp.metricsScope.Timer(metrics.ActivityScheduledToStartLatency).Record(scheduledToStartLatency)
-
-	return &activityTask{task: response, pollStartTime: startTime}, nil
+	return result.task, result.err
 }
 
-func (atp *activityTaskPoller) pollLocallyDispatchedTask(ctx context.Context) (interface{}, error) {
-	task := atp.ldaTunnel.getTask()
-	if task == nil {
-		return nil, nil
-	}
+// Poll for a single activity task from the service
+func (atp *activityTaskPoller) pollFromServer(ctx context.Context) <-chan *PollResult {
+	resultCh := make(chan *PollResult, 1)
+	go func() {
+		defer close(resultCh)
+		startTime := time.Now()
 
-	//TODO add metric
+		atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
 
-	response := &s.PollForActivityTaskResponse{}
-	response.ActivityId = task.ActivityId
-	response.ActivityType = task.ActivityType
-	response.Header = task.Header
-	response.Input = task.Input
-	response.WorkflowExecution = task.WorkflowExecution
-	response.ScheduledTimestampOfThisAttempt = task.ScheduledTimestampOfThisAttempt
-	response.ScheduledTimestamp = task.ScheduledTimestamp
-	response.ScheduleToCloseTimeoutSeconds = task.ScheduleToCloseTimeoutSeconds
-	response.StartedTimestamp = task.StartedTimestamp
-	response.StartToCloseTimeoutSeconds = task.StartToCloseTimeoutSeconds
-	response.HeartbeatTimeoutSeconds = task.HeartbeatTimeoutSeconds
-	response.TaskToken = task.TaskToken
-	response.WorkflowType = task.WorkflowType
-	response.WorkflowDomain = task.WorkflowDomain
+		traceLog(func() {
+			atp.logger.Debug("activityTaskPoller::Poll")
+		})
+		request := &s.PollForActivityTaskRequest{
+			Domain:           common.StringPtr(atp.domain),
+			TaskList:         common.TaskListPtr(s.TaskList{Name: common.StringPtr(atp.taskListName)}),
+			Identity:         common.StringPtr(atp.identity),
+			TaskListMetadata: &s.TaskListMetadata{MaxTasksPerSecond: &atp.activitiesPerSecond},
+		}
 
-	return &activityTask{task: response, pollStartTime: time.Now()}, nil
+		response, err := atp.service.PollForActivityTask(ctx, request, yarpcCallOptions...)
+		if err != nil {
+			if isServiceTransientError(err) {
+				atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
+			} else {
+				atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
+			}
+			resultCh <- &PollResult{nil, err}
+			return
+		}
+		if response == nil || len(response.TaskToken) == 0 {
+			atp.metricsScope.Counter(metrics.ActivityPollNoTaskCounter).Inc(1)
+			resultCh <- &PollResult{&activityTask{}, nil}
+			return
+		}
+
+		atp.metricsScope.Counter(metrics.ActivityPollSucceedCounter).Inc(1)
+		atp.metricsScope.Timer(metrics.ActivityPollLatency).Record(time.Now().Sub(startTime))
+
+		scheduledToStartLatency := time.Duration(response.GetStartedTimestamp() - response.GetScheduledTimestampOfThisAttempt())
+		atp.metricsScope.Timer(metrics.ActivityScheduledToStartLatency).Record(scheduledToStartLatency)
+
+		resultCh <- &PollResult{&activityTask{task: response, pollStartTime: startTime}, nil}
+	}()
+	return resultCh
+}
+
+func (atp *activityTaskPoller) pollLocallyDispatchedTask(ctx context.Context) <-chan *PollResult {
+	resultCh := make(chan *PollResult, 1)
+	go func() {
+		defer close(resultCh)
+		startTime := time.Now()
+		task := atp.ldaTunnel.getTask()
+		if task == nil {
+			resultCh <- &PollResult{nil, nil}
+			return
+		}
+
+		//TODO add metric
+
+		response := &s.PollForActivityTaskResponse{}
+		response.ActivityId = task.ActivityId
+		response.ActivityType = task.ActivityType
+		response.Header = task.Header
+		response.Input = task.Input
+		response.WorkflowExecution = task.WorkflowExecution
+		response.ScheduledTimestampOfThisAttempt = task.ScheduledTimestampOfThisAttempt
+		response.ScheduledTimestamp = task.ScheduledTimestamp
+		response.ScheduleToCloseTimeoutSeconds = task.ScheduleToCloseTimeoutSeconds
+		response.StartedTimestamp = task.StartedTimestamp
+		response.StartToCloseTimeoutSeconds = task.StartToCloseTimeoutSeconds
+		response.HeartbeatTimeoutSeconds = task.HeartbeatTimeoutSeconds
+		response.TaskToken = task.TaskToken
+		response.WorkflowType = task.WorkflowType
+		response.WorkflowDomain = task.WorkflowDomain
+		resultCh <- &PollResult{&activityTask{task: response, pollStartTime: startTime}, nil}
+	}()
+	return resultCh
 }
 
 // PollTask polls a new task
 func (atp *activityTaskPoller) PollTask() (interface{}, error) {
 	// Get the task.
-	activityTask, err := atp.doPoll(atp.pollFunc)
+	activityTask, err := atp.doPoll(atp.poll)
 	if err != nil {
 		return nil, err
 	}

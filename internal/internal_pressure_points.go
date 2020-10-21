@@ -70,6 +70,7 @@ func newWorkflowWorkerWithPressurePoints(
 		params,
 		&pressurePointMgrImpl{config: pressurePoints, logger: params.Logger},
 		registry,
+		nil,
 	)
 }
 

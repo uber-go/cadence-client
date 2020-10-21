@@ -146,11 +146,6 @@ type (
 		// default: false
 		DisableActivityWorker bool
 
-		// EnableActivityLocalDispatch allows workflow worker to dispatch activity tasks through local tunnel after decisions are made.
-		// This is an performance optimization to skip activity scheduling efforts.
-		// If it is enabled then DisableActivityWorker option must be false.
-		EnableActivityLocalDispatch bool
-
 		// Optional: Disable sticky execution.
 		// default: false
 		// Sticky Execution is to run the decision tasks for one workflow execution on same worker host. This is an

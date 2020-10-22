@@ -103,7 +103,7 @@ func (s *WorkersTestSuite) TestWorkflowWorker() {
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
-		s.service, domain, executionParameters, nil, overrides, newRegistry(),
+		s.service, domain, executionParameters, nil, overrides, newRegistry(), nil,
 	)
 	workflowWorker.Start()
 	workflowWorker.Stop()
@@ -129,7 +129,7 @@ func (s *WorkersTestSuite) TestActivityWorker() {
 	registry := newRegistry()
 	registry.addActivityWithLock(a.ActivityType().Name, a)
 	activityWorker := newActivityWorker(
-		s.service, domain, executionParameters, overrides, registry, nil,
+		s.service, domain, executionParameters, overrides, registry, nil, nil,
 	)
 	activityWorker.Start()
 	activityWorker.Stop()
@@ -179,7 +179,7 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	registry := newRegistry()
 	registry.addActivityWithLock(a.ActivityType().Name, a)
 	worker := newActivityWorker(
-		s.service, domain, executionParameters, overrides, registry, nil,
+		s.service, domain, executionParameters, overrides, registry, nil, nil,
 	)
 	worker.Start()
 	activityTaskHandler.BlockedOnExecuteCalled()
@@ -207,7 +207,7 @@ func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
-		s.service, domain, executionParameters, nil, overrides, newRegistry(),
+		s.service, domain, executionParameters, nil, overrides, newRegistry(), nil,
 	)
 	workflowWorker.Start()
 	workflowWorker.Stop()

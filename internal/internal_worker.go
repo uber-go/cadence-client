@@ -452,7 +452,9 @@ func newActivityWorker(
 	ldaTunnel *locallyDispatchedActivityTunnel,
 ) *activityWorker {
 	workerStopChannel := make(chan struct{}, 1)
-	ldaTunnel.stopCh = workerStopChannel
+	if ldaTunnel != nil {
+		ldaTunnel.stopCh = workerStopChannel
+	}
 	params.WorkerStopChannel = getReadOnlyChannel(workerStopChannel)
 	ensureRequiredParams(&params)
 

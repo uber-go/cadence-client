@@ -438,7 +438,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 				if wtp.ldaTunnel != nil {
 					for _, decision := range request.Decisions {
 						attr := decision.ScheduleActivityTaskDecisionAttributes
-						if attr != nil {
+						if attr != nil && wtp.taskListName == attr.TaskList.GetName() {
 							// as the regular activity worker must be enabled - assume the activity type is in registry
 							// otherwise the activity would be failed and retried in a regular way
 							activityTask := &locallyDispatchedActivityTask{

@@ -1160,9 +1160,6 @@ func augmentWorkerOptions(options WorkerOptions) WorkerOptions {
 	if options.MaxConcurrentActivityExecutionSize == 0 {
 		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
 	}
-	if options.MaxConcurrentActivityExecutionSize == 0 {
-		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
-	}
 	if options.WorkerActivitiesPerSecond == 0 {
 		options.WorkerActivitiesPerSecond = defaultWorkerActivitiesPerSecond
 	}

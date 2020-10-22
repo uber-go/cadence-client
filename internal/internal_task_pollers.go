@@ -171,9 +171,10 @@ func (lat *localActivityTunnel) sendTask(task *localActivityTask) bool {
 	}
 }
 
-func newLocallyDispatchedActivityTunnel() *locallyDispatchedActivityTunnel {
+func newLocallyDispatchedActivityTunnel(stopCh <-chan struct{}) *locallyDispatchedActivityTunnel {
 	return &locallyDispatchedActivityTunnel{
 		taskCh: make(chan *locallyDispatchedActivityTask, 5),
+		stopCh: stopCh,
 	}
 }
 

@@ -98,6 +98,7 @@ type (
 		worker              *baseWorker
 		identity            string
 		stopC               chan struct{}
+		ldaTunnel           *locallyDispatchedActivityTunnel
 	}
 
 	// sessionWorker wraps the code for hosting session creation, completion and
@@ -403,11 +404,11 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	creationTasklist := getCreationTasklist(params.TaskList)
 	params.UserContext = context.WithValue(params.UserContext, sessionEnvironmentContextKey, sessionEnvironment)
 	params.TaskList = sessionEnvironment.GetResourceSpecificTasklist()
-	activityWorker := newActivityWorker(service, domain, params, overrides, env, nil, nil)
+	activityWorker := newActivityWorker(service, domain, params, overrides, env, nil)
 
 	params.MaxConcurrentActivityPollers = 1
 	params.TaskList = creationTasklist
-	creationWorker := newActivityWorker(service, domain, params, overrides, env, sessionEnvironment.GetTokenBucket(), nil)
+	creationWorker := newActivityWorker(service, domain, params, overrides, env, sessionEnvironment.GetTokenBucket())
 
 	return &sessionWorker{
 		creationWorker: creationWorker,
@@ -449,12 +450,8 @@ func newActivityWorker(
 	overrides *workerOverrides,
 	env *registry,
 	sessionTokenBucket *sessionTokenBucket,
-	ldaTunnel *locallyDispatchedActivityTunnel,
 ) *activityWorker {
 	workerStopChannel := make(chan struct{}, 1)
-	if ldaTunnel != nil {
-		ldaTunnel.stopCh = workerStopChannel
-	}
 	params.WorkerStopChannel = getReadOnlyChannel(workerStopChannel)
 	ensureRequiredParams(&params)
 
@@ -465,7 +462,7 @@ func newActivityWorker(
 	} else {
 		taskHandler = newActivityTaskHandler(service, params, env)
 	}
-	return newActivityTaskWorker(taskHandler, service, domain, params, sessionTokenBucket, workerStopChannel, ldaTunnel)
+	return newActivityTaskWorker(taskHandler, service, domain, params, sessionTokenBucket, workerStopChannel)
 }
 
 func newActivityTaskWorker(
@@ -475,10 +472,9 @@ func newActivityTaskWorker(
 	workerParams workerExecutionParameters,
 	sessionTokenBucket *sessionTokenBucket,
 	stopC chan struct{},
-	ldaTunnel *locallyDispatchedActivityTunnel,
 ) (worker *activityWorker) {
 	ensureRequiredParams(&workerParams)
-
+	ldaTunnel := newLocallyDispatchedActivityTunnel(stopC)
 	poller := newActivityTaskPoller(
 		taskHandler,
 		service,
@@ -511,6 +507,7 @@ func newActivityTaskWorker(
 		identity:            workerParams.Identity,
 		domain:              domain,
 		stopC:               stopC,
+		ldaTunnel:           ldaTunnel,
 	}
 }
 
@@ -1000,7 +997,6 @@ func newAggregatedWorker(
 	var activityWorker *activityWorker
 
 	if !wOptions.DisableActivityWorker {
-		ldaTunnel = newLocallyDispatchedActivityTunnel()
 		activityWorker = newActivityWorker(
 			service,
 			domain,
@@ -1008,8 +1004,8 @@ func newAggregatedWorker(
 			nil,
 			registry,
 			nil,
-			ldaTunnel,
 		)
+		ldaTunnel = activityWorker.ldaTunnel
 	}
 
 	// workflow factory.

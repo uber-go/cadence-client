@@ -25,6 +25,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -175,26 +176,6 @@ func newLocallyDispatchedActivityTunnel(stopCh <-chan struct{}) *locallyDispatch
 	return &locallyDispatchedActivityTunnel{
 		taskCh: make(chan *locallyDispatchedActivityTask, 5),
 		stopCh: stopCh,
-	}
-}
-
-func (ldat *locallyDispatchedActivityTunnel) getTask() *locallyDispatchedActivityTask {
-	var task *locallyDispatchedActivityTask
-	select {
-	case task = <-ldat.taskCh:
-	case <-ldat.stopCh:
-		return nil
-	}
-
-	select {
-	case ready := <-task.readyCh:
-		if ready {
-			return task
-		} else {
-			return nil
-		}
-	case <-ldat.stopCh:
-		return nil
 	}
 }
 
@@ -453,6 +434,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 								HeartbeatTimeoutSeconds:       attr.HeartbeatTimeoutSeconds,
 								WorkflowExecution:             task.WorkflowExecution,
 								WorkflowType:                  task.WorkflowType,
+								StartTime:                     time.Now(),
 							}
 							if !wtp.ldaTunnel.sendTask(activityTask) {
 								// all pollers are busy - no room to optimize the remaining dispatches
@@ -917,14 +899,17 @@ type PollResult struct {
 // Poll for a single activity task from the service
 func (atp *activityTaskPoller) poll(ctx context.Context) (interface{}, error) {
 	pollFromServerCtx, cancelServerPoll := context.WithCancel(ctx)
-	var result *PollResult
-	// pick the first available poll above, the second one might be lost and so should rely on retry policy
+
+	// pick the first available poll above, the server one might be lost and so should rely on retry policy
 	select {
-	case result = <-atp.pollLocallyDispatchedTask(ctx):
+	case localTask := <-atp.ldaTunnel.taskCh:
 		cancelServerPoll()
-	case result = <-atp.pollFromServer(pollFromServerCtx):
+		return atp.handleLocallyDispatchedTask(localTask)
+	case pollResult := <-atp.pollFromServer(pollFromServerCtx):
+		return pollResult.task, pollResult.err
+	case <-atp.shutdownC:
+		return &activityTask{}, nil
 	}
-	return result.task, result.err
 }
 
 // Poll for a single activity task from the service
@@ -973,37 +958,36 @@ func (atp *activityTaskPoller) pollFromServer(ctx context.Context) <-chan *PollR
 	return resultCh
 }
 
-func (atp *activityTaskPoller) pollLocallyDispatchedTask(ctx context.Context) <-chan *PollResult {
-	resultCh := make(chan *PollResult, 1)
-	go func() {
-		defer close(resultCh)
-		startTime := time.Now()
-		task := atp.ldaTunnel.getTask()
-		if task == nil {
-			resultCh <- &PollResult{nil, nil}
-			return
+func (atp *activityTaskPoller) handleLocallyDispatchedTask(task *locallyDispatchedActivityTask) (*activityTask, error) {
+
+	select {
+	case ready := <-task.readyCh:
+		if !ready {
+			return nil, errors.New("the local dispatch request was rejected by the server this time")
 		}
+	case <-atp.shutdownC:
+		return &activityTask{}, nil
+	}
 
-		//TODO add metric
+	//TODO add metric
 
-		response := &s.PollForActivityTaskResponse{}
-		response.ActivityId = task.ActivityId
-		response.ActivityType = task.ActivityType
-		response.Header = task.Header
-		response.Input = task.Input
-		response.WorkflowExecution = task.WorkflowExecution
-		response.ScheduledTimestampOfThisAttempt = task.ScheduledTimestampOfThisAttempt
-		response.ScheduledTimestamp = task.ScheduledTimestamp
-		response.ScheduleToCloseTimeoutSeconds = task.ScheduleToCloseTimeoutSeconds
-		response.StartedTimestamp = task.StartedTimestamp
-		response.StartToCloseTimeoutSeconds = task.StartToCloseTimeoutSeconds
-		response.HeartbeatTimeoutSeconds = task.HeartbeatTimeoutSeconds
-		response.TaskToken = task.TaskToken
-		response.WorkflowType = task.WorkflowType
-		response.WorkflowDomain = task.WorkflowDomain
-		resultCh <- &PollResult{&activityTask{task: response, pollStartTime: startTime}, nil}
-	}()
-	return resultCh
+	response := &s.PollForActivityTaskResponse{}
+	response.ActivityId = task.ActivityId
+	response.ActivityType = task.ActivityType
+	response.Header = task.Header
+	response.Input = task.Input
+	response.WorkflowExecution = task.WorkflowExecution
+	response.ScheduledTimestampOfThisAttempt = task.ScheduledTimestampOfThisAttempt
+	response.ScheduledTimestamp = task.ScheduledTimestamp
+	response.ScheduleToCloseTimeoutSeconds = task.ScheduleToCloseTimeoutSeconds
+	response.StartedTimestamp = task.StartedTimestamp
+	response.StartToCloseTimeoutSeconds = task.StartToCloseTimeoutSeconds
+	response.HeartbeatTimeoutSeconds = task.HeartbeatTimeoutSeconds
+	response.TaskToken = task.TaskToken
+	response.WorkflowType = task.WorkflowType
+	response.WorkflowDomain = task.WorkflowDomain
+	response.Attempt = common.Int32Ptr(0)
+	return &activityTask{task: response, pollStartTime: task.StartTime}, nil
 }
 
 // PollTask polls a new task

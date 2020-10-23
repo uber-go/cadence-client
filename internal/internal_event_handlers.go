@@ -152,6 +152,7 @@ type (
 		WorkflowType                    *shared.WorkflowType
 		WorkflowDomain                  *string
 		Header                          *shared.Header
+		StartTime                       time.Time
 	}
 
 	localActivityMarkerData struct {

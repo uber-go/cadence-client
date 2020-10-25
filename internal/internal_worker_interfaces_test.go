@@ -214,7 +214,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 	}
 
 	// Register activity instances and launch the worker.
-	activityWorker := newActivityWorker(s.service, domain, activityExecutionParameters, nil, registry, nil, nil)
+	activityWorker := newActivityWorker(s.service, domain, activityExecutionParameters, nil, registry, nil)
 	defer activityWorker.Stop()
 	activityWorker.Start()
 

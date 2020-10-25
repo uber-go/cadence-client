@@ -910,7 +910,23 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserv
 }
 
 // Poll for a single activity task from the service
-func (atp *activityTaskPoller) poll(ctx context.Context) (interface{}, error) {
+func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTaskResponse, error) {
+	request := &s.PollForActivityTaskRequest{
+		Domain:           common.StringPtr(atp.domain),
+		TaskList:         common.TaskListPtr(s.TaskList{Name: common.StringPtr(atp.taskListName)}),
+		Identity:         common.StringPtr(atp.identity),
+		TaskListMetadata: &s.TaskListMetadata{MaxTasksPerSecond: &atp.activitiesPerSecond},
+	}
+	return atp.service.PollForActivityTask(ctx, request, yarpcCallOptions...)
+}
+
+func (atp *activityTaskPoller) pollWithMetricsFunc(
+	pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, error)) func(ctx context.Context) (interface{}, error) {
+	return func(ctx context.Context) (interface{}, error) { return atp.pollWithMetrics(ctx, pollFunc) }
+}
+
+func (atp *activityTaskPoller) pollWithMetrics(ctx context.Context,
+	pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, error)) (interface{}, error) {
 	startTime := time.Now()
 
 	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
@@ -918,14 +934,8 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (interface{}, error) {
 	traceLog(func() {
 		atp.logger.Debug("activityTaskPoller::Poll")
 	})
-	request := &s.PollForActivityTaskRequest{
-		Domain:           common.StringPtr(atp.domain),
-		TaskList:         common.TaskListPtr(s.TaskList{Name: common.StringPtr(atp.taskListName)}),
-		Identity:         common.StringPtr(atp.identity),
-		TaskListMetadata: &s.TaskListMetadata{MaxTasksPerSecond: &atp.activitiesPerSecond},
-	}
 
-	response, err := atp.service.PollForActivityTask(ctx, request, yarpcCallOptions...)
+	response, err := pollFunc(ctx)
 	if err != nil {
 		if isServiceTransientError(err) {
 			atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
@@ -951,7 +961,7 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (interface{}, error) {
 // PollTask polls a new task
 func (atp *activityTaskPoller) PollTask() (interface{}, error) {
 	// Get the task.
-	activityTask, err := atp.doPoll(atp.poll)
+	activityTask, err := atp.doPoll(atp.pollWithMetricsFunc(atp.poll))
 	if err != nil {
 		return nil, err
 	}
@@ -1023,7 +1033,7 @@ func newLocallyDispatchedActivityTaskPoller(taskHandler ActivityTaskHandler, ser
 // PollTask polls a new task
 func (atp *locallyDispatchedActivityTaskPoller) PollTask() (interface{}, error) {
 	// Get the task.
-	activityTask, err := atp.doPoll(atp.poll)
+	activityTask, err := atp.doPoll(atp.pollWithMetricsFunc(atp.pollLocallyDispatchedActivity))
 	if err != nil {
 		return nil, err
 	}
@@ -1031,11 +1041,11 @@ func (atp *locallyDispatchedActivityTaskPoller) PollTask() (interface{}, error) 
 	return activityTask, nil
 }
 
-func (atp *locallyDispatchedActivityTaskPoller) poll(ctx context.Context) (interface{}, error) {
-	startTime := time.Now()
+func (atp *locallyDispatchedActivityTaskPoller) pollLocallyDispatchedActivity(ctx context.Context) (*s.PollForActivityTaskResponse, error) {
+
 	task := atp.ldaTunnel.getTask()
 	if task == nil {
-		return &activityTask{}, nil
+		return nil, nil
 	}
 
 	//TODO add metric
@@ -1056,7 +1066,7 @@ func (atp *locallyDispatchedActivityTaskPoller) poll(ctx context.Context) (inter
 	response.WorkflowType = task.WorkflowType
 	response.WorkflowDomain = task.WorkflowDomain
 	response.Attempt = common.Int32Ptr(0)
-	return &activityTask{task: response, pollStartTime: startTime}, nil
+	return response, nil
 }
 
 func reportActivityComplete(ctx context.Context, service workflowserviceclient.Interface, request interface{}, metricsScope tally.Scope) error {

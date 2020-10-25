@@ -912,7 +912,9 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserv
 // Poll for a single activity task from the service
 func (atp *activityTaskPoller) poll(ctx context.Context) (interface{}, error) {
 	startTime := time.Now()
+
 	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
+
 	traceLog(func() {
 		atp.logger.Debug("activityTaskPoller::Poll")
 	})
@@ -922,6 +924,7 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (interface{}, error) {
 		Identity:         common.StringPtr(atp.identity),
 		TaskListMetadata: &s.TaskListMetadata{MaxTasksPerSecond: &atp.activitiesPerSecond},
 	}
+
 	response, err := atp.service.PollForActivityTask(ctx, request, yarpcCallOptions...)
 	if err != nil {
 		if isServiceTransientError(err) {
@@ -935,10 +938,13 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (interface{}, error) {
 		atp.metricsScope.Counter(metrics.ActivityPollNoTaskCounter).Inc(1)
 		return &activityTask{}, nil
 	}
+
 	atp.metricsScope.Counter(metrics.ActivityPollSucceedCounter).Inc(1)
 	atp.metricsScope.Timer(metrics.ActivityPollLatency).Record(time.Now().Sub(startTime))
+
 	scheduledToStartLatency := time.Duration(response.GetStartedTimestamp() - response.GetScheduledTimestampOfThisAttempt())
 	atp.metricsScope.Timer(metrics.ActivityScheduledToStartLatency).Record(scheduledToStartLatency)
+
 	return &activityTask{task: response, pollStartTime: startTime}, nil
 }
 

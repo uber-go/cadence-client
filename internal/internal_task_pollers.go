@@ -1042,14 +1042,13 @@ func (atp *locallyDispatchedActivityTaskPoller) PollTask() (interface{}, error) 
 }
 
 func (atp *locallyDispatchedActivityTaskPoller) pollLocallyDispatchedActivity(ctx context.Context) (*s.PollForActivityTaskResponse, error) {
-
 	task := atp.ldaTunnel.getTask()
+	atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollCounter).Inc(1)
 	if task == nil {
+		atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollNoTaskCounter).Inc(1)
 		return nil, nil
 	}
-
-	//TODO add metric
-
+	atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollSucceedCounter).Inc(1)
 	response := &s.PollForActivityTaskResponse{}
 	response.ActivityId = task.ActivityId
 	response.ActivityType = task.ActivityType

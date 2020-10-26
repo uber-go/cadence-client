@@ -79,6 +79,8 @@ const (
 	LocallyDispatchedActivityPollCounter        = CadenceMetricsPrefix + "locally-dispatched-activity-poll-total"
 	LocallyDispatchedActivityPollNoTaskCounter  = CadenceMetricsPrefix + "locally-dispatched-activity-poll-no-task"
 	LocallyDispatchedActivityPollSucceedCounter = CadenceMetricsPrefix + "locally-dispatched-activity-poll-succeed"
+	ActivityLocalDispatchFailedCounter          = CadenceMetricsPrefix + "activity-local-dispatch-failed"
+	ActivityLocalDispatchSucceedCounter         = CadenceMetricsPrefix + "activity-local-dispatch-succeed"
 	WorkerPanicCounter                          = CadenceMetricsPrefix + "worker-panic"
 
 	UnhandledSignalsCounter = CadenceMetricsPrefix + "unhandled-signals"

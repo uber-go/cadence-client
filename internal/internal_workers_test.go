@@ -235,7 +235,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 	isWorkflowCompleted := false
 	longDecisionWorkflowFn := func(ctx Context, input []byte) error {
 		lao := LocalActivityOptions{
-			ScheduleToCloseTimeout: time.Second * 10,
+			ScheduleToCloseTimeout: time.Second * 2,
 		}
 		ctx = WithLocalActivityOptions(ctx, lao)
 		err := ExecuteLocalActivity(ctx, localActivitySleep, time.Second).Get(ctx, nil)
@@ -351,7 +351,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 	select {
 	case <-doneCh:
 		break
-	case <-time.After(time.Second * 10):
+	case <-time.After(time.Second * 4):
 	}
 	worker.Stop()
 

@@ -368,7 +368,13 @@ func (ww *workflowWorker) Run() error {
 
 // Shutdown the worker.
 func (ww *workflowWorker) Stop() {
-	close(ww.stopC)
+	select {
+	case <-ww.stopC:
+		// channel is already closed
+	default:
+		close(ww.stopC)
+	}
+
 	// TODO: remove the stop methods in favor of the workerStopChannel
 	ww.localActivityWorker.Stop()
 	ww.worker.Stop()
@@ -520,7 +526,13 @@ func (aw *activityWorker) Run() error {
 
 // Shutdown the worker.
 func (aw *activityWorker) Stop() {
-	close(aw.stopC)
+	select {
+	case <-aw.stopC:
+		// channel is already closed
+	default:
+		close(aw.stopC)
+	}
+
 	aw.worker.Stop()
 }
 
@@ -783,28 +795,34 @@ func (aw *aggregatedWorker) Start() error {
 		return fmt.Errorf("failed to get executable checksum: %v", err)
 	}
 
+	workerStarted := false
+
 	if !isInterfaceNil(aw.workflowWorker) {
 		if len(aw.registry.getRegisteredWorkflowTypes()) == 0 {
-			aw.logger.Warn(
-				"Starting worker without any workflows. Workflows must be registered before start.",
+			aw.logger.Info(
+				"Worker has no workflows registered. Workflows must be registered before start. Skipping",
 			)
+		} else {
+			if err := aw.workflowWorker.Start(); err != nil {
+				return err
+			}
 		}
-		if err := aw.workflowWorker.Start(); err != nil {
-			return err
-		}
+		workerStarted = true
 	}
 	if !isInterfaceNil(aw.activityWorker) {
 		if len(aw.registry.getRegisteredActivities()) == 0 {
-			aw.logger.Warn(
-				"Starting worker without any activities. Activities must be registered before start.",
+			aw.logger.Info(
+				"Worker has no activities registered. Activities must be registered before start. Skipping.",
 			)
-		}
-		if err := aw.activityWorker.Start(); err != nil {
-			// stop workflow worker.
-			if !isInterfaceNil(aw.workflowWorker) {
-				aw.workflowWorker.Stop()
+		} else {
+			if err := aw.activityWorker.Start(); err != nil {
+				// stop workflow worker.
+				if !isInterfaceNil(aw.workflowWorker) {
+					aw.workflowWorker.Stop()
+				}
+				return err
 			}
-			return err
+			workerStarted = true
 		}
 	}
 
@@ -821,7 +839,10 @@ func (aw *aggregatedWorker) Start() error {
 		}
 	}
 
-	aw.logger.Info("Started Worker")
+	if workerStarted {
+		aw.logger.Info("Started Worker")
+	}
+
 	return nil
 }
 

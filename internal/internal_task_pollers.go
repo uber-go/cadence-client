@@ -443,8 +443,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 					for _, decision := range request.Decisions {
 						attr := decision.ScheduleActivityTaskDecisionAttributes
 						if attr != nil && wtp.taskListName == attr.TaskList.GetName() {
-							// as the regular activity worker must be enabled - assume the activity type is in registry
-							// otherwise the activity would be failed and retried from server
+							// assume the activity type is in registry otherwise the activity would be failed and retried from server
 							activityTask := &locallyDispatchedActivityTask{
 								readyCh:                       make(chan bool),
 								ActivityId:                    attr.ActivityId,

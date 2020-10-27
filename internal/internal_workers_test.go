@@ -23,6 +23,7 @@ package internal
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -517,7 +518,7 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 			StartToCloseTimeout:    1 * time.Second,
 		}
 		ctx = WithActivityOptions(ctx, ao)
-		err := ExecuteActivity(ctx, activitySleep, time.Millisecond*500).Get(ctx, nil)
+		err := ExecuteActivity(ctx, activitySleep, 500*time.Millisecond).Get(ctx, nil)
 		return err
 	}
 
@@ -561,16 +562,15 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 	) (success *m.RespondDecisionTaskCompletedResponse, err error) {
 		s.Equal(1, len(request.Decisions))
 		activitiesToDispatchLocally := make(map[string]*m.ActivityLocalDispatchInfo)
-		for _, d := range request.Decisions {
-			s.Equal(m.DecisionTypeScheduleActivityTask, d.GetDecisionType())
-			activitiesToDispatchLocally[*d.ScheduleActivityTaskDecisionAttributes.ActivityId] =
-				&m.ActivityLocalDispatchInfo{
-					ActivityId:                      d.ScheduleActivityTaskDecisionAttributes.ActivityId,
-					ScheduledTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
-					ScheduledTimestampOfThisAttempt: common.Int64Ptr(time.Now().UnixNano()),
-					StartedTimestamp:                common.Int64Ptr(time.Now().UnixNano()),
-					TaskToken:                       []byte("test-token")}
-		}
+		d := request.Decisions[0]
+		s.Equal(m.DecisionTypeScheduleActivityTask, d.GetDecisionType())
+		activitiesToDispatchLocally[*d.ScheduleActivityTaskDecisionAttributes.ActivityId] =
+			&m.ActivityLocalDispatchInfo{
+				ActivityId:                      d.ScheduleActivityTaskDecisionAttributes.ActivityId,
+				ScheduledTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
+				ScheduledTimestampOfThisAttempt: common.Int64Ptr(time.Now().UnixNano()),
+				StartedTimestamp:                common.Int64Ptr(time.Now().UnixNano()),
+				TaskToken:                       []byte("test-token")}
 		return &m.RespondDecisionTaskCompletedResponse{ActivitiesToDispatchLocally: activitiesToDispatchLocally}, nil
 	}).Times(1)
 	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(ctx context.Context, request *m.RespondActivityTaskCompletedRequest, opts ...yarpc.CallOption,
@@ -596,7 +596,7 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 	select {
 	case <-doneCh:
 		break
-	case <-time.After(time.Second * 3):
+	case <-time.After(3 * time.Second):
 	}
 	worker.Stop()
 
@@ -605,16 +605,17 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 }
 
 func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
-	activityCalledCount := 0
+	var activityCalledCount uint32 = 0
 	activitySleep := func(duration time.Duration) error {
 		time.Sleep(duration)
-		activityCalledCount++
+		atomic.AddUint32(&activityCalledCount, 1)
+		//activityCalledCount++
 		return nil
 	}
 
 	doneCh := make(chan struct{})
 
-	activityCount := 5
+	var activityCount uint32 = 5
 	workflowFn := func(ctx Context, input []byte) error {
 		ao := ActivityOptions{
 			ScheduleToCloseTimeout: 1 * time.Second,
@@ -622,10 +623,10 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 			StartToCloseTimeout:    1 * time.Second,
 		}
 		ctx = WithActivityOptions(ctx, ao)
-		for i := 1; i < activityCount; i++ {
-			ExecuteActivity(ctx, activitySleep, time.Millisecond*500)
+		for i := 1; i < int(activityCount); i++ {
+			ExecuteActivity(ctx, activitySleep, 500*time.Millisecond)
 		}
-		ExecuteActivity(ctx, activitySleep, time.Millisecond*500).Get(ctx, nil)
+		ExecuteActivity(ctx, activitySleep, 500*time.Millisecond).Get(ctx, nil)
 		return nil
 	}
 
@@ -667,7 +668,7 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil).AnyTimes()
 	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(ctx context.Context, request *m.RespondDecisionTaskCompletedRequest, opts ...yarpc.CallOption,
 	) (success *m.RespondDecisionTaskCompletedResponse, err error) {
-		s.Equal(activityCount, len(request.Decisions))
+		s.Equal(int(activityCount), len(request.Decisions))
 		activitiesToDispatchLocally := make(map[string]*m.ActivityLocalDispatchInfo)
 		for _, d := range request.Decisions {
 			s.Equal(m.DecisionTypeScheduleActivityTask, d.GetDecisionType())
@@ -681,17 +682,17 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 		}
 		return &m.RespondDecisionTaskCompletedResponse{ActivitiesToDispatchLocally: activitiesToDispatchLocally}, nil
 	}).Times(1)
-	activityResponseCompletedCount := 0
+	var activityResponseCompletedCount uint32 = 0
 	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(ctx context.Context, request *m.RespondActivityTaskCompletedRequest, opts ...yarpc.CallOption,
 	) error {
 		defer func() {
-			if activityResponseCompletedCount == activityCount {
+			if atomic.LoadUint32(&activityResponseCompletedCount) == activityCount {
 				close(doneCh)
 			}
 		}()
-		activityResponseCompletedCount++
+		atomic.AddUint32(&activityResponseCompletedCount, 1)
 		return nil
-	}).Times(activityCount)
+	}).Times(int(activityCount))
 
 	options := WorkerOptions{
 		Logger:   zap.NewNop(),
@@ -709,7 +710,7 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 	select {
 	case <-doneCh:
 		break
-	case <-time.After(time.Second * 5):
+	case <-time.After(5 * time.Second):
 	}
 	worker.Stop()
 

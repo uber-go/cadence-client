@@ -921,8 +921,10 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTask
 	return atp.service.PollForActivityTask(ctx, request, yarpcCallOptions...)
 }
 
+type pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, error)
+
 func (atp *activityTaskPoller) pollWithMetricsFunc(
-	pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, error)) func(ctx context.Context) (interface{}, error) {
+	pollFunc pollFunc) func(ctx context.Context) (interface{}, error) {
 	return func(ctx context.Context) (interface{}, error) { return atp.pollWithMetrics(ctx, pollFunc) }
 }
 

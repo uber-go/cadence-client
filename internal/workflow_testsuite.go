@@ -447,6 +447,23 @@ func (t *TestWorkflowEnvironment) SetWorkflowTimeout(executionTimeout time.Durat
 	return t
 }
 
+// SetWorkflowCronSchedule sets the Cron schedule for this tested workflow.
+// The first execution of the workflow will not adhere to the Cron schedule and will start executing immediately.
+// Consecutive iterations will follow the specified schedule.
+// Use SetWorkflowCronMaxIterations() to enforce a limit on the number of consecutive iterations after the initial
+// execution.
+func (t *TestWorkflowEnvironment) SetWorkflowCronSchedule(cron string) *TestWorkflowEnvironment {
+	t.impl.setCronSchedule(cron)
+	return t
+}
+
+// SetWorkflowCronMaxIterations sets the a limit on the number of Cron iterations, not including the first one
+// of the tested workflow.
+func (t *TestWorkflowEnvironment) SetWorkflowCronMaxIterations(maxIterations int) *TestWorkflowEnvironment {
+	t.impl.setCronMaxIterationas(maxIterations )
+	return t
+}
+
 // SetOnActivityStartedListener sets a listener that will be called before activity starts execution.
 // Note: ActivityInfo is defined in internal package, use public type activity.Info instead.
 func (t *TestWorkflowEnvironment) SetOnActivityStartedListener(

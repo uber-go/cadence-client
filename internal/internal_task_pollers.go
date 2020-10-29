@@ -445,7 +445,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 						if attr != nil && wtp.taskListName == attr.TaskList.GetName() {
 							// assume the activity type is in registry otherwise the activity would be failed and retried from server
 							activityTask := &locallyDispatchedActivityTask{
-								readyCh:                       make(chan bool),
+								readyCh:                       make(chan bool, 1),
 								ActivityId:                    attr.ActivityId,
 								ActivityType:                  attr.ActivityType,
 								Input:                         attr.Input,

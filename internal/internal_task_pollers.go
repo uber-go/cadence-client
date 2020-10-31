@@ -912,13 +912,34 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserv
 
 // Poll for a single activity task from the service
 func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTaskResponse, error) {
+
+	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
+
+	traceLog(func() {
+		atp.logger.Debug("activityTaskPoller::Poll")
+	})
 	request := &s.PollForActivityTaskRequest{
 		Domain:           common.StringPtr(atp.domain),
 		TaskList:         common.TaskListPtr(s.TaskList{Name: common.StringPtr(atp.taskListName)}),
 		Identity:         common.StringPtr(atp.identity),
 		TaskListMetadata: &s.TaskListMetadata{MaxTasksPerSecond: &atp.activitiesPerSecond},
 	}
-	return atp.service.PollForActivityTask(ctx, request, yarpcCallOptions...)
+	response, err := atp.service.PollForActivityTask(ctx, request, yarpcCallOptions...)
+
+	if err != nil {
+		if isServiceTransientError(err) {
+			atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
+		} else {
+			atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
+		}
+		return nil, err
+	}
+	if response == nil || len(response.TaskToken) == 0 {
+		atp.metricsScope.Counter(metrics.ActivityPollNoTaskCounter).Inc(1)
+		return nil, nil
+	}
+
+	return response, err
 }
 
 type pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, error)
@@ -932,23 +953,9 @@ func (atp *activityTaskPoller) pollWithMetrics(ctx context.Context,
 	pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, error)) (interface{}, error) {
 	startTime := time.Now()
 
-	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
-
-	traceLog(func() {
-		atp.logger.Debug("activityTaskPoller::Poll")
-	})
-
-	response, err := pollFunc(ctx)
-	if err != nil {
-		if isServiceTransientError(err) {
-			atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
-		} else {
-			atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
-		}
-		return nil, err
-	}
+	// for now error is handled separately by specific poll func
+	response, _ := pollFunc(ctx)
 	if response == nil || len(response.TaskToken) == 0 {
-		atp.metricsScope.Counter(metrics.ActivityPollNoTaskCounter).Inc(1)
 		return &activityTask{}, nil
 	}
 
@@ -1051,6 +1058,8 @@ func (atp *locallyDispatchedActivityTaskPoller) pollLocallyDispatchedActivity(ct
 		atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollNoTaskCounter).Inc(1)
 		return nil, nil
 	}
+	// update total poll counter if optimization succeeded only, to be backwards compatible
+	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
 	atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollSucceedCounter).Inc(1)
 	response := &s.PollForActivityTaskResponse{}
 	response.ActivityId = task.ActivityId

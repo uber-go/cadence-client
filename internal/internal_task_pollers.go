@@ -145,8 +145,9 @@ type (
 	}
 
 	locallyDispatchedActivityTunnel struct {
-		taskCh chan *locallyDispatchedActivityTask
-		stopCh <-chan struct{}
+		taskCh       chan *locallyDispatchedActivityTask
+		stopCh       <-chan struct{}
+		metricsScope *metrics.TaggedScope
 	}
 )
 
@@ -191,11 +192,15 @@ func (ldat *locallyDispatchedActivityTunnel) getTask() *locallyDispatchedActivit
 		return nil
 	}
 
+	ldat.metricsScope.Counter("cadence-" + "locally-dispatched-activity-getTask-total").Inc(1)
+
 	select {
 	case ready := <-task.readyCh:
 		if ready {
+			ldat.metricsScope.Counter("cadence-" + "locally-dispatched-activity-readyCh-true-total").Inc(1)
 			return task
 		} else {
+			ldat.metricsScope.Counter("cadence-" + "locally-dispatched-activity-readyCh-false-total").Inc(1)
 			return nil
 		}
 	case <-ldat.stopCh:
@@ -953,10 +958,12 @@ func (atp *activityTaskPoller) pollWithMetrics(ctx context.Context,
 	pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, error)) (interface{}, error) {
 	startTime := time.Now()
 
-	// for now error is handled separately by specific poll func
-	response, _ := pollFunc(ctx)
+	response, err := pollFunc(ctx)
 	if response == nil || len(response.TaskToken) == 0 {
 		return &activityTask{}, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	atp.metricsScope.Counter(metrics.ActivityPollSucceedCounter).Inc(1)
@@ -1058,7 +1065,7 @@ func (atp *locallyDispatchedActivityTaskPoller) pollLocallyDispatchedActivity(ct
 		atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollNoTaskCounter).Inc(1)
 		return nil, nil
 	}
-	// update total poll counter if optimization succeeded only, to be backwards compatible
+	// to be backwards compatible, update total poll counter if optimization succeeded only
 	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
 	atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollSucceedCounter).Inc(1)
 	response := &s.PollForActivityTaskResponse{}

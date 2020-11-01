@@ -1044,6 +1044,7 @@ func newAggregatedWorker(
 				nil,
 			)
 			ldaTunnel = locallyDispatchedActivityWorker.poller.(*locallyDispatchedActivityTaskPoller).ldaTunnel
+			ldaTunnel.metricsScope = metrics.NewTaggedScope(workerParams.MetricsScope)
 		}
 	}
 

@@ -193,15 +193,11 @@ func (ldat *locallyDispatchedActivityTunnel) getTask() *locallyDispatchedActivit
 		return nil
 	}
 
-	ldat.metricsScope.Counter("cadence-" + "locally-dispatched-activity-getTask-total").Inc(1)
-
 	select {
 	case ready := <-task.readyCh:
 		if ready {
-			ldat.metricsScope.Counter("cadence-" + "locally-dispatched-activity-readyCh-true-total").Inc(1)
 			return task
 		} else {
-			ldat.metricsScope.Counter("cadence-" + "locally-dispatched-activity-readyCh-false-total").Inc(1)
 			return nil
 		}
 	case <-ldat.stopCh:

@@ -467,7 +467,7 @@ func newActivityWorker(
 	pollerCount := params.MaxConcurrentActivityPollers
 	if overrides != nil && overrides.useLocallyDispatchedActivityPoller {
 		// consider to move the tunnel taskChSize to the worker options in the future
-		taskChSize := 15
+		taskChSize := 10
 		// set pollerCount close to the queue size to keep high rate
 		pollerCount = taskChSize
 		taskPoller = newLocallyDispatchedActivityTaskPoller(taskHandler, service, domain, params, taskChSize)

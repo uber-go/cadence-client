@@ -178,9 +178,9 @@ func (lat *localActivityTunnel) sendTask(task *localActivityTask) bool {
 	}
 }
 
-func newLocallyDispatchedActivityTunnel(stopCh <-chan struct{}) *locallyDispatchedActivityTunnel {
+func newLocallyDispatchedActivityTunnel(stopCh <-chan struct{}, taskChSize int) *locallyDispatchedActivityTunnel {
 	return &locallyDispatchedActivityTunnel{
-		taskCh: make(chan *locallyDispatchedActivityTask, 25),
+		taskCh: make(chan *locallyDispatchedActivityTask, taskChSize),
 		stopCh: stopCh,
 	}
 }
@@ -1035,11 +1035,10 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 }
 
 func newLocallyDispatchedActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserviceclient.Interface,
-	domain string, params workerExecutionParameters) *locallyDispatchedActivityTaskPoller {
-
+	domain string, params workerExecutionParameters, taskChSize int) *locallyDispatchedActivityTaskPoller {
 	locallyDispatchedActivityTaskPoller := &locallyDispatchedActivityTaskPoller{
 		activityTaskPoller: *newActivityTaskPoller(taskHandler, service, domain, params),
-		ldaTunnel:          newLocallyDispatchedActivityTunnel(params.WorkerStopChannel),
+		ldaTunnel:          newLocallyDispatchedActivityTunnel(params.WorkerStopChannel, taskChSize),
 	}
 	return locallyDispatchedActivityTaskPoller
 }

@@ -25,7 +25,6 @@ package internal
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -1059,7 +1058,7 @@ func (atp *locallyDispatchedActivityTaskPoller) pollLocallyDispatchedActivity(ct
 	atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollCounter).Inc(1)
 	if task == nil {
 		atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollNoTaskCounter).Inc(1)
-		return nil, errors.New("activity was not dispatched locally")
+		return nil, nil
 	}
 	// to be backwards compatible, update total poll counter if optimization succeeded only
 	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)

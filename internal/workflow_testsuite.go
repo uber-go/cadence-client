@@ -179,10 +179,12 @@ func (t *TestActivityEnvironment) SetWorkerStopChannel(c chan struct{}) {
 	t.impl.setWorkerStopChannel(c)
 }
 
+// RegisterWorkflow register workflows
 func (t *TestWorkflowEnvironment) RegisterWorkflow(w interface{}) {
 	t.impl.RegisterWorkflow(w)
 }
 
+// RegisterWorkflowWithOptions register workflows
 func (t *TestWorkflowEnvironment) RegisterWorkflowWithOptions(w interface{}, options RegisterWorkflowOptions) {
 	if len(t.ExpectedCalls) > 0 {
 		panic("RegisterWorkflow calls cannot follow mock related ones like OnWorkflow or similar")
@@ -190,10 +192,12 @@ func (t *TestWorkflowEnvironment) RegisterWorkflowWithOptions(w interface{}, opt
 	t.impl.RegisterWorkflowWithOptions(w, options)
 }
 
+// RegisterActivity registers activity
 func (t *TestWorkflowEnvironment) RegisterActivity(a interface{}) {
 	t.impl.RegisterActivity(a)
 }
 
+// RegisterActivityWithOptions registers activity
 func (t *TestWorkflowEnvironment) RegisterActivityWithOptions(a interface{}, options RegisterActivityOptions) {
 	if len(t.ExpectedCalls) > 0 {
 		panic("RegisterActivity calls cannot follow mock related ones like OnActivity or similar")

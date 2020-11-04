@@ -460,7 +460,7 @@ func (t *TestWorkflowEnvironment) SetWorkflowCronSchedule(cron string) *TestWork
 // SetWorkflowCronMaxIterations sets the a limit on the number of Cron iterations, not including the first one
 // of the tested workflow.
 func (t *TestWorkflowEnvironment) SetWorkflowCronMaxIterations(maxIterations int) *TestWorkflowEnvironment {
-	t.impl.setCronMaxIterationas(maxIterations )
+	t.impl.setCronMaxIterationas(maxIterations)
 	return t
 }
 

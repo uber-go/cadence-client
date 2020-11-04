@@ -773,6 +773,26 @@ func (wc *workflowClient) CountWorkflow(ctx context.Context, request *s.CountWor
 	return response, nil
 }
 
+// ResetWorkflow implementation
+func (wc *workflowClient) ResetWorkflow(ctx context.Context, request *s.ResetWorkflowExecutionRequest) (*s.ResetWorkflowExecutionResponse, error) {
+	if len(request.GetDomain()) == 0 {
+		request.Domain = common.StringPtr(wc.domain)
+	}
+	var response *s.ResetWorkflowExecutionResponse
+	err := backoff.Retry(ctx,
+		func() error {
+			var err1 error
+			tchCtx, cancel, opt := newChannelContext(ctx)
+			defer cancel()
+			response, err1 = wc.workflowService.ResetWorkflowExecution(tchCtx, request, opt...)
+			return err1
+		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 // GetSearchAttributes implementation
 func (wc *workflowClient) GetSearchAttributes(ctx context.Context) (*s.GetSearchAttributesResponse, error) {
 	var response *s.GetSearchAttributesResponse

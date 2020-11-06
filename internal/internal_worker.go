@@ -464,13 +464,8 @@ func newActivityWorker(
 	}
 	// Get an activity task poller.
 	var taskPoller taskPoller
-	pollerCount := params.MaxConcurrentActivityPollers
 	if overrides != nil && overrides.useLocallyDispatchedActivityPoller {
-		// consider to move the tunnel taskChSize to the worker options in the future
-		taskChSize := 10
-		// set pollerCount close to the queue size to keep high rate
-		pollerCount = taskChSize
-		taskPoller = newLocallyDispatchedActivityTaskPoller(taskHandler, service, domain, params, taskChSize)
+		taskPoller = newLocallyDispatchedActivityTaskPoller(taskHandler, service, domain, params)
 		workerType = "LocallyDispatchedActivityWorker"
 	} else {
 		taskPoller = newActivityTaskPoller(
@@ -480,7 +475,7 @@ func newActivityWorker(
 			params,
 		)
 	}
-	return newActivityTaskWorker(service, domain, params, sessionTokenBucket, workerStopChannel, taskPoller, workerType, pollerCount)
+	return newActivityTaskWorker(service, domain, params, sessionTokenBucket, workerStopChannel, taskPoller, workerType)
 }
 
 func newActivityTaskWorker(
@@ -491,12 +486,11 @@ func newActivityTaskWorker(
 	stopC chan struct{},
 	poller taskPoller,
 	workerType string,
-	pollerCount int,
 ) (worker *activityWorker) {
 	ensureRequiredParams(&workerParams)
 	base := newBaseWorker(
 		baseWorkerOptions{
-			pollerCount:       pollerCount,
+			pollerCount:       workerParams.MaxConcurrentActivityPollers,
 			pollerRate:        defaultPollerRate,
 			maxConcurrentTask: workerParams.ConcurrentActivityExecutionSize,
 			maxTaskPerSecond:  workerParams.WorkerActivitiesPerSecond,

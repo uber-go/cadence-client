@@ -177,9 +177,9 @@ func (lat *localActivityTunnel) sendTask(task *localActivityTask) bool {
 	}
 }
 
-func newLocallyDispatchedActivityTunnel(stopCh <-chan struct{}, taskChSize int) *locallyDispatchedActivityTunnel {
+func newLocallyDispatchedActivityTunnel(stopCh <-chan struct{}) *locallyDispatchedActivityTunnel {
 	return &locallyDispatchedActivityTunnel{
-		taskCh: make(chan *locallyDispatchedActivityTask, taskChSize),
+		taskCh: make(chan *locallyDispatchedActivityTask),
 		stopCh: stopCh,
 	}
 }
@@ -469,22 +469,26 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 						}
 					}
 				}
+				defer func() {
+					for _, at := range activityTasks {
+						started := false
+						if response != nil && err1 == nil {
+							if adl, ok := response.ActivitiesToDispatchLocally[*at.ActivityId]; ok {
+								at.ScheduledTimestamp = adl.ScheduledTimestamp
+								at.StartedTimestamp = adl.StartedTimestamp
+								at.ScheduledTimestampOfThisAttempt = adl.ScheduledTimestampOfThisAttempt
+								at.TaskToken = adl.TaskToken
+								started = true
+							}
+						}
+						at.readyCh <- started
+					}
+				}()
 				response, err1 = wtp.service.RespondDecisionTaskCompleted(tchCtx, request, opt...)
 				if err1 != nil {
 					traceLog(func() {
 						wtp.logger.Debug("RespondDecisionTaskCompleted failed.", zap.Error(err1))
 					})
-				}
-				for _, at := range activityTasks {
-					if adl, ok := response.ActivitiesToDispatchLocally[*at.ActivityId]; err1 == nil && ok {
-						at.ScheduledTimestamp = adl.ScheduledTimestamp
-						at.StartedTimestamp = adl.StartedTimestamp
-						at.ScheduledTimestampOfThisAttempt = adl.ScheduledTimestampOfThisAttempt
-						at.TaskToken = adl.TaskToken
-						at.readyCh <- true
-					} else {
-						at.readyCh <- false
-					}
 				}
 
 			case *s.RespondQueryTaskCompletedRequest:
@@ -1034,10 +1038,10 @@ func (atp *activityTaskPoller) ProcessTask(task interface{}) error {
 }
 
 func newLocallyDispatchedActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserviceclient.Interface,
-	domain string, params workerExecutionParameters, taskChSize int) *locallyDispatchedActivityTaskPoller {
+	domain string, params workerExecutionParameters) *locallyDispatchedActivityTaskPoller {
 	locallyDispatchedActivityTaskPoller := &locallyDispatchedActivityTaskPoller{
 		activityTaskPoller: *newActivityTaskPoller(taskHandler, service, domain, params),
-		ldaTunnel:          newLocallyDispatchedActivityTunnel(params.WorkerStopChannel, taskChSize),
+		ldaTunnel:          newLocallyDispatchedActivityTunnel(params.WorkerStopChannel),
 	}
 	return locallyDispatchedActivityTaskPoller
 }

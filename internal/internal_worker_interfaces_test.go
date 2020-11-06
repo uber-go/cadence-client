@@ -200,7 +200,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 
 	registry := newRegistry()
 	// Launch worker.
-	workflowWorker := newWorkflowWorker(s.service, domain, workflowExecutionParameters, nil, registry)
+	workflowWorker := newWorkflowWorker(s.service, domain, workflowExecutionParameters, nil, registry, nil)
 	defer workflowWorker.Stop()
 	workflowWorker.Start()
 

@@ -805,24 +805,22 @@ func (aw *aggregatedWorker) Start() error {
 		return fmt.Errorf("failed to get executable checksum: %v", err)
 	}
 
-	workerStarted := false
-
 	if !isInterfaceNil(aw.workflowWorker) {
 		if len(aw.registry.getRegisteredWorkflowTypes()) == 0 {
 			aw.logger.Info(
-				"Worker has no workflows registered. Workflows must be registered before start. Skipping",
+				"Worker has no workflows registered, so workflow worker will not be started.",
 			)
 		} else {
 			if err := aw.workflowWorker.Start(); err != nil {
 				return err
 			}
 		}
-		workerStarted = true
+		aw.logger.Info("Started Workflow Worker")
 	}
 	if !isInterfaceNil(aw.activityWorker) {
 		if len(aw.registry.getRegisteredActivities()) == 0 {
 			aw.logger.Info(
-				"Worker has no activities registered. Activities must be registered before start. Skipping.",
+				"Worker has no activities registered, so activity worker will not be started.",
 			)
 		} else {
 			if err := aw.activityWorker.Start(); err != nil {
@@ -842,7 +840,7 @@ func (aw *aggregatedWorker) Start() error {
 					return err
 				}
 			}
-			workerStarted = true
+			aw.logger.Info("Started Activity Worker")
 		}
 	}
 
@@ -860,10 +858,6 @@ func (aw *aggregatedWorker) Start() error {
 			}
 			return err
 		}
-	}
-
-	if workerStarted {
-		aw.logger.Info("Started Worker")
 	}
 
 	return nil

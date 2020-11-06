@@ -596,7 +596,7 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 	select {
 	case <-doneCh:
 		break
-	case <-time.After(3 * time.Second):
+	case <-time.After(1 * time.Second):
 	}
 	worker.Stop()
 
@@ -609,7 +609,6 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 	activitySleep := func(duration time.Duration) error {
 		time.Sleep(duration)
 		atomic.AddUint32(&activityCalledCount, 1)
-		//activityCalledCount++
 		return nil
 	}
 
@@ -646,6 +645,11 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 		},
 		createTestEventDecisionTaskScheduled(2, &m.DecisionTaskScheduledEventAttributes{TaskList: &m.TaskList{Name: &taskList}}),
 		createTestEventDecisionTaskStarted(3),
+	}
+
+	options := WorkerOptions{
+		Logger:   zap.NewNop(),
+		Identity: "test-worker-identity",
 	}
 
 	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil).AnyTimes()
@@ -692,28 +696,26 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 		}()
 		atomic.AddUint32(&activityResponseCompletedCount, 1)
 		return nil
-	}).Times(int(activityCount))
+	}).MinTimes(1)
 
-	options := WorkerOptions{
-		Logger:   zap.NewNop(),
-		Identity: "test-worker-identity",
-	}
 	worker := newAggregatedWorker(s.service, domain, taskList, options)
 	worker.RegisterWorkflowWithOptions(
 		workflowFn,
 		RegisterWorkflowOptions{Name: workflowType},
 	)
 	worker.RegisterActivityWithOptions(activitySleep, RegisterActivityOptions{Name: "activitySleep"})
-
+	s.NotNil(worker.locallyDispatchedActivityWorker)
 	worker.Start()
+
 	// wait for test to complete
 	select {
 	case <-doneCh:
 		break
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 	}
 	worker.Stop()
 
-	s.Equal(activityCount, activityResponseCompletedCount)
-	s.Equal(activityCount, activityCalledCount)
+	// for currently unbuffered channel at least one activity should be sent
+	s.True(activityResponseCompletedCount > 0)
+	s.True(activityCalledCount > 0)
 }

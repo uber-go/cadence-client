@@ -98,7 +98,6 @@ type (
 		worker              *baseWorker
 		identity            string
 		stopC               chan struct{}
-		ldaTunnel           *locallyDispatchedActivityTunnel
 	}
 
 	// sessionWorker wraps the code for hosting session creation, completion and

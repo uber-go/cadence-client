@@ -458,14 +458,14 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 								WorkflowExecution:             task.WorkflowExecution,
 								WorkflowType:                  task.WorkflowType,
 							}
-							if !wtp.ldaTunnel.sendTask(activityTask) {
-								// all pollers are busy - no room to optimize the remaining dispatches
+							if wtp.ldaTunnel.sendTask(activityTask) {
+								wtp.metricsScope.Counter(metrics.ActivityLocalDispatchSucceedCounter).Inc(1)
+								decision.ScheduleActivityTaskDecisionAttributes.RequestLocalDispatch = common.BoolPtr(true)
+								activityTasks = append(activityTasks, activityTask)
+							} else {
+								// all pollers are busy - no room to optimize
 								wtp.metricsScope.Counter(metrics.ActivityLocalDispatchFailedCounter).Inc(1)
-								break
 							}
-							wtp.metricsScope.Counter(metrics.ActivityLocalDispatchSucceedCounter).Inc(1)
-							decision.ScheduleActivityTaskDecisionAttributes.RequestLocalDispatch = common.BoolPtr(true)
-							activityTasks = append(activityTasks, activityTask)
 						}
 					}
 				}

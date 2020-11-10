@@ -23,7 +23,6 @@ package internal
 
 import (
 	"context"
-	"go.uber.org/cadence/worker"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -247,7 +246,7 @@ func NewWorker(
 	domain string,
 	taskList string,
 	options WorkerOptions,
-) worker.Worker {
+) *aggregatedWorker {
 	return newAggregatedWorker(service, domain, taskList, options)
 }
 

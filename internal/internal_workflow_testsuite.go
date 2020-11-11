@@ -432,6 +432,9 @@ func (env *testWorkflowEnvironmentImpl) setWorkerOptions(options WorkerOptions) 
 	if len(options.ContextPropagators) > 0 {
 		env.workerOptions.ContextPropagators = options.ContextPropagators
 	}
+	if options.Logger != nil {
+		env.workerOptions.Logger = options.Logger
+	}
 	env.workflowInterceptors = options.WorkflowInterceptorChainFactories
 }
 

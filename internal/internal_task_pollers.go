@@ -916,9 +916,10 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserv
 }
 
 // Poll for a single activity task from the service
-func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTaskResponse, error) {
+func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTaskResponse, time.Time, error) {
 
 	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
+	startTime := time.Now()
 
 	traceLog(func() {
 		atp.logger.Debug("activityTaskPoller::Poll")
@@ -937,17 +938,17 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTask
 		} else {
 			atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
 		}
-		return nil, err
+		return nil, startTime, err
 	}
 	if response == nil || len(response.TaskToken) == 0 {
 		atp.metricsScope.Counter(metrics.ActivityPollNoTaskCounter).Inc(1)
-		return nil, nil
+		return nil, startTime, nil
 	}
 
-	return response, err
+	return response, startTime, err
 }
 
-type pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, error)
+type pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, time.Time, error)
 
 func (atp *activityTaskPoller) pollWithMetricsFunc(
 	pollFunc pollFunc) func(ctx context.Context) (interface{}, error) {
@@ -955,10 +956,9 @@ func (atp *activityTaskPoller) pollWithMetricsFunc(
 }
 
 func (atp *activityTaskPoller) pollWithMetrics(ctx context.Context,
-	pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, error)) (interface{}, error) {
-	startTime := time.Now()
+	pollFunc func(ctx context.Context) (*s.PollForActivityTaskResponse, time.Time, error)) (interface{}, error) {
 
-	response, err := pollFunc(ctx)
+	response, startTime, err := pollFunc(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1057,12 +1057,13 @@ func (atp *locallyDispatchedActivityTaskPoller) PollTask() (interface{}, error) 
 	return activityTask, nil
 }
 
-func (atp *locallyDispatchedActivityTaskPoller) pollLocallyDispatchedActivity(ctx context.Context) (*s.PollForActivityTaskResponse, error) {
+func (atp *locallyDispatchedActivityTaskPoller) pollLocallyDispatchedActivity(ctx context.Context) (*s.PollForActivityTaskResponse, time.Time, error) {
 	task := atp.ldaTunnel.getTask()
 	atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollCounter).Inc(1)
+	startTime := time.Now()
 	if task == nil {
 		atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollNoTaskCounter).Inc(1)
-		return nil, nil
+		return nil, startTime, nil
 	}
 	// to be backwards compatible, update total poll counter if optimization succeeded only
 	atp.metricsScope.Counter(metrics.ActivityPollCounter).Inc(1)
@@ -1083,7 +1084,7 @@ func (atp *locallyDispatchedActivityTaskPoller) pollLocallyDispatchedActivity(ct
 	response.WorkflowType = task.WorkflowType
 	response.WorkflowDomain = task.WorkflowDomain
 	response.Attempt = common.Int32Ptr(0)
-	return response, nil
+	return response, startTime, nil
 }
 
 func reportActivityComplete(ctx context.Context, service workflowserviceclient.Interface, request interface{}, metricsScope tally.Scope) error {

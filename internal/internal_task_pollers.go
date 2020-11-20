@@ -1060,6 +1060,7 @@ func (atp *locallyDispatchedActivityTaskPoller) PollTask() (interface{}, error) 
 func (atp *locallyDispatchedActivityTaskPoller) pollLocallyDispatchedActivity(ctx context.Context) (*s.PollForActivityTaskResponse, time.Time, error) {
 	task := atp.ldaTunnel.getTask()
 	atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollCounter).Inc(1)
+	// consider to remove the poll latency metric for local dispatch as unnecessary
 	startTime := time.Now()
 	if task == nil {
 		atp.metricsScope.Counter(metrics.LocallyDispatchedActivityPollNoTaskCounter).Inc(1)

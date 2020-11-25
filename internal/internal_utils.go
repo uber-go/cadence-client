@@ -140,7 +140,6 @@ func newChannelContextHelper(ctx context.Context, isQuery bool, options ...func(
 	return ctx, cancelFn, yarpcCallOptions
 }
 
-
 // GetWorkerIdentity gets a default identity for the worker.
 func getWorkerIdentity(tasklistName string) string {
 	return fmt.Sprintf("%d@%s@%s", os.Getpid(), getHostName(), tasklistName)

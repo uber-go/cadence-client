@@ -154,7 +154,7 @@ type (
 		onTimerFiredListener             func(timerID string)
 		onTimerCancelledListener         func(timerID string)
 
-		cronMaxIterations  int
+		cronMaxIterations int
 	}
 
 	// testWorkflowEnvironmentImpl is the environment that runs the workflow/activity unit tests.
@@ -186,10 +186,9 @@ type (
 		workerStopChannel  chan struct{}
 		sessionEnvironment *testSessionEnvironmentImpl
 
-		cronSchedule       string
-		cronIterations     int
-		workflowInput      []byte
-
+		cronSchedule   string
+		cronIterations int
+		workflowInput  []byte
 	}
 
 	testSessionEnvironmentImpl struct {
@@ -831,7 +830,7 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 	// 1. Child-Workflows
 	// 2. non-cron Workflows
 	if env.isChildWorkflow() && !env.IsCron() {
-	  close(env.doneChannel)
+		close(env.doneChannel)
 	}
 
 	if env.isChildWorkflow() {
@@ -955,7 +954,7 @@ func (h *testWorkflowHandle) rerun(asChild bool) bool {
 						// Use the existing headers and input
 						env.workflowDef.Execute(env, env.header, env.workflowInput)
 						env.startDecisionTask()
-					}, backoff - backoff)
+					}, backoff-backoff)
 					return true
 				}
 			}
@@ -1395,8 +1394,9 @@ func (w *workflowExecutorWrapper) Execute(ctx Context, input []byte) (result []b
 	// the main loop, but the mock could block if it is configured to wait. So we need to use a separate goroutinue to
 	// run the mock, and resume after mock call returns.
 	mockReadyChannel := NewChannel(ctx)
-	// make a copy of the context for getMockReturn() call to avoid race condition
-	ctxCopy := newWorkflowContext(w.env, nil, nil)
+	// make a copy of the context for getMockReturn() call to avoid race condition.
+	interceptors, envInterceptor := newWorkflowInterceptors(env, env.GetWorkflowInterceptors())
+	ctxCopy := newWorkflowContext(w.env, interceptors, envInterceptor)
 	go func() {
 		// getMockReturn could block if mock is configured to wait. The returned mockRet is what has been configured
 		// for the mock by using MockCallWrapper.Return(). The mockRet could be mock values or mock function. We process

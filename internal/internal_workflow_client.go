@@ -935,7 +935,7 @@ func (wc *workflowClient) QueryWorkflowWithOptions(ctx context.Context, request 
 	var resp *s.QueryWorkflowResponse
 	err := backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContextForQuery(ctx)
 			defer cancel()
 			var err error
 			resp, err = wc.workflowService.QueryWorkflow(tchCtx, req, opt...)

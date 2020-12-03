@@ -61,6 +61,8 @@ const (
 	minRPCTimeout = 1 * time.Second
 	//maxRPCTimeout is maximum rpc call timeout allowed
 	maxRPCTimeout = 5 * time.Second
+	// maxQueryRPCTimeout is the maximum rpc call timeout allowed for query
+	maxQueryRPCTimeout = 20 * time.Second
 )
 
 var (
@@ -99,8 +101,17 @@ func chanTimeout(timeout time.Duration) func(builder *contextBuilder) {
 	}
 }
 
+// newChannelContext - Get a rpc channel context for query
+func newChannelContextForQuery(ctx context.Context, options ...func(builder *contextBuilder)) (context.Context, context.CancelFunc, []yarpc.CallOption) {
+	return newChannelContextHelper(ctx, true, options...)
+}
+
 // newChannelContext - Get a rpc channel context
 func newChannelContext(ctx context.Context, options ...func(builder *contextBuilder)) (context.Context, context.CancelFunc, []yarpc.CallOption) {
+	return newChannelContextHelper(ctx, false, options...)
+}
+
+func newChannelContextHelper(ctx context.Context, isQuery bool, options ...func(builder *contextBuilder)) (context.Context, context.CancelFunc, []yarpc.CallOption) {
 	rpcTimeout := defaultRPCTimeout
 	if ctx != nil {
 		// Set rpc timeout less than context timeout to allow for retries when call gets lost
@@ -110,8 +121,10 @@ func newChannelContext(ctx context.Context, options ...func(builder *contextBuil
 			// Make sure to not set rpc timeout lower than minRPCTimeout
 			if rpcTimeout < minRPCTimeout {
 				rpcTimeout = minRPCTimeout
-			} else if rpcTimeout > maxRPCTimeout {
+			} else if rpcTimeout > maxRPCTimeout && !isQuery {
 				rpcTimeout = maxRPCTimeout
+			} else if rpcTimeout > maxQueryRPCTimeout && isQuery {
+				rpcTimeout = maxQueryRPCTimeout
 			}
 		}
 	}

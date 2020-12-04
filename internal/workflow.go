@@ -245,8 +245,6 @@ type RegisterWorkflowOptions struct {
 	DisableAlreadyRegisteredCheck bool
 }
 
-// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // RegisterWorkflow - registers a workflow function with the framework.
 // The public form is: workflow.Register(...)
 // A workflow takes a cadence context and input and returns a (result, error) or just error.
@@ -257,12 +255,12 @@ type RegisterWorkflowOptions struct {
 //	func sampleWorkflow(ctx workflow.Context, arg1 int) (result string, err error)
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 // This method calls panic if workflowFunc doesn't comply with the expected format.
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func RegisterWorkflow(workflowFunc interface{}) {
 	RegisterWorkflowWithOptions(workflowFunc, RegisterWorkflowOptions{})
 }
 
-// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // RegisterWorkflowWithOptions registers the workflow function with options.
 // The public form is: workflow.RegisterWithOptions(...)
 // The user can use options to provide an external name for the workflow or leave it empty if no
@@ -278,6 +276,8 @@ func RegisterWorkflow(workflowFunc interface{}) {
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 // This method calls panic if workflowFunc doesn't comply with the expected format or tries to register the same workflow
 // type name twice. Use workflow.RegisterOptions.DisableAlreadyRegisteredCheck to allow multiple registrations.
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func RegisterWorkflowWithOptions(workflowFunc interface{}, opts RegisterWorkflowOptions) {
 	registry := getGlobalRegistry()
 	registry.RegisterWorkflowWithOptions(workflowFunc, opts)
@@ -756,6 +756,7 @@ type WorkflowInfo struct {
 	RetryPolicy                         *s.RetryPolicy
 }
 
+// GetBinaryChecksum returns the binary checksum(identifier) of this worker
 func (wInfo *WorkflowInfo) GetBinaryChecksum() string {
 	if wInfo.BinaryChecksum == nil {
 		return getBinaryChecksum()

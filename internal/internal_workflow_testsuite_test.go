@@ -2796,8 +2796,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowAlreadyRunning() {
 	s.Equal("heartbeat_child1 ", result)
 }
 
-func (s *WorkflowTestSuiteUnitTest) Test_CronWorkflow() {
-
+func (s *WorkflowTestSuiteUnitTest) Test_CronChildWorkflow() {
 	failedCount, successCount, lastCompletionResult := 0, 0, 0
 	cronWorkflow := func(ctx Context) (int, error) {
 		info := GetWorkflowInfo(ctx)
@@ -2859,6 +2858,35 @@ func (s *WorkflowTestSuiteUnitTest) Test_CronWorkflow() {
 	s.Equal(4, failedCount)
 	s.Equal(4, successCount)
 	s.Equal(4, lastCompletionResult)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_CronWorkflow() {
+	var totalRuns int
+	cronWorkflow := func(ctx Context) (int, error) {
+		var result int
+		if HasLastCompletionResult(ctx) {
+			GetLastCompletionResult(ctx, &result)
+		}
+		Sleep(ctx, time.Second*3)
+		result++
+		return result, nil
+	}
+
+	env := s.NewTestWorkflowEnvironment()
+	env.SetWorkflowCronSchedule("0 * * * *") // hourly)
+	env.SetWorkflowCronMaxIterations(1)
+	env.RegisterWorkflow(cronWorkflow)
+
+	startTime, _ := time.Parse(time.RFC3339, "2018-12-20T16:30:00+08:00")
+	env.SetStartTime(startTime)
+	env.ExecuteWorkflow(cronWorkflow)
+
+	env.GetWorkflowResult(&totalRuns)
+	s.True(env.IsWorkflowCompleted())
+	err := env.GetWorkflowError()
+	s.NoError(err)
+
+	s.Equal(2, totalRuns)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_CronHasLastResult() {

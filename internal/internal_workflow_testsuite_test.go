@@ -2804,7 +2804,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CronChildWorkflow() {
 		if HasLastCompletionResult(ctx) {
 			GetLastCompletionResult(ctx, &result)
 		}
-		Sleep(ctx, time.Second * 3)
+		Sleep(ctx, time.Second*3)
 		if info.Attempt == 0 {
 			failedCount++
 			return 0, errors.New("please-retry")
@@ -2831,7 +2831,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CronChildWorkflow() {
 
 		cronFuture := ExecuteChildWorkflow(ctx1, cronWorkflow) // cron never stop so this future won't return
 
-		timeoutTimer := NewTimer(ctx, time.Hour * 3)
+		timeoutTimer := NewTimer(ctx, time.Hour*3)
 		selector := NewSelector(ctx)
 		var err error
 		selector.AddFuture(cronFuture, func(f Future) {
@@ -2867,7 +2867,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CronWorkflow() {
 		if HasLastCompletionResult(ctx) {
 			GetLastCompletionResult(ctx, &result)
 		}
-		Sleep(ctx, time.Second * 3)
+		Sleep(ctx, time.Second*3)
 		result++
 		return result, nil
 	}

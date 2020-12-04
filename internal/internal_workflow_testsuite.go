@@ -154,7 +154,7 @@ type (
 		onTimerFiredListener             func(timerID string)
 		onTimerCancelledListener         func(timerID string)
 
-		cronMaxIterations  int
+		cronMaxIterations int
 	}
 
 	// testWorkflowEnvironmentImpl is the environment that runs the workflow/activity unit tests.
@@ -186,10 +186,9 @@ type (
 		workerStopChannel  chan struct{}
 		sessionEnvironment *testSessionEnvironmentImpl
 
-		cronSchedule       string
-		cronIterations     int
-		workflowInput      []byte
-
+		cronSchedule   string
+		cronIterations int
+		workflowInput  []byte
 	}
 
 	testSessionEnvironmentImpl struct {
@@ -831,7 +830,7 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 	// 1. Child-Workflows
 	// 2. non-cron Workflows
 	if env.isChildWorkflow() && !env.IsCron() {
-	  close(env.doneChannel)
+		close(env.doneChannel)
 	}
 
 	if env.isChildWorkflow() {
@@ -919,7 +918,7 @@ func (h *testWorkflowHandle) rerun(asChild bool) bool {
 				workflowNow := env.Now().In(time.UTC)
 				backoff := schedule.Next(workflowNow).Sub(workflowNow)
 				if backoff > 0 {
-					env.cronIterations += 1
+					env.cronIterations++
 					delete(env.runningWorkflows, env.workflowInfo.WorkflowExecution.ID)
 					params.attempt = 0
 					params.scheduledTime = env.Now()
@@ -943,7 +942,7 @@ func (h *testWorkflowHandle) rerun(asChild bool) bool {
 				workflowNow := env.Now().In(time.UTC)
 				backoff := schedule.Next(workflowNow).Sub(workflowNow)
 				if backoff > 0 {
-					env.cronIterations += 1
+					env.cronIterations++
 					// Prepare the env for the next iteration
 					env.runningCount--
 					env.setLastCompletionResult(result)
@@ -955,7 +954,7 @@ func (h *testWorkflowHandle) rerun(asChild bool) bool {
 						// Use the existing headers and input
 						env.workflowDef.Execute(env, env.header, env.workflowInput)
 						env.startDecisionTask()
-					}, backoff - backoff)
+					}, backoff-backoff)
 					return true
 				}
 			}

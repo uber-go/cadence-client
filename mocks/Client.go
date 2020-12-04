@@ -27,7 +27,9 @@ import (
 	"context"
 
 	"github.com/stretchr/testify/mock"
+
 	"go.uber.org/cadence/.gen/go/shared"
+	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/client"
 	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal"
@@ -366,6 +368,30 @@ func (_m *Client) QueryWorkflowWithOptions(ctx context.Context, request *client.
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *client.QueryWorkflowWithOptionsRequest) error); ok {
+		r1 = rf(ctx, request)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+func (_m *Client) ResetWorkflow(ctx context.Context, request *s.ResetWorkflowExecutionRequest) (*s.ResetWorkflowExecutionResponse, error){
+	var _ca []interface{}
+	_ca = append(_ca, ctx, request)
+	ret := _m.Called(_ca...)
+
+	var r0 *s.ResetWorkflowExecutionResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *s.ResetWorkflowExecutionRequest) *s.ResetWorkflowExecutionResponse); ok {
+		r0 = rf(ctx, request)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*s.ResetWorkflowExecutionResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *s.ResetWorkflowExecutionRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)

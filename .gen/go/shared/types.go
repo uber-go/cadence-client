@@ -146,7 +146,11 @@ func (v *AccessDeniedError) Error() string {
 }
 
 type ActivityLocalDispatchInfo struct {
-	ActivityId *string `json:"activityId,omitempty"`
+	ActivityId                      *string `json:"activityId,omitempty"`
+	ScheduledTimestamp              *int64  `json:"scheduledTimestamp,omitempty"`
+	StartedTimestamp                *int64  `json:"startedTimestamp,omitempty"`
+	ScheduledTimestampOfThisAttempt *int64  `json:"scheduledTimestampOfThisAttempt,omitempty"`
+	TaskToken                       []byte  `json:"taskToken,omitempty"`
 }
 
 // ToWire translates a ActivityLocalDispatchInfo struct into a Thrift-level intermediate
@@ -166,7 +170,7 @@ type ActivityLocalDispatchInfo struct {
 //   }
 func (v *ActivityLocalDispatchInfo) ToWire() (wire.Value, error) {
 	var (
-		fields [1]wire.Field
+		fields [5]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -178,6 +182,38 @@ func (v *ActivityLocalDispatchInfo) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+	if v.ScheduledTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.ScheduledTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
+	if v.StartedTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.StartedTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+	if v.ScheduledTimestampOfThisAttempt != nil {
+		w, err = wire.NewValueI64(*(v.ScheduledTimestampOfThisAttempt)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.TaskToken != nil {
+		w, err = wire.NewValueBinary(v.TaskToken), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
 
@@ -216,6 +252,44 @@ func (v *ActivityLocalDispatchInfo) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 20:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.ScheduledTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 30:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.StartedTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 40:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.ScheduledTimestampOfThisAttempt = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 50:
+			if field.Value.Type() == wire.TBinary {
+				v.TaskToken, err = field.Value.GetBinary(), error(nil)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -229,10 +303,26 @@ func (v *ActivityLocalDispatchInfo) String() string {
 		return "<nil>"
 	}
 
-	var fields [1]string
+	var fields [5]string
 	i := 0
 	if v.ActivityId != nil {
 		fields[i] = fmt.Sprintf("ActivityId: %v", *(v.ActivityId))
+		i++
+	}
+	if v.ScheduledTimestamp != nil {
+		fields[i] = fmt.Sprintf("ScheduledTimestamp: %v", *(v.ScheduledTimestamp))
+		i++
+	}
+	if v.StartedTimestamp != nil {
+		fields[i] = fmt.Sprintf("StartedTimestamp: %v", *(v.StartedTimestamp))
+		i++
+	}
+	if v.ScheduledTimestampOfThisAttempt != nil {
+		fields[i] = fmt.Sprintf("ScheduledTimestampOfThisAttempt: %v", *(v.ScheduledTimestampOfThisAttempt))
+		i++
+	}
+	if v.TaskToken != nil {
+		fields[i] = fmt.Sprintf("TaskToken: %v", v.TaskToken)
 		i++
 	}
 
@@ -240,6 +330,16 @@ func (v *ActivityLocalDispatchInfo) String() string {
 }
 
 func _String_EqualsPtr(lhs, rhs *string) bool {
+	if lhs != nil && rhs != nil {
+
+		x := *lhs
+		y := *rhs
+		return (x == y)
+	}
+	return lhs == nil && rhs == nil
+}
+
+func _I64_EqualsPtr(lhs, rhs *int64) bool {
 	if lhs != nil && rhs != nil {
 
 		x := *lhs
@@ -257,6 +357,18 @@ func (v *ActivityLocalDispatchInfo) Equals(rhs *ActivityLocalDispatchInfo) bool 
 	if !_String_EqualsPtr(v.ActivityId, rhs.ActivityId) {
 		return false
 	}
+	if !_I64_EqualsPtr(v.ScheduledTimestamp, rhs.ScheduledTimestamp) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.StartedTimestamp, rhs.StartedTimestamp) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.ScheduledTimestampOfThisAttempt, rhs.ScheduledTimestampOfThisAttempt) {
+		return false
+	}
+	if !((v.TaskToken == nil && rhs.TaskToken == nil) || (v.TaskToken != nil && rhs.TaskToken != nil && bytes.Equal(v.TaskToken, rhs.TaskToken))) {
+		return false
+	}
 
 	return true
 }
@@ -266,6 +378,36 @@ func (v *ActivityLocalDispatchInfo) Equals(rhs *ActivityLocalDispatchInfo) bool 
 func (v *ActivityLocalDispatchInfo) GetActivityId() (o string) {
 	if v.ActivityId != nil {
 		return *v.ActivityId
+	}
+
+	return
+}
+
+// GetScheduledTimestamp returns the value of ScheduledTimestamp if it is set or its
+// zero value if it is unset.
+func (v *ActivityLocalDispatchInfo) GetScheduledTimestamp() (o int64) {
+	if v.ScheduledTimestamp != nil {
+		return *v.ScheduledTimestamp
+	}
+
+	return
+}
+
+// GetStartedTimestamp returns the value of StartedTimestamp if it is set or its
+// zero value if it is unset.
+func (v *ActivityLocalDispatchInfo) GetStartedTimestamp() (o int64) {
+	if v.StartedTimestamp != nil {
+		return *v.StartedTimestamp
+	}
+
+	return
+}
+
+// GetScheduledTimestampOfThisAttempt returns the value of ScheduledTimestampOfThisAttempt if it is set or its
+// zero value if it is unset.
+func (v *ActivityLocalDispatchInfo) GetScheduledTimestampOfThisAttempt() (o int64) {
+	if v.ScheduledTimestampOfThisAttempt != nil {
+		return *v.ScheduledTimestampOfThisAttempt
 	}
 
 	return
@@ -386,16 +528,6 @@ func (v *ActivityTaskCancelRequestedEventAttributes) String() string {
 	}
 
 	return fmt.Sprintf("ActivityTaskCancelRequestedEventAttributes{%v}", strings.Join(fields[:i], ", "))
-}
-
-func _I64_EqualsPtr(lhs, rhs *int64) bool {
-	if lhs != nil && rhs != nil {
-
-		x := *lhs
-		y := *rhs
-		return (x == y)
-	}
-	return lhs == nil && rhs == nil
 }
 
 // Equals returns true if all the fields of this ActivityTaskCancelRequestedEventAttributes match the
@@ -11444,6 +11576,7 @@ type DescribeWorkflowExecutionResponse struct {
 	WorkflowExecutionInfo  *WorkflowExecutionInfo          `json:"workflowExecutionInfo,omitempty"`
 	PendingActivities      []*PendingActivityInfo          `json:"pendingActivities,omitempty"`
 	PendingChildren        []*PendingChildExecutionInfo    `json:"pendingChildren,omitempty"`
+	PendingDecision        *PendingDecisionInfo            `json:"pendingDecision,omitempty"`
 }
 
 type _List_PendingActivityInfo_ValueList []*PendingActivityInfo
@@ -11521,7 +11654,7 @@ func (_List_PendingChildExecutionInfo_ValueList) Close() {}
 //   }
 func (v *DescribeWorkflowExecutionResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [4]wire.Field
+		fields [5]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -11557,6 +11690,14 @@ func (v *DescribeWorkflowExecutionResponse) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.PendingDecision != nil {
+		w, err = v.PendingDecision.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
 		i++
 	}
 
@@ -11623,6 +11764,12 @@ func _List_PendingChildExecutionInfo_Read(l wire.ValueList) ([]*PendingChildExec
 	return o, err
 }
 
+func _PendingDecisionInfo_Read(w wire.Value) (*PendingDecisionInfo, error) {
+	var v PendingDecisionInfo
+	err := v.FromWire(w)
+	return &v, err
+}
+
 // FromWire deserializes a DescribeWorkflowExecutionResponse struct from its Thrift-level
 // representation. The Thrift-level representation may be obtained
 // from a ThriftRW protocol implementation.
@@ -11677,6 +11824,14 @@ func (v *DescribeWorkflowExecutionResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 50:
+			if field.Value.Type() == wire.TStruct {
+				v.PendingDecision, err = _PendingDecisionInfo_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -11690,7 +11845,7 @@ func (v *DescribeWorkflowExecutionResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [4]string
+	var fields [5]string
 	i := 0
 	if v.ExecutionConfiguration != nil {
 		fields[i] = fmt.Sprintf("ExecutionConfiguration: %v", v.ExecutionConfiguration)
@@ -11706,6 +11861,10 @@ func (v *DescribeWorkflowExecutionResponse) String() string {
 	}
 	if v.PendingChildren != nil {
 		fields[i] = fmt.Sprintf("PendingChildren: %v", v.PendingChildren)
+		i++
+	}
+	if v.PendingDecision != nil {
+		fields[i] = fmt.Sprintf("PendingDecision: %v", v.PendingDecision)
 		i++
 	}
 
@@ -11757,6 +11916,9 @@ func (v *DescribeWorkflowExecutionResponse) Equals(rhs *DescribeWorkflowExecutio
 		return false
 	}
 	if !((v.PendingChildren == nil && rhs.PendingChildren == nil) || (v.PendingChildren != nil && rhs.PendingChildren != nil && _List_PendingChildExecutionInfo_Equals(v.PendingChildren, rhs.PendingChildren))) {
+		return false
+	}
+	if !((v.PendingDecision == nil && rhs.PendingDecision == nil) || (v.PendingDecision != nil && rhs.PendingDecision != nil && v.PendingDecision.Equals(rhs.PendingDecision))) {
 		return false
 	}
 
@@ -21986,6 +22148,417 @@ func (v *PendingChildExecutionInfo) GetParentClosePolicy() (o ParentClosePolicy)
 	return
 }
 
+type PendingDecisionInfo struct {
+	State                      *PendingDecisionState `json:"state,omitempty"`
+	ScheduledTimestamp         *int64                `json:"scheduledTimestamp,omitempty"`
+	StartedTimestamp           *int64                `json:"startedTimestamp,omitempty"`
+	Attempt                    *int64                `json:"attempt,omitempty"`
+	OriginalScheduledTimestamp *int64                `json:"originalScheduledTimestamp,omitempty"`
+}
+
+// ToWire translates a PendingDecisionInfo struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//   x, err := v.ToWire()
+//   if err != nil {
+//     return err
+//   }
+//
+//   if err := binaryProtocol.Encode(x, writer); err != nil {
+//     return err
+//   }
+func (v *PendingDecisionInfo) ToWire() (wire.Value, error) {
+	var (
+		fields [5]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.State != nil {
+		w, err = v.State.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 10, Value: w}
+		i++
+	}
+	if v.ScheduledTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.ScheduledTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 20, Value: w}
+		i++
+	}
+	if v.StartedTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.StartedTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 30, Value: w}
+		i++
+	}
+	if v.Attempt != nil {
+		w, err = wire.NewValueI64(*(v.Attempt)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.OriginalScheduledTimestamp != nil {
+		w, err = wire.NewValueI64(*(v.OriginalScheduledTimestamp)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _PendingDecisionState_Read(w wire.Value) (PendingDecisionState, error) {
+	var v PendingDecisionState
+	err := v.FromWire(w)
+	return v, err
+}
+
+// FromWire deserializes a PendingDecisionInfo struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a PendingDecisionInfo struct
+// from the provided intermediate representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//   if err != nil {
+//     return nil, err
+//   }
+//
+//   var v PendingDecisionInfo
+//   if err := v.FromWire(x); err != nil {
+//     return nil, err
+//   }
+//   return &v, nil
+func (v *PendingDecisionInfo) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 10:
+			if field.Value.Type() == wire.TI32 {
+				var x PendingDecisionState
+				x, err = _PendingDecisionState_Read(field.Value)
+				v.State = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 20:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.ScheduledTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 30:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.StartedTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 40:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.Attempt = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 50:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.OriginalScheduledTimestamp = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a PendingDecisionInfo
+// struct.
+func (v *PendingDecisionInfo) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [5]string
+	i := 0
+	if v.State != nil {
+		fields[i] = fmt.Sprintf("State: %v", *(v.State))
+		i++
+	}
+	if v.ScheduledTimestamp != nil {
+		fields[i] = fmt.Sprintf("ScheduledTimestamp: %v", *(v.ScheduledTimestamp))
+		i++
+	}
+	if v.StartedTimestamp != nil {
+		fields[i] = fmt.Sprintf("StartedTimestamp: %v", *(v.StartedTimestamp))
+		i++
+	}
+	if v.Attempt != nil {
+		fields[i] = fmt.Sprintf("Attempt: %v", *(v.Attempt))
+		i++
+	}
+	if v.OriginalScheduledTimestamp != nil {
+		fields[i] = fmt.Sprintf("OriginalScheduledTimestamp: %v", *(v.OriginalScheduledTimestamp))
+		i++
+	}
+
+	return fmt.Sprintf("PendingDecisionInfo{%v}", strings.Join(fields[:i], ", "))
+}
+
+func _PendingDecisionState_EqualsPtr(lhs, rhs *PendingDecisionState) bool {
+	if lhs != nil && rhs != nil {
+
+		x := *lhs
+		y := *rhs
+		return x.Equals(y)
+	}
+	return lhs == nil && rhs == nil
+}
+
+// Equals returns true if all the fields of this PendingDecisionInfo match the
+// provided PendingDecisionInfo.
+//
+// This function performs a deep comparison.
+func (v *PendingDecisionInfo) Equals(rhs *PendingDecisionInfo) bool {
+	if !_PendingDecisionState_EqualsPtr(v.State, rhs.State) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.ScheduledTimestamp, rhs.ScheduledTimestamp) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.StartedTimestamp, rhs.StartedTimestamp) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.Attempt, rhs.Attempt) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.OriginalScheduledTimestamp, rhs.OriginalScheduledTimestamp) {
+		return false
+	}
+
+	return true
+}
+
+// GetState returns the value of State if it is set or its
+// zero value if it is unset.
+func (v *PendingDecisionInfo) GetState() (o PendingDecisionState) {
+	if v.State != nil {
+		return *v.State
+	}
+
+	return
+}
+
+// GetScheduledTimestamp returns the value of ScheduledTimestamp if it is set or its
+// zero value if it is unset.
+func (v *PendingDecisionInfo) GetScheduledTimestamp() (o int64) {
+	if v.ScheduledTimestamp != nil {
+		return *v.ScheduledTimestamp
+	}
+
+	return
+}
+
+// GetStartedTimestamp returns the value of StartedTimestamp if it is set or its
+// zero value if it is unset.
+func (v *PendingDecisionInfo) GetStartedTimestamp() (o int64) {
+	if v.StartedTimestamp != nil {
+		return *v.StartedTimestamp
+	}
+
+	return
+}
+
+// GetAttempt returns the value of Attempt if it is set or its
+// zero value if it is unset.
+func (v *PendingDecisionInfo) GetAttempt() (o int64) {
+	if v.Attempt != nil {
+		return *v.Attempt
+	}
+
+	return
+}
+
+// GetOriginalScheduledTimestamp returns the value of OriginalScheduledTimestamp if it is set or its
+// zero value if it is unset.
+func (v *PendingDecisionInfo) GetOriginalScheduledTimestamp() (o int64) {
+	if v.OriginalScheduledTimestamp != nil {
+		return *v.OriginalScheduledTimestamp
+	}
+
+	return
+}
+
+type PendingDecisionState int32
+
+const (
+	PendingDecisionStateScheduled PendingDecisionState = 0
+	PendingDecisionStateStarted   PendingDecisionState = 1
+)
+
+// PendingDecisionState_Values returns all recognized values of PendingDecisionState.
+func PendingDecisionState_Values() []PendingDecisionState {
+	return []PendingDecisionState{
+		PendingDecisionStateScheduled,
+		PendingDecisionStateStarted,
+	}
+}
+
+// UnmarshalText tries to decode PendingDecisionState from a byte slice
+// containing its name.
+//
+//   var v PendingDecisionState
+//   err := v.UnmarshalText([]byte("SCHEDULED"))
+func (v *PendingDecisionState) UnmarshalText(value []byte) error {
+	switch string(value) {
+	case "SCHEDULED":
+		*v = PendingDecisionStateScheduled
+		return nil
+	case "STARTED":
+		*v = PendingDecisionStateStarted
+		return nil
+	default:
+		return fmt.Errorf("unknown enum value %q for %q", value, "PendingDecisionState")
+	}
+}
+
+// Ptr returns a pointer to this enum value.
+func (v PendingDecisionState) Ptr() *PendingDecisionState {
+	return &v
+}
+
+// ToWire translates PendingDecisionState into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// Enums are represented as 32-bit integers over the wire.
+func (v PendingDecisionState) ToWire() (wire.Value, error) {
+	return wire.NewValueI32(int32(v)), nil
+}
+
+// FromWire deserializes PendingDecisionState from its Thrift-level
+// representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TI32)
+//   if err != nil {
+//     return PendingDecisionState(0), err
+//   }
+//
+//   var v PendingDecisionState
+//   if err := v.FromWire(x); err != nil {
+//     return PendingDecisionState(0), err
+//   }
+//   return v, nil
+func (v *PendingDecisionState) FromWire(w wire.Value) error {
+	*v = (PendingDecisionState)(w.GetI32())
+	return nil
+}
+
+// String returns a readable string representation of PendingDecisionState.
+func (v PendingDecisionState) String() string {
+	w := int32(v)
+	switch w {
+	case 0:
+		return "SCHEDULED"
+	case 1:
+		return "STARTED"
+	}
+	return fmt.Sprintf("PendingDecisionState(%d)", w)
+}
+
+// Equals returns true if this PendingDecisionState value matches the provided
+// value.
+func (v PendingDecisionState) Equals(rhs PendingDecisionState) bool {
+	return v == rhs
+}
+
+// MarshalJSON serializes PendingDecisionState into JSON.
+//
+// If the enum value is recognized, its name is returned. Otherwise,
+// its integer value is returned.
+//
+// This implements json.Marshaler.
+func (v PendingDecisionState) MarshalJSON() ([]byte, error) {
+	switch int32(v) {
+	case 0:
+		return ([]byte)("\"SCHEDULED\""), nil
+	case 1:
+		return ([]byte)("\"STARTED\""), nil
+	}
+	return ([]byte)(strconv.FormatInt(int64(v), 10)), nil
+}
+
+// UnmarshalJSON attempts to decode PendingDecisionState from its JSON
+// representation.
+//
+// This implementation supports both, numeric and string inputs. If a
+// string is provided, it must be a known enum name.
+//
+// This implements json.Unmarshaler.
+func (v *PendingDecisionState) UnmarshalJSON(text []byte) error {
+	d := json.NewDecoder(bytes.NewReader(text))
+	d.UseNumber()
+	t, err := d.Token()
+	if err != nil {
+		return err
+	}
+
+	switch w := t.(type) {
+	case json.Number:
+		x, err := w.Int64()
+		if err != nil {
+			return err
+		}
+		if x > math.MaxInt32 {
+			return fmt.Errorf("enum overflow from JSON %q for %q", text, "PendingDecisionState")
+		}
+		if x < math.MinInt32 {
+			return fmt.Errorf("enum underflow from JSON %q for %q", text, "PendingDecisionState")
+		}
+		*v = (PendingDecisionState)(x)
+		return nil
+	case string:
+		return v.UnmarshalText([]byte(w))
+	default:
+		return fmt.Errorf("invalid JSON value %q (%T) to unmarshal into %q", t, t, "PendingDecisionState")
+	}
+}
+
 type PollForActivityTaskRequest struct {
 	Domain           *string           `json:"domain,omitempty"`
 	TaskList         *TaskList         `json:"taskList,omitempty"`
@@ -29018,6 +29591,7 @@ type ResetWorkflowExecutionRequest struct {
 	Reason                *string            `json:"reason,omitempty"`
 	DecisionFinishEventId *int64             `json:"decisionFinishEventId,omitempty"`
 	RequestId             *string            `json:"requestId,omitempty"`
+	SkipSignalReapply     *bool              `json:"skipSignalReapply,omitempty"`
 }
 
 // ToWire translates a ResetWorkflowExecutionRequest struct into a Thrift-level intermediate
@@ -29037,7 +29611,7 @@ type ResetWorkflowExecutionRequest struct {
 //   }
 func (v *ResetWorkflowExecutionRequest) ToWire() (wire.Value, error) {
 	var (
-		fields [5]wire.Field
+		fields [6]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -29081,6 +29655,14 @@ func (v *ResetWorkflowExecutionRequest) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 50, Value: w}
+		i++
+	}
+	if v.SkipSignalReapply != nil {
+		w, err = wire.NewValueBool(*(v.SkipSignalReapply)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 60, Value: w}
 		i++
 	}
 
@@ -29157,6 +29739,16 @@ func (v *ResetWorkflowExecutionRequest) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 60:
+			if field.Value.Type() == wire.TBool {
+				var x bool
+				x, err = field.Value.GetBool(), error(nil)
+				v.SkipSignalReapply = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -29170,7 +29762,7 @@ func (v *ResetWorkflowExecutionRequest) String() string {
 		return "<nil>"
 	}
 
-	var fields [5]string
+	var fields [6]string
 	i := 0
 	if v.Domain != nil {
 		fields[i] = fmt.Sprintf("Domain: %v", *(v.Domain))
@@ -29190,6 +29782,10 @@ func (v *ResetWorkflowExecutionRequest) String() string {
 	}
 	if v.RequestId != nil {
 		fields[i] = fmt.Sprintf("RequestId: %v", *(v.RequestId))
+		i++
+	}
+	if v.SkipSignalReapply != nil {
+		fields[i] = fmt.Sprintf("SkipSignalReapply: %v", *(v.SkipSignalReapply))
 		i++
 	}
 
@@ -29214,6 +29810,9 @@ func (v *ResetWorkflowExecutionRequest) Equals(rhs *ResetWorkflowExecutionReques
 		return false
 	}
 	if !_String_EqualsPtr(v.RequestId, rhs.RequestId) {
+		return false
+	}
+	if !_Bool_EqualsPtr(v.SkipSignalReapply, rhs.SkipSignalReapply) {
 		return false
 	}
 
@@ -29255,6 +29854,16 @@ func (v *ResetWorkflowExecutionRequest) GetDecisionFinishEventId() (o int64) {
 func (v *ResetWorkflowExecutionRequest) GetRequestId() (o string) {
 	if v.RequestId != nil {
 		return *v.RequestId
+	}
+
+	return
+}
+
+// GetSkipSignalReapply returns the value of SkipSignalReapply if it is set or its
+// zero value if it is unset.
+func (v *ResetWorkflowExecutionRequest) GetSkipSignalReapply() (o bool) {
+	if v.SkipSignalReapply != nil {
+		return *v.SkipSignalReapply
 	}
 
 	return

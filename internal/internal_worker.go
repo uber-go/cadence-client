@@ -110,8 +110,9 @@ type (
 
 	// Worker overrides.
 	workerOverrides struct {
-		workflowTaskHandler WorkflowTaskHandler
-		activityTaskHandler ActivityTaskHandler
+		workflowTaskHandler                WorkflowTaskHandler
+		activityTaskHandler                ActivityTaskHandler
+		useLocallyDispatchedActivityPoller bool
 	}
 
 	// workerExecutionParameters defines worker configure/execution options.
@@ -198,8 +199,9 @@ func newWorkflowWorker(
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
 	registry *registry,
+	ldaTunnel *locallyDispatchedActivityTunnel,
 ) *workflowWorker {
-	return newWorkflowWorkerInternal(service, domain, params, ppMgr, nil, registry)
+	return newWorkflowWorkerInternal(service, domain, params, ppMgr, nil, registry, ldaTunnel)
 }
 
 func ensureRequiredParams(params *workerExecutionParameters) {
@@ -265,6 +267,7 @@ func newWorkflowWorkerInternal(
 	ppMgr pressurePointMgr,
 	overrides *workerOverrides,
 	registry *registry,
+	ldaTunnel *locallyDispatchedActivityTunnel,
 ) *workflowWorker {
 	workerStopChannel := make(chan struct{})
 	params.WorkerStopChannel = getReadOnlyChannel(workerStopChannel)
@@ -276,7 +279,7 @@ func newWorkflowWorkerInternal(
 	} else {
 		taskHandler = newWorkflowTaskHandler(domain, params, ppMgr, registry)
 	}
-	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params, workerStopChannel)
+	return newWorkflowTaskWorkerInternal(taskHandler, service, domain, params, workerStopChannel, ldaTunnel)
 }
 
 func newWorkflowTaskWorkerInternal(
@@ -285,10 +288,12 @@ func newWorkflowTaskWorkerInternal(
 	domain string,
 	params workerExecutionParameters,
 	stopC chan struct{},
+	ldaTunnel *locallyDispatchedActivityTunnel,
 ) *workflowWorker {
 	ensureRequiredParams(&params)
 	poller := newWorkflowTaskPoller(
 		taskHandler,
+		ldaTunnel,
 		service,
 		domain,
 		params,
@@ -368,7 +373,12 @@ func (ww *workflowWorker) Run() error {
 
 // Shutdown the worker.
 func (ww *workflowWorker) Stop() {
-	close(ww.stopC)
+	select {
+	case <-ww.stopC:
+		// channel is already closed
+	default:
+		close(ww.stopC)
+	}
 	// TODO: remove the stop methods in favor of the workerStopChannel
 	ww.localActivityWorker.Stop()
 	ww.worker.Stop()
@@ -443,7 +453,7 @@ func newActivityWorker(
 	workerStopChannel := make(chan struct{}, 1)
 	params.WorkerStopChannel = getReadOnlyChannel(workerStopChannel)
 	ensureRequiredParams(&params)
-
+	workerType := "ActivityWorker"
 	// Get a activity task handler.
 	var taskHandler ActivityTaskHandler
 	if overrides != nil && overrides.activityTaskHandler != nil {
@@ -451,26 +461,32 @@ func newActivityWorker(
 	} else {
 		taskHandler = newActivityTaskHandler(service, params, env)
 	}
-	return newActivityTaskWorker(taskHandler, service, domain, params, sessionTokenBucket, workerStopChannel)
+	// Get an activity task poller.
+	var taskPoller taskPoller
+	if overrides != nil && overrides.useLocallyDispatchedActivityPoller {
+		taskPoller = newLocallyDispatchedActivityTaskPoller(taskHandler, service, domain, params)
+		workerType = "LocallyDispatchedActivityWorker"
+	} else {
+		taskPoller = newActivityTaskPoller(
+			taskHandler,
+			service,
+			domain,
+			params,
+		)
+	}
+	return newActivityTaskWorker(service, domain, params, sessionTokenBucket, workerStopChannel, taskPoller, workerType)
 }
 
 func newActivityTaskWorker(
-	taskHandler ActivityTaskHandler,
 	service workflowserviceclient.Interface,
 	domain string,
 	workerParams workerExecutionParameters,
 	sessionTokenBucket *sessionTokenBucket,
 	stopC chan struct{},
+	poller taskPoller,
+	workerType string,
 ) (worker *activityWorker) {
 	ensureRequiredParams(&workerParams)
-
-	poller := newActivityTaskPoller(
-		taskHandler,
-		service,
-		domain,
-		workerParams,
-	)
-
 	base := newBaseWorker(
 		baseWorkerOptions{
 			pollerCount:       workerParams.MaxConcurrentActivityPollers,
@@ -479,7 +495,7 @@ func newActivityTaskWorker(
 			maxTaskPerSecond:  workerParams.WorkerActivitiesPerSecond,
 			taskWorker:        poller,
 			identity:          workerParams.Identity,
-			workerType:        "ActivityWorker",
+			workerType:        workerType,
 			shutdownTimeout:   workerParams.WorkerStopTimeout,
 			userContextCancel: workerParams.UserContextCancel},
 		workerParams.Logger,
@@ -520,7 +536,12 @@ func (aw *activityWorker) Run() error {
 
 // Shutdown the worker.
 func (aw *activityWorker) Stop() {
-	close(aw.stopC)
+	select {
+	case <-aw.stopC:
+		// channel is already closed
+	default:
+		close(aw.stopC)
+	}
 	aw.worker.Stop()
 }
 
@@ -755,11 +776,12 @@ func getDataConverterFromActivityCtx(ctx context.Context) DataConverter {
 
 // aggregatedWorker combines management of both workflowWorker and activityWorker worker lifecycle.
 type aggregatedWorker struct {
-	workflowWorker *workflowWorker
-	activityWorker *activityWorker
-	sessionWorker  *sessionWorker
-	logger         *zap.Logger
-	registry       *registry
+	workflowWorker                  *workflowWorker
+	activityWorker                  *activityWorker
+	locallyDispatchedActivityWorker *activityWorker
+	sessionWorker                   *sessionWorker
+	logger                          *zap.Logger
+	registry                        *registry
 }
 
 func (aw *aggregatedWorker) RegisterWorkflow(w interface{}) {
@@ -785,26 +807,40 @@ func (aw *aggregatedWorker) Start() error {
 
 	if !isInterfaceNil(aw.workflowWorker) {
 		if len(aw.registry.getRegisteredWorkflowTypes()) == 0 {
-			aw.logger.Warn(
-				"Starting worker without any workflows. Workflows must be registered before start.",
+			aw.logger.Info(
+				"Worker has no workflows registered, so workflow worker will not be started.",
 			)
+		} else {
+			if err := aw.workflowWorker.Start(); err != nil {
+				return err
+			}
 		}
-		if err := aw.workflowWorker.Start(); err != nil {
-			return err
-		}
+		aw.logger.Info("Started Workflow Worker")
 	}
 	if !isInterfaceNil(aw.activityWorker) {
 		if len(aw.registry.getRegisteredActivities()) == 0 {
-			aw.logger.Warn(
-				"Starting worker without any activities. Activities must be registered before start.",
+			aw.logger.Info(
+				"Worker has no activities registered, so activity worker will not be started.",
 			)
-		}
-		if err := aw.activityWorker.Start(); err != nil {
-			// stop workflow worker.
-			if !isInterfaceNil(aw.workflowWorker) {
-				aw.workflowWorker.Stop()
+		} else {
+			if err := aw.activityWorker.Start(); err != nil {
+				// stop workflow worker.
+				if !isInterfaceNil(aw.workflowWorker) {
+					aw.workflowWorker.Stop()
+				}
+				return err
 			}
-			return err
+			if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+				if err := aw.locallyDispatchedActivityWorker.Start(); err != nil {
+					// stop workflow worker.
+					if !isInterfaceNil(aw.workflowWorker) {
+						aw.workflowWorker.Stop()
+					}
+					aw.activityWorker.Stop()
+					return err
+				}
+			}
+			aw.logger.Info("Started Activity Worker")
 		}
 	}
 
@@ -817,11 +853,13 @@ func (aw *aggregatedWorker) Start() error {
 			if !isInterfaceNil(aw.activityWorker) {
 				aw.activityWorker.Stop()
 			}
+			if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+				aw.locallyDispatchedActivityWorker.Stop()
+			}
 			return err
 		}
 	}
 
-	aw.logger.Info("Started Worker")
 	return nil
 }
 
@@ -904,6 +942,9 @@ func (aw *aggregatedWorker) Stop() {
 	if !isInterfaceNil(aw.activityWorker) {
 		aw.activityWorker.Stop()
 	}
+	if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+		aw.locallyDispatchedActivityWorker.Stop()
+	}
 	if !isInterfaceNil(aw.sessionWorker) {
 		aw.sessionWorker.Stop()
 	}
@@ -968,6 +1009,38 @@ func newAggregatedWorker(
 	// worker specific registry
 	registry := newRegistry()
 
+	// ldaTunnel is a one way tunnel to dispatch activity tasks from workflow poller to activity poller
+	var ldaTunnel *locallyDispatchedActivityTunnel
+
+	// activity types.
+	var activityWorker, locallyDispatchedActivityWorker *activityWorker
+
+	if !wOptions.DisableActivityWorker {
+		activityWorker = newActivityWorker(
+			service,
+			domain,
+			workerParams,
+			nil,
+			registry,
+			nil,
+		)
+
+		// do not dispatch locally if TaskListActivitiesPerSecond is set
+		if workerParams.TaskListActivitiesPerSecond == defaultTaskListActivitiesPerSecond {
+			// TODO update taskPoller interface so one activity worker can multiplex on multiple pollers
+			locallyDispatchedActivityWorker = newActivityWorker(
+				service,
+				domain,
+				workerParams,
+				&workerOverrides{useLocallyDispatchedActivityPoller: true},
+				registry,
+				nil,
+			)
+			ldaTunnel = locallyDispatchedActivityWorker.poller.(*locallyDispatchedActivityTaskPoller).ldaTunnel
+			ldaTunnel.metricsScope = metrics.NewTaggedScope(workerParams.MetricsScope)
+		}
+	}
+
 	// workflow factory.
 	var workflowWorker *workflowWorker
 	if !wOptions.DisableWorkflowWorker {
@@ -987,22 +1060,10 @@ func newAggregatedWorker(
 				workerParams,
 				nil,
 				registry,
+				ldaTunnel,
 			)
 		}
-	}
 
-	// activity types.
-	var activityWorker *activityWorker
-
-	if !wOptions.DisableActivityWorker {
-		activityWorker = newActivityWorker(
-			service,
-			domain,
-			workerParams,
-			nil,
-			registry,
-			nil,
-		)
 	}
 
 	var sessionWorker *sessionWorker
@@ -1025,11 +1086,12 @@ func newAggregatedWorker(
 	}
 
 	return &aggregatedWorker{
-		workflowWorker: workflowWorker,
-		activityWorker: activityWorker,
-		sessionWorker:  sessionWorker,
-		logger:         logger,
-		registry:       registry,
+		workflowWorker:                  workflowWorker,
+		activityWorker:                  activityWorker,
+		locallyDispatchedActivityWorker: locallyDispatchedActivityWorker,
+		sessionWorker:                   sessionWorker,
+		logger:                          logger,
+		registry:                        registry,
 	}
 }
 

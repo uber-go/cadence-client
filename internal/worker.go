@@ -250,11 +250,11 @@ func NewWorker(
 	return newAggregatedWorker(service, domain, taskList, options)
 }
 
-// Deprecated: Global workflow replay methods are replaced by equivalent WorkflowReplayer instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // ReplayWorkflowExecution loads a workflow execution history from the Cadence service and executes a single decision task for it.
 // Use for testing backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is the only optional parameter. Defaults to the noop logger.
+// Deprecated: Global workflow replay methods are replaced by equivalent WorkflowReplayer instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func ReplayWorkflowExecution(
 	ctx context.Context,
 	service workflowserviceclient.Interface,
@@ -266,32 +266,32 @@ func ReplayWorkflowExecution(
 	return r.ReplayWorkflowExecution(ctx, service, logger, domain, execution)
 }
 
-// Deprecated: Global workflow replay methods are replaced by equivalent WorkflowReplayer instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // ReplayWorkflowHistory executes a single decision task for the given history.
 // Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.
+// Deprecated: Global workflow replay methods are replaced by equivalent WorkflowReplayer instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
 	r := NewWorkflowReplayer()
 	return r.ReplayWorkflowHistory(logger, history)
 }
 
-// Deprecated: Global workflow replay methods are replaced by equivalent WorkflowReplayer instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // ReplayWorkflowHistoryFromJSONFile executes a single decision task for the given json history file.
 // Use for testing backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.
+// Deprecated: Global workflow replay methods are replaced by equivalent WorkflowReplayer instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string) error {
 	r := NewWorkflowReplayer()
 	return r.ReplayWorkflowHistoryFromJSONFile(logger, jsonfileName)
 }
 
-// Deprecated: Global workflow replay methods are replaced by equivalent WorkflowReplayer instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // ReplayPartialWorkflowHistoryFromJSONFile executes a single decision task for the given json history file upto provided
 // lastEventID(inclusive).
 // Use for testing backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.
+// Deprecated: Global workflow replay methods are replaced by equivalent WorkflowReplayer instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string, lastEventID int64) error {
 	r := NewWorkflowReplayer()
 	return r.ReplayPartialWorkflowHistoryFromJSONFile(logger, jsonfileName, lastEventID)

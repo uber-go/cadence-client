@@ -127,8 +127,6 @@ type (
 	}
 )
 
-// Deprecated: Global activity registration methods are replaced by equivalent Worker instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // RegisterActivity - register an activity function or a pointer to a structure with the framework.
 // The public form is: activity.Register(...)
 // An activity function takes a context and input and returns a (result, error) or just error.
@@ -158,12 +156,12 @@ type (
 //
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 // This method calls panic if activityFunc doesn't comply with the expected format.
+// Deprecated: Global activity registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func RegisterActivity(activityFunc interface{}) {
 	RegisterActivityWithOptions(activityFunc, RegisterActivityOptions{})
 }
 
-// Deprecated: Global activity registration methods are replaced by equivalent Worker instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // RegisterActivityWithOptions registers the activity function or struct pointer with options.
 // The public form is: activity.RegisterWithOptions(...)
 // The user can use options to provide an external name for the activity or leave it empty if no
@@ -181,6 +179,8 @@ func RegisterActivity(activityFunc interface{}) {
 // The other use of options is to disable duplicated activity registration check
 // which might be useful for integration tests.
 // activity.RegisterWithOptions(barActivity, RegisterActivityOptions{DisableAlreadyRegisteredCheck: true})
+// Deprecated: Global activity registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func RegisterActivityWithOptions(activityFunc interface{}, opts RegisterActivityOptions) {
 	registry := getGlobalRegistry()
 	registry.RegisterActivityWithOptions(activityFunc, opts)

@@ -51,8 +51,6 @@ type (
 	Info = internal.WorkflowInfo
 )
 
-// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // Register - registers a workflow function with the framework.
 // A workflow takes a workflow context and input and returns a (result, error) or just error.
 // Examples:
@@ -62,12 +60,12 @@ type (
 //	func sampleWorkflow(ctx workflow.Context, arg1 int) (result string, err error)
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 // This method calls panic if workflowFunc doesn't comply with the expected format.
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func Register(workflowFunc interface{}) {
 	internal.RegisterWorkflow(workflowFunc)
 }
 
-// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
-// This method is kept to maintain backward compatibility and should not be used.
 // RegisterWithOptions registers the workflow function with options
 // The user can use options to provide an external name for the workflow or leave it empty if no
 // external name is required. This can be used as
@@ -81,6 +79,8 @@ func Register(workflowFunc interface{}) {
 //	func sampleWorkflow(ctx workflow.Context, arg1 int) (result string, err error)
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 // This method calls panic if workflowFunc doesn't comply with the expected format.
+// Deprecated: Global workflow registration methods are replaced by equivalent Worker instance methods.
+// This method is kept to maintain backward compatibility and should not be used.
 func RegisterWithOptions(workflowFunc interface{}, opts RegisterOptions) {
 	internal.RegisterWorkflowWithOptions(workflowFunc, opts)
 }

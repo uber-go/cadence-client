@@ -960,9 +960,16 @@ func (atp *activityTaskPoller) pollWithMetrics(ctx context.Context,
 
 	response, startTime, err := pollFunc(ctx)
 	if err != nil {
+		atp.metricsScope.Counter("cadence-activity-response-error").Inc(1)
 		return nil, err
 	}
-	if response == nil || len(response.TaskToken) == 0 {
+	if response == nil {
+		atp.metricsScope.Counter("cadence-activity-response-empty").Inc(1)
+		return &activityTask{}, nil
+	}
+
+	if len(response.TaskToken) == 0 {
+		atp.metricsScope.Counter("cadence-activity-tasktoken-empty").Inc(1)
 		return &activityTask{}, nil
 	}
 

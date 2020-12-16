@@ -573,17 +573,25 @@ func (w *Workflows) defaultLocalActivityOptions() workflow.LocalActivityOptions 
 	}
 }
 
+func getActionRetryPolicy() *cadence.RetryPolicy {
+	interval := time.Duration(20 * time.Second)
+
+	initialInterval := interval / 20
+	maxInterval := interval / 3
+	return &cadence.RetryPolicy{
+		InitialInterval:          initialInterval,
+		BackoffCoefficient:       2.0,
+		MaximumInterval:          maxInterval,
+		ExpirationInterval:       interval,
+		NonRetriableErrorReasons: []string{"ActionNonRetryableError"},
+	}
+}
+
 func (w *Workflows) defaultActivityOptionsWithRetry() workflow.ActivityOptions {
 	return workflow.ActivityOptions{
 		ScheduleToStartTimeout: 5 * time.Second,
 		ScheduleToCloseTimeout: 5 * time.Second,
 		StartToCloseTimeout:    9 * time.Second,
-		RetryPolicy: &cadence.RetryPolicy{
-			InitialInterval:    time.Second,
-			BackoffCoefficient: 2.0,
-			MaximumInterval:    time.Second,
-			ExpirationInterval: 100 * time.Second,
-			MaximumAttempts:    3,
-		},
+		RetryPolicy:            getActionRetryPolicy(),
 	}
 }

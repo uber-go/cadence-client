@@ -479,7 +479,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 								at.ScheduledTimestampOfThisAttempt = adl.ScheduledTimestampOfThisAttempt
 								at.TaskToken = adl.TaskToken
 								if len(adl.TaskToken) == 0 {
-									wtp.metricsScope.Counter("cadence-activity-adl-tasktoken-empty").Inc(1)
+									wtp.metricsScope.Counter("555-cadence-activity-adl-tasktoken-empty").Inc(1)
 								}
 								wtp.metricsScope.Counter("metrics.ActivityLocalDispatchFailedCounter").Inc(1)
 								started = true

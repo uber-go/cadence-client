@@ -193,7 +193,7 @@ type testWorkflowStruct struct{}
 type testActivityStruct struct{}
 
 func (ts *testWorkflowStruct) Method(ctx Context) error { return nil }
-func (ts *testActivityStruct) Method() error { return nil }
+func (ts *testActivityStruct) Method() error            { return nil }
 
 func testActivityFunction() error            { return nil }
 func testWorkflowFunction(ctx Context) error { return nil }

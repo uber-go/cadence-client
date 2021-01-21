@@ -82,7 +82,7 @@ type (
 		//	- BadRequestError
 		//	- WorkflowExecutionAlreadyStartedError
 		//	- InternalServiceError
-		StartWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*workflow.Execution, error)
+		StartWorkflow(ctx context.Context, options StartWorkflowOptions, workflowFunc interface{}, args ...interface{}) (*workflow.Execution, error)
 
 		// ExecuteWorkflow starts a workflow execution and return a WorkflowRun instance and error
 		// The user can use this to start using a function or workflow type name.
@@ -145,7 +145,7 @@ type (
 		//  - BadRequestError
 		//	- InternalServiceError
 		SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
-			options StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (*workflow.Execution, error)
+			options StartWorkflowOptions, workflowFunc interface{}, workflowArgs ...interface{}) (*workflow.Execution, error)
 
 		// CancelWorkflow cancels a workflow in execution
 		// - workflow ID of the workflow.
@@ -325,6 +325,14 @@ type (
 		//  - EntityNotExistError
 		//  - QueryFailError
 		QueryWorkflowWithOptions(ctx context.Context, request *QueryWorkflowWithOptionsRequest) (*QueryWorkflowWithOptionsResponse, error)
+
+		// ResetWorkflow reset a given workflow execution and returns a new execution
+		// See ResetWorkflowRequest and ResetWorkflowResponse for more information.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - InternalServiceError
+		//  - EntityNotExistError
+		ResetWorkflow(ctx context.Context, request *s.ResetWorkflowExecutionRequest) (*s.ResetWorkflowExecutionResponse, error)
 
 		// DescribeWorkflowExecution returns information about the specified workflow execution.
 		// - runID can be default(empty string). if empty string then it will pick the last running execution of that workflow ID.

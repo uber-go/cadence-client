@@ -136,9 +136,9 @@ func (s *internalWorkerTestSuite) TearDownTest() {
 
 func (s *internalWorkerTestSuite) createLocalActivityMarkerDataForTest(activityID, activityType string) []byte {
 	lamd := localActivityMarkerData{
-		ActivityID: activityID,
+		ActivityID:   activityID,
 		ActivityType: activityType,
-		ReplayTime: time.Now(),
+		ReplayTime:   time.Now(),
 	}
 
 	// encode marker data

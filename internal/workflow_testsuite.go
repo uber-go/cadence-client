@@ -179,10 +179,12 @@ func (t *TestActivityEnvironment) SetWorkerStopChannel(c chan struct{}) {
 	t.impl.setWorkerStopChannel(c)
 }
 
+// RegisterWorkflow register workflows
 func (t *TestWorkflowEnvironment) RegisterWorkflow(w interface{}) {
 	t.impl.RegisterWorkflow(w)
 }
 
+// RegisterWorkflowWithOptions register workflows
 func (t *TestWorkflowEnvironment) RegisterWorkflowWithOptions(w interface{}, options RegisterWorkflowOptions) {
 	if len(t.ExpectedCalls) > 0 {
 		panic("RegisterWorkflow calls cannot follow mock related ones like OnWorkflow or similar")
@@ -190,10 +192,12 @@ func (t *TestWorkflowEnvironment) RegisterWorkflowWithOptions(w interface{}, opt
 	t.impl.RegisterWorkflowWithOptions(w, options)
 }
 
+// RegisterActivity registers activity
 func (t *TestWorkflowEnvironment) RegisterActivity(a interface{}) {
 	t.impl.RegisterActivity(a)
 }
 
+// RegisterActivityWithOptions registers activity
 func (t *TestWorkflowEnvironment) RegisterActivityWithOptions(a interface{}, options RegisterActivityOptions) {
 	if len(t.ExpectedCalls) > 0 {
 		panic("RegisterActivity calls cannot follow mock related ones like OnActivity or similar")
@@ -444,6 +448,23 @@ func (t *TestWorkflowEnvironment) SetTestTimeout(idleTimeout time.Duration) *Tes
 // This is based on the workflow time (a.k.a workflow.Now() time).
 func (t *TestWorkflowEnvironment) SetWorkflowTimeout(executionTimeout time.Duration) *TestWorkflowEnvironment {
 	t.impl.executionTimeout = executionTimeout
+	return t
+}
+
+// SetWorkflowCronSchedule sets the Cron schedule for this tested workflow.
+// The first execution of the workflow will not adhere to the Cron schedule and will start executing immediately.
+// Consecutive iterations will follow the specified schedule.
+// Use SetWorkflowCronMaxIterations() to enforce a limit on the number of consecutive iterations after the initial
+// execution.
+func (t *TestWorkflowEnvironment) SetWorkflowCronSchedule(cron string) *TestWorkflowEnvironment {
+	t.impl.setCronSchedule(cron)
+	return t
+}
+
+// SetWorkflowCronMaxIterations sets the a limit on the number of Cron iterations, not including the first one
+// of the tested workflow.
+func (t *TestWorkflowEnvironment) SetWorkflowCronMaxIterations(maxIterations int) *TestWorkflowEnvironment {
+	t.impl.setCronMaxIterationas(maxIterations)
 	return t
 }
 

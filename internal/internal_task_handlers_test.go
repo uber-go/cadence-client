@@ -555,7 +555,7 @@ func (t *TaskHandlersTestSuite) TestCacheEvictionWhenErrorOccurs() {
 	task := createWorkflowTask(testEvents, 3, "HelloWorld_Workflow")
 	// newWorkflowTaskWorkerInternal will set the laTunnel in taskHandler, without it, ProcessWorkflowTask()
 	// will fail as it can't find laTunnel in getWorkflowCache().
-	newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}))
+	newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}), nil)
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 
 	t.Error(err)
@@ -588,7 +588,7 @@ func (t *TaskHandlersTestSuite) TestWithMissingHistoryEvents() {
 		task := createWorkflowTask(testEvents, startEventID, "HelloWorld_Workflow")
 		// newWorkflowTaskWorkerInternal will set the laTunnel in taskHandler, without it, ProcessWorkflowTask()
 		// will fail as it can't find laTunnel in getWorkflowCache().
-		newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}))
+		newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}), nil)
 		request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 
 		t.Error(err)
@@ -640,7 +640,7 @@ func (t *TaskHandlersTestSuite) TestWithTruncatedHistory() {
 		task.StartedEventId = common.Int64Ptr(tc.startedEventID)
 		// newWorkflowTaskWorkerInternal will set the laTunnel in taskHandler, without it, ProcessWorkflowTask()
 		// will fail as it can't find laTunnel in getWorkflowCache().
-		newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}))
+		newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}), nil)
 		request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 
 		if tc.isResultErr {
@@ -754,7 +754,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 	task = createWorkflowTask(testEvents, 3, "HelloWorld_Workflow")
 	// newWorkflowTaskWorkerInternal will set the laTunnel in taskHandler, without it, ProcessWorkflowTask()
 	// will fail as it can't find laTunnel in getWorkflowCache().
-	newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, stopC)
+	newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, stopC, nil)
 	request, err = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.Error(err)
 	t.Nil(request)
@@ -927,7 +927,7 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_InvalidQueryTask() {
 	task := createWorkflowTask(nil, 3, "HelloWorld_Workflow")
 	task.Query = &s.WorkflowQuery{}
 	task.Queries = map[string]*s.WorkflowQuery{"query_id": {}}
-	newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}))
+	newWorkflowTaskWorkerInternal(taskHandler, t.service, testDomain, params, make(chan struct{}), nil)
 	// query and queries are both specified so this is an invalid task
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 
@@ -1300,12 +1300,13 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
 			WorkflowExecution: &s.WorkflowExecution{
 				WorkflowId: common.StringPtr("wID"),
 				RunId:      common.StringPtr("rID")},
-			ActivityType:                  &s.ActivityType{Name: common.StringPtr("test")},
-			ActivityId:                    common.StringPtr(uuid.New()),
-			ScheduledTimestamp:            common.Int64Ptr(d.ScheduleTS.UnixNano()),
-			ScheduleToCloseTimeoutSeconds: common.Int32Ptr(d.ScheduleDuration),
-			StartedTimestamp:              common.Int64Ptr(d.StartTS.UnixNano()),
-			StartToCloseTimeoutSeconds:    common.Int32Ptr(d.StartDuration),
+			ActivityType:                    &s.ActivityType{Name: common.StringPtr("test")},
+			ActivityId:                      common.StringPtr(uuid.New()),
+			ScheduledTimestamp:              common.Int64Ptr(d.ScheduleTS.UnixNano()),
+			ScheduledTimestampOfThisAttempt: common.Int64Ptr(d.ScheduleTS.UnixNano()),
+			ScheduleToCloseTimeoutSeconds:   common.Int32Ptr(d.ScheduleDuration),
+			StartedTimestamp:                common.Int64Ptr(d.StartTS.UnixNano()),
+			StartToCloseTimeoutSeconds:      common.Int32Ptr(d.StartDuration),
 			WorkflowType: &s.WorkflowType{
 				Name: common.StringPtr("wType"),
 			},
@@ -1358,12 +1359,13 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionWorkerStop() {
 		WorkflowExecution: &s.WorkflowExecution{
 			WorkflowId: common.StringPtr("wID"),
 			RunId:      common.StringPtr("rID")},
-		ActivityType:                  &s.ActivityType{Name: common.StringPtr("test")},
-		ActivityId:                    common.StringPtr(uuid.New()),
-		ScheduledTimestamp:            common.Int64Ptr(time.Now().UnixNano()),
-		ScheduleToCloseTimeoutSeconds: common.Int32Ptr(1),
-		StartedTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
-		StartToCloseTimeoutSeconds:    common.Int32Ptr(1),
+		ActivityType:                    &s.ActivityType{Name: common.StringPtr("test")},
+		ActivityId:                      common.StringPtr(uuid.New()),
+		ScheduledTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
+		ScheduledTimestampOfThisAttempt: common.Int64Ptr(time.Now().UnixNano()),
+		ScheduleToCloseTimeoutSeconds:   common.Int32Ptr(1),
+		StartedTimestamp:                common.Int64Ptr(time.Now().UnixNano()),
+		StartToCloseTimeoutSeconds:      common.Int32Ptr(1),
 		WorkflowType: &s.WorkflowType{
 			Name: common.StringPtr("wType"),
 		},

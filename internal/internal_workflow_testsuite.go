@@ -153,6 +153,8 @@ type (
 		onTimerScheduledListener         func(timerID string, duration time.Duration)
 		onTimerFiredListener             func(timerID string)
 		onTimerCancelledListener         func(timerID string)
+
+		cronMaxIterations int
 	}
 
 	// testWorkflowEnvironmentImpl is the environment that runs the workflow/activity unit tests.
@@ -183,6 +185,10 @@ type (
 
 		workerStopChannel  chan struct{}
 		sessionEnvironment *testSessionEnvironmentImpl
+
+		cronSchedule   string
+		cronIterations int
+		workflowInput  []byte
 	}
 
 	testSessionEnvironmentImpl struct {
@@ -225,6 +231,8 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *regist
 			testTimeout:      time.Second * 3,
 
 			expectedMockCalls: make(map[string]struct{}),
+
+			cronMaxIterations: -1,
 		},
 
 		workflowInfo: &WorkflowInfo{
@@ -246,13 +254,19 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *regist
 
 		doneChannel:       make(chan struct{}),
 		workerStopChannel: make(chan struct{}),
+
+		cronIterations: 0,
 	}
 
 	// move forward the mock clock to start time.
 	env.setStartTime(time.Now())
 
 	// put current workflow as a running workflow so child can send signal to parent
-	env.runningWorkflows[env.workflowInfo.WorkflowExecution.ID] = &testWorkflowHandle{env: env, callback: func(result []byte, err error) {}}
+	testWorkflowHandle := &testWorkflowHandle{env: env, callback: func(result []byte, err error) {}}
+	if env.workflowInfo.CronSchedule != nil && len(*env.workflowInfo.CronSchedule) > 0 {
+		testWorkflowHandle.params.cronSchedule = *env.workflowInfo.CronSchedule
+	}
+	env.runningWorkflows[env.workflowInfo.WorkflowExecution.ID] = testWorkflowHandle
 
 	if env.logger == nil {
 		logger, _ := zap.NewDevelopment()
@@ -329,7 +343,14 @@ func (env *testWorkflowEnvironmentImpl) setStartTime(startTime time.Time) {
 		startTime = env.wallClock.Now()
 	}
 	env.mockClock.Add(startTime.Sub(env.mockClock.Now()))
+}
 
+func (env *testWorkflowEnvironmentImpl) setCronSchedule(cronSchedule string) {
+	env.workflowInfo.CronSchedule = &cronSchedule
+}
+
+func (env *testWorkflowEnvironmentImpl) setCronMaxIterationas(cronMaxIterations int) {
+	env.cronMaxIterations = cronMaxIterations
 }
 
 func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(params *executeWorkflowParams, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) (*testWorkflowEnvironmentImpl, error) {
@@ -457,6 +478,8 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(delayStart time.
 		panic(err)
 	}
 	env.workflowDef = workflowDefinition
+	// Store the Workflow input for potential Cron
+	env.workflowInput = input
 
 	// env.workflowDef.Execute() method will execute dispatcher. We want the dispatcher to only run in main loop.
 	// In case of child workflow, this executeWorkflowInternal() is run in separate goroutinue, so use postCallback
@@ -784,7 +807,10 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 	}
 
 	dc := env.GetDataConverter()
-	env.isTestCompleted = true
+	// Test is potentially not over, for parent Cron workflows
+	if (!env.isChildWorkflow() && !env.IsCron()) || env.isChildWorkflow() {
+		env.isTestCompleted = true
+	}
 
 	if err != nil {
 		switch err := err.(type) {
@@ -800,7 +826,12 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 		env.testResult = newEncodedValue(result, dc)
 	}
 
-	close(env.doneChannel)
+	// Only close on:
+	// 1. Child-Workflows
+	// 2. non-cron Workflows
+	if env.isChildWorkflow() && !env.IsCron() {
+		close(env.doneChannel)
+	}
 
 	if env.isChildWorkflow() {
 		// this is completion of child workflow
@@ -810,7 +841,7 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 			// would have already been removed from the runningWorkflows map by RequestCancelWorkflow().
 			childWorkflowHandle.handled = true
 			// check if a retry is needed
-			if childWorkflowHandle.rerunAsChild() {
+			if childWorkflowHandle.rerun(true) {
 				// rerun requested, so we don't want to post the error to parent workflow, return here.
 				return
 			}
@@ -825,12 +856,27 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 				}
 			}, true /* true to trigger parent workflow to resume to handle child workflow's result */)
 		}
+	} else {
+		if env.IsCron() {
+			workflowID := env.workflowInfo.WorkflowExecution.ID
+			if workflowHandle, ok := env.runningWorkflows[workflowID]; ok {
+				// On rerun, consider Workflow as not-handled
+				if workflowHandle.rerun(false) {
+					return
+				}
+			}
+		}
 	}
+	// No Reruns....Test is Complete
+	env.isTestCompleted = true
 }
 
-func (h *testWorkflowHandle) rerunAsChild() bool {
+func (h *testWorkflowHandle) rerun(asChild bool) bool {
 	env := h.env
-	if !env.isChildWorkflow() {
+	if asChild && !env.isChildWorkflow() {
+		return false
+	}
+	if !asChild && env.isChildWorkflow() {
 		return false
 	}
 	params := h.params
@@ -844,40 +890,74 @@ func (h *testWorkflowHandle) rerunAsChild() bool {
 		// not successful run this time, carry over from whatever previous run pass to this run.
 		result = env.workflowInfo.lastCompletionResult
 	}
-	params.lastCompletionResult = result
+	if asChild {
+		params.lastCompletionResult = result
 
-	if params.retryPolicy != nil && env.testError != nil {
-		errReason, _ := getErrorDetails(env.testError, env.GetDataConverter())
-		var expireTime time.Time
-		if params.retryPolicy.GetExpirationIntervalInSeconds() > 0 {
-			expireTime = params.scheduledTime.Add(time.Second * time.Duration(params.retryPolicy.GetExpirationIntervalInSeconds()))
+		if params.retryPolicy != nil && env.testError != nil {
+			errReason, _ := getErrorDetails(env.testError, env.GetDataConverter())
+			var expireTime time.Time
+			if params.retryPolicy.GetExpirationIntervalInSeconds() > 0 {
+				expireTime = params.scheduledTime.Add(time.Second * time.Duration(params.retryPolicy.GetExpirationIntervalInSeconds()))
+			}
+			backoff := getRetryBackoffFromThriftRetryPolicy(params.retryPolicy, env.workflowInfo.Attempt, errReason, env.Now(), expireTime)
+			if backoff > 0 {
+				// remove the current child workflow from the pending child workflow map because
+				// the childWorkflowID will be the same for retry run.
+				delete(env.runningWorkflows, env.workflowInfo.WorkflowExecution.ID)
+				params.attempt++
+				env.parentEnv.executeChildWorkflowWithDelay(backoff, *params, h.callback, nil /* child workflow already started */)
+				return true
+			}
 		}
-		backoff := getRetryBackoffFromThriftRetryPolicy(params.retryPolicy, env.workflowInfo.Attempt, errReason, env.Now(), expireTime)
-		if backoff > 0 {
-			// remove the current child workflow from the pending child workflow map because
-			// the childWorkflowID will be the same for retry run.
-			delete(env.runningWorkflows, env.workflowInfo.WorkflowExecution.ID)
-			params.attempt++
-			env.parentEnv.executeChildWorkflowWithDelay(backoff, *params, h.callback, nil /* child workflow already started */)
-
-			return true
+		if len(params.cronSchedule) > 0 {
+			if env.cronMaxIterations < 0 || (env.cronMaxIterations > 0 && env.cronIterations < env.cronMaxIterations) {
+				schedule, err := cron.ParseStandard(params.cronSchedule)
+				if err != nil {
+					panic(fmt.Errorf("invalid cron schedule %v, err: %v", params.cronSchedule, err))
+				}
+				workflowNow := env.Now().In(time.UTC)
+				backoff := schedule.Next(workflowNow).Sub(workflowNow)
+				if backoff > 0 {
+					env.cronIterations++
+					delete(env.runningWorkflows, env.workflowInfo.WorkflowExecution.ID)
+					params.attempt = 0
+					params.scheduledTime = env.Now()
+					env.parentEnv.executeChildWorkflowWithDelay(backoff, *params, h.callback, nil /* child workflow already started */)
+					return true
+				}
+			}
 		}
-	}
-
-	if len(params.cronSchedule) > 0 {
-		schedule, err := cron.ParseStandard(params.cronSchedule)
-		if err != nil {
-			panic(fmt.Errorf("invalid cron schedule %v, err: %v", params.cronSchedule, err))
-		}
-
-		workflowNow := env.Now().In(time.UTC)
-		backoff := schedule.Next(workflowNow).Sub(workflowNow)
-		if backoff > 0 {
-			delete(env.runningWorkflows, env.workflowInfo.WorkflowExecution.ID)
-			params.attempt = 0
-			params.scheduledTime = env.Now()
-			env.parentEnv.executeChildWorkflowWithDelay(backoff, *params, h.callback, nil /* child workflow already started */)
-			return true
+	} else {
+		// Re-run a non-Child workflow if it has a Cron Schedule
+		if h.env.workflowInfo.CronSchedule != nil {
+			if env.cronMaxIterations < 0 || (env.cronMaxIterations > 0 && env.cronIterations < env.cronMaxIterations) {
+				cronSchedule := *h.env.workflowInfo.CronSchedule
+				if len(cronSchedule) == 0 {
+					return false
+				}
+				schedule, err := cron.ParseStandard(cronSchedule)
+				if err != nil {
+					panic(fmt.Errorf("invalid cron schedule %v, err: %v", cronSchedule, err))
+				}
+				workflowNow := env.Now().In(time.UTC)
+				backoff := schedule.Next(workflowNow).Sub(workflowNow)
+				if backoff > 0 {
+					env.cronIterations++
+					// Prepare the env for the next iteration
+					env.runningCount--
+					env.setLastCompletionResult(result)
+					// Since MainLoop is already running, we just want to execute the dispatcher
+					// which will run the Workflow,
+					env.registerDelayedCallback(func() {
+						env.runningCount++
+						env.workflowDef, _ = env.getWorkflowDefinition(env.workflowInfo.WorkflowType)
+						// Use the existing headers and input
+						env.workflowDef.Execute(env, env.header, env.workflowInput)
+						env.startDecisionTask()
+					}, backoff-backoff)
+					return true
+				}
+			}
 		}
 	}
 
@@ -1575,15 +1655,16 @@ func newTestActivityTask(workflowID, runID, activityID, workflowTypeName, domain
 			WorkflowId: common.StringPtr(workflowID),
 			RunId:      common.StringPtr(runID),
 		},
-		ActivityId:                    common.StringPtr(activityID),
-		TaskToken:                     []byte(activityID), // use activityID as TaskToken so we can map TaskToken in heartbeat calls.
-		ActivityType:                  &shared.ActivityType{Name: common.StringPtr(params.ActivityType.Name)},
-		Input:                         params.Input,
-		ScheduledTimestamp:            common.Int64Ptr(time.Now().UnixNano()),
-		ScheduleToCloseTimeoutSeconds: common.Int32Ptr(params.ScheduleToCloseTimeoutSeconds),
-		StartedTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
-		StartToCloseTimeoutSeconds:    common.Int32Ptr(params.StartToCloseTimeoutSeconds),
-		HeartbeatTimeoutSeconds:       common.Int32Ptr(params.HeartbeatTimeoutSeconds),
+		ActivityId:                      common.StringPtr(activityID),
+		TaskToken:                       []byte(activityID), // use activityID as TaskToken so we can map TaskToken in heartbeat calls.
+		ActivityType:                    &shared.ActivityType{Name: common.StringPtr(params.ActivityType.Name)},
+		Input:                           params.Input,
+		ScheduledTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
+		ScheduleToCloseTimeoutSeconds:   common.Int32Ptr(params.ScheduleToCloseTimeoutSeconds),
+		ScheduledTimestampOfThisAttempt: common.Int64Ptr(time.Now().UnixNano()),
+		StartedTimestamp:                common.Int64Ptr(time.Now().UnixNano()),
+		StartToCloseTimeoutSeconds:      common.Int32Ptr(params.StartToCloseTimeoutSeconds),
+		HeartbeatTimeoutSeconds:         common.Int32Ptr(params.HeartbeatTimeoutSeconds),
 		WorkflowType: &shared.WorkflowType{
 			Name: common.StringPtr(workflowTypeName),
 		},
@@ -1721,6 +1802,11 @@ func (env *testWorkflowEnvironmentImpl) IsReplaying() bool {
 	return false
 }
 
+func (env *testWorkflowEnvironmentImpl) IsCron() bool {
+	// this test environment never replay
+	return env.workflowInfo.CronSchedule != nil && len(*env.workflowInfo.CronSchedule) > 0
+}
+
 func (env *testWorkflowEnvironmentImpl) SignalExternalWorkflow(domainName, workflowID, runID, signalName string, input []byte, arg interface{}, childWorkflowOnly bool, callback resultHandler) {
 	// check if target workflow is a known workflow
 	if childHandle, ok := env.runningWorkflows[workflowID]; ok {
@@ -1849,19 +1935,21 @@ func getMockMethodForGetVersion(changeID string) string {
 }
 
 func (env *testWorkflowEnvironmentImpl) UpsertSearchAttributes(attributes map[string]interface{}) error {
-	attr, err := validateAndSerializeSearchAttributes(attributes)
-
-	env.workflowInfo.SearchAttributes = mergeSearchAttributes(env.workflowInfo.SearchAttributes, attr)
-
 	mockMethod := mockMethodForUpsertSearchAttributes
-	if _, ok := env.expectedMockCalls[mockMethod]; !ok {
-		// mock not found
-		return err
+	if _, ok := env.expectedMockCalls[mockMethod]; ok {
+		// mock found, check if return is error
+		args := []interface{}{attributes}
+		mockRet := env.mock.MethodCalled(mockMethod, args...)
+		if len(mockRet) > 1 {
+			panic(fmt.Sprintf("mock of UpsertSearchAttributes should return only one error"))
+		}
+		if len(mockRet) == 1 && mockRet[0] != nil {
+			return mockRet[0].(error)
+		}
 	}
 
-	args := []interface{}{attributes}
-	env.mock.MethodCalled(mockMethod, args...)
-
+	attr, err := validateAndSerializeSearchAttributes(attributes)
+	env.workflowInfo.SearchAttributes = mergeSearchAttributes(env.workflowInfo.SearchAttributes, attr)
 	return err
 }
 

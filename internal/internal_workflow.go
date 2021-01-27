@@ -438,7 +438,10 @@ func newWorkflowContext(env workflowEnvironment, interceptors WorkflowIntercepto
 	return rootCtx
 }
 
-func newWorkflowInterceptors(env workflowEnvironment, factories []WorkflowInterceptorFactory) (WorkflowInterceptor, *workflowEnvironmentInterceptor) {
+func newWorkflowInterceptors(
+	env workflowEnvironment,
+	factories []WorkflowInterceptorFactory,
+) (WorkflowInterceptor, *workflowEnvironmentInterceptor) {
 	envInterceptor := &workflowEnvironmentInterceptor{env: env}
 	var interceptor WorkflowInterceptor = envInterceptor
 	for i := len(factories) - 1; i >= 0; i-- {

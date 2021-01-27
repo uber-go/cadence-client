@@ -700,6 +700,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock() {
 		if err != nil {
 			return "", err
 		}
+
+		cwo = ChildWorkflowOptions{WorkflowID: "workflow-id", ExecutionStartToCloseTimeout: time.Minute}
+		ctx = WithChildWorkflowOptions(ctx, cwo)
 		var heartbeatWorkflowResult string
 		err = ExecuteChildWorkflow(ctx, testWorkflowHeartbeat, "slow", time.Hour).Get(ctx, &heartbeatWorkflowResult)
 		if err != nil {
@@ -718,6 +721,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock() {
 
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("mock_msg", nil)
 	env.OnWorkflow(testWorkflowHeartbeat, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(a mock.Arguments) {
+			ctx := a.Get(0).(Context)
+
+			// Ensure GetWorkflowInfo is usable in mocks.
+			info := GetWorkflowInfo(ctx)
+			s.Equal("workflow-id", info.WorkflowExecution.ID)
+		}).
 		Return("mock_heartbeat", nil)
 	env.ExecuteWorkflow(workflowFn)
 

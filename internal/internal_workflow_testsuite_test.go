@@ -700,6 +700,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock() {
 		if err != nil {
 			return "", err
 		}
+
+		cwo = ChildWorkflowOptions{WorkflowID: "workflow-id", ExecutionStartToCloseTimeout: time.Minute}
+		ctx = WithChildWorkflowOptions(ctx, cwo)
 		var heartbeatWorkflowResult string
 		err = ExecuteChildWorkflow(ctx, testWorkflowHeartbeat, "slow", time.Hour).Get(ctx, &heartbeatWorkflowResult)
 		if err != nil {
@@ -718,6 +721,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock() {
 
 	env.OnActivity(testActivityHello, mock.Anything, mock.Anything).Return("mock_msg", nil)
 	env.OnWorkflow(testWorkflowHeartbeat, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(a mock.Arguments) {
+			ctx := a.Get(0).(Context)
+
+			// Ensure GetWorkflowInfo is usable in mocks.
+			info := GetWorkflowInfo(ctx)
+			s.Equal("workflow-id", info.WorkflowExecution.ID)
+		}).
 		Return("mock_heartbeat", nil)
 	env.ExecuteWorkflow(workflowFn)
 
@@ -2804,7 +2814,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CronChildWorkflow() {
 		if HasLastCompletionResult(ctx) {
 			GetLastCompletionResult(ctx, &result)
 		}
-		Sleep(ctx, time.Second * 3)
+		Sleep(ctx, time.Second*3)
 		if info.Attempt == 0 {
 			failedCount++
 			return 0, errors.New("please-retry")
@@ -2831,7 +2841,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CronChildWorkflow() {
 
 		cronFuture := ExecuteChildWorkflow(ctx1, cronWorkflow) // cron never stop so this future won't return
 
-		timeoutTimer := NewTimer(ctx, time.Hour * 3)
+		timeoutTimer := NewTimer(ctx, time.Hour*3)
 		selector := NewSelector(ctx)
 		var err error
 		selector.AddFuture(cronFuture, func(f Future) {
@@ -2867,7 +2877,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CronWorkflow() {
 		if HasLastCompletionResult(ctx) {
 			GetLastCompletionResult(ctx, &result)
 		}
-		Sleep(ctx, time.Second * 3)
+		Sleep(ctx, time.Second*3)
 		result++
 		return result, nil
 	}

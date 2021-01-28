@@ -72,7 +72,7 @@ type (
 		service      workflowserviceclient.Interface
 		taskHandler  WorkflowTaskHandler
 		ldaTunnel    *locallyDispatchedActivityTunnel
-		metricsScope tally.Scope
+		metricsScope *metrics.TaggedScope
 		logger       *zap.Logger
 
 		stickyUUID                   string
@@ -276,7 +276,7 @@ func newWorkflowTaskPoller(
 		identity:                     params.Identity,
 		taskHandler:                  taskHandler,
 		ldaTunnel:                    ldaTunnel,
-		metricsScope:                 params.MetricsScope,
+		metricsScope:                 metrics.NewTaggedScope(params.MetricsScope),
 		logger:                       params.Logger,
 		stickyUUID:                   uuid.New(),
 		disableStickyExecution:       params.DisableStickyExecution,
@@ -385,8 +385,9 @@ func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTa
 
 func (wtp *workflowTaskPoller) RespondTaskCompletedWithMetrics(completedRequest interface{}, taskErr error, task *s.PollForDecisionTaskResponse, startTime time.Time) (response *s.RespondDecisionTaskCompletedResponse, err error) {
 
+	metricsScope := wtp.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
 	if taskErr != nil {
-		wtp.metricsScope.Counter(metrics.DecisionExecutionFailedCounter).Inc(1)
+		metricsScope.Counter(metrics.DecisionExecutionFailedCounter).Inc(1)
 		wtp.logger.Warn("Failed to process decision task.",
 			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
@@ -395,17 +396,17 @@ func (wtp *workflowTaskPoller) RespondTaskCompletedWithMetrics(completedRequest 
 		// convert err to DecisionTaskFailed
 		completedRequest = errorToFailDecisionTask(task.TaskToken, taskErr, wtp.identity)
 	} else {
-		wtp.metricsScope.Counter(metrics.DecisionTaskCompletedCounter).Inc(1)
+		metricsScope.Counter(metrics.DecisionTaskCompletedCounter).Inc(1)
 	}
 
-	wtp.metricsScope.Timer(metrics.DecisionExecutionLatency).Record(time.Now().Sub(startTime))
+	metricsScope.Timer(metrics.DecisionExecutionLatency).Record(time.Now().Sub(startTime))
 
 	responseStartTime := time.Now()
 	if response, err = wtp.RespondTaskCompleted(completedRequest, task); err != nil {
-		wtp.metricsScope.Counter(metrics.DecisionResponseFailedCounter).Inc(1)
+		metricsScope.Counter(metrics.DecisionResponseFailedCounter).Inc(1)
 		return
 	}
-	wtp.metricsScope.Timer(metrics.DecisionResponseLatency).Record(time.Now().Sub(responseStartTime))
+	metricsScope.Timer(metrics.DecisionResponseLatency).Record(time.Now().Sub(responseStartTime))
 
 	return
 }
@@ -787,11 +788,12 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 			zap.Bool("IsQueryTask", response.Query != nil))
 	})
 
-	wtp.metricsScope.Counter(metrics.DecisionPollSucceedCounter).Inc(1)
-	wtp.metricsScope.Timer(metrics.DecisionPollLatency).Record(time.Now().Sub(startTime))
+	metricsScope := wtp.metricsScope.GetTaggedScope(tagWorkflowType, response.WorkflowType.GetName())
+	metricsScope.Counter(metrics.DecisionPollSucceedCounter).Inc(1)
+	metricsScope.Timer(metrics.DecisionPollLatency).Record(time.Now().Sub(startTime))
 
 	scheduledToStartLatency := time.Duration(response.GetStartedTimestamp() - response.GetScheduledTimestamp())
-	wtp.metricsScope.Timer(metrics.DecisionScheduledToStartLatency).Record(scheduledToStartLatency)
+	metricsScope.Timer(metrics.DecisionScheduledToStartLatency).Record(scheduledToStartLatency)
 	return task, nil
 }
 
@@ -966,11 +968,14 @@ func (atp *activityTaskPoller) pollWithMetrics(ctx context.Context,
 		return &activityTask{}, nil
 	}
 
-	atp.metricsScope.Counter(metrics.ActivityPollSucceedCounter).Inc(1)
-	atp.metricsScope.Timer(metrics.ActivityPollLatency).Record(time.Now().Sub(startTime))
+	workflowType := response.WorkflowType.GetName()
+	activityType := response.ActivityType.GetName()
+	metricsScope := getMetricsScopeForActivity(atp.metricsScope, workflowType, activityType)
+	metricsScope.Counter(metrics.ActivityPollSucceedCounter).Inc(1)
+	metricsScope.Timer(metrics.ActivityPollLatency).Record(time.Now().Sub(startTime))
 
 	scheduledToStartLatency := time.Duration(response.GetStartedTimestamp() - response.GetScheduledTimestampOfThisAttempt())
-	atp.metricsScope.Timer(metrics.ActivityScheduledToStartLatency).Record(scheduledToStartLatency)
+	metricsScope.Timer(metrics.ActivityScheduledToStartLatency).Record(scheduledToStartLatency)
 
 	return &activityTask{task: response, pollStartTime: startTime}, nil
 }

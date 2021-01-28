@@ -135,6 +135,25 @@ type (
 		header       *shared.Header
 	}
 
+	locallyDispatchedActivityTask struct {
+		// used to notify the poller the response from server is completed and the task is ready
+		readyCh                         chan bool
+		TaskToken                       []byte
+		WorkflowExecution               *shared.WorkflowExecution
+		ActivityId                      *string
+		ActivityType                    *shared.ActivityType
+		Input                           []byte
+		ScheduledTimestamp              *int64
+		ScheduleToCloseTimeoutSeconds   *int32
+		StartedTimestamp                *int64
+		StartToCloseTimeoutSeconds      *int32
+		HeartbeatTimeoutSeconds         *int32
+		ScheduledTimestampOfThisAttempt *int64
+		WorkflowType                    *shared.WorkflowType
+		WorkflowDomain                  *string
+		Header                          *shared.Header
+	}
+
 	localActivityMarkerData struct {
 		ActivityID   string        `json:"activityId,omitempty"`
 		ActivityType string        `json:"activityType,omitempty"`

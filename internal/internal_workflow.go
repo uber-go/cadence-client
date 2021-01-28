@@ -438,7 +438,10 @@ func newWorkflowContext(env workflowEnvironment, interceptors WorkflowIntercepto
 	return rootCtx
 }
 
-func newWorkflowInterceptors(env workflowEnvironment, factories []WorkflowInterceptorFactory) (WorkflowInterceptor, *workflowEnvironmentInterceptor) {
+func newWorkflowInterceptors(
+	env workflowEnvironment,
+	factories []WorkflowInterceptorFactory,
+) (WorkflowInterceptor, *workflowEnvironmentInterceptor) {
 	envInterceptor := &workflowEnvironmentInterceptor{env: env}
 	var interceptor WorkflowInterceptor = envInterceptor
 	for i := len(factories) - 1; i >= 0; i-- {
@@ -564,6 +567,12 @@ func getState(ctx Context) *coroutineState {
 		panic("getState: not workflow context")
 	}
 	state := s.(*coroutineState)
+	// When workflow gets evicted from cache is closes the dispatcher and exits all its coroutines.
+	// However if workflow function have a defer, it will be executed. Many workflow API calls will end up here.
+	// The following check prevents coroutine executing further. It would panic otherwise as context is no longer valid.
+	if state.dispatcher.closed {
+		runtime.Goexit()
+	}
 	if !state.dispatcher.executing {
 		panic(panicIllegalAccessCoroutinueState)
 	}

@@ -626,6 +626,11 @@ func TestDispatchClose(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			ii := i
 			GoNamed(ctx, fmt.Sprintf("c-%v", i), func(ctx Context) {
+				defer func(){
+					// Trigger no-longer-valid context access within deferred function.
+					// At this point deferred function should not continue and will be exited.
+					getState(ctx)
+				}()
 				c.Receive(ctx, nil) // blocked forever
 				history = append(history, fmt.Sprintf("child-%v", ii))
 			})
@@ -652,6 +657,10 @@ func TestDispatchClose(t *testing.T) {
 		"root",
 	}
 	require.EqualValues(t, expected, history)
+	for _, c := range d.coroutines {
+		// Ensure that coroutines did not panic during dispatcher closing procedure
+		require.Nil(t, c.panicError)
+	}
 }
 
 func TestPanic(t *testing.T) {

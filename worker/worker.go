@@ -37,6 +37,26 @@ type (
 	// Worker hosts workflow and activity implementations.
 	// Use worker.New(...) to create an instance.
 	Worker interface {
+		Registry
+
+		// Start starts the worker in a non-blocking fashion
+		Start() error
+		// Run is a blocking start and cleans up resources when killed
+		// returns error only if it fails to start the worker
+		Run() error
+		// Stop cleans up any resources opened by worker
+		Stop()
+	}
+
+
+	// Registry exposes registration functions to consumers.
+	Registry interface {
+		WorkflowRegistry
+		ActivityRegistry
+	}
+
+	// WorkflowRegistry exposes workflow registration functions to consumers.
+	WorkflowRegistry interface {
 		// RegisterWorkflow - registers a workflow function with the worker.
 		// A workflow takes a workflow.Context and input and returns a (result, error) or just error.
 		// Examples:
@@ -57,7 +77,10 @@ type (
 		// This method panics if workflowFunc doesn't comply with the expected format or tries to register the same workflow
 		// type name twice. Use workflow.RegisterOptions.DisableAlreadyRegisteredCheck to allow multiple registrations.
 		RegisterWorkflowWithOptions(w interface{}, options workflow.RegisterOptions)
+	}
 
+	// ActivityRegistry exposes activity registration functions to consumers.
+	ActivityRegistry interface {
 		// RegisterActivity - register an activity function or a pointer to a structure with the worker.
 		// An activity function takes a context and input and returns a (result, error) or just error.
 		//
@@ -106,14 +129,6 @@ type (
 		// which might be useful for integration tests.
 		// worker.RegisterActivityWithOptions(barActivity, RegisterActivityOptions{DisableAlreadyRegisteredCheck: true})
 		RegisterActivityWithOptions(a interface{}, options activity.RegisterOptions)
-
-		// Start starts the worker in a non-blocking fashion
-		Start() error
-		// Run is a blocking start and cleans up resources when killed
-		// returns error only if it fails to start the worker
-		Run() error
-		// Stop cleans up any resources opened by worker
-		Stop()
 	}
 
 	// WorkflowReplayer supports replaying a workflow from its event history.

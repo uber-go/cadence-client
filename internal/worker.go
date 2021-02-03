@@ -205,6 +205,10 @@ type (
 		// Optional: Sets opentracing Tracer that is to be used to emit tracing information
 		// default: no tracer - opentracing.NoopTracer
 		Tracer opentracing.Tracer
+
+		// Optional: Automatically send heartbeats for any activity with a HeartbeatTimeout
+		// default: false
+		ActivityAutoHeartbeat bool
 	}
 )
 

@@ -144,6 +144,7 @@ type (
 		workerStopCh       <-chan struct{}
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
+		autoHeartbeat      bool
 	}
 
 	// history wrapper method to help information about events.
@@ -1611,6 +1612,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		workerStopCh:       params.WorkerStopChannel,
 		contextPropagators: params.ContextPropagators,
 		tracer:             params.Tracer,
+		autoHeartbeat:      params.ActivityAutoHeartbeat,
 	}
 }
 
@@ -1819,6 +1821,26 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 
 	ctx, span := createOpenTracingActivitySpan(ctx, ath.tracer, time.Now(), activityType, t.WorkflowExecution.GetWorkflowId(), t.WorkflowExecution.GetRunId())
 	defer span.Finish()
+
+	if ath.autoHeartbeat && t.HeartbeatTimeoutSeconds != nil && *t.HeartbeatTimeoutSeconds > 0 {
+		go func() {
+			autoHbInterval := time.Duration(*t.HeartbeatTimeoutSeconds) * time.Second / 2
+			ticker := time.NewTicker(autoHbInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					hbErr := invoker.Heartbeat(nil)
+					if IsCanceledError(hbErr) {
+						return
+					}
+				}
+			}
+		}()
+	}
+
 	output, err := activityImplementation.Execute(ctx, t.Input)
 
 	dlCancelFunc()

@@ -189,6 +189,8 @@ type (
 		Tracer opentracing.Tracer
 
 		WorkflowInterceptors []WorkflowInterceptorFactory
+
+		ActivityAutoHeartbeat bool
 	}
 )
 
@@ -992,6 +994,7 @@ func newAggregatedWorker(
 		ContextPropagators:                   wOptions.ContextPropagators,
 		Tracer:                               wOptions.Tracer,
 		WorkflowInterceptors:                 wOptions.WorkflowInterceptorChainFactories,
+		ActivityAutoHeartbeat:                wOptions.ActivityAutoHeartbeat,
 	}
 
 	ensureRequiredParams(&workerParams)

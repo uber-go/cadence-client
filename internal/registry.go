@@ -92,7 +92,7 @@ func (r *registry) RegisterWorkflowWithOptions(
 	defer r.Unlock()
 
 	if !options.DisableAlreadyRegisteredCheck {
-		if _, ok := r.workflowFuncMap[registerName]; ok {
+		if _, ok := r.getWorkflowNoLock(registerName); ok {
 			panic(fmt.Sprintf("workflow name \"%v\" is already registered", registerName))
 		}
 	}
@@ -141,7 +141,7 @@ func (r *registry) registerActivityFunction(af interface{}, options RegisterActi
 	defer r.Unlock()
 
 	if !options.DisableAlreadyRegisteredCheck {
-		if _, ok := r.activityFuncMap[registerName]; ok {
+		if _, ok := r.getActivityNoLock(registerName); ok {
 			return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 		}
 	}
@@ -231,6 +231,14 @@ func (r *registry) getWorkflowFn(fnName string) (interface{}, bool) {
 	return fn, ok
 }
 
+func (r *registry) getWorkflowNoLock(registerName string) (interface{}, bool) {
+	a, ok := r.workflowFuncMap[registerName]
+	if !ok && r.next != nil {
+		return r.next.getWorkflowNoLock(registerName)
+	}
+	return a, ok
+}
+
 func (r *registry) getRegisteredWorkflowTypes() []string {
 	r.Lock() // do not defer for Unlock to call next.getRegisteredWorkflowTypes without lock
 	var result []string
@@ -277,10 +285,10 @@ func (r *registry) GetActivity(fnName string) (activity, bool) {
 	return a, ok
 }
 
-func (r *registry) getActivityNoLock(fnName string) (activity, bool) {
-	a, ok := r.activityFuncMap[fnName]
+func (r *registry) getActivityNoLock(registerName string) (activity, bool) {
+	a, ok := r.activityFuncMap[registerName]
 	if !ok && r.next != nil {
-		return r.next.getActivityNoLock(fnName)
+		return r.next.getActivityNoLock(registerName)
 	}
 	return a, ok
 }

@@ -48,7 +48,6 @@ type (
 		Stop()
 	}
 
-
 	// Registry exposes registration functions to consumers.
 	Registry interface {
 		WorkflowRegistry
@@ -139,12 +138,7 @@ type (
 	// It is important to maintain backwards compatibility through use of workflow.GetVersion
 	// to ensure that new deployments are not going to break open workflows.
 	WorkflowReplayer interface {
-
-		// RegisterWorkflow registers workflow that is going to be replayed
-		RegisterWorkflow(w interface{})
-
-		// RegisterWorkflowWithOptions registers workflow that is going to be replayed with user provided name
-		RegisterWorkflowWithOptions(w interface{}, options workflow.RegisterOptions)
+		WorkflowRegistry
 
 		// ReplayWorkflowHistory executes a single decision task for the given json history file.
 		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
@@ -172,8 +166,22 @@ type (
 		ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.Interface, logger *zap.Logger, domain string, execution workflow.Execution) error
 	}
 
+	// WorkflowShadower retrieves and replays workflow history from Cadence service to determine if there's any nondeterministic changes in the workflow definition
+	WorkflowShadower interface {
+		WorkflowRegistry
+
+		Start()
+
+		Run()
+
+		Stop()
+	}
+
 	// Options is used to configure a worker instance.
 	Options = internal.WorkerOptions
+
+	// WorkflowShadowerOptions is used to configure a WorkflowShadower.
+	WorkflowShadowerOptions = internal.WorkflowShadowerOptions
 
 	// NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 	// mismatched history events (presumably arising from non-deterministic workflow definitions).
@@ -214,6 +222,14 @@ func New(
 // NewWorkflowReplayer creates a WorkflowReplayer instance.
 func NewWorkflowReplayer() WorkflowReplayer {
 	return internal.NewWorkflowReplayer()
+}
+
+// NewWorkflowShadower creates a WorkflowShadower instance.
+func NewWorkflowShadower(
+	service workflowserviceclient.Interface,
+	config *WorkflowShadowerOptions,
+) WorkflowShadower {
+	return internal.NewWorkflowShadower(service, config)
 }
 
 // EnableVerboseLogging enable or disable verbose logging of internal Cadence library components.

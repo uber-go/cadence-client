@@ -92,6 +92,7 @@ func (r *registry) RegisterWorkflowWithOptions(
 	defer r.Unlock()
 
 	if !options.DisableAlreadyRegisteredCheck {
+		// TODO: check chained registry?
 		if _, ok := r.workflowFuncMap[registerName]; ok {
 			panic(fmt.Sprintf("workflow name \"%v\" is already registered", registerName))
 		}
@@ -141,6 +142,7 @@ func (r *registry) registerActivityFunction(af interface{}, options RegisterActi
 	defer r.Unlock()
 
 	if !options.DisableAlreadyRegisteredCheck {
+		// TODO: check chained registry?
 		if _, ok := r.activityFuncMap[registerName]; ok {
 			return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 		}

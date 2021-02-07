@@ -104,7 +104,7 @@ func (r *WorkflowReplayer) ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.
 	return r.replayWorkflowHistory(logger, service, ReplayDomainName, history)
 }
 
-// ReplayWorkflowExecution replays workflow execution loading it from Temporal service.
+// ReplayWorkflowExecution replays workflow execution loading it from Cadence service.
 func (r *WorkflowReplayer) ReplayWorkflowExecution(
 	ctx context.Context,
 	service workflowserviceclient.Interface,

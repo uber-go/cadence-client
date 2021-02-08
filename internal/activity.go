@@ -66,6 +66,11 @@ type (
 		// This option has no effect when explicit Name is provided.
 		EnableShortName               bool
 		DisableAlreadyRegisteredCheck bool
+		// Automatically send heartbeats for this activity at an interval that is less than the HeartbeatTimeout.
+		// Note that this will prevent the activity from being able to reliably record details from an internal heartbeat.
+		// This option has no effect if the activity is executed with a HeartbeatTimeout of 0
+		// Default: false
+		EnableAutoHeartbeat bool
 	}
 
 	// ActivityOptions stores all activity-specific parameters that will be stored inside of a context.

@@ -1259,6 +1259,10 @@ func (t *testActivityDeadline) GetFunction() interface{} {
 	return t.Execute
 }
 
+func (t *testActivityDeadline) GetOptions() RegisterActivityOptions {
+	return RegisterActivityOptions{}
+}
+
 type deadlineTest struct {
 	actWaitDuration  time.Duration
 	ScheduleTS       time.Time

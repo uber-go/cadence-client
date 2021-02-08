@@ -189,8 +189,6 @@ type (
 		Tracer opentracing.Tracer
 
 		WorkflowInterceptors []WorkflowInterceptorFactory
-
-		ActivityAutoHeartbeat bool
 	}
 )
 
@@ -695,8 +693,9 @@ func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
 
 // Wrapper to execute activity functions.
 type activityExecutor struct {
-	name string
-	fn   interface{}
+	name    string
+	fn      interface{}
+	options RegisterActivityOptions
 }
 
 func (ae *activityExecutor) ActivityType() ActivityType {
@@ -705,6 +704,10 @@ func (ae *activityExecutor) ActivityType() ActivityType {
 
 func (ae *activityExecutor) GetFunction() interface{} {
 	return ae.fn
+}
+
+func (ae *activityExecutor) GetOptions() RegisterActivityOptions {
+	return ae.options
 }
 
 func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, error) {
@@ -994,7 +997,6 @@ func newAggregatedWorker(
 		ContextPropagators:                   wOptions.ContextPropagators,
 		Tracer:                               wOptions.Tracer,
 		WorkflowInterceptors:                 wOptions.WorkflowInterceptorChainFactories,
-		ActivityAutoHeartbeat:                wOptions.ActivityAutoHeartbeat,
 	}
 
 	ensureRequiredParams(&workerParams)

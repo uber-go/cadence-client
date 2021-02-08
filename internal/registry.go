@@ -145,7 +145,7 @@ func (r *registry) registerActivityFunction(af interface{}, options RegisterActi
 			return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 		}
 	}
-	r.activityFuncMap[registerName] = &activityExecutor{registerName, af}
+	r.activityFuncMap[registerName] = &activityExecutor{registerName, af, options}
 	if len(alias) > 0 || options.EnableShortName {
 		r.activityAliasMap[fnName] = registerName
 	}
@@ -187,7 +187,7 @@ func (r *registry) registerActivityStruct(aStruct interface{}, options RegisterA
 				return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 			}
 		}
-		r.activityFuncMap[registerName] = &activityExecutor{registerName, methodValue.Interface()}
+		r.activityFuncMap[registerName] = &activityExecutor{registerName, methodValue.Interface(), options}
 		if len(structPrefix) > 0 || options.EnableShortName {
 			r.activityAliasMap[methodName] = registerName
 		}

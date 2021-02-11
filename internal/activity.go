@@ -67,8 +67,7 @@ type (
 		EnableShortName               bool
 		DisableAlreadyRegisteredCheck bool
 		// Automatically send heartbeats for this activity at an interval that is less than the HeartbeatTimeout.
-		// Note that this will prevent the activity from being able to reliably record details from an internal heartbeat.
-		// This option has no effect if the activity is executed with a HeartbeatTimeout of 0
+		// This option has no effect if the activity is executed with a HeartbeatTimeout of 0.
 		// Default: false
 		EnableAutoHeartbeat bool
 	}
@@ -257,7 +256,7 @@ func GetWorkerStopChannel(ctx context.Context) <-chan struct{} {
 //  TODO: we don't have a way to distinguish between the two cases when context is cancelled because
 //  context doesn't support overriding value of ctx.Error.
 //  TODO: Implement automatic heartbeating with cancellation through ctx.
-// details - the details that you provided here can be seen in the worflow when it receives TimeoutError, you
+// details - the details that you provided here can be seen in the workflow when it receives TimeoutError, you
 // can check error TimeoutType()/Details().
 func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 	env := getActivityEnv(ctx)
@@ -274,7 +273,7 @@ func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 			panic(err)
 		}
 	}
-	err = env.serviceInvoker.Heartbeat(data, false)
+	err = env.serviceInvoker.BatchHeartbeat(data)
 	if err != nil {
 		log := GetActivityLogger(ctx)
 		log.Debug("RecordActivityHeartbeat With Error:", zap.Error(err))
@@ -285,7 +284,9 @@ func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 // Implement to unit test activities.
 type ServiceInvoker interface {
 	// Returns ActivityTaskCanceledError if activity is cancelled
-	Heartbeat(details []byte, skipBatching bool) error
+	Heartbeat(details []byte) error
+	BatchHeartbeat(details []byte) error
+	BackgroundHeartbeat() error
 	Close(flushBufferedHeartbeat bool)
 	GetClient(domain string, options *ClientOptions) Client
 }

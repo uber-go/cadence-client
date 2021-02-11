@@ -1623,27 +1623,63 @@ type cadenceInvoker struct {
 	heartBeatTimeoutInSec int32       // The heart beat interval configured for this activity.
 	hbBatchEndTimer       *time.Timer // Whether we started a batch of operations that need to be reported in the cycle. This gets started on a user call.
 	lastDetailsToReport   *[]byte
+	detailsToReport       *[]byte
 	closeCh               chan struct{}
 	workerStopChannel     <-chan struct{}
 }
 
-func (i *cadenceInvoker) Heartbeat(details []byte, skipBatching bool) error {
+func (i *cadenceInvoker) Heartbeat(details []byte) error {
 	i.Lock()
 	defer i.Unlock()
 
-	if i.hbBatchEndTimer != nil && !skipBatching {
-		// If we have started batching window, keep track of last reported progress.
-		i.lastDetailsToReport = &details
+	_, err := i.internalHeartBeat(details)
+	return err
+}
+
+func (i *cadenceInvoker) BackgroundHeartbeat() error {
+	i.Lock()
+	defer i.Unlock()
+
+	if i.hbBatchEndTimer != nil {
+		if i.detailsToReport == nil {
+			i.detailsToReport = i.lastDetailsToReport
+		}
+
 		return nil
 	}
 
+	var details []byte
+	if i.detailsToReport != nil {
+		details = *i.detailsToReport
+	} else if i.lastDetailsToReport != nil {
+		details = *i.lastDetailsToReport
+	}
+
+	return i.heartbeatAndScheduleNextRun(details)
+}
+
+func (i *cadenceInvoker) BatchHeartbeat(details []byte) error {
+	i.Lock()
+	defer i.Unlock()
+
+	if i.hbBatchEndTimer != nil {
+		// If we have started batching window, keep track of last reported progress.
+		i.detailsToReport = &details
+		return nil
+	}
+
+	return i.heartbeatAndScheduleNextRun(details)
+}
+
+func (i *cadenceInvoker) heartbeatAndScheduleNextRun(details []byte) error {
 	isActivityCancelled, err := i.internalHeartBeat(details)
 
 	// If the activity is cancelled, the activity can ignore the cancellation and do its work
 	// and complete. Our cancellation is co-operative, so we will try to heartbeat.
-	if (err == nil || isActivityCancelled) && !skipBatching {
+	if err == nil || isActivityCancelled {
 		// We have successfully sent heartbeat, start next batching window.
-		i.lastDetailsToReport = nil
+		i.lastDetailsToReport = &details
+		i.detailsToReport = nil
 
 		// Create timer to fire before the threshold to report.
 		deadlineToTrigger := i.heartBeatTimeoutInSec
@@ -1671,18 +1707,18 @@ func (i *cadenceInvoker) Heartbeat(details []byte, skipBatching bool) error {
 			var detailsToReport *[]byte
 
 			i.Lock()
-			detailsToReport = i.lastDetailsToReport
+			detailsToReport = i.detailsToReport
 			i.hbBatchEndTimer.Stop()
 			i.hbBatchEndTimer = nil
-			i.Unlock()
 
 			if detailsToReport != nil {
 				// TODO: there is a potential race condition here as the lock is released here and
-				// locked again in the Hearbeat() method. This possible that a heartbeat call from
+				// locked again in the Heartbeat() method. This possible that a heartbeat call from
 				// user activity grabs the lock first and calls internalHeartBeat before this
 				// batching goroutine, which means some activity progress will be lost.
-				i.Heartbeat(*detailsToReport, false)
+				i.heartbeatAndScheduleNextRun(*detailsToReport)
 			}
+			i.Unlock()
 		}()
 	}
 
@@ -1830,7 +1866,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					hbErr := invoker.Heartbeat(nil)
+					hbErr := invoker.BackgroundHeartbeat()
 					if IsCanceledError(hbErr) {
 						return
 					}

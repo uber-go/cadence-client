@@ -283,9 +283,15 @@ func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 // ServiceInvoker abstracts calls to the Cadence service from an activity implementation.
 // Implement to unit test activities.
 type ServiceInvoker interface {
-	// Returns ActivityTaskCanceledError if activity is cancelled
+	// All the heartbeat methods will return ActivityTaskCanceledError if activity is cancelled.
+	// Heartbeat sends a record heartbeat request to Cadence server directly without buffering.
+	// It should only be used by the sessions framework.
 	Heartbeat(details []byte) error
+	// BatchHeartbeat sends heartbeat on the first attempt, and batches additional requests
+	// to send it later according to heartbeat timeout.
 	BatchHeartbeat(details []byte) error
+	// BackgroundHeartbeat should only be used by Cadence library internally to heartbeat automatically
+	// without detail.
 	BackgroundHeartbeat() error
 	Close(flushBufferedHeartbeat bool)
 	GetClient(domain string, options *ClientOptions) Client

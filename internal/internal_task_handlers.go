@@ -1712,10 +1712,6 @@ func (i *cadenceInvoker) heartbeatAndScheduleNextRun(details []byte) error {
 			i.hbBatchEndTimer = nil
 
 			if detailsToReport != nil {
-				// TODO: there is a potential race condition here as the lock is released here and
-				// locked again in the Heartbeat() method. This possible that a heartbeat call from
-				// user activity grabs the lock first and calls internalHeartBeat before this
-				// batching goroutine, which means some activity progress will be lost.
 				i.heartbeatAndScheduleNextRun(*detailsToReport)
 			}
 			i.Unlock()

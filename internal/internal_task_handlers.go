@@ -1622,8 +1622,8 @@ type cadenceInvoker struct {
 	cancelHandler         func()
 	heartBeatTimeoutInSec int32       // The heart beat interval configured for this activity.
 	hbBatchEndTimer       *time.Timer // Whether we started a batch of operations that need to be reported in the cycle. This gets started on a user call.
-	lastDetailsReported   *[]byte
-	detailsToReport       *[]byte
+	detailsToReport       *[]byte     // Details to be reported in the next reporting interval.
+	lastDetailsReported   *[]byte     // Details that were reported in the last reporting interval.
 	closeCh               chan struct{}
 	workerStopChannel     <-chan struct{}
 }

@@ -1860,12 +1860,19 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			defer ticker.Stop()
 			for {
 				select {
+				case <-ath.workerStopCh:
+					return
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
 					hbErr := invoker.BackgroundHeartbeat()
-					if IsCanceledError(hbErr) {
-						return
+					if hbErr != nil && IsCanceledError(hbErr) {
+						ath.logger.Error("Activity auto heartbeat error.",
+							zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
+							zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
+							zap.String(tagActivityType, activityType),
+							zap.Error(err),
+						)
 					}
 				}
 			}

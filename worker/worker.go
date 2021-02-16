@@ -170,11 +170,7 @@ type (
 	WorkflowShadower interface {
 		WorkflowRegistry
 
-		Start()
-
-		Run()
-
-		Stop()
+		Run() error
 	}
 
 	// Options is used to configure a worker instance.
@@ -183,6 +179,8 @@ type (
 	// WorkflowShadowerOptions is used to configure a WorkflowShadower.
 	WorkflowShadowerOptions = internal.WorkflowShadowerOptions
 
+	TimeFilter                    = internal.TimeFilter
+	WorkflowShadowerExitCondition = internal.WorkflowShadowerExitCondition
 	// NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 	// mismatched history events (presumably arising from non-deterministic workflow definitions).
 	NonDeterministicWorkflowPolicy = internal.NonDeterministicWorkflowPolicy
@@ -227,9 +225,9 @@ func NewWorkflowReplayer() WorkflowReplayer {
 // NewWorkflowShadower creates a WorkflowShadower instance.
 func NewWorkflowShadower(
 	service workflowserviceclient.Interface,
-	config *WorkflowShadowerOptions,
-) WorkflowShadower {
-	return internal.NewWorkflowShadower(service, config)
+	options *WorkflowShadowerOptions,
+) (WorkflowShadower, error) {
+	return internal.NewWorkflowShadower(service, options)
 }
 
 // EnableVerboseLogging enable or disable verbose logging of internal Cadence library components.

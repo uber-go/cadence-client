@@ -36,6 +36,7 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/serializer"
 	"go.uber.org/zap"
 )
@@ -120,8 +121,21 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 		Domain:    common.StringPtr(domain),
 		Execution: sharedExecution,
 	}
-	hResponse, err := service.GetWorkflowExecutionHistory(ctx, request)
-	if err != nil {
+
+	var hResponse *shared.GetWorkflowExecutionHistoryResponse
+	if err := backoff.Retry(ctx,
+		func() error {
+			tchCtx, cancel, opt := newChannelContext(ctx)
+
+			var err error
+			hResponse, err = service.GetWorkflowExecutionHistory(tchCtx, request, opt...)
+			cancel()
+
+			return err
+		},
+		createDynamicServiceRetryPolicy(ctx),
+		isServiceTransientError,
+	); err != nil {
 		return err
 	}
 

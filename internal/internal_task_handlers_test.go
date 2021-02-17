@@ -36,8 +36,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	s "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/gen/thrift/cadence/workflowservicetest"
+	s "go.uber.org/cadence/gen/thrift/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
 )

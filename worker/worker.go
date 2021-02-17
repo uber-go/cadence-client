@@ -25,9 +25,9 @@ package worker
 import (
 	"context"
 
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/activity"
+	"go.uber.org/cadence/gen/thrift/cadence/workflowserviceclient"
+	"go.uber.org/cadence/gen/thrift/shared"
 	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
@@ -47,7 +47,6 @@ type (
 		// Stop cleans up any resources opened by worker
 		Stop()
 	}
-
 
 	// Registry exposes registration functions to consumers.
 	Registry interface {

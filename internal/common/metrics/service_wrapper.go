@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/gen/thrift/cadence/workflowserviceclient"
+	"go.uber.org/cadence/gen/thrift/shared"
 	"go.uber.org/yarpc"
 )
 

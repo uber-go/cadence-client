@@ -28,10 +28,10 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	"go.uber.org/cadence/.gen/go/shared"
-	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/client"
 	"go.uber.org/cadence/encoded"
+	"go.uber.org/cadence/gen/thrift/shared"
+	s "go.uber.org/cadence/gen/thrift/shared"
 	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/workflow"
 )
@@ -376,7 +376,7 @@ func (_m *Client) QueryWorkflowWithOptions(ctx context.Context, request *client.
 	return r0, r1
 }
 
-func (_m *Client) ResetWorkflow(ctx context.Context, request *s.ResetWorkflowExecutionRequest) (*s.ResetWorkflowExecutionResponse, error){
+func (_m *Client) ResetWorkflow(ctx context.Context, request *s.ResetWorkflowExecutionRequest) (*s.ResetWorkflowExecutionResponse, error) {
 	var _ca []interface{}
 	_ca = append(_ca, ctx, request)
 	ret := _m.Called(_ca...)

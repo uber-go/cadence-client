@@ -32,47 +32,22 @@ ALL_SRC := $(THRIFTRW_OUT) $(shell \
 UT_DIRS := $(filter-out $(INTEG_TEST_ROOT)%, $(sort $(dir $(filter %_test.go,$(ALL_SRC)))))
 
 # Files that needs to run lint.  excludes testify mocks and the thrift sentinel.
-LINT_SRC := $(filter-out ./mock% $(THRIFTRW_OUT),$(ALL_SRC))
+LINT_SRC := $(filter-out ./mock% ./tools.go $(THRIFTRW_OUT),$(ALL_SRC))
 
-THRIFTRW_VERSION := v1.11.0
-YARPC_VERSION := v1.29.1
-GOLINT_VERSION := 470b6b0bb3005eda157f0275e2e4895055396a81
-STATICCHECK_VERSION := 2019.2.3
-ERRCHECK_VERSION := v1.2.0
+$(BINS)/thriftrw: go.mod
+	go build -mod=readonly -o $@ go.uber.org/thriftrw
 
-# versioned tools.  just change the version vars above, it'll automatically trigger a rebuild.
-$(BINS)/versions/thriftrw-$(THRIFTRW_VERSION):
-	./versioned_go_build.sh go.uber.org/thriftrw $(THRIFTRW_VERSION) $@
+$(BINS)/thriftrw-plugin-yarpc: go.mod
+	go build -mod=readonly -o $@ go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc
 
-$(BINS)/versions/yarpc-$(YARPC_VERSION):
-	./versioned_go_build.sh go.uber.org/yarpc $(YARPC_VERSION) encoding/thrift/thriftrw-plugin-yarpc $@
+$(BINS)/golint: go.mod
+	go build -mod=readonly -o $@ golang.org/x/lint/golint
 
-$(BINS)/versions/golint-$(GOLINT_VERSION):
-	./versioned_go_build.sh golang.org/x/lint $(GOLINT_VERSION) golint $@
+$(BINS)/staticcheck: go.mod
+	go build -mod=readonly -o $@ honnef.co/go/tools/cmd/staticcheck
 
-$(BINS)/versions/staticcheck-$(STATICCHECK_VERSION):
-	./versioned_go_build.sh honnef.co/go/tools $(STATICCHECK_VERSION) cmd/staticcheck $@
-
-$(BINS)/versions/errcheck-$(ERRCHECK_VERSION):
-	./versioned_go_build.sh github.com/kisielk/errcheck $(ERRCHECK_VERSION) $@
-
-# stable tool targets.  depend on / execute these instead of the versioned ones.
-# this versioned-to-nice-name thing is mostly because thriftrw depends on the yarpc
-# bin to be named "thriftrw-plugin-yarpc".
-$(BINS)/thriftrw: $(BINS)/versions/thriftrw-$(THRIFTRW_VERSION)
-	@ln -fs $(CURDIR)/$< $@
-
-$(BINS)/thriftrw-plugin-yarpc: $(BINS)/versions/yarpc-$(YARPC_VERSION)
-	@ln -fs $(CURDIR)/$< $@
-
-$(BINS)/golint: $(BINS)/versions/golint-$(GOLINT_VERSION)
-	@ln -fs $(CURDIR)/$< $@
-
-$(BINS)/staticcheck: $(BINS)/versions/staticcheck-$(STATICCHECK_VERSION)
-	@ln -fs $(CURDIR)/$< $@
-
-$(BINS)/errcheck: $(BINS)/versions/errcheck-$(ERRCHECK_VERSION)
-	@ln -fs $(CURDIR)/$< $@
+$(BINS)/errcheck: go.mod
+	go build -mod=readonly -o $@ github.com/kisielk/errcheck
 
 $(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 	@echo 'thriftrw: $(THRIFTRW_SRC)'
@@ -88,10 +63,7 @@ $(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 git-submodules:
 	git submodule update --init --recursive
 
-yarpc-install:
-	GO111MODULE=off go get -u github.com/myitcv/gobin
-	GOOS= GOARCH= gobin -mod=readonly go.uber.org/thriftrw
-	GOOS= GOARCH= gobin -mod=readonly go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc
+yarpc-install: $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 
 thriftc: git-submodules yarpc-install $(THRIFTRW_OUT) copyright
 
@@ -106,7 +78,7 @@ copyright $(BUILD)/copyright: $(ALL_SRC)
 	@touch $(BUILD)/copyright
 
 $(BUILD)/dummy:
-	go build -i -o $@ internal/cmd/dummy/dummy.go
+	go build -o $@ internal/cmd/dummy/dummy.go
 
 bins: thriftc $(ALL_SRC) $(BUILD)/copyright lint $(BUILD)/dummy
 

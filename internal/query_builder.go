@@ -48,25 +48,25 @@ var (
 )
 
 type (
-	// QueryConstructor constructs visibility query
-	QueryConstructor interface {
-		WorkflowTypes([]string) QueryConstructor
-		WorkflowStatus([]WorkflowStatus) QueryConstructor
-		StartTime(time.Time, time.Time) QueryConstructor
-		Query() string
+	// QueryBuilder builds visibility query
+	QueryBuilder interface {
+		WorkflowTypes([]string) QueryBuilder
+		WorkflowStatus([]WorkflowStatus) QueryBuilder
+		StartTime(time.Time, time.Time) QueryBuilder
+		Build() string
 	}
 
-	queryConstructorImpl struct {
+	queryBuilderImpl struct {
 		builder strings.Builder
 	}
 )
 
-// NewQueryConstructor creates a new visibility QueryConstructor
-func NewQueryConstructor() QueryConstructor {
-	return &queryConstructorImpl{}
+// NewQueryBuilder creates a new visibility QueryBuilder
+func NewQueryBuilder() QueryBuilder {
+	return &queryBuilderImpl{}
 }
 
-func (q *queryConstructorImpl) WorkflowTypes(types []string) QueryConstructor {
+func (q *queryBuilderImpl) WorkflowTypes(types []string) QueryBuilder {
 	workflowTypeQueries := make([]string, 0, len(types))
 	for _, workflowType := range types {
 		workflowTypeQueries = append(workflowTypeQueries, fmt.Sprintf(keyWorkflowType+` = "%v"`, workflowType))
@@ -75,7 +75,7 @@ func (q *queryConstructorImpl) WorkflowTypes(types []string) QueryConstructor {
 	return q
 }
 
-func (q *queryConstructorImpl) WorkflowStatus(statuses []WorkflowStatus) QueryConstructor {
+func (q *queryBuilderImpl) WorkflowStatus(statuses []WorkflowStatus) QueryBuilder {
 	workflowStatusQueries := make([]string, 0, len(statuses))
 	for _, status := range statuses {
 		var statusQuery string
@@ -93,7 +93,7 @@ func (q *queryConstructorImpl) WorkflowStatus(statuses []WorkflowStatus) QueryCo
 	return q
 }
 
-func (q *queryConstructorImpl) StartTime(minStartTime, maxStartTime time.Time) QueryConstructor {
+func (q *queryBuilderImpl) StartTime(minStartTime, maxStartTime time.Time) QueryBuilder {
 	startTimeQueries := make([]string, 0, 2)
 	if !minStartTime.IsZero() {
 		startTimeQueries = append(startTimeQueries, fmt.Sprintf(keyStartTime+` >= %v`, minStartTime.UnixNano()))
@@ -106,11 +106,11 @@ func (q *queryConstructorImpl) StartTime(minStartTime, maxStartTime time.Time) Q
 	return q
 }
 
-func (q *queryConstructorImpl) Query() string {
+func (q *queryBuilderImpl) Build() string {
 	return q.builder.String()
 }
 
-func (q *queryConstructorImpl) appendPartialQuery(query string) {
+func (q *queryBuilderImpl) appendPartialQuery(query string) {
 	if len(query) == 0 {
 		return
 	}

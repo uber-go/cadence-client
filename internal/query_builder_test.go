@@ -9,21 +9,21 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type queryConstructorSuite struct {
+type queryBuilderSuite struct {
 	*require.Assertions
 	suite.Suite
 }
 
-func TestQueryConstructorSuite(t *testing.T) {
-	s := new(queryConstructorSuite)
+func TestQueryBuilderSuite(t *testing.T) {
+	s := new(queryBuilderSuite)
 	suite.Run(t, s)
 }
 
-func (s *queryConstructorSuite) SetupTest() {
+func (s *queryBuilderSuite) SetupTest() {
 	s.Assertions = require.New(s.T())
 }
 
-func (s *queryConstructorSuite) TestWorkflowTypeQuery() {
+func (s *queryBuilderSuite) TestWorkflowTypeQuery() {
 	testCases := []struct {
 		msg           string
 		workflowTypes []string
@@ -48,14 +48,14 @@ func (s *queryConstructorSuite) TestWorkflowTypeQuery() {
 
 	for _, test := range testCases {
 		s.T().Run(test.msg, func(t *testing.T) {
-			constructor := NewQueryConstructor()
-			constructor.WorkflowTypes(test.workflowTypes)
-			s.Equal(test.expectedQuery, constructor.Query())
+			builder := NewQueryBuilder()
+			builder.WorkflowTypes(test.workflowTypes)
+			s.Equal(test.expectedQuery, builder.Build())
 		})
 	}
 }
 
-func (s *queryConstructorSuite) TestWorkflowStatusQuery() {
+func (s *queryBuilderSuite) TestWorkflowStatusQuery() {
 	testCases := []struct {
 		msg              string
 		workflowStatuses []WorkflowStatus
@@ -85,14 +85,14 @@ func (s *queryConstructorSuite) TestWorkflowStatusQuery() {
 
 	for _, test := range testCases {
 		s.T().Run(test.msg, func(t *testing.T) {
-			constructor := NewQueryConstructor()
-			constructor.WorkflowStatus(test.workflowStatuses)
-			s.Equal(test.expectedQuery, constructor.Query())
+			builder := NewQueryBuilder()
+			builder.WorkflowStatus(test.workflowStatuses)
+			s.Equal(test.expectedQuery, builder.Build())
 		})
 	}
 }
 
-func (s *queryConstructorSuite) TestStartTimeQuery() {
+func (s *queryBuilderSuite) TestStartTimeQuery() {
 	testTimestamp := time.Now()
 	testCases := []struct {
 		msg           string
@@ -121,18 +121,18 @@ func (s *queryConstructorSuite) TestStartTimeQuery() {
 
 	for _, test := range testCases {
 		s.T().Run(test.msg, func(t *testing.T) {
-			constructor := NewQueryConstructor()
-			constructor.StartTime(test.minStartTime, test.maxStartTime)
-			s.Equal(test.expectedQuery, constructor.Query())
+			builder := NewQueryBuilder()
+			builder.StartTime(test.minStartTime, test.maxStartTime)
+			s.Equal(test.expectedQuery, builder.Build())
 		})
 	}
 }
 
-func (s *queryConstructorSuite) TestMultipleFilters() {
+func (s *queryBuilderSuite) TestMultipleFilters() {
 	maxStartTime := time.Now()
 	minStartTime := maxStartTime.Add(-time.Hour)
 
-	constructor := NewQueryConstructor().
+	builder := NewQueryBuilder().
 		WorkflowTypes([]string{"testWorkflowType1", "testWorkflowType2"}).
 		WorkflowStatus([]WorkflowStatus{WorkflowStatusOpen}).
 		StartTime(minStartTime, maxStartTime)
@@ -141,10 +141,10 @@ func (s *queryConstructorSuite) TestMultipleFilters() {
 		minStartTime.UnixNano(),
 		maxStartTime.UnixNano(),
 	)
-	s.Equal(expectedQuery, constructor.Query())
+	s.Equal(expectedQuery, builder.Build())
 }
 
-func (s *queryConstructorSuite) TestToWorkflowStatus() {
+func (s *queryBuilderSuite) TestToWorkflowStatus() {
 	testCases := []struct {
 		msg            string
 		statusString   string

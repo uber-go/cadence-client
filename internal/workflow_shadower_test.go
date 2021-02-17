@@ -198,13 +198,13 @@ func (s *workflowShadowerSuite) TestShadowerOptionValidation() {
 			},
 			expectErr: false,
 			validationFn: func(options *WorkflowShadowerOptions) {
-				expectedQuery := NewQueryConstructor().
+				expectedQuery := NewQueryBuilder().
 					WorkflowTypes([]string{"testWorkflowType"}).
 					WorkflowStatus([]WorkflowStatus{WorkflowStatusOpen}).
 					StartTime(
 						s.testTimestamp.Add(-time.Hour),
 						s.testTimestamp,
-					).Query()
+					).Build()
 
 				s.Equal(expectedQuery, options.WorkflowQuery)
 			},

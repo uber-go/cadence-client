@@ -41,8 +41,6 @@ import (
 
 var (
 	errInvalidTimeFilter = errors.New("should specify either TimeRange or Min, Max timestamp")
-
-	maxTimestamp = time.Unix(0, math.MaxInt64)
 )
 
 type (
@@ -247,7 +245,7 @@ func (o *WorkflowShadowerOptions) validateAndPopulateFields() error {
 
 	// validate workflow status
 	if len(o.WorkflowQuery) == 0 {
-		queryConstructor := NewQueryConstructor().WorkflowTypes(o.WorkflowTypes)
+		queryBuilder := NewQueryBuilder().WorkflowTypes(o.WorkflowTypes)
 
 		statuses := make([]WorkflowStatus, 0, len(o.WorkflowStatus))
 		for _, statusString := range o.WorkflowStatus {
@@ -257,16 +255,16 @@ func (o *WorkflowShadowerOptions) validateAndPopulateFields() error {
 			}
 			statuses = append(statuses, status)
 		}
-		queryConstructor.WorkflowStatus(statuses)
+		queryBuilder.WorkflowStatus(statuses)
 
 		if o.WorkflowStartTimeFilter != nil {
 			if err := o.WorkflowStartTimeFilter.validateAndPopulateFields(); err != nil {
 				return fmt.Errorf("invalid start time filter, error: %v", err)
 			}
-			queryConstructor.StartTime(o.WorkflowStartTimeFilter.MinTimestamp, o.WorkflowStartTimeFilter.MaxTimestamp)
+			queryBuilder.StartTime(o.WorkflowStartTimeFilter.MinTimestamp, o.WorkflowStartTimeFilter.MaxTimestamp)
 		}
 
-		o.WorkflowQuery = queryConstructor.Query()
+		o.WorkflowQuery = queryBuilder.Build()
 	}
 
 	if o.SamplingRate == 0 {

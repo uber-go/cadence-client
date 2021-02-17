@@ -31,6 +31,7 @@ func TestWorkflowRegistration(t *testing.T) {
 	tests := []struct {
 		msg               string
 		register          func(r *registry)
+		registerPanic     bool
 		workflowType      string
 		altWorkflowType   string
 		resolveByFunction interface{}
@@ -66,11 +67,41 @@ func TestWorkflowRegistration(t *testing.T) {
 			altWorkflowType:   "go.uber.org/cadence/internal.(*testWorkflowStruct).Method-fm",
 			resolveByFunction: w.Method,
 		},
+		{
+			msg: "register duplicated workflow in one registry (should panic)",
+			register: func(r *registry) {
+				r.RegisterWorkflow(testWorkflowFunction)
+				r.RegisterWorkflow(testWorkflowFunction)
+			},
+			registerPanic: true,
+		},
+		{
+			msg: "register duplicated workflow with already registered check disabled",
+			register: func(r *registry) {
+				r.RegisterWorkflow(testWorkflowFunction)
+				r.RegisterWorkflowWithOptions(testWorkflowFunction, RegisterWorkflowOptions{DisableAlreadyRegisteredCheck: true})
+			},
+			workflowType:      "go.uber.org/cadence/internal.testWorkflowFunction",
+			resolveByFunction: testWorkflowFunction,
+		},
+		{
+			msg: "register duplicated workflow in chained registry (should panic)",
+			register: func(r *registry) {
+				r.next.RegisterWorkflow(testWorkflowFunction)
+				r.RegisterWorkflow(testWorkflowFunction)
+			},
+			registerPanic: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.msg, func(t *testing.T) {
 			r := newRegistry()
+			if tt.registerPanic {
+				require.Panics(t, func() { tt.register(r) }, "register should panic")
+				return
+			}
+
 			tt.register(r)
 
 			// Verify registered workflow type
@@ -104,6 +135,7 @@ func TestActivityRegistration(t *testing.T) {
 	tests := []struct {
 		msg               string
 		register          func(r *registry)
+		registerPanic     bool
 		activityType      string
 		altActivityType   string
 		resolveByFunction interface{}
@@ -156,10 +188,41 @@ func TestActivityRegistration(t *testing.T) {
 			resolveByFunction: (&testActivityStruct{}).Method,
 			resolveByAlias:    "prefix.Method",
 		},
+		{
+			msg: "register duplicated activity function in one registry (should panic)",
+			register: func(r *registry) {
+				duplicatedActivityAlias := "activity.alias"
+				r.RegisterActivityWithOptions(testActivityFunction, RegisterActivityOptions{Name: duplicatedActivityAlias})
+				r.RegisterActivityWithOptions(testActivityFunction, RegisterActivityOptions{Name: duplicatedActivityAlias})
+			},
+			registerPanic: true,
+		},
+		{
+			msg: "register duplicated activity struct with already registered check disabled",
+			register: func(r *registry) {
+				r.RegisterActivity(&testActivityStruct{})
+				r.RegisterActivityWithOptions(&testActivityStruct{}, RegisterActivityOptions{DisableAlreadyRegisteredCheck: true})
+			},
+			activityType:      "go.uber.org/cadence/internal.(*testActivityStruct).Method",
+			resolveByFunction: (&testActivityStruct{}).Method,
+		},
+		{
+			msg: "register duplicated activity function in chained registry (should panic)",
+			register: func(r *registry) {
+				r.next.RegisterActivity(testActivityFunction)
+				r.RegisterActivity(testActivityFunction)
+			},
+			registerPanic: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.msg, func(t *testing.T) {
 			r := newRegistry()
+			if tt.registerPanic {
+				require.Panics(t, func() { tt.register(r) }, "register should panic")
+				return
+			}
+
 			tt.register(r)
 
 			// Verify registered activity type

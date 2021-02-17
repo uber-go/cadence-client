@@ -305,6 +305,51 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ReplayFailed() {
 	s.Error(s.testShadower.shadowWorker())
 }
 
+func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpectedReplayError() {
+	testCases := []struct {
+		msg                string
+		getHistoryErr      error
+		getHistoryResponse *shared.GetWorkflowExecutionHistoryResponse
+	}{
+		{
+			msg:           "only workflow started event", // for example cron workflow
+			getHistoryErr: nil,
+			getHistoryResponse: &shared.GetWorkflowExecutionHistoryResponse{
+				History: &shared.History{Events: []*shared.HistoryEvent{
+					createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
+						WorkflowType: &shared.WorkflowType{Name: common.StringPtr("testWorkflow")},
+						TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
+						Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+					}),
+				},
+				},
+			},
+		},
+		{
+			msg:                "workflow not exist",
+			getHistoryErr:      &shared.EntityNotExistsError{Message: "Workflow passed retention date"},
+			getHistoryResponse: nil,
+		},
+		{
+			msg:                "corrupted workflow history", // for example cron workflow
+			getHistoryErr:      &shared.InternalServiceError{Message: "History events not continuous"},
+			getHistoryResponse: nil,
+		},
+	}
+
+	for _, test := range testCases {
+		s.T().Run(test.msg, func(t *testing.T) {
+			s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Return(&shared.ListWorkflowExecutionsResponse{
+				Executions:    s.newTestWorkflowExecutions(1),
+				NextPageToken: nil,
+			}, nil).Times(1)
+			s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any()).Return(test.getHistoryResponse, test.getHistoryErr).Times(1)
+
+			s.NoError(s.testShadower.shadowWorker())
+		})
+	}
+}
+
 func (s *workflowShadowerSuite) newTestWorkflowExecutions(size int) []*shared.WorkflowExecutionInfo {
 	executions := make([]*shared.WorkflowExecutionInfo, size)
 	for i := 0; i != size; i++ {

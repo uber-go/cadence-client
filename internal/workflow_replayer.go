@@ -41,6 +41,13 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	errReplayEmptyHistory          = errors.New("empty events")
+	errReplayHistoryTooShort       = errors.New("at least 3 events expected in the history")
+	errReplayInvalidFirstEvent     = errors.New("first event is not WorkflowExecutionStarted")
+	errReplayCorruptedStartedEvent = errors.New("corrupted WorkflowExecutionStarted")
+)
+
 // WorkflowReplayer is used to replay workflow code from an event history
 type WorkflowReplayer struct {
 	registry *registry
@@ -134,7 +141,13 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 			return err
 		},
 		createDynamicServiceRetryPolicy(ctx),
-		isServiceTransientError,
+		func(err error) bool {
+			if _, ok := err.(*shared.InternalServiceError); ok {
+				// treat InternalServiceError as non-retryable, as the workflow history may be corrupted
+				return false
+			}
+			return isServiceTransientError(err)
+		},
 	); err != nil {
 		return err
 	}
@@ -160,20 +173,20 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 	taskList := "ReplayTaskList"
 	events := history.Events
 	if events == nil {
-		return errors.New("empty events")
+		return errReplayEmptyHistory
 	}
 	if len(events) < 3 {
-		return errors.New("at least 3 events expected in the history")
+		return errReplayHistoryTooShort
 	}
 	first := events[0]
 	if first.GetEventType() != shared.EventTypeWorkflowExecutionStarted {
-		return errors.New("first event is not WorkflowExecutionStarted")
+		return errReplayInvalidFirstEvent
 	}
 	last := events[len(events)-1]
 
 	attr := first.WorkflowExecutionStartedEventAttributes
 	if attr == nil {
-		return errors.New("corrupted WorkflowExecutionStarted")
+		return errReplayCorruptedStartedEvent
 	}
 	workflowType := attr.WorkflowType
 	execution := &shared.WorkflowExecution{

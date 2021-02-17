@@ -178,9 +178,6 @@ func (s *WorkflowShadower) shadowWorker() error {
 				continue
 			}
 
-			// TODO: handle the case following error
-			//     1. less than 3 history events, potentially cron workflow
-			//     2. error from get workflow execution history, potentially corrupted workflow
 			if err := s.replayer.ReplayWorkflowExecution(
 				ctx,
 				s.service,
@@ -191,8 +188,26 @@ func (s *WorkflowShadower) shadowWorker() error {
 					RunID: execution.Execution.GetRunId(),
 				},
 			); err != nil {
+				if err == errReplayHistoryTooShort {
+					// less than 3 history events, potentially cron workflow
+					continue
+				}
+
+				switch err.(type) {
+				case *shared.EntityNotExistsError:
+					continue
+				case *shared.InternalServiceError:
+					// workflow not exist, or potentially corrupted workflow
+					s.options.Logger.Warn("Skipped replaying workflow",
+						zap.String("WorkflowID", execution.Execution.GetWorkflowId()),
+						zap.String("RunID", execution.Execution.GetRunId()),
+						zap.Error(err),
+					)
+					continue
+				}
 				return err
 			}
+
 			s.options.Logger.Info("Successfully replayed workflow",
 				zap.String("WorkflowID", execution.Execution.GetWorkflowId()),
 				zap.String("RunID", execution.Execution.GetRunId()),

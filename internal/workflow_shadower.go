@@ -61,8 +61,6 @@ type (
 
 	// TimeFilter represents a time range filter
 	TimeFilter struct {
-		TimeRange string
-
 		MinTimestamp time.Time
 		MaxTimestamp time.Time
 	}
@@ -296,23 +294,6 @@ func (o *WorkflowShadowerOptions) validateAndPopulateFields() error {
 }
 
 func (t *TimeFilter) validateAndPopulateFields() error {
-	if len(t.TimeRange) != 0 && (!t.MinTimestamp.IsZero() || !t.MaxTimestamp.IsZero()) {
-		// both forms are used
-		return errInvalidTimeFilter
-	}
-
-	if len(t.TimeRange) != 0 {
-		duration, err := time.ParseDuration(t.TimeRange)
-		if err != nil {
-			return fmt.Errorf("failed to parse time range, error: %v", err)
-		}
-
-		now := time.Now()
-		t.MinTimestamp = now.Add(-duration)
-		t.MaxTimestamp = now
-		return nil
-	}
-
 	if t.MaxTimestamp.IsZero() {
 		t.MaxTimestamp = maxTimestamp
 	}

@@ -96,16 +96,7 @@ func (s *workflowShadowerSuite) TestTimeFilterValidation() {
 		validationFn func(TimeFilter)
 	}{
 		{
-			msg: "both forms are used",
-			timeFilter: TimeFilter{
-				TimeRange:    "24h",
-				MinTimestamp: time.Now().Add(-24 * time.Hour),
-				MaxTimestamp: time.Now(),
-			},
-			expectErr: true,
-		},
-		{
-			msg:        "neither form is used",
+			msg:        "neither timestamp is specified",
 			timeFilter: TimeFilter{},
 			expectErr:  false,
 			validationFn: func(f TimeFilter) {
@@ -133,16 +124,6 @@ func (s *workflowShadowerSuite) TestTimeFilterValidation() {
 			validationFn: func(f TimeFilter) {
 				s.True(f.MinTimestamp.IsZero())
 				s.True(f.MaxTimestamp.Equal(s.testTimestamp))
-			},
-		},
-		{
-			msg: "time range",
-			timeFilter: TimeFilter{
-				TimeRange: "24h",
-			},
-			expectErr: false,
-			validationFn: func(f TimeFilter) {
-				s.Equal(24*time.Hour, f.MaxTimestamp.Sub(f.MinTimestamp))
 			},
 		},
 	}
@@ -299,7 +280,21 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ReplayFailed() {
 		History: s.testWorkflowHistory,
 	}, nil).Times(successfullyReplayed)
 	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any()).Return(&shared.GetWorkflowExecutionHistoryResponse{
-		History: &shared.History{Events: []*shared.HistoryEvent{}},
+		History: &shared.History{Events: []*shared.HistoryEvent{
+			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
+				TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
+				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+			}),
+			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskStarted(3),
+			createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
+			createTestEventActivityTaskScheduled(5, &shared.ActivityTaskScheduledEventAttributes{
+				ActivityId:   common.StringPtr("0"),
+				ActivityType: &shared.ActivityType{Name: common.StringPtr("unknownActivityType")},
+				TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
+			}),
+		}},
 	}, nil).Times(1)
 
 	s.Error(s.testShadower.shadowWorker())
@@ -320,6 +315,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpectedReplayErro
 						WorkflowType: &shared.WorkflowType{Name: common.StringPtr("testWorkflow")},
 						TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
 						Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+						CronSchedule: common.StringPtr("* * * * *"),
 					}),
 				},
 				},

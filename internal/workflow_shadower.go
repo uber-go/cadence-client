@@ -43,6 +43,12 @@ var (
 	errInvalidTimeFilter = errors.New("should specify either TimeRange or Min, Max timestamp")
 )
 
+const (
+	statusInitialized int32 = 0
+	statusStarted     int32 = 1
+	statusStopped     int32 = 2
+)
+
 type (
 	// WorkflowShadowerOptions configs WorkflowShadower
 	WorkflowShadowerOptions struct {
@@ -98,7 +104,7 @@ func NewWorkflowShadower(
 		options:  options,
 		replayer: NewWorkflowReplayer(),
 
-		status:     util.DaemonStatusInitialized,
+		status:     statusInitialized,
 		shutdownCh: make(chan struct{}),
 
 		clock: clock.New(),
@@ -117,7 +123,7 @@ func (s *WorkflowShadower) RegisterWorkflowWithOptions(w interface{}, options Re
 
 // Run starts WorkflowShadower in a blocking fashion
 func (s *WorkflowShadower) Run() error {
-	if !atomic.CompareAndSwapInt32(&s.status, util.DaemonStatusInitialized, util.DaemonStatusStarted) {
+	if !atomic.CompareAndSwapInt32(&s.status, statusInitialized, statusStarted) {
 		return errors.New("Workflow shadower already started")
 	}
 
@@ -126,7 +132,7 @@ func (s *WorkflowShadower) Run() error {
 
 // Stop stops WorkflowShadower and wait up to one miniute for all goroutines to finish before returning
 func (s *WorkflowShadower) Stop() {
-	if !atomic.CompareAndSwapInt32(&s.status, util.DaemonStatusStarted, util.DaemonStatusStopped) {
+	if !atomic.CompareAndSwapInt32(&s.status, statusStarted, statusStopped) {
 		return
 	}
 

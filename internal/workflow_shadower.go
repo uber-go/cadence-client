@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Copyright (c) 2017-2021 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -37,10 +37,6 @@ import (
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/util"
 	"go.uber.org/zap"
-)
-
-var (
-	errInvalidTimeFilter = errors.New("should specify either TimeRange or Min, Max timestamp")
 )
 
 const (

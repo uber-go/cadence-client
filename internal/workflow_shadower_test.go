@@ -253,7 +253,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_MaxShadowingCount(
 	maxShadowingCount := 50
 
 	s.testShadower.options.ExitCondition = &WorkflowShadowerExitCondition{
-		MaxShadowingCount: maxShadowingCount,
+		ShadowingCount: maxShadowingCount,
 	}
 
 	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Return(&shared.ListWorkflowExecutionsResponse{

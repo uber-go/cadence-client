@@ -178,9 +178,12 @@ type (
 
 	// WorkflowShadowerOptions is used to configure a WorkflowShadower.
 	WorkflowShadowerOptions = internal.WorkflowShadowerOptions
-
-	TimeFilter                    = internal.TimeFilter
+	// TimeFilter represents a time range through the min and max timestamp
+	TimeFilter = internal.TimeFilter
+	// WorkflowShadowerExitCondition configures when the workflow shadower should exit.
+	// If not specified shadower will exit after replaying all workflows satisfying the visibility query.
 	WorkflowShadowerExitCondition = internal.WorkflowShadowerExitCondition
+
 	// NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 	// mismatched history events (presumably arising from non-deterministic workflow definitions).
 	NonDeterministicWorkflowPolicy = internal.NonDeterministicWorkflowPolicy

@@ -46,7 +46,7 @@ const (
 )
 
 type (
-	// WorkflowShadowerOptions configs WorkflowShadower
+	// WorkflowShadowerOptions is used to configure a WorkflowShadower.
 	WorkflowShadowerOptions struct {
 		Domain string
 
@@ -61,16 +61,17 @@ type (
 		Logger *zap.Logger
 	}
 
-	// TimeFilter represents a time range filter
+	// TimeFilter represents a time range through the min and max timestamp
 	TimeFilter struct {
 		MinTimestamp time.Time
 		MaxTimestamp time.Time
 	}
 
-	// WorkflowShadowerExitCondition specifies when Shadower should stop shadowing and exit
+	// WorkflowShadowerExitCondition configures when the workflow shadower should exit.
+	// If not specified shadower will exit after replaying all workflows satisfying the visibility query.
 	WorkflowShadowerExitCondition struct {
-		ExpirationTime    time.Duration
-		MaxShadowingCount int
+		ExpirationTime time.Duration
+		ShadowingCount int
 	}
 
 	// WorkflowShadower retrieves and replays workflow history from Cadence service to determine if there's any nondeterministic changes in the workflow definition
@@ -159,8 +160,8 @@ func (s *WorkflowShadower) shadowWorker() error {
 
 	replayCount := 0
 	maxReplayCount := math.MaxInt64
-	if s.options.ExitCondition != nil && s.options.ExitCondition.MaxShadowingCount != 0 {
-		maxReplayCount = s.options.ExitCondition.MaxShadowingCount
+	if s.options.ExitCondition != nil && s.options.ExitCondition.ShadowingCount != 0 {
+		maxReplayCount = s.options.ExitCondition.ShadowingCount
 	}
 	rand.Seed(s.clock.Now().UnixNano())
 	for {

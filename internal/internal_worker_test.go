@@ -42,20 +42,13 @@ import (
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 func testInternalWorkerRegister(r *registry) {
 	r.RegisterWorkflowWithOptions(
 		sampleWorkflowExecute,
 		RegisterWorkflowOptions{Name: "sampleWorkflowExecute"},
-	)
-	r.RegisterWorkflow(testReplayWorkflow)
-	r.RegisterWorkflow(testReplayWorkflowLocalActivity)
-	r.RegisterWorkflow(testReplayWorkflowFromFile)
-	r.RegisterWorkflow(testReplayWorkflowFromFileParent)
-	r.RegisterActivityWithOptions(
-		testActivity,
-		RegisterActivityOptions{Name: "testActivity"},
 	)
 	r.RegisterActivity(testActivityByteArgs)
 	r.RegisterActivityWithOptions(
@@ -81,14 +74,6 @@ func testInternalWorkerRegisterWithTestEnv(env *TestWorkflowEnvironment) {
 	env.RegisterWorkflowWithOptions(
 		sampleWorkflowExecute,
 		RegisterWorkflowOptions{Name: "sampleWorkflowExecute"},
-	)
-	env.RegisterWorkflow(testReplayWorkflow)
-	env.RegisterWorkflow(testReplayWorkflowLocalActivity)
-	env.RegisterWorkflow(testReplayWorkflowFromFile)
-	env.RegisterWorkflow(testReplayWorkflowFromFileParent)
-	env.RegisterActivityWithOptions(
-		testActivity,
-		RegisterActivityOptions{Name: "testActivity"},
 	)
 	env.RegisterActivity(testActivityByteArgs)
 	env.RegisterActivityWithOptions(
@@ -134,272 +119,8 @@ func (s *internalWorkerTestSuite) TearDownTest() {
 	s.mockCtrl.Finish() // assert mock’s expectations
 }
 
-func (s *internalWorkerTestSuite) createLocalActivityMarkerDataForTest(activityID, activityType string) []byte {
-	lamd := localActivityMarkerData{
-		ActivityID:   activityID,
-		ActivityType: activityType,
-		ReplayTime:   time.Now(),
-	}
-
-	// encode marker data
-	markerData, err := encodeArg(nil, lamd)
-	s.NoError(err)
-	return markerData
-}
-
-func getLogger() *zap.Logger {
-	logger, _ := zap.NewDevelopment()
-	return logger
-}
-
-func testReplayWorkflow(ctx Context) error {
-	ao := ActivityOptions{
-		ScheduleToStartTimeout: time.Second,
-		StartToCloseTimeout:    time.Second,
-	}
-	ctx = WithActivityOptions(ctx, ao)
-	err := ExecuteActivity(ctx, "testActivity").Get(ctx, nil)
-	if err != nil {
-		getLogger().Error("activity failed with error.", zap.Error(err))
-		panic("Failed workflow")
-	}
-	return err
-}
-
-func testReplayWorkflowLocalActivity(ctx Context) error {
-	ao := LocalActivityOptions{
-		ScheduleToCloseTimeout: time.Second,
-	}
-	ctx = WithLocalActivityOptions(ctx, ao)
-	err := ExecuteLocalActivity(ctx, testActivity).Get(ctx, nil)
-	if err != nil {
-		getLogger().Error("activity failed with error.", zap.Error(err))
-		panic("Failed workflow")
-	}
-	return err
-}
-
-func testReplayWorkflowFromFile(ctx Context) error {
-	ao := ActivityOptions{
-		ScheduleToStartTimeout: time.Minute,
-		StartToCloseTimeout:    time.Minute,
-		HeartbeatTimeout:       20 * time.Second,
-		WaitForCancellation:    true,
-	}
-	ctx = WithActivityOptions(ctx, ao)
-	err := ExecuteActivity(ctx, "testActivityMultipleArgs", 2, "test", true).Get(ctx, nil)
-	if err != nil {
-		getLogger().Error("activity failed with error.", zap.Error(err))
-		panic("Failed workflow")
-	}
-	return err
-}
-
-func testReplayWorkflowFromFileParent(ctx Context) error {
-	execution := GetWorkflowInfo(ctx).WorkflowExecution
-	childID := fmt.Sprintf("child_workflow:%v", execution.RunID)
-	cwo := ChildWorkflowOptions{
-		WorkflowID:                   childID,
-		ExecutionStartToCloseTimeout: time.Minute,
-	}
-	ctx = WithChildWorkflowOptions(ctx, cwo)
-	var result string
-	cwf := ExecuteChildWorkflow(ctx, testReplayWorkflowFromFile)
-	f1 := cwf.SignalChildWorkflow(ctx, "test-signal", "test-data")
-	err := f1.Get(ctx, nil)
-	err = cwf.Get(ctx, &result)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func testActivity(ctx context.Context) error {
-	return nil
-}
-
-func (s *internalWorkerTestSuite) TestReplayWorkflowHistory() {
-	taskList := "taskList1"
-	testEvents := []*shared.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
-			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
-			Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
-		}),
-		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
-		createTestEventDecisionTaskStarted(3),
-		createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-		createTestEventActivityTaskScheduled(5, &shared.ActivityTaskScheduledEventAttributes{
-			ActivityId:   common.StringPtr("0"),
-			ActivityType: &shared.ActivityType{Name: common.StringPtr("testActivity")},
-			TaskList:     &shared.TaskList{Name: &taskList},
-		}),
-		createTestEventActivityTaskStarted(6, &shared.ActivityTaskStartedEventAttributes{
-			ScheduledEventId: common.Int64Ptr(5),
-		}),
-		createTestEventActivityTaskCompleted(7, &shared.ActivityTaskCompletedEventAttributes{
-			ScheduledEventId: common.Int64Ptr(5),
-			StartedEventId:   common.Int64Ptr(6),
-		}),
-		createTestEventDecisionTaskScheduled(8, &shared.DecisionTaskScheduledEventAttributes{}),
-		createTestEventDecisionTaskStarted(9),
-		createTestEventDecisionTaskCompleted(10, &shared.DecisionTaskCompletedEventAttributes{
-			ScheduledEventId: common.Int64Ptr(8),
-			StartedEventId:   common.Int64Ptr(9),
-		}),
-		createTestEventWorkflowExecutionCompleted(11, &shared.WorkflowExecutionCompletedEventAttributes{
-			DecisionTaskCompletedEventId: common.Int64Ptr(10),
-		}),
-	}
-
-	history := &shared.History{Events: testEvents}
-	logger := getLogger()
-	replayer := NewWorkflowReplayer()
-	replayer.RegisterWorkflow(testReplayWorkflow)
-	err := replayer.ReplayWorkflowHistory(logger, history)
-	require.NoError(s.T(), err)
-}
-
-func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_Incomplete() {
-	taskList := "taskList1"
-	testEvents := []*shared.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
-			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
-			Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
-		}),
-		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
-		createTestEventDecisionTaskStarted(3),
-		createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-		createTestEventActivityTaskScheduled(5, &shared.ActivityTaskScheduledEventAttributes{
-			ActivityId:   common.StringPtr("0"),
-			ActivityType: &shared.ActivityType{Name: common.StringPtr("testActivity-fm")},
-			TaskList:     &shared.TaskList{Name: &taskList},
-		}),
-	}
-
-	history := &shared.History{Events: testEvents}
-	logger := getLogger()
-	replayer := NewWorkflowReplayer()
-	replayer.RegisterWorkflow(testReplayWorkflow)
-	err := replayer.ReplayWorkflowHistory(logger, history)
-	require.NoError(s.T(), err)
-}
-
-func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity() {
-	taskList := "taskList1"
-	testEvents := []*shared.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
-			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
-			Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
-		}),
-		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
-		createTestEventDecisionTaskStarted(3),
-		createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-
-		createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
-			MarkerName:                   common.StringPtr(localActivityMarkerName),
-			Details:                      s.createLocalActivityMarkerDataForTest("0", "go.uber.org/cadence/internal.testActivity"),
-			DecisionTaskCompletedEventId: common.Int64Ptr(4),
-		}),
-
-		createTestEventWorkflowExecutionCompleted(6, &shared.WorkflowExecutionCompletedEventAttributes{
-			DecisionTaskCompletedEventId: common.Int64Ptr(4),
-		}),
-	}
-
-	history := &shared.History{Events: testEvents}
-	logger := getLogger()
-	replayer := &WorkflowReplayer{registry: s.registry}
-	err := replayer.ReplayWorkflowHistory(logger, history)
-	require.NoError(s.T(), err)
-}
-
-func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity_Result_Mismatch() {
-	taskList := "taskList1"
-	testEvents := []*shared.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
-			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
-			Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
-		}),
-		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
-		createTestEventDecisionTaskStarted(3),
-		createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-
-		createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
-			MarkerName:                   common.StringPtr(localActivityMarkerName),
-			Details:                      s.createLocalActivityMarkerDataForTest("0", ""),
-			DecisionTaskCompletedEventId: common.Int64Ptr(4),
-		}),
-
-		createTestEventWorkflowExecutionCompleted(6, &shared.WorkflowExecutionCompletedEventAttributes{
-			Result:                       []byte("some-incorrect-result"),
-			DecisionTaskCompletedEventId: common.Int64Ptr(4),
-		}),
-	}
-
-	history := &shared.History{Events: testEvents}
-	logger := getLogger()
-	replayer := &WorkflowReplayer{registry: s.registry}
-	err := replayer.ReplayWorkflowHistory(logger, history)
-	require.Error(s.T(), err)
-}
-
-func (s *internalWorkerTestSuite) TestReplayWorkflowHistory_LocalActivity_Activity_Type_Mismatch() {
-	taskList := "taskList1"
-	testEvents := []*shared.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-			WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
-			TaskList:     &shared.TaskList{Name: common.StringPtr(taskList)},
-			Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
-		}),
-		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
-		createTestEventDecisionTaskStarted(3),
-		createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-
-		createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
-			MarkerName:                   common.StringPtr(localActivityMarkerName),
-			Details:                      s.createLocalActivityMarkerDataForTest("0", "different-activity-type"),
-			DecisionTaskCompletedEventId: common.Int64Ptr(4),
-		}),
-
-		createTestEventWorkflowExecutionCompleted(6, &shared.WorkflowExecutionCompletedEventAttributes{
-			DecisionTaskCompletedEventId: common.Int64Ptr(4),
-		}),
-	}
-
-	history := &shared.History{Events: testEvents}
-	logger := getLogger()
-	replayer := &WorkflowReplayer{registry: s.registry}
-	err := replayer.ReplayWorkflowHistory(logger, history)
-	require.Error(s.T(), err)
-}
-
-func (s *internalWorkerTestSuite) TestReplayWorkflowHistoryFromFileLocalActivities() {
-	logger := getLogger()
-	replayer := NewWorkflowReplayer()
-	wf := localActivitiesCallingOptionsWorkflow{s.T()}
-	replayer.RegisterWorkflow(wf.Execute)
-	err := replayer.ReplayWorkflowHistoryFromJSONFile(logger, "testdata/localActivities.json")
-	require.NoError(s.T(), err)
-}
-
-func (s *internalWorkerTestSuite) TestReplayWorkflowHistoryFromFileParent() {
-	logger := getLogger()
-	replayer := NewWorkflowReplayer()
-	replayer.RegisterWorkflow(testReplayWorkflowFromFileParent)
-	err := replayer.ReplayWorkflowHistoryFromJSONFile(logger, "testdata/parentWF.json")
-	require.NoError(s.T(), err)
-}
-
-func (s *internalWorkerTestSuite) TestReplayWorkflowHistoryFromFile() {
-	logger := getLogger()
-	replayer := NewWorkflowReplayer()
-	replayer.RegisterWorkflow(testReplayWorkflowFromFile)
-	err := replayer.ReplayWorkflowHistoryFromJSONFile(logger, "testdata/sampleHistory.json")
-	require.NoError(s.T(), err)
+func getTestLogger(t *testing.T) *zap.Logger {
+	return zaptest.NewLogger(t)
 }
 
 func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExecutionParameters) {
@@ -413,7 +134,7 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 		createTestEventDecisionTaskStarted(3),
 	}
 
-	workflowType := "go.uber.org/cadence/internal.testReplayWorkflow"
+	workflowType := "sampleWorkflowExecute"
 	workflowID := "testID"
 	runID := "testRunID"
 
@@ -432,7 +153,7 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 func (s *internalWorkerTestSuite) TestDecisionTaskHandler() {
 	params := workerExecutionParameters{
 		Identity: "identity",
-		Logger:   getLogger(),
+		Logger:   getTestLogger(s.T()),
 	}
 	s.testDecisionTaskHandlerHelper(params)
 }
@@ -440,7 +161,7 @@ func (s *internalWorkerTestSuite) TestDecisionTaskHandler() {
 func (s *internalWorkerTestSuite) TestDecisionTaskHandler_WithDataConverter() {
 	params := workerExecutionParameters{
 		Identity:      "identity",
-		Logger:        getLogger(),
+		Logger:        getTestLogger(s.T()),
 		DataConverter: newTestDataConverter(),
 	}
 	s.testDecisionTaskHandlerHelper(params)
@@ -760,85 +481,6 @@ func (s *internalWorkerTestSuite) TestRecordActivityHeartbeatByID() {
 	wfClient.RecordActivityHeartbeatByID(context.Background(), domain, "wid", "rid", "aid",
 		"testStack", "customerObjects", 4)
 	require.NotNil(s.T(), heartbeatRequest)
-}
-
-type localActivitiesCallingOptionsWorkflow struct {
-	t *testing.T
-}
-
-func (w localActivitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (result []byte, err error) {
-	ao := LocalActivityOptions{
-		ScheduleToCloseTimeout: time.Second,
-	}
-	ctx = WithLocalActivityOptions(ctx, ao)
-
-	// By functions.
-	err = ExecuteLocalActivity(ctx, testActivityByteArgs, input).Get(ctx, nil)
-	require.NoError(w.t, err, err)
-
-	err = ExecuteLocalActivity(ctx, testActivityMultipleArgs, 2, []string{"test"}, true).Get(ctx, nil)
-	require.NoError(w.t, err, err)
-
-	err = ExecuteLocalActivity(ctx, testActivityNoResult, 2, "test").Get(ctx, nil)
-	require.NoError(w.t, err, err)
-
-	err = ExecuteLocalActivity(ctx, testActivityNoContextArg, 2, "test").Get(ctx, nil)
-	require.NoError(w.t, err, err)
-
-	f := ExecuteLocalActivity(ctx, testActivityReturnByteArray)
-	var r []byte
-	err = f.Get(ctx, &r)
-	require.NoError(w.t, err, err)
-	require.Equal(w.t, []byte("testActivity"), r)
-
-	f = ExecuteLocalActivity(ctx, testActivityReturnInt)
-	var rInt int
-	err = f.Get(ctx, &rInt)
-	require.NoError(w.t, err, err)
-	require.Equal(w.t, 5, rInt)
-
-	f = ExecuteLocalActivity(ctx, testActivityReturnString)
-	var rString string
-	err = f.Get(ctx, &rString)
-
-	require.NoError(w.t, err, err)
-	require.Equal(w.t, "testActivity", rString)
-
-	f = ExecuteLocalActivity(ctx, testActivityReturnEmptyString)
-	var r2String string
-	err = f.Get(ctx, &r2String)
-	require.NoError(w.t, err, err)
-	require.Equal(w.t, "", r2String)
-
-	f = ExecuteLocalActivity(ctx, testActivityReturnEmptyStruct)
-	var r2Struct testActivityResult
-	err = f.Get(ctx, &r2Struct)
-	require.NoError(w.t, err, err)
-	require.Equal(w.t, testActivityResult{}, r2Struct)
-
-	f = ExecuteLocalActivity(ctx, testActivityReturnNilStructPtr)
-	var rStructPtr *testActivityResult
-	err = f.Get(ctx, &rStructPtr)
-	require.NoError(w.t, err, err)
-	require.True(w.t, rStructPtr == nil)
-
-	f = ExecuteLocalActivity(ctx, testActivityReturnStructPtr)
-	err = f.Get(ctx, &rStructPtr)
-	require.NoError(w.t, err, err)
-	require.Equal(w.t, *rStructPtr, testActivityResult{Index: 10})
-
-	f = ExecuteLocalActivity(ctx, testActivityReturnNilStructPtrPtr)
-	var rStruct2Ptr **testActivityResult
-	err = f.Get(ctx, &rStruct2Ptr)
-	require.NoError(w.t, err, err)
-	require.True(w.t, rStruct2Ptr == nil)
-
-	f = ExecuteLocalActivity(ctx, testActivityReturnStructPtrPtr)
-	err = f.Get(ctx, &rStruct2Ptr)
-	require.NoError(w.t, err, err)
-	require.True(w.t, **rStruct2Ptr == testActivityResult{Index: 10})
-
-	return []byte("Done"), nil
 }
 
 type activitiesCallingOptionsWorkflow struct {

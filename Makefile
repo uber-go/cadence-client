@@ -151,3 +151,32 @@ fmt:
 clean:
 	rm -Rf $(BUILD)
 	rm -Rf .gen
+
+# broken up into multiple += so I can interleave comments.
+# this all becomes a single line of output.
+# you must not use single-quotes within the string in this var.
+JQ_DEPS_AGE = jq '
+# only deal with things with updates
+JQ_DEPS_AGE += select(.Update)
+# allow additional filtering, e.g. DEPS_FILTER='$(JQ_DEPS_ONLY_DIRECT)'
+JQ_DEPS_AGE += $(DEPS_FILTER)
+# add "days between current version and latest version"
+JQ_DEPS_AGE += | . + {Age:(((.Update.Time | fromdate) - (.Time | fromdate))/60/60/24 | floor)}
+# add "days between latest version and now"
+JQ_DEPS_AGE += | . + {Available:((now - (.Update.Time | fromdate))/60/60/24 | floor)}
+# 123 days: library 	old_version -> new_version
+JQ_DEPS_AGE += | ([.Age, .Available] | max | tostring) + " days: " + .Path + "  \t" + .Version + " -> " + .Update.Version
+JQ_DEPS_AGE += '
+# remove surrounding quotes from output
+JQ_DEPS_AGE += --raw-output
+
+# exclude `"Indirect": true` dependencies.  direct ones have no "Indirect" key at all.
+JQ_DEPS_ONLY_DIRECT = | select(has("Indirect") | not)
+
+deps: ## Check for dependency updates, for things that are directly imported
+	@make --no-print-directory DEPS_FILTER='$(JQ_DEPS_ONLY_DIRECT)' deps-all
+
+deps-all: ## Check for all dependency updates
+	@go list -u -m -json all \
+		| $(JQ_DEPS_AGE) \
+		| sort -n

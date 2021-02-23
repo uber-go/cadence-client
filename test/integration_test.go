@@ -208,6 +208,13 @@ func (ts *IntegrationTestSuite) TestActivityRetryOnHBTimeout() {
 	ts.EqualValues(expected, ts.activities.invoked())
 }
 
+func (ts *IntegrationTestSuite) TestActivityAutoHeartbeat() {
+	var expected []string
+	err := ts.executeWorkflow("test-activity-auto-heartbeat", ts.workflows.ActivityAutoHeartbeat, &expected)
+	ts.NoError(err)
+	ts.EqualValues(expected, ts.activities.invoked())
+}
+
 func (ts *IntegrationTestSuite) TestContinueAsNew() {
 	var result int
 	err := ts.executeWorkflow("test-continueasnew", ts.workflows.ContinueAsNew, &result, 4, ts.taskListName)

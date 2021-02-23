@@ -151,6 +151,10 @@ func (ga greeterActivity) GetFunction() interface{} {
 	return ga.Execute
 }
 
+func (ga greeterActivity) GetOptions() RegisterActivityOptions {
+	return RegisterActivityOptions{}
+}
+
 // Greeter activity func
 func greeterActivityFunc(ctx context.Context, input []byte) ([]byte, error) {
 	return []byte("Hello world"), nil

@@ -66,6 +66,10 @@ type (
 		// This option has no effect when explicit Name is provided.
 		EnableShortName               bool
 		DisableAlreadyRegisteredCheck bool
+		// Automatically send heartbeats for this activity at an interval that is less than the HeartbeatTimeout.
+		// This option has no effect if the activity is executed with a HeartbeatTimeout of 0.
+		// Default: false
+		EnableAutoHeartbeat bool
 	}
 
 	// ActivityOptions stores all activity-specific parameters that will be stored inside of a context.
@@ -252,7 +256,7 @@ func GetWorkerStopChannel(ctx context.Context) <-chan struct{} {
 //  TODO: we don't have a way to distinguish between the two cases when context is cancelled because
 //  context doesn't support overriding value of ctx.Error.
 //  TODO: Implement automatic heartbeating with cancellation through ctx.
-// details - the details that you provided here can be seen in the worflow when it receives TimeoutError, you
+// details - the details that you provided here can be seen in the workflow when it receives TimeoutError, you
 // can check error TimeoutType()/Details().
 func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 	env := getActivityEnv(ctx)
@@ -269,7 +273,7 @@ func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 			panic(err)
 		}
 	}
-	err = env.serviceInvoker.Heartbeat(data, false)
+	err = env.serviceInvoker.BatchHeartbeat(data)
 	if err != nil {
 		log := GetActivityLogger(ctx)
 		log.Debug("RecordActivityHeartbeat With Error:", zap.Error(err))
@@ -279,8 +283,16 @@ func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
 // ServiceInvoker abstracts calls to the Cadence service from an activity implementation.
 // Implement to unit test activities.
 type ServiceInvoker interface {
-	// Returns ActivityTaskCanceledError if activity is cancelled
-	Heartbeat(details []byte, skipBatching bool) error
+	// All the heartbeat methods will return ActivityTaskCanceledError if activity is cancelled.
+	// Heartbeat sends a record heartbeat request to Cadence server directly without buffering.
+	// It should only be used by the sessions framework.
+	Heartbeat(details []byte) error
+	// BatchHeartbeat sends heartbeat on the first attempt, and batches additional requests
+	// to send it later according to heartbeat timeout.
+	BatchHeartbeat(details []byte) error
+	// BackgroundHeartbeat should only be used by Cadence library internally to heartbeat automatically
+	// without detail.
+	BackgroundHeartbeat() error
 	Close(flushBufferedHeartbeat bool)
 	GetClient(domain string, options *ClientOptions) Client
 }

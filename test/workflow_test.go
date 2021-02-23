@@ -172,6 +172,27 @@ func (w *Workflows) ActivityRetryOnHBTimeout(ctx workflow.Context) ([]string, er
 	return []string{"heartbeatAndSleep", "heartbeatAndSleep", "heartbeatAndSleep"}, nil
 }
 
+func (w *Workflows) ActivityAutoHeartbeat(ctx workflow.Context) ([]string, error) {
+	opts := workflow.ActivityOptions{
+		ScheduleToStartTimeout: time.Second,
+		ScheduleToCloseTimeout: 10 * time.Second,
+		StartToCloseTimeout:    10 * time.Second,
+		HeartbeatTimeout:       2 * time.Second,
+	}
+	ctx = workflow.WithActivityOptions(ctx, opts)
+
+	var result int
+	err := workflow.ExecuteActivity(ctx, "HeartbeatAndSleep", 0, 5*time.Second).Get(ctx, &result)
+	if err != nil {
+		return nil, fmt.Errorf("expected activity to succed but failed:%v", err)
+	}
+	if result != 1 {
+		return nil, fmt.Errorf("activity should only be executed once")
+	}
+
+	return []string{"heartbeatAndSleep"}, nil
+}
+
 func (w *Workflows) ContinueAsNew(ctx workflow.Context, count int, taskList string) (int, error) {
 	tl := workflow.GetInfo(ctx).TaskListName
 	if tl != taskList {
@@ -535,6 +556,7 @@ func (w *Workflows) register(worker worker.Worker) {
 	workflow.RegisterWithOptions(w.Basic, workflow.RegisterOptions{DisableAlreadyRegisteredCheck: true})
 	worker.RegisterWorkflow(w.ActivityRetryOnError)
 	worker.RegisterWorkflow(w.ActivityRetryOnHBTimeout)
+	worker.RegisterWorkflow(w.ActivityAutoHeartbeat)
 	worker.RegisterWorkflow(w.ActivityRetryOnTimeout)
 	worker.RegisterWorkflow(w.ActivityRetryOptionsChange)
 	worker.RegisterWorkflow(w.ContinueAsNew)

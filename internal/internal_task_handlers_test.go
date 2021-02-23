@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1183,9 +1184,66 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NoError() {
 		taskToken: nil,
 	}
 
-	heartbeatErr := cadenceInvoker.Heartbeat(nil, false)
+	heartbeatErr := cadenceInvoker.BatchHeartbeat(nil)
+	t.NoError(heartbeatErr)
+}
 
-	t.Nil(heartbeatErr)
+func newHeartbeatRequestMatcher(details []byte) gomock.Matcher {
+	return &recordHeartbeatRequestMatcher{details: details}
+}
+
+type recordHeartbeatRequestMatcher struct {
+	details []byte
+}
+
+func (r *recordHeartbeatRequestMatcher) String() string {
+	panic("implement me")
+}
+
+func (r *recordHeartbeatRequestMatcher) Matches(x interface{}) bool {
+	req, ok := x.(*s.RecordActivityTaskHeartbeatRequest)
+	if !ok {
+		return false
+	}
+
+	return reflect.DeepEqual(r.details, req.Details)
+}
+
+func (t *TaskHandlersTestSuite) TestHeartBeat_Interleaved() {
+	mockCtrl := gomock.NewController(t.T())
+	mockService := workflowservicetest.NewMockClient(mockCtrl)
+
+	cancelRequested := false
+	heartbeatResponse := s.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
+	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), newHeartbeatRequestMatcher([]byte("1")), callOptions...).Return(&heartbeatResponse, nil).Times(3)
+	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), newHeartbeatRequestMatcher([]byte("2")), callOptions...).Return(&heartbeatResponse, nil).Times(3)
+
+	cadenceInvoker := &cadenceInvoker{
+		identity:              "Test_Cadence_Invoker",
+		service:               mockService,
+		taskToken:             nil,
+		heartBeatTimeoutInSec: 3,
+	}
+
+	heartbeatErr := cadenceInvoker.BatchHeartbeat([]byte("1"))
+	t.NoError(heartbeatErr)
+	time.Sleep(1 * time.Second)
+
+	for i := 0; i < 4; i++ {
+		heartbeatErr = cadenceInvoker.BackgroundHeartbeat()
+		t.NoError(heartbeatErr)
+		time.Sleep(time.Second)
+	}
+
+	heartbeatErr = cadenceInvoker.BatchHeartbeat([]byte("2"))
+	t.NoError(heartbeatErr)
+	time.Sleep(1 * time.Second)
+
+	for i := 0; i < 4; i++ {
+		heartbeatErr = cadenceInvoker.BackgroundHeartbeat()
+		t.NoError(heartbeatErr)
+		time.Sleep(time.Second)
+	}
 }
 
 func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
@@ -1203,7 +1261,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 		0,
 		make(chan struct{}))
 
-	heartbeatErr := cadenceInvoker.Heartbeat(nil, false)
+	heartbeatErr := cadenceInvoker.BatchHeartbeat(nil)
 	t.NotNil(heartbeatErr)
 	_, ok := (heartbeatErr).(*s.EntityNotExistsError)
 	t.True(ok, "heartbeatErr must be EntityNotExistsError.")
@@ -1227,7 +1285,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveErro
 		0,
 		make(chan struct{}))
 
-	heartbeatErr := cadenceInvoker.Heartbeat(nil, false)
+	heartbeatErr := cadenceInvoker.BatchHeartbeat(nil)
 	t.NotNil(heartbeatErr)
 	_, ok := (heartbeatErr).(*s.DomainNotActiveError)
 	t.True(ok, "heartbeatErr must be DomainNotActiveError.")
@@ -1257,6 +1315,10 @@ func (t *testActivityDeadline) ActivityType() ActivityType {
 
 func (t *testActivityDeadline) GetFunction() interface{} {
 	return t.Execute
+}
+
+func (t *testActivityDeadline) GetOptions() RegisterActivityOptions {
+	return RegisterActivityOptions{}
 }
 
 type deadlineTest struct {

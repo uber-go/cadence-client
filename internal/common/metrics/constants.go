@@ -101,4 +101,9 @@ const (
 	StickyCacheSize  = CadenceMetricsPrefix + "sticky-cache-size"
 
 	NonDeterministicError = CadenceMetricsPrefix + "non-deterministic-error"
+
+	ReplaySucceedCounter = CadenceMetricsPrefix + "replay-succeed"
+	ReplayFailedCounter  = CadenceMetricsPrefix + "replay-failed"
+	ReplaySkippedCounter = CadenceMetricsPrefix + "replay-skipped"
+	ReplayLatency        = CadenceMetricsPrefix + "replay-latency"
 )

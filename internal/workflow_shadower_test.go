@@ -204,7 +204,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 	}
 
 	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
-		Executions:    s.newTestWorkflowExecutions(totalWorkflows),
+		Executions:    newTestWorkflowExecutions(totalWorkflows),
 		NextPageToken: nil,
 	}, nil).Times(1)
 	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(...interface{}) (*shared.GetWorkflowExecutionHistoryResponse, error) {
@@ -225,7 +225,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_MaxShadowingCount(
 	}
 
 	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
-		Executions:    s.newTestWorkflowExecutions(maxShadowingCount * 2),
+		Executions:    newTestWorkflowExecutions(maxShadowingCount * 2),
 		NextPageToken: []byte{1, 2, 3},
 	}, nil).Times(1)
 	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
@@ -236,7 +236,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_MaxShadowingCount(
 }
 
 func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_FullScan() {
-	workflowExecutions := s.newTestWorkflowExecutions(10)
+	workflowExecutions := newTestWorkflowExecutions(10)
 	numScan := 3
 	totalWorkflows := len(workflowExecutions) * numScan
 
@@ -261,28 +261,14 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_FullScan() {
 func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ReplayFailed() {
 	successfullyReplayed := 5
 	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
-		Executions:    s.newTestWorkflowExecutions(successfullyReplayed * 2),
+		Executions:    newTestWorkflowExecutions(successfullyReplayed * 2),
 		NextPageToken: []byte{1, 2, 3},
 	}, nil).Times(1)
 	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
 		History: s.testWorkflowHistory,
 	}, nil).Times(successfullyReplayed)
 	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
-		History: &shared.History{Events: []*shared.HistoryEvent{
-			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
-			}),
-			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
-			createTestEventDecisionTaskStarted(3),
-			createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-			createTestEventActivityTaskScheduled(5, &shared.ActivityTaskScheduledEventAttributes{
-				ActivityId:   common.StringPtr("0"),
-				ActivityType: &shared.ActivityType{Name: common.StringPtr("unknownActivityType")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
-			}),
-		}},
+		History: getTestReplayWorkflowMismatchHistory(),
 	}, nil).Times(1)
 
 	s.Error(s.testShadower.shadowWorker())
@@ -324,7 +310,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpectedReplayErro
 	for _, test := range testCases {
 		s.T().Run(test.msg, func(t *testing.T) {
 			s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
-				Executions:    s.newTestWorkflowExecutions(1),
+				Executions:    newTestWorkflowExecutions(1),
 				NextPageToken: nil,
 			}, nil).Times(1)
 			s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(test.getHistoryResponse, test.getHistoryErr).Times(1)
@@ -334,7 +320,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpectedReplayErro
 	}
 }
 
-func (s *workflowShadowerSuite) newTestWorkflowExecutions(size int) []*shared.WorkflowExecutionInfo {
+func newTestWorkflowExecutions(size int) []*shared.WorkflowExecutionInfo {
 	executions := make([]*shared.WorkflowExecutionInfo, size)
 	for i := 0; i != size; i++ {
 		executions[i] = &shared.WorkflowExecutionInfo{

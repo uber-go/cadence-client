@@ -69,8 +69,12 @@ func (s *workflowShadowerActivitiesSuite) SetupTest() {
 		BackgroundActivityContext: activityContext,
 		Logger:                    zaptest.NewLogger(s.T()),
 	})
-	s.env.RegisterActivity(scanWorkflowActivity)
-	s.env.RegisterActivity(replayWorkflowExecutionActivity)
+	s.env.RegisterActivityWithOptions(scanWorkflowActivity, RegisterActivityOptions{
+		Name: scanWorkflowActivityName,
+	})
+	s.env.RegisterActivityWithOptions(replayWorkflowExecutionActivity, RegisterActivityOptions{
+		Name: replayWorkflowExecutionActivityName,
+	})
 }
 
 func (s *workflowShadowerActivitiesSuite) TearDownTest() {
@@ -90,7 +94,7 @@ func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity() {
 		SamplingRate:  0.5,
 	}
 
-	resultValue, err := s.env.ExecuteActivity(scanWorkflowActivity, params)
+	resultValue, err := s.env.ExecuteActivity(scanWorkflowActivityName, params)
 	s.NoError(err)
 
 	var result scanWorkflowActivityResult
@@ -111,7 +115,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_No
 		Executions: make([]WorkflowExecution, numExecutions),
 	}
 
-	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivity, params)
+	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
 	s.NoError(err)
 
 	var result replayWorkflowActivityResult
@@ -140,7 +144,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Wi
 		Executions: make([]WorkflowExecution, numExecutions),
 	}
 
-	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivity, params)
+	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
 	s.NoError(err)
 
 	var result replayWorkflowActivityResult
@@ -179,7 +183,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Ra
 		Executions: make([]WorkflowExecution, numExecutions),
 	}
 
-	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivity, params)
+	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
 	s.NoError(err)
 
 	var result replayWorkflowActivityResult

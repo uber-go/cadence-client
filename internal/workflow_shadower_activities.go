@@ -32,12 +32,12 @@ import (
 	"go.uber.org/zap"
 )
 
-type (
-	// workflowExecution struct {
-	// 	WorkflowID string
-	// 	RunID      string
-	// }
+const (
+	scanWorkflowActivityName            = "scanWorkflowActivity"
+	replayWorkflowExecutionActivityName = "replayWorkflowExecutionActivity"
+)
 
+type (
 	scanWorkflowActivityParams struct {
 		Domain        string
 		WorkflowQuery string

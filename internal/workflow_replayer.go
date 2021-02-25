@@ -36,8 +36,16 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/serializer"
 	"go.uber.org/zap"
+)
+
+var (
+	errReplayEmptyHistory          = errors.New("empty events")
+	errReplayHistoryTooShort       = errors.New("at least 3 events expected in the history")
+	errReplayInvalidFirstEvent     = errors.New("first event is not WorkflowExecutionStarted")
+	errReplayCorruptedStartedEvent = errors.New("corrupted WorkflowExecutionStarted")
 )
 
 // WorkflowReplayer is used to replay workflow code from an event history
@@ -104,7 +112,7 @@ func (r *WorkflowReplayer) ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.
 	return r.replayWorkflowHistory(logger, service, ReplayDomainName, history)
 }
 
-// ReplayWorkflowExecution replays workflow execution loading it from Temporal service.
+// ReplayWorkflowExecution replays workflow execution loading it from Cadence service.
 func (r *WorkflowReplayer) ReplayWorkflowExecution(
 	ctx context.Context,
 	service workflowserviceclient.Interface,
@@ -120,8 +128,27 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 		Domain:    common.StringPtr(domain),
 		Execution: sharedExecution,
 	}
-	hResponse, err := service.GetWorkflowExecutionHistory(ctx, request)
-	if err != nil {
+
+	var hResponse *shared.GetWorkflowExecutionHistoryResponse
+	if err := backoff.Retry(ctx,
+		func() error {
+			tchCtx, cancel, opt := newChannelContext(ctx)
+
+			var err error
+			hResponse, err = service.GetWorkflowExecutionHistory(tchCtx, request, opt...)
+			cancel()
+
+			return err
+		},
+		createDynamicServiceRetryPolicy(ctx),
+		func(err error) bool {
+			if _, ok := err.(*shared.InternalServiceError); ok {
+				// treat InternalServiceError as non-retryable, as the workflow history may be corrupted
+				return false
+			}
+			return isServiceTransientError(err)
+		},
+	); err != nil {
 		return err
 	}
 
@@ -146,20 +173,20 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 	taskList := "ReplayTaskList"
 	events := history.Events
 	if events == nil {
-		return errors.New("empty events")
+		return errReplayEmptyHistory
 	}
 	if len(events) < 3 {
-		return errors.New("at least 3 events expected in the history")
+		return errReplayHistoryTooShort
 	}
 	first := events[0]
 	if first.GetEventType() != shared.EventTypeWorkflowExecutionStarted {
-		return errors.New("first event is not WorkflowExecutionStarted")
+		return errReplayInvalidFirstEvent
 	}
 	last := events[len(events)-1]
 
 	attr := first.WorkflowExecutionStartedEventAttributes
 	if attr == nil {
-		return errors.New("corrupted WorkflowExecutionStarted")
+		return errReplayCorruptedStartedEvent
 	}
 	workflowType := attr.WorkflowType
 	execution := &shared.WorkflowExecution{

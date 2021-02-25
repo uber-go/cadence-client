@@ -36,6 +36,7 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
+	"go.uber.org/cadence/internal/common/util"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
@@ -347,7 +348,7 @@ func (bw *baseWorker) Stop() {
 	close(bw.shutdownCh)
 	bw.limiterContextCancel()
 
-	if success := awaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {
+	if success := util.AwaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {
 		traceLog(func() {
 			bw.logger.Info("Worker graceful shutdown timed out.", zap.Duration("Shutdown timeout", bw.options.shutdownTimeout))
 		})

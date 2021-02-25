@@ -43,6 +43,7 @@ type (
 		Execute(ctx context.Context, input []byte) ([]byte, error)
 		ActivityType() ActivityType
 		GetFunction() interface{}
+		GetOptions() RegisterActivityOptions
 	}
 
 	activityInfo struct {

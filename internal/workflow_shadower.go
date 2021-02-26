@@ -141,6 +141,11 @@ func (s *WorkflowShadower) shadowWorker() error {
 	s.shutdownWG.Add(1)
 	defer s.shutdownWG.Done()
 
+	scanRequest := scanWorkflowActivityParams{
+		Domain:        s.options.Domain,
+		WorkflowQuery: s.options.WorkflowQuery,
+		SamplingRate:  s.options.SamplingRate,
+	}
 	s.options.Logger.Info("Shadow workflow query",
 		zap.String(tagVisibilityQuery, s.options.WorkflowQuery),
 	)
@@ -158,11 +163,6 @@ func (s *WorkflowShadower) shadowWorker() error {
 	}
 	rand.Seed(s.clock.Now().UnixNano())
 	for {
-		scanRequest := scanWorkflowActivityParams{
-			Domain:        s.options.Domain,
-			WorkflowQuery: s.options.WorkflowQuery,
-			SamplingRate:  s.options.SamplingRate,
-		}
 		scanResult, err := scanWorkflowExecutionsHelper(ctx, s.service, scanRequest, s.options.Logger)
 		if err != nil {
 			return err

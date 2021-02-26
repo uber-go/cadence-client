@@ -626,7 +626,7 @@ func TestDispatchClose(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			ii := i
 			GoNamed(ctx, fmt.Sprintf("c-%v", i), func(ctx Context) {
-				defer func(){
+				defer func() {
 					// Trigger no-longer-valid context access within deferred function.
 					// At this point deferred function should not continue and will be exited.
 					getState(ctx)

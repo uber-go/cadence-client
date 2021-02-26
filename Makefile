@@ -4,7 +4,7 @@
 default: test
 
 IMPORT_ROOT := go.uber.org/cadence
-THRIFT_GENDIR := .gen/go
+THRIFT_GENDIR := gen/thrift
 THRIFTRW_SRC := idls/thrift/cadence.thrift
 # one or more thriftrw-generated file(s), to create / depend on generated code
 THRIFTRW_OUT := $(THRIFT_GENDIR)/cadence/idl.go
@@ -25,7 +25,7 @@ INTEG_STICKY_ON_COVER_FILE := $(COVER_ROOT)/integ_test_sticky_on_cover.out
 ALL_SRC := $(THRIFTRW_OUT) $(shell \
 	find . -name "*.go" | \
 	grep -v \
-	-e .gen/ \
+	-e gen/ \
 	-e .build/ \
 )
 
@@ -68,7 +68,7 @@ yarpc-install: $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 thriftc: git-submodules yarpc-install $(THRIFTRW_OUT) copyright
 
 clean_thrift:
-	rm -rf .gen
+	rm -rf gen
 
 # `make copyright` or depend on "copyright" to force-run licensegen,
 # or depend on $(BUILD)/copyright to let it run as needed.
@@ -103,9 +103,9 @@ test: thriftc unit_test integ_test_sticky_off integ_test_sticky_on
 
 $(COVER_ROOT)/cover.out: $(UT_COVER_FILE) $(INTEG_STICKY_OFF_COVER_FILE) $(INTEG_STICKY_ON_COVER_FILE)
 	@echo "mode: atomic" > $(COVER_ROOT)/cover.out
-	cat $(UT_COVER_FILE) | grep -v "mode: atomic" | grep -v ".gen" >> $(COVER_ROOT)/cover.out
-	cat $(INTEG_STICKY_OFF_COVER_FILE) | grep -v "mode: atomic" | grep -v ".gen" >> $(COVER_ROOT)/cover.out
-	cat $(INTEG_STICKY_ON_COVER_FILE) | grep -v "mode: atomic" | grep -v ".gen" >> $(COVER_ROOT)/cover.out
+	cat $(UT_COVER_FILE) | grep -v "mode: atomic" | grep -v "gen" >> $(COVER_ROOT)/cover.out
+	cat $(INTEG_STICKY_OFF_COVER_FILE) | grep -v "mode: atomic" | grep -v "gen" >> $(COVER_ROOT)/cover.out
+	cat $(INTEG_STICKY_ON_COVER_FILE) | grep -v "mode: atomic" | grep -v "gen" >> $(COVER_ROOT)/cover.out
 
 cover: $(COVER_ROOT)/cover.out
 	go tool cover -html=$(COVER_ROOT)/cover.out;
@@ -150,7 +150,7 @@ fmt:
 
 clean:
 	rm -Rf $(BUILD)
-	rm -Rf .gen
+	rm -Rf gen
 
 # broken up into multiple += so I can interleave comments.
 # this all becomes a single line of output.

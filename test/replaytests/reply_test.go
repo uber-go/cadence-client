@@ -26,7 +26,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
+	"go.uber.org/cadence/gen/thrift/cadence/workflowservicetest"
 	"go.uber.org/cadence/worker"
 	"go.uber.org/zap"
 )

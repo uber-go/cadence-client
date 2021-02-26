@@ -23,7 +23,7 @@ package internal
 import (
 	"context"
 
-	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/gen/thrift/shared"
 )
 
 // HeaderWriter is an interface to write information to cadence headers

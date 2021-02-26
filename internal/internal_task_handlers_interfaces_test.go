@@ -27,8 +27,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/tchannel-go/thrift"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	m "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/gen/thrift/cadence/workflowservicetest"
+	m "go.uber.org/cadence/gen/thrift/shared"
 	"go.uber.org/cadence/internal/common"
 	"golang.org/x/net/context"
 )

@@ -23,7 +23,7 @@ package common
 import (
 	"math"
 
-	s "go.uber.org/cadence/.gen/go/shared"
+	s "go.uber.org/cadence/gen/thrift/shared"
 )
 
 // Int32Ceil return the int32 ceil of a float64

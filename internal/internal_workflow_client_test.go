@@ -24,14 +24,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/serializer"
 	"log"
 	"os"
 	"testing"
 	"time"
 
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/serializer"
+
+	"go.uber.org/cadence/gen/thrift/cadence/workflowservicetest"
+	"go.uber.org/cadence/gen/thrift/shared"
 	"go.uber.org/cadence/internal/common"
 
 	"github.com/golang/mock/gomock"

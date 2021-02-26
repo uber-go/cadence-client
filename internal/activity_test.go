@@ -73,7 +73,7 @@ func (s *activityTestSuite) TestActivityHeartbeat_InternalError() {
 	invoker := newServiceInvoker([]byte("task-token"), "identity", s.service, cancel, 1, make(chan struct{}))
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
 		serviceInvoker: invoker,
-		logger:         getLogger()})
+		logger:         getTestLogger(s.T())})
 
 	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
 		Return(nil, &shared.InternalServiceError{}).
@@ -89,7 +89,7 @@ func (s *activityTestSuite) TestActivityHeartbeat_CancelRequested() {
 	invoker := newServiceInvoker([]byte("task-token"), "identity", s.service, cancel, 1, make(chan struct{}))
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
 		serviceInvoker: invoker,
-		logger:         getLogger()})
+		logger:         getTestLogger(s.T())})
 
 	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
 		Return(&shared.RecordActivityTaskHeartbeatResponse{CancelRequested: common.BoolPtr(true)}, nil).Times(1)
@@ -104,7 +104,7 @@ func (s *activityTestSuite) TestActivityHeartbeat_EntityNotExist() {
 	invoker := newServiceInvoker([]byte("task-token"), "identity", s.service, cancel, 1, make(chan struct{}))
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
 		serviceInvoker: invoker,
-		logger:         getLogger()})
+		logger:         getTestLogger(s.T())})
 
 	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
 		Return(&shared.RecordActivityTaskHeartbeatResponse{}, &shared.EntityNotExistsError{}).Times(1)
@@ -119,7 +119,7 @@ func (s *activityTestSuite) TestActivityHeartbeat_SuppressContinousInvokes() {
 	invoker := newServiceInvoker([]byte("task-token"), "identity", s.service, cancel, 2, make(chan struct{}))
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
 		serviceInvoker: invoker,
-		logger:         getLogger()})
+		logger:         getTestLogger(s.T())})
 
 	// Multiple calls but only one call is made.
 	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
@@ -134,7 +134,7 @@ func (s *activityTestSuite) TestActivityHeartbeat_SuppressContinousInvokes() {
 	invoker2 := newServiceInvoker([]byte("task-token"), "identity", service2, cancel, 0, make(chan struct{}))
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
 		serviceInvoker: invoker2,
-		logger:         getLogger()})
+		logger:         getTestLogger(s.T())})
 	service2.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
 		Return(&shared.RecordActivityTaskHeartbeatResponse{}, nil).Times(1)
 	RecordActivityHeartbeat(ctx, "testDetails")
@@ -147,7 +147,7 @@ func (s *activityTestSuite) TestActivityHeartbeat_SuppressContinousInvokes() {
 	invoker3 := newServiceInvoker([]byte("task-token"), "identity", service3, cancel, 2, make(chan struct{}))
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
 		serviceInvoker: invoker3,
-		logger:         getLogger()})
+		logger:         getTestLogger(s.T())})
 	service3.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
 		Return(&shared.RecordActivityTaskHeartbeatResponse{}, nil).Times(1)
 
@@ -177,7 +177,7 @@ func (s *activityTestSuite) TestActivityHeartbeat_SuppressContinousInvokes() {
 	invoker4 := newServiceInvoker([]byte("task-token"), "identity", service4, cancel, 2, make(chan struct{}))
 	ctx = context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
 		serviceInvoker: invoker4,
-		logger:         getLogger()})
+		logger:         getTestLogger(s.T())})
 	service4.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
 		Return(&shared.RecordActivityTaskHeartbeatResponse{}, nil).Times(1)
 	service4.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).

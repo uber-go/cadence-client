@@ -23,6 +23,7 @@ package internal
 import (
 	"context"
 	"math/rand"
+	"strings"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -35,6 +36,12 @@ import (
 const (
 	scanWorkflowActivityName            = "scanWorkflowActivity"
 	replayWorkflowExecutionActivityName = "replayWorkflowExecutionActivity"
+)
+
+const (
+	errMsgDomainNotExists           = "domain not exists"
+	errMsgInvalidQuery              = "invalid visibility query"
+	errMsgWorkflowTypeNotRegistered = "workflow type not registered"
 )
 
 type (
@@ -78,7 +85,14 @@ func scanWorkflowActivity(
 	logger := GetActivityLogger(ctx)
 	service := ctx.Value(serviceClientContextKey).(workflowserviceclient.Interface)
 
-	return scanWorkflowExecutionsHelper(ctx, service, params, logger)
+	scanResult, err := scanWorkflowExecutionsHelper(ctx, service, params, logger)
+	switch err.(type) {
+	case *shared.EntityNotExistsError:
+		err = NewCustomError(errMsgDomainNotExists, err.Error())
+	case *shared.BadRequestError:
+		err = NewCustomError(errMsgInvalidQuery, err.Error())
+	}
+	return scanResult, err
 }
 
 func scanWorkflowExecutionsHelper(
@@ -159,6 +173,10 @@ func replayWorkflowExecutionActivity(
 		if err != nil {
 			scope.Counter(metrics.ReplayFailedCounter).Inc(1)
 			progress.Result.Failed++
+			if isWorkflowTypeNotRegisteredError(err) {
+				// this should fail the replay workflow as it requires worker deployment to fix the workflow registration.
+				return progress.Result, NewCustomError(errMsgWorkflowTypeNotRegistered, err.Error())
+			}
 		} else if success {
 			scope.Counter(metrics.ReplaySucceedCounter).Inc(1)
 			progress.Result.Succeed++
@@ -193,26 +211,26 @@ func replayWorkflowExecutionHelper(
 		return true, nil
 	}
 
-	if isExpectedReplayErr(err) {
-		taggedLogger.Info("Skipped replaying workflow", zap.Error(err))
-		return false, nil
+	if isNondeterministicErr(err) || isWorkflowTypeNotRegisteredError(err) {
+		taggedLogger.Error("Replay workflow failed", zap.Error(err))
+		return false, err
 	}
 
-	taggedLogger.Error("Replay workflow failed", zap.Error(err))
-	return false, err
+	taggedLogger.Info("Skipped replaying workflow", zap.Error(err))
+	return false, nil
 }
 
-func isExpectedReplayErr(err error) bool {
-	if err == errReplayHistoryTooShort {
-		// less than 3 history events, potentially cron workflow
-		return true
-	}
+func isNondeterministicErr(err error) bool {
+	// There're a few expected replay errors, for example:
+	//   1. errReplayHistoryTooShort
+	//   2. workflow not exist
+	//   3. internal service error when reading workflow history
+	// since we can't get an exhaustive list of expected errors, we only treat replay as failed
+	// when we are sure the error is due to non-determinisim to make sure there's no false positive.
+	// as shadowing doesn't guarantee to catch all nondeterministic errors.
+	return strings.Contains(err.Error(), "nondeterministic")
+}
 
-	switch err.(type) {
-	case *shared.EntityNotExistsError, *shared.InternalServiceError:
-		// workflow not exist, or potentially corrupted workflow
-		return true
-	}
-
-	return false
+func isWorkflowTypeNotRegisteredError(err error) bool {
+	return strings.Contains(err.Error(), errMsgUnknownWorkflowType)
 }

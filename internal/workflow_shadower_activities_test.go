@@ -81,7 +81,7 @@ func (s *workflowShadowerActivitiesSuite) TearDownTest() {
 	s.controller.Finish()
 }
 
-func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity() {
+func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_Succeed() {
 	numExecutions := 1000
 	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
 		Executions:    newTestWorkflowExecutions(numExecutions),
@@ -102,6 +102,21 @@ func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity() {
 	s.NotNil(result.NextPageToken)
 	s.True(len(result.Executions) > 0)
 	s.True(len(result.Executions) < numExecutions)
+}
+
+func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_InvalidQuery() {
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(nil, &shared.BadRequestError{
+		Message: "invalid query",
+	}).Times(1)
+
+	params := scanWorkflowActivityParams{
+		Domain:        defaultTestDomain,
+		WorkflowQuery: "invalid workflow visibility query",
+	}
+
+	_, err := s.env.ExecuteActivity(scanWorkflowActivityName, params)
+	s.Error(err)
+	s.Equal(errMsgInvalidQuery, err.Error())
 }
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_NoPreviousProgress() {
@@ -191,4 +206,19 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Ra
 	s.Equal(numSucceed, result.Succeed)
 	s.Equal(numFailed, result.Failed)
 	s.Equal(numSkipped, numExecutions-result.Succeed-result.Failed)
+}
+
+func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_WorkflowNotRegistered() {
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+		History: getTestReplayWorkflowLocalActivityHistory(), // this workflow type is not registered
+	}, nil).Times(1)
+
+	params := replayWorkflowActivityParams{
+		Domain:     defaultTestDomain,
+		Executions: make([]WorkflowExecution, 5),
+	}
+
+	_, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
+	s.Error(err)
+	s.Equal(errMsgWorkflowTypeNotRegistered, err.Error())
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Copyright (c) 2017-2021 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -9195,10 +9195,150 @@ func (v *DecisionTaskStartedEventAttributes) GetRequestId() (o string) {
 	return
 }
 
+type DecisionTaskTimedOutCause int32
+
+const (
+	DecisionTaskTimedOutCauseTimeout DecisionTaskTimedOutCause = 0
+	DecisionTaskTimedOutCauseReset   DecisionTaskTimedOutCause = 1
+)
+
+// DecisionTaskTimedOutCause_Values returns all recognized values of DecisionTaskTimedOutCause.
+func DecisionTaskTimedOutCause_Values() []DecisionTaskTimedOutCause {
+	return []DecisionTaskTimedOutCause{
+		DecisionTaskTimedOutCauseTimeout,
+		DecisionTaskTimedOutCauseReset,
+	}
+}
+
+// UnmarshalText tries to decode DecisionTaskTimedOutCause from a byte slice
+// containing its name.
+//
+//   var v DecisionTaskTimedOutCause
+//   err := v.UnmarshalText([]byte("TIMEOUT"))
+func (v *DecisionTaskTimedOutCause) UnmarshalText(value []byte) error {
+	switch string(value) {
+	case "TIMEOUT":
+		*v = DecisionTaskTimedOutCauseTimeout
+		return nil
+	case "RESET":
+		*v = DecisionTaskTimedOutCauseReset
+		return nil
+	default:
+		return fmt.Errorf("unknown enum value %q for %q", value, "DecisionTaskTimedOutCause")
+	}
+}
+
+// Ptr returns a pointer to this enum value.
+func (v DecisionTaskTimedOutCause) Ptr() *DecisionTaskTimedOutCause {
+	return &v
+}
+
+// ToWire translates DecisionTaskTimedOutCause into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// Enums are represented as 32-bit integers over the wire.
+func (v DecisionTaskTimedOutCause) ToWire() (wire.Value, error) {
+	return wire.NewValueI32(int32(v)), nil
+}
+
+// FromWire deserializes DecisionTaskTimedOutCause from its Thrift-level
+// representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TI32)
+//   if err != nil {
+//     return DecisionTaskTimedOutCause(0), err
+//   }
+//
+//   var v DecisionTaskTimedOutCause
+//   if err := v.FromWire(x); err != nil {
+//     return DecisionTaskTimedOutCause(0), err
+//   }
+//   return v, nil
+func (v *DecisionTaskTimedOutCause) FromWire(w wire.Value) error {
+	*v = (DecisionTaskTimedOutCause)(w.GetI32())
+	return nil
+}
+
+// String returns a readable string representation of DecisionTaskTimedOutCause.
+func (v DecisionTaskTimedOutCause) String() string {
+	w := int32(v)
+	switch w {
+	case 0:
+		return "TIMEOUT"
+	case 1:
+		return "RESET"
+	}
+	return fmt.Sprintf("DecisionTaskTimedOutCause(%d)", w)
+}
+
+// Equals returns true if this DecisionTaskTimedOutCause value matches the provided
+// value.
+func (v DecisionTaskTimedOutCause) Equals(rhs DecisionTaskTimedOutCause) bool {
+	return v == rhs
+}
+
+// MarshalJSON serializes DecisionTaskTimedOutCause into JSON.
+//
+// If the enum value is recognized, its name is returned. Otherwise,
+// its integer value is returned.
+//
+// This implements json.Marshaler.
+func (v DecisionTaskTimedOutCause) MarshalJSON() ([]byte, error) {
+	switch int32(v) {
+	case 0:
+		return ([]byte)("\"TIMEOUT\""), nil
+	case 1:
+		return ([]byte)("\"RESET\""), nil
+	}
+	return ([]byte)(strconv.FormatInt(int64(v), 10)), nil
+}
+
+// UnmarshalJSON attempts to decode DecisionTaskTimedOutCause from its JSON
+// representation.
+//
+// This implementation supports both, numeric and string inputs. If a
+// string is provided, it must be a known enum name.
+//
+// This implements json.Unmarshaler.
+func (v *DecisionTaskTimedOutCause) UnmarshalJSON(text []byte) error {
+	d := json.NewDecoder(bytes.NewReader(text))
+	d.UseNumber()
+	t, err := d.Token()
+	if err != nil {
+		return err
+	}
+
+	switch w := t.(type) {
+	case json.Number:
+		x, err := w.Int64()
+		if err != nil {
+			return err
+		}
+		if x > math.MaxInt32 {
+			return fmt.Errorf("enum overflow from JSON %q for %q", text, "DecisionTaskTimedOutCause")
+		}
+		if x < math.MinInt32 {
+			return fmt.Errorf("enum underflow from JSON %q for %q", text, "DecisionTaskTimedOutCause")
+		}
+		*v = (DecisionTaskTimedOutCause)(x)
+		return nil
+	case string:
+		return v.UnmarshalText([]byte(w))
+	default:
+		return fmt.Errorf("invalid JSON value %q (%T) to unmarshal into %q", t, t, "DecisionTaskTimedOutCause")
+	}
+}
+
 type DecisionTaskTimedOutEventAttributes struct {
-	ScheduledEventId *int64       `json:"scheduledEventId,omitempty"`
-	StartedEventId   *int64       `json:"startedEventId,omitempty"`
-	TimeoutType      *TimeoutType `json:"timeoutType,omitempty"`
+	ScheduledEventId *int64                     `json:"scheduledEventId,omitempty"`
+	StartedEventId   *int64                     `json:"startedEventId,omitempty"`
+	TimeoutType      *TimeoutType               `json:"timeoutType,omitempty"`
+	BaseRunId        *string                    `json:"baseRunId,omitempty"`
+	NewRunId         *string                    `json:"newRunId,omitempty"`
+	ForkEventVersion *int64                     `json:"forkEventVersion,omitempty"`
+	Reason           *string                    `json:"reason,omitempty"`
+	Cause            *DecisionTaskTimedOutCause `json:"cause,omitempty"`
 }
 
 // ToWire translates a DecisionTaskTimedOutEventAttributes struct into a Thrift-level intermediate
@@ -9218,7 +9358,7 @@ type DecisionTaskTimedOutEventAttributes struct {
 //   }
 func (v *DecisionTaskTimedOutEventAttributes) ToWire() (wire.Value, error) {
 	var (
-		fields [3]wire.Field
+		fields [8]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -9248,8 +9388,54 @@ func (v *DecisionTaskTimedOutEventAttributes) ToWire() (wire.Value, error) {
 		fields[i] = wire.Field{ID: 30, Value: w}
 		i++
 	}
+	if v.BaseRunId != nil {
+		w, err = wire.NewValueString(*(v.BaseRunId)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 40, Value: w}
+		i++
+	}
+	if v.NewRunId != nil {
+		w, err = wire.NewValueString(*(v.NewRunId)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 50, Value: w}
+		i++
+	}
+	if v.ForkEventVersion != nil {
+		w, err = wire.NewValueI64(*(v.ForkEventVersion)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 60, Value: w}
+		i++
+	}
+	if v.Reason != nil {
+		w, err = wire.NewValueString(*(v.Reason)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 70, Value: w}
+		i++
+	}
+	if v.Cause != nil {
+		w, err = v.Cause.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 80, Value: w}
+		i++
+	}
 
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _DecisionTaskTimedOutCause_Read(w wire.Value) (DecisionTaskTimedOutCause, error) {
+	var v DecisionTaskTimedOutCause
+	err := v.FromWire(w)
+	return v, err
 }
 
 // FromWire deserializes a DecisionTaskTimedOutEventAttributes struct from its Thrift-level
@@ -9304,6 +9490,56 @@ func (v *DecisionTaskTimedOutEventAttributes) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 40:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.BaseRunId = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 50:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.NewRunId = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 60:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.ForkEventVersion = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 70:
+			if field.Value.Type() == wire.TBinary {
+				var x string
+				x, err = field.Value.GetString(), error(nil)
+				v.Reason = &x
+				if err != nil {
+					return err
+				}
+
+			}
+		case 80:
+			if field.Value.Type() == wire.TI32 {
+				var x DecisionTaskTimedOutCause
+				x, err = _DecisionTaskTimedOutCause_Read(field.Value)
+				v.Cause = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -9317,7 +9553,7 @@ func (v *DecisionTaskTimedOutEventAttributes) String() string {
 		return "<nil>"
 	}
 
-	var fields [3]string
+	var fields [8]string
 	i := 0
 	if v.ScheduledEventId != nil {
 		fields[i] = fmt.Sprintf("ScheduledEventId: %v", *(v.ScheduledEventId))
@@ -9331,8 +9567,38 @@ func (v *DecisionTaskTimedOutEventAttributes) String() string {
 		fields[i] = fmt.Sprintf("TimeoutType: %v", *(v.TimeoutType))
 		i++
 	}
+	if v.BaseRunId != nil {
+		fields[i] = fmt.Sprintf("BaseRunId: %v", *(v.BaseRunId))
+		i++
+	}
+	if v.NewRunId != nil {
+		fields[i] = fmt.Sprintf("NewRunId: %v", *(v.NewRunId))
+		i++
+	}
+	if v.ForkEventVersion != nil {
+		fields[i] = fmt.Sprintf("ForkEventVersion: %v", *(v.ForkEventVersion))
+		i++
+	}
+	if v.Reason != nil {
+		fields[i] = fmt.Sprintf("Reason: %v", *(v.Reason))
+		i++
+	}
+	if v.Cause != nil {
+		fields[i] = fmt.Sprintf("Cause: %v", *(v.Cause))
+		i++
+	}
 
 	return fmt.Sprintf("DecisionTaskTimedOutEventAttributes{%v}", strings.Join(fields[:i], ", "))
+}
+
+func _DecisionTaskTimedOutCause_EqualsPtr(lhs, rhs *DecisionTaskTimedOutCause) bool {
+	if lhs != nil && rhs != nil {
+
+		x := *lhs
+		y := *rhs
+		return x.Equals(y)
+	}
+	return lhs == nil && rhs == nil
 }
 
 // Equals returns true if all the fields of this DecisionTaskTimedOutEventAttributes match the
@@ -9347,6 +9613,21 @@ func (v *DecisionTaskTimedOutEventAttributes) Equals(rhs *DecisionTaskTimedOutEv
 		return false
 	}
 	if !_TimeoutType_EqualsPtr(v.TimeoutType, rhs.TimeoutType) {
+		return false
+	}
+	if !_String_EqualsPtr(v.BaseRunId, rhs.BaseRunId) {
+		return false
+	}
+	if !_String_EqualsPtr(v.NewRunId, rhs.NewRunId) {
+		return false
+	}
+	if !_I64_EqualsPtr(v.ForkEventVersion, rhs.ForkEventVersion) {
+		return false
+	}
+	if !_String_EqualsPtr(v.Reason, rhs.Reason) {
+		return false
+	}
+	if !_DecisionTaskTimedOutCause_EqualsPtr(v.Cause, rhs.Cause) {
 		return false
 	}
 
@@ -9378,6 +9659,56 @@ func (v *DecisionTaskTimedOutEventAttributes) GetStartedEventId() (o int64) {
 func (v *DecisionTaskTimedOutEventAttributes) GetTimeoutType() (o TimeoutType) {
 	if v.TimeoutType != nil {
 		return *v.TimeoutType
+	}
+
+	return
+}
+
+// GetBaseRunId returns the value of BaseRunId if it is set or its
+// zero value if it is unset.
+func (v *DecisionTaskTimedOutEventAttributes) GetBaseRunId() (o string) {
+	if v.BaseRunId != nil {
+		return *v.BaseRunId
+	}
+
+	return
+}
+
+// GetNewRunId returns the value of NewRunId if it is set or its
+// zero value if it is unset.
+func (v *DecisionTaskTimedOutEventAttributes) GetNewRunId() (o string) {
+	if v.NewRunId != nil {
+		return *v.NewRunId
+	}
+
+	return
+}
+
+// GetForkEventVersion returns the value of ForkEventVersion if it is set or its
+// zero value if it is unset.
+func (v *DecisionTaskTimedOutEventAttributes) GetForkEventVersion() (o int64) {
+	if v.ForkEventVersion != nil {
+		return *v.ForkEventVersion
+	}
+
+	return
+}
+
+// GetReason returns the value of Reason if it is set or its
+// zero value if it is unset.
+func (v *DecisionTaskTimedOutEventAttributes) GetReason() (o string) {
+	if v.Reason != nil {
+		return *v.Reason
+	}
+
+	return
+}
+
+// GetCause returns the value of Cause if it is set or its
+// zero value if it is unset.
+func (v *DecisionTaskTimedOutEventAttributes) GetCause() (o DecisionTaskTimedOutCause) {
+	if v.Cause != nil {
+		return *v.Cause
 	}
 
 	return

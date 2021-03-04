@@ -49,17 +49,18 @@ type (
 		Domain        string
 		WorkflowQuery string
 		NextPageToken []byte
+		PageSize      int
 		SamplingRate  float64
 	}
 
 	scanWorkflowActivityResult struct {
-		Executions    []WorkflowExecution
+		Executions    []shared.WorkflowExecution
 		NextPageToken []byte
 	}
 
 	replayWorkflowActivityParams struct {
 		Domain     string
-		Executions []WorkflowExecution
+		Executions []shared.WorkflowExecution
 	}
 
 	replayWorkflowActivityProgress struct {
@@ -68,8 +69,10 @@ type (
 	}
 
 	replayWorkflowActivityResult struct {
-		Succeed int
-		Failed  int // not needed if return once a failed workflow is encountered
+		Succeeded        int
+		Skipped          int
+		Failed           int
+		FailedExecutions []shared.WorkflowExecution
 	}
 )
 
@@ -107,6 +110,9 @@ func scanWorkflowExecutionsHelper(
 		Query:         common.StringPtr(params.WorkflowQuery),
 		NextPageToken: params.NextPageToken,
 	}
+	if params.PageSize != 0 {
+		request.PageSize = common.Int32Ptr(int32(params.PageSize))
+	}
 
 	var resp *shared.ListWorkflowExecutionsResponse
 	if err := backoff.Retry(ctx,
@@ -130,13 +136,10 @@ func scanWorkflowExecutionsHelper(
 		return scanWorkflowActivityResult{}, err
 	}
 
-	executions := make([]WorkflowExecution, 0, len(resp.Executions))
+	executions := make([]shared.WorkflowExecution, 0, len(resp.Executions))
 	for _, execution := range resp.Executions {
-		if shouldReplay(params.SamplingRate) {
-			executions = append(executions, WorkflowExecution{
-				ID:    execution.Execution.GetWorkflowId(),
-				RunID: execution.Execution.GetRunId(),
-			})
+		if shouldReplay(params.SamplingRate) && execution.Execution != nil {
+			executions = append(executions, *execution.Execution)
 		}
 	}
 
@@ -169,19 +172,24 @@ func replayWorkflowExecutionActivity(
 
 	for _, execution := range params.Executions[progress.NextExecutionIdx:] {
 		sw := scope.Timer(metrics.ReplayLatency).Start()
-		success, err := replayWorkflowExecutionHelper(ctx, replayer, service, logger, params.Domain, execution)
+		success, err := replayWorkflowExecutionHelper(ctx, replayer, service, logger, params.Domain, WorkflowExecution{
+			ID:    execution.GetWorkflowId(),
+			RunID: execution.GetRunId(),
+		})
 		if err != nil {
 			scope.Counter(metrics.ReplayFailedCounter).Inc(1)
 			progress.Result.Failed++
+			progress.Result.FailedExecutions = append(progress.Result.FailedExecutions, execution)
 			if isWorkflowTypeNotRegisteredError(err) {
 				// this should fail the replay workflow as it requires worker deployment to fix the workflow registration.
 				return progress.Result, NewCustomError(errMsgWorkflowTypeNotRegistered, err.Error())
 			}
 		} else if success {
 			scope.Counter(metrics.ReplaySucceedCounter).Inc(1)
-			progress.Result.Succeed++
+			progress.Result.Succeeded++
 		} else {
 			scope.Counter(metrics.ReplaySkippedCounter).Inc(1)
+			progress.Result.Skipped++
 		}
 		sw.Stop()
 

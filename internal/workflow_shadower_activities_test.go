@@ -127,7 +127,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_No
 
 	params := replayWorkflowActivityParams{
 		Domain:     defaultTestDomain,
-		Executions: make([]WorkflowExecution, numExecutions),
+		Executions: make([]shared.WorkflowExecution, numExecutions),
 	}
 
 	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
@@ -135,15 +135,18 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_No
 
 	var result replayWorkflowActivityResult
 	s.NoError(resultValue.Get(&result))
-	s.Equal(numExecutions, result.Succeed)
+	s.Equal(numExecutions, result.Succeeded)
+	s.Equal(0, result.Skipped)
 	s.Equal(0, result.Failed)
+	s.Empty(result.FailedExecutions)
 }
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_WithPreviousProgress() {
 	progress := replayWorkflowActivityProgress{
 		Result: replayWorkflowActivityResult{
-			Succeed: 3,
-			Failed:  0,
+			Succeeded: 3,
+			Skipped:   2,
+			Failed:    0,
 		},
 		NextExecutionIdx: 5,
 	}
@@ -156,7 +159,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Wi
 
 	params := replayWorkflowActivityParams{
 		Domain:     defaultTestDomain,
-		Executions: make([]WorkflowExecution, numExecutions),
+		Executions: make([]shared.WorkflowExecution, numExecutions),
 	}
 
 	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
@@ -164,8 +167,10 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Wi
 
 	var result replayWorkflowActivityResult
 	s.NoError(resultValue.Get(&result))
-	s.Equal(progress.Result.Succeed+numExecutions-progress.NextExecutionIdx, result.Succeed)
-	s.Equal(0, result.Failed)
+	s.Equal(progress.Result.Succeeded+numExecutions-progress.NextExecutionIdx, result.Succeeded)
+	s.Equal(progress.Result.Skipped, result.Skipped)
+	s.Equal(progress.Result.Failed, result.Failed)
+	s.Empty(result.FailedExecutions)
 }
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_RandomReplayResult() {
@@ -195,7 +200,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Ra
 
 	params := replayWorkflowActivityParams{
 		Domain:     defaultTestDomain,
-		Executions: make([]WorkflowExecution, numExecutions),
+		Executions: make([]shared.WorkflowExecution, numExecutions),
 	}
 
 	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
@@ -203,9 +208,10 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Ra
 
 	var result replayWorkflowActivityResult
 	s.NoError(resultValue.Get(&result))
-	s.Equal(numSucceed, result.Succeed)
+	s.Equal(numSucceed, result.Succeeded)
+	s.Equal(numSkipped, result.Skipped)
 	s.Equal(numFailed, result.Failed)
-	s.Equal(numSkipped, numExecutions-result.Succeed-result.Failed)
+	s.Len(result.FailedExecutions, numFailed)
 }
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_WorkflowNotRegistered() {
@@ -215,7 +221,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Wo
 
 	params := replayWorkflowActivityParams{
 		Domain:     defaultTestDomain,
-		Executions: make([]WorkflowExecution, 5),
+		Executions: make([]shared.WorkflowExecution, 5),
 	}
 
 	_, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)

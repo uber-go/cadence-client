@@ -179,7 +179,10 @@ func (s *WorkflowShadower) shadowWorker() error {
 				s.service,
 				s.options.Logger,
 				s.options.Domain,
-				execution,
+				WorkflowExecution{
+					ID:    execution.GetWorkflowId(),
+					RunID: execution.GetRunId(),
+				},
 			)
 			if err != nil {
 				return err

@@ -32,6 +32,8 @@ import (
 
 	"github.com/facebookgo/clock"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	"go.uber.org/cadence/.gen/go/shadower"
+	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/util"
 	"go.uber.org/zap"
 )
@@ -141,10 +143,10 @@ func (s *WorkflowShadower) shadowWorker() error {
 	s.shutdownWG.Add(1)
 	defer s.shutdownWG.Done()
 
-	scanRequest := scanWorkflowActivityParams{
-		Domain:        s.options.Domain,
-		WorkflowQuery: s.options.WorkflowQuery,
-		SamplingRate:  s.options.SamplingRate,
+	scanRequest := shadower.ScanWorkflowActivityParams{
+		Domain:        common.StringPtr(s.options.Domain),
+		WorkflowQuery: common.StringPtr(s.options.WorkflowQuery),
+		SamplingRate:  common.Float64Ptr(s.options.SamplingRate),
 	}
 	s.options.Logger.Info("Shadow workflow query",
 		zap.String(tagVisibilityQuery, s.options.WorkflowQuery),

@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	"go.uber.org/cadence/.gen/go/shadower"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/backoff"
@@ -33,46 +34,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	scanWorkflowActivityName            = "scanWorkflowActivity"
-	replayWorkflowExecutionActivityName = "replayWorkflowExecutionActivity"
-)
-
-const (
-	errMsgDomainNotExists           = "domain not exists"
-	errMsgInvalidQuery              = "invalid visibility query"
-	errMsgWorkflowTypeNotRegistered = "workflow type not registered"
-)
-
 type (
-	scanWorkflowActivityParams struct {
-		Domain        string
-		WorkflowQuery string
-		NextPageToken []byte
-		PageSize      int
-		SamplingRate  float64
-	}
-
-	scanWorkflowActivityResult struct {
-		Executions    []shared.WorkflowExecution
-		NextPageToken []byte
-	}
-
-	replayWorkflowActivityParams struct {
-		Domain     string
-		Executions []shared.WorkflowExecution
-	}
-
 	replayWorkflowActivityProgress struct {
-		Result           replayWorkflowActivityResult
+		Result           shadower.ReplayWorkflowActivityResult
 		NextExecutionIdx int
-	}
-
-	replayWorkflowActivityResult struct {
-		Succeeded        int
-		Skipped          int
-		Failed           int
-		FailedExecutions []shared.WorkflowExecution
 	}
 )
 
@@ -81,19 +46,28 @@ const (
 	workflowReplayerContextKey contextKey = "workflowReplayer"
 )
 
+func registerShadowerActivities(w *aggregatedWorker) {
+	w.RegisterActivityWithOptions(scanWorkflowActivity, RegisterActivityOptions{
+		Name: shadower.ScanWorkflowActivityName,
+	})
+	w.RegisterActivityWithOptions(replayWorkflowActivity, RegisterActivityOptions{
+		Name: shadower.ReplayWorkflowActivityName,
+	})
+}
+
 func scanWorkflowActivity(
 	ctx context.Context,
-	params scanWorkflowActivityParams,
-) (scanWorkflowActivityResult, error) {
+	params shadower.ScanWorkflowActivityParams,
+) (shadower.ScanWorkflowActivityResult, error) {
 	logger := GetActivityLogger(ctx)
 	service := ctx.Value(serviceClientContextKey).(workflowserviceclient.Interface)
 
 	scanResult, err := scanWorkflowExecutionsHelper(ctx, service, params, logger)
 	switch err.(type) {
 	case *shared.EntityNotExistsError:
-		err = NewCustomError(errMsgDomainNotExists, err.Error())
+		err = NewCustomError(shadower.ErrReasonDomainNotExists, err.Error())
 	case *shared.BadRequestError:
-		err = NewCustomError(errMsgInvalidQuery, err.Error())
+		err = NewCustomError(shadower.ErrReasonInvalidQuery, err.Error())
 	}
 	return scanResult, err
 }
@@ -101,17 +75,15 @@ func scanWorkflowActivity(
 func scanWorkflowExecutionsHelper(
 	ctx context.Context,
 	service workflowserviceclient.Interface,
-	params scanWorkflowActivityParams,
+	params shadower.ScanWorkflowActivityParams,
 	logger *zap.Logger,
-) (scanWorkflowActivityResult, error) {
+) (shadower.ScanWorkflowActivityResult, error) {
 
 	request := &shared.ListWorkflowExecutionsRequest{
-		Domain:        common.StringPtr(params.Domain),
-		Query:         common.StringPtr(params.WorkflowQuery),
+		Domain:        params.Domain,
+		Query:         params.WorkflowQuery,
 		NextPageToken: params.NextPageToken,
-	}
-	if params.PageSize != 0 {
-		request.PageSize = common.Int32Ptr(int32(params.PageSize))
+		PageSize:      params.PageSize,
 	}
 
 	var resp *shared.ListWorkflowExecutionsResponse
@@ -129,36 +101,40 @@ func scanWorkflowExecutionsHelper(
 		isServiceTransientError,
 	); err != nil {
 		logger.Error("Failed to scan workflow executions",
-			zap.String(tagDomain, params.Domain),
-			zap.String(tagVisibilityQuery, params.WorkflowQuery),
+			zap.String(tagDomain, params.GetDomain()),
+			zap.String(tagVisibilityQuery, params.GetWorkflowQuery()),
 			zap.Error(err),
 		)
-		return scanWorkflowActivityResult{}, err
+		return shadower.ScanWorkflowActivityResult{}, err
 	}
 
-	executions := make([]shared.WorkflowExecution, 0, len(resp.Executions))
+	executions := make([]*shared.WorkflowExecution, 0, len(resp.Executions))
 	for _, execution := range resp.Executions {
-		if shouldReplay(params.SamplingRate) && execution.Execution != nil {
-			executions = append(executions, *execution.Execution)
+		if shouldReplay(params.GetSamplingRate()) {
+			executions = append(executions, execution.Execution)
 		}
 	}
 
-	return scanWorkflowActivityResult{
+	return shadower.ScanWorkflowActivityResult{
 		Executions:    executions,
 		NextPageToken: resp.NextPageToken,
 	}, nil
 }
 
 func shouldReplay(probability float64) bool {
+	if probability == 0 {
+		return true
+	}
+
 	return rand.Float64() <= probability
 }
 
-func replayWorkflowExecutionActivity(
+func replayWorkflowActivity(
 	ctx context.Context,
-	params replayWorkflowActivityParams,
-) (replayWorkflowActivityResult, error) {
+	params shadower.ReplayWorkflowActivityParams,
+) (shadower.ReplayWorkflowActivityResult, error) {
 	logger := GetActivityLogger(ctx)
-	scope := tagScope(GetActivityMetricsScope(ctx), tagDomain, params.Domain, tagTaskList, GetActivityInfo(ctx).TaskList)
+	scope := tagScope(GetActivityMetricsScope(ctx), tagDomain, params.GetDomain(), tagTaskList, GetActivityInfo(ctx).TaskList)
 	service := ctx.Value(serviceClientContextKey).(workflowserviceclient.Interface)
 	replayer := ctx.Value(workflowReplayerContextKey).(*WorkflowReplayer)
 
@@ -166,30 +142,41 @@ func replayWorkflowExecutionActivity(
 	if err := GetHeartbeatDetails(ctx, &progress); err != nil {
 		progress = replayWorkflowActivityProgress{
 			NextExecutionIdx: 0,
-			Result:           replayWorkflowActivityResult{},
+			Result: shadower.ReplayWorkflowActivityResult{
+				Succeeded: common.Int32Ptr(0),
+				Skipped:   common.Int32Ptr(0),
+				Failed:    common.Int32Ptr(0),
+			},
 		}
 	}
 
+	// following code assumes all pointers in progress.Result are not nil, this is ensured by:
+	//   1. if not previous progress, init to pointer to 0
+	//   2. if has previous progress, the progress uploaded during heartbeat has non nil pointers
+
 	for _, execution := range params.Executions[progress.NextExecutionIdx:] {
+		if execution == nil {
+			continue
+		}
+
 		sw := scope.Timer(metrics.ReplayLatency).Start()
-		success, err := replayWorkflowExecutionHelper(ctx, replayer, service, logger, params.Domain, WorkflowExecution{
+		success, err := replayWorkflowExecutionHelper(ctx, replayer, service, logger, params.GetDomain(), WorkflowExecution{
 			ID:    execution.GetWorkflowId(),
 			RunID: execution.GetRunId(),
 		})
 		if err != nil {
 			scope.Counter(metrics.ReplayFailedCounter).Inc(1)
-			progress.Result.Failed++
-			progress.Result.FailedExecutions = append(progress.Result.FailedExecutions, execution)
+			*progress.Result.Failed++
 			if isWorkflowTypeNotRegisteredError(err) {
 				// this should fail the replay workflow as it requires worker deployment to fix the workflow registration.
-				return progress.Result, NewCustomError(errMsgWorkflowTypeNotRegistered, err.Error())
+				return progress.Result, NewCustomError(shadower.ErrReasonWorkflowTypeNotRegistered, err.Error())
 			}
 		} else if success {
 			scope.Counter(metrics.ReplaySucceedCounter).Inc(1)
-			progress.Result.Succeeded++
+			*progress.Result.Succeeded++
 		} else {
 			scope.Counter(metrics.ReplaySkippedCounter).Inc(1)
-			progress.Result.Skipped++
+			*progress.Result.Skipped++
 		}
 		sw.Stop()
 

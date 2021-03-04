@@ -29,7 +29,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
+	"go.uber.org/cadence/.gen/go/shadower"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -70,10 +72,10 @@ func (s *workflowShadowerActivitiesSuite) SetupTest() {
 		Logger:                    zaptest.NewLogger(s.T()),
 	})
 	s.env.RegisterActivityWithOptions(scanWorkflowActivity, RegisterActivityOptions{
-		Name: scanWorkflowActivityName,
+		Name: shadower.ScanWorkflowActivityName,
 	})
-	s.env.RegisterActivityWithOptions(replayWorkflowExecutionActivity, RegisterActivityOptions{
-		Name: replayWorkflowExecutionActivityName,
+	s.env.RegisterActivityWithOptions(replayWorkflowActivity, RegisterActivityOptions{
+		Name: shadower.ReplayWorkflowActivityName,
 	})
 }
 
@@ -88,16 +90,16 @@ func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_Succeed() {
 		NextPageToken: []byte{1, 2, 3},
 	}, nil).Times(1)
 
-	params := scanWorkflowActivityParams{
-		Domain:        defaultTestDomain,
-		WorkflowQuery: "some random workflow visibility query",
-		SamplingRate:  0.5,
+	params := shadower.ScanWorkflowActivityParams{
+		Domain:        common.StringPtr(defaultTestDomain),
+		WorkflowQuery: common.StringPtr("some random workflow visibility query"),
+		SamplingRate:  common.Float64Ptr(0.5),
 	}
 
-	resultValue, err := s.env.ExecuteActivity(scanWorkflowActivityName, params)
+	resultValue, err := s.env.ExecuteActivity(shadower.ScanWorkflowActivityName, params)
 	s.NoError(err)
 
-	var result scanWorkflowActivityResult
+	var result shadower.ScanWorkflowActivityResult
 	s.NoError(resultValue.Get(&result))
 	s.NotNil(result.NextPageToken)
 	s.True(len(result.Executions) > 0)
@@ -109,14 +111,14 @@ func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_InvalidQuery(
 		Message: "invalid query",
 	}).Times(1)
 
-	params := scanWorkflowActivityParams{
-		Domain:        defaultTestDomain,
-		WorkflowQuery: "invalid workflow visibility query",
+	params := shadower.ScanWorkflowActivityParams{
+		Domain:        common.StringPtr(defaultTestDomain),
+		WorkflowQuery: common.StringPtr("invalid workflow visibility query"),
 	}
 
-	_, err := s.env.ExecuteActivity(scanWorkflowActivityName, params)
+	_, err := s.env.ExecuteActivity(shadower.ScanWorkflowActivityName, params)
 	s.Error(err)
-	s.Equal(errMsgInvalidQuery, err.Error())
+	s.Equal(shadower.ErrReasonInvalidQuery, err.Error())
 }
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_NoPreviousProgress() {
@@ -125,28 +127,24 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_No
 		History: s.testWorkflowHistory,
 	}, nil).Times(numExecutions)
 
-	params := replayWorkflowActivityParams{
-		Domain:     defaultTestDomain,
-		Executions: make([]shared.WorkflowExecution, numExecutions),
-	}
+	params := newTestReplayWorkflowActivityParams(numExecutions)
 
-	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
+	resultValue, err := s.env.ExecuteActivity(shadower.ReplayWorkflowActivityName, params)
 	s.NoError(err)
 
-	var result replayWorkflowActivityResult
+	var result shadower.ReplayWorkflowActivityResult
 	s.NoError(resultValue.Get(&result))
-	s.Equal(numExecutions, result.Succeeded)
-	s.Equal(0, result.Skipped)
-	s.Equal(0, result.Failed)
-	s.Empty(result.FailedExecutions)
+	s.Equal(int32(numExecutions), result.GetSucceeded())
+	s.Zero(result.GetSkipped())
+	s.Zero(result.GetFailed())
 }
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_WithPreviousProgress() {
 	progress := replayWorkflowActivityProgress{
-		Result: replayWorkflowActivityResult{
-			Succeeded: 3,
-			Skipped:   2,
-			Failed:    0,
+		Result: shadower.ReplayWorkflowActivityResult{
+			Succeeded: common.Int32Ptr(3),
+			Skipped:   common.Int32Ptr(2),
+			Failed:    common.Int32Ptr(0),
 		},
 		NextExecutionIdx: 5,
 	}
@@ -157,26 +155,22 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Wi
 		History: s.testWorkflowHistory,
 	}, nil).Times(numExecutions - progress.NextExecutionIdx)
 
-	params := replayWorkflowActivityParams{
-		Domain:     defaultTestDomain,
-		Executions: make([]shared.WorkflowExecution, numExecutions),
-	}
+	params := newTestReplayWorkflowActivityParams(numExecutions)
 
-	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
+	resultValue, err := s.env.ExecuteActivity(shadower.ReplayWorkflowActivityName, params)
 	s.NoError(err)
 
-	var result replayWorkflowActivityResult
+	var result shadower.ReplayWorkflowActivityResult
 	s.NoError(resultValue.Get(&result))
-	s.Equal(progress.Result.Succeeded+numExecutions-progress.NextExecutionIdx, result.Succeeded)
-	s.Equal(progress.Result.Skipped, result.Skipped)
-	s.Equal(progress.Result.Failed, result.Failed)
-	s.Empty(result.FailedExecutions)
+	s.Equal(progress.Result.GetSucceeded()+int32(numExecutions-progress.NextExecutionIdx), result.GetSucceeded())
+	s.Equal(progress.Result.GetSkipped(), result.GetSkipped())
+	s.Equal(progress.Result.GetFailed(), result.GetFailed())
 }
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_RandomReplayResult() {
-	numSucceed := 0
-	numFailed := 0
-	numSkipped := 0
+	numSucceed := int32(0)
+	numFailed := int32(0)
+	numSkipped := int32(0)
 	numExecutions := 100
 
 	mismatchWorkflowHistory := getTestReplayWorkflowMismatchHistory()
@@ -198,20 +192,16 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Ra
 		}
 	}
 
-	params := replayWorkflowActivityParams{
-		Domain:     defaultTestDomain,
-		Executions: make([]shared.WorkflowExecution, numExecutions),
-	}
+	params := newTestReplayWorkflowActivityParams(numExecutions)
 
-	resultValue, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
+	resultValue, err := s.env.ExecuteActivity(shadower.ReplayWorkflowActivityName, params)
 	s.NoError(err)
 
-	var result replayWorkflowActivityResult
+	var result shadower.ReplayWorkflowActivityResult
 	s.NoError(resultValue.Get(&result))
-	s.Equal(numSucceed, result.Succeeded)
-	s.Equal(numSkipped, result.Skipped)
-	s.Equal(numFailed, result.Failed)
-	s.Len(result.FailedExecutions, numFailed)
+	s.Equal(numSucceed, result.GetSucceeded())
+	s.Equal(numSkipped, result.GetSkipped())
+	s.Equal(numFailed, result.GetFailed())
 }
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_WorkflowNotRegistered() {
@@ -219,12 +209,20 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Wo
 		History: getTestReplayWorkflowLocalActivityHistory(), // this workflow type is not registered
 	}, nil).Times(1)
 
-	params := replayWorkflowActivityParams{
-		Domain:     defaultTestDomain,
-		Executions: make([]shared.WorkflowExecution, 5),
-	}
+	params := newTestReplayWorkflowActivityParams(5)
 
-	_, err := s.env.ExecuteActivity(replayWorkflowExecutionActivityName, params)
+	_, err := s.env.ExecuteActivity(shadower.ReplayWorkflowActivityName, params)
 	s.Error(err)
-	s.Equal(errMsgWorkflowTypeNotRegistered, err.Error())
+	s.Equal(shadower.ErrReasonWorkflowTypeNotRegistered, err.Error())
+}
+
+func newTestReplayWorkflowActivityParams(numExecutions int) shadower.ReplayWorkflowActivityParams {
+	params := shadower.ReplayWorkflowActivityParams{
+		Domain:     common.StringPtr(defaultTestDomain),
+		Executions: make([]*shared.WorkflowExecution, 0, numExecutions),
+	}
+	for i := 0; i != numExecutions; i++ {
+		params.Executions = append(params.Executions, &shared.WorkflowExecution{})
+	}
+	return params
 }

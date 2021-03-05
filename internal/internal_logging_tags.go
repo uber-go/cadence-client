@@ -37,4 +37,5 @@ const (
 	tagChildWorkflowID   = "ChildWorkflowID"
 	tagLocalActivityType = "LocalActivityType"
 	tagQueryType         = "QueryType"
+	tagVisibilityQuery   = "VisibilityQuery"
 )

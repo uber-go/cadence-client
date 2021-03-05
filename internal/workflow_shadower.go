@@ -32,9 +32,8 @@ import (
 
 	"github.com/facebookgo/clock"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/.gen/go/shadower"
 	"go.uber.org/cadence/internal/common"
-	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/util"
 	"go.uber.org/zap"
 )
@@ -144,12 +143,13 @@ func (s *WorkflowShadower) shadowWorker() error {
 	s.shutdownWG.Add(1)
 	defer s.shutdownWG.Done()
 
-	scanWorkflowReq := &shared.ListWorkflowExecutionsRequest{
-		Domain: common.StringPtr(s.options.Domain),
-		Query:  common.StringPtr(s.options.WorkflowQuery),
+	scanRequest := shadower.ScanWorkflowActivityParams{
+		Domain:        common.StringPtr(s.options.Domain),
+		WorkflowQuery: common.StringPtr(s.options.WorkflowQuery),
+		SamplingRate:  common.Float64Ptr(s.options.SamplingRate),
 	}
 	s.options.Logger.Info("Shadow workflow query",
-		zap.String("Query", s.options.WorkflowQuery),
+		zap.String(tagVisibilityQuery, s.options.WorkflowQuery),
 	)
 
 	ctx := context.Background()
@@ -165,92 +165,46 @@ func (s *WorkflowShadower) shadowWorker() error {
 	}
 	rand.Seed(s.clock.Now().UnixNano())
 	for {
-		scanWorkflowResp, err := s.scanWorkflowExecutionsWithRetry(ctx, scanWorkflowReq)
+		scanResult, err := scanWorkflowExecutionsHelper(ctx, s.service, scanRequest, s.options.Logger)
 		if err != nil {
 			return err
 		}
 
-		for _, execution := range scanWorkflowResp.Executions {
+		for _, execution := range scanResult.Executions {
 			if s.clock.Now().After(expirationTime) {
 				return nil
 			}
 
-			if rand.Float64() >= s.options.SamplingRate {
-				continue
-			}
-
-			if err := s.replayer.ReplayWorkflowExecution(
+			success, err := replayWorkflowExecutionHelper(
 				ctx,
+				s.replayer,
 				s.service,
 				s.options.Logger,
 				s.options.Domain,
 				WorkflowExecution{
-					ID:    execution.Execution.GetWorkflowId(),
-					RunID: execution.Execution.GetRunId(),
+					ID:    execution.GetWorkflowId(),
+					RunID: execution.GetRunId(),
 				},
-			); err != nil {
-				if err == errReplayHistoryTooShort {
-					// less than 3 history events, potentially cron workflow
-					continue
-				}
-
-				switch err.(type) {
-				case *shared.EntityNotExistsError:
-					continue
-				case *shared.InternalServiceError:
-					// workflow not exist, or potentially corrupted workflow
-					s.options.Logger.Warn("Skipped replaying workflow",
-						zap.String("WorkflowID", execution.Execution.GetWorkflowId()),
-						zap.String("RunID", execution.Execution.GetRunId()),
-						zap.Error(err),
-					)
-					continue
-				}
+			)
+			if err != nil {
 				return err
 			}
+			if success {
+				replayCount++
+			}
 
-			s.options.Logger.Info("Successfully replayed workflow",
-				zap.String("WorkflowID", execution.Execution.GetWorkflowId()),
-				zap.String("RunID", execution.Execution.GetRunId()),
-			)
-
-			replayCount++
 			if replayCount == maxReplayCount {
 				return nil
 			}
 		}
 
-		if len(scanWorkflowResp.NextPageToken) == 0 {
+		if len(scanResult.NextPageToken) == 0 {
 			return nil
 		}
 
-		scanWorkflowReq.NextPageToken = scanWorkflowResp.NextPageToken
+		scanRequest.NextPageToken = scanResult.NextPageToken
 	}
 
-}
-
-func (s *WorkflowShadower) scanWorkflowExecutionsWithRetry(
-	ctx context.Context,
-	request *shared.ListWorkflowExecutionsRequest,
-) (*shared.ListWorkflowExecutionsResponse, error) {
-	var resp *shared.ListWorkflowExecutionsResponse
-	if err := backoff.Retry(ctx,
-		func() error {
-			tchCtx, cancel, opt := newChannelContext(context.Background())
-
-			var err error
-			resp, err = s.service.ScanWorkflowExecutions(tchCtx, request, opt...)
-			cancel()
-
-			return err
-		},
-		createDynamicServiceRetryPolicy(ctx),
-		isServiceTransientError,
-	); err != nil {
-		return nil, err
-	}
-
-	return resp, nil
 }
 
 func (o *WorkflowShadowerOptions) validateAndPopulateFields() error {

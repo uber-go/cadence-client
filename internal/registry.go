@@ -28,6 +28,10 @@ import (
 	"sync"
 )
 
+const (
+	errMsgUnknownWorkflowType = "unable to find workflow type"
+)
+
 var once sync.Once
 
 // Singleton to hold the host registration details.
@@ -315,7 +319,7 @@ func (r *registry) getWorkflowDefinition(wt WorkflowType) (workflowDefinition, e
 	wf, ok := r.getWorkflowFn(lookup)
 	if !ok {
 		supported := strings.Join(r.getRegisteredWorkflowTypes(), ", ")
-		return nil, fmt.Errorf("unable to find workflow type: %v. Supported types: [%v]", lookup, supported)
+		return nil, fmt.Errorf(errMsgUnknownWorkflowType+": %v. Supported types: [%v]", lookup, supported)
 	}
 	wd := &workflowExecutor{workflowType: lookup, fn: wf}
 	return newSyncWorkflowDefinition(wd), nil

@@ -182,7 +182,7 @@ type (
 	TimeFilter = internal.TimeFilter
 	// WorkflowShadowerExitCondition configures when the workflow shadower should exit.
 	// If not specified shadower will exit after replaying all workflows satisfying the visibility query.
-	WorkflowShadowerExitCondition = internal.WorkflowShadowerExitCondition
+	WorkflowShadowerExitCondition = internal.ShadowExitCondition
 
 	// NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 	// mismatched history events (presumably arising from non-deterministic workflow definitions).
@@ -228,9 +228,11 @@ func NewWorkflowReplayer() WorkflowReplayer {
 // NewWorkflowShadower creates a WorkflowShadower instance.
 func NewWorkflowShadower(
 	service workflowserviceclient.Interface,
+	domain string,
 	options *WorkflowShadowerOptions,
+	logger *zap.Logger,
 ) (WorkflowShadower, error) {
-	return internal.NewWorkflowShadower(service, options)
+	return internal.NewWorkflowShadower(service, domain, options, logger)
 }
 
 // EnableVerboseLogging enable or disable verbose logging of internal Cadence library components.

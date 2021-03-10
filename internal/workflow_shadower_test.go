@@ -57,9 +57,7 @@ func (s *workflowShadowerSuite) SetupTest() {
 	s.mockService = workflowservicetest.NewMockClient(s.controller)
 
 	var err error
-	s.testShadower, err = NewWorkflowShadower(s.mockService, &WorkflowShadowerOptions{
-		Domain: "testDomain",
-	})
+	s.testShadower, err = NewWorkflowShadower(s.mockService, "testDomain", &WorkflowShadowerOptions{}, nil)
 	s.NoError(err)
 
 	// overwrite shadower clock to be a mock clock
@@ -138,26 +136,24 @@ func (s *workflowShadowerSuite) TestShadowerOptionValidation() {
 		validationFn func(*WorkflowShadowerOptions)
 	}{
 		{
-			msg:       "domain not specified",
-			options:   WorkflowShadowerOptions{},
+			msg: "exit condition not specified in continuous mode",
+			options: WorkflowShadowerOptions{
+				Mode: ShadowModeContinuous,
+			},
 			expectErr: true,
 		},
 		{
-			msg: "populate sampling rate and logger",
-			options: WorkflowShadowerOptions{
-				Domain: "testDomain",
-			},
+			msg:       "populate sampling rate",
+			options:   WorkflowShadowerOptions{},
 			expectErr: false,
 			validationFn: func(options *WorkflowShadowerOptions) {
 				s.Empty(options.WorkflowQuery)
 				s.Equal(1.0, options.SamplingRate)
-				s.NotNil(options.Logger)
 			},
 		},
 		{
 			msg: "construct query",
 			options: WorkflowShadowerOptions{
-				Domain:         "testDomain",
 				WorkflowTypes:  []string{"testWorkflowType"},
 				WorkflowStatus: []string{"open"},
 				WorkflowStartTimeFilter: &TimeFilter{
@@ -199,8 +195,8 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 	timePerWorkflow := 7 * time.Second
 	expirationTime := time.Minute
 
-	s.testShadower.options.ExitCondition = &WorkflowShadowerExitCondition{
-		ExpirationTime: expirationTime,
+	s.testShadower.options.ExitCondition = &ShadowExitCondition{
+		ExpirationInterval: expirationTime,
 	}
 
 	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
@@ -220,7 +216,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_MaxShadowingCount() {
 	maxShadowingCount := 50
 
-	s.testShadower.options.ExitCondition = &WorkflowShadowerExitCondition{
+	s.testShadower.options.ExitCondition = &ShadowExitCondition{
 		ShadowingCount: maxShadowingCount,
 	}
 

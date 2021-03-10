@@ -196,6 +196,141 @@ func (v *ExitCondition) GetShadowCount() (o int32) {
 	return
 }
 
+type Mode int32
+
+const (
+	ModeNormal     Mode = 0
+	ModeContinuous Mode = 1
+)
+
+// Mode_Values returns all recognized values of Mode.
+func Mode_Values() []Mode {
+	return []Mode{
+		ModeNormal,
+		ModeContinuous,
+	}
+}
+
+// UnmarshalText tries to decode Mode from a byte slice
+// containing its name.
+//
+//   var v Mode
+//   err := v.UnmarshalText([]byte("Normal"))
+func (v *Mode) UnmarshalText(value []byte) error {
+	switch string(value) {
+	case "Normal":
+		*v = ModeNormal
+		return nil
+	case "Continuous":
+		*v = ModeContinuous
+		return nil
+	default:
+		return fmt.Errorf("unknown enum value %q for %q", value, "Mode")
+	}
+}
+
+// Ptr returns a pointer to this enum value.
+func (v Mode) Ptr() *Mode {
+	return &v
+}
+
+// ToWire translates Mode into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// Enums are represented as 32-bit integers over the wire.
+func (v Mode) ToWire() (wire.Value, error) {
+	return wire.NewValueI32(int32(v)), nil
+}
+
+// FromWire deserializes Mode from its Thrift-level
+// representation.
+//
+//   x, err := binaryProtocol.Decode(reader, wire.TI32)
+//   if err != nil {
+//     return Mode(0), err
+//   }
+//
+//   var v Mode
+//   if err := v.FromWire(x); err != nil {
+//     return Mode(0), err
+//   }
+//   return v, nil
+func (v *Mode) FromWire(w wire.Value) error {
+	*v = (Mode)(w.GetI32())
+	return nil
+}
+
+// String returns a readable string representation of Mode.
+func (v Mode) String() string {
+	w := int32(v)
+	switch w {
+	case 0:
+		return "Normal"
+	case 1:
+		return "Continuous"
+	}
+	return fmt.Sprintf("Mode(%d)", w)
+}
+
+// Equals returns true if this Mode value matches the provided
+// value.
+func (v Mode) Equals(rhs Mode) bool {
+	return v == rhs
+}
+
+// MarshalJSON serializes Mode into JSON.
+//
+// If the enum value is recognized, its name is returned. Otherwise,
+// its integer value is returned.
+//
+// This implements json.Marshaler.
+func (v Mode) MarshalJSON() ([]byte, error) {
+	switch int32(v) {
+	case 0:
+		return ([]byte)("\"Normal\""), nil
+	case 1:
+		return ([]byte)("\"Continuous\""), nil
+	}
+	return ([]byte)(strconv.FormatInt(int64(v), 10)), nil
+}
+
+// UnmarshalJSON attempts to decode Mode from its JSON
+// representation.
+//
+// This implementation supports both, numeric and string inputs. If a
+// string is provided, it must be a known enum name.
+//
+// This implements json.Unmarshaler.
+func (v *Mode) UnmarshalJSON(text []byte) error {
+	d := json.NewDecoder(bytes.NewReader(text))
+	d.UseNumber()
+	t, err := d.Token()
+	if err != nil {
+		return err
+	}
+
+	switch w := t.(type) {
+	case json.Number:
+		x, err := w.Int64()
+		if err != nil {
+			return err
+		}
+		if x > math.MaxInt32 {
+			return fmt.Errorf("enum overflow from JSON %q for %q", text, "Mode")
+		}
+		if x < math.MinInt32 {
+			return fmt.Errorf("enum underflow from JSON %q for %q", text, "Mode")
+		}
+		*v = (Mode)(x)
+		return nil
+	case string:
+		return v.UnmarshalText([]byte(w))
+	default:
+		return fmt.Errorf("invalid JSON value %q (%T) to unmarshal into %q", t, t, "Mode")
+	}
+}
+
 type ReplayWorkflowActivityParams struct {
 	Domain     *string                     `json:"domain,omitempty"`
 	Executions []*shared.WorkflowExecution `json:"executions,omitempty"`
@@ -988,154 +1123,19 @@ func (v *ScanWorkflowActivityResult) Equals(rhs *ScanWorkflowActivityResult) boo
 	return true
 }
 
-type ShadowMode int32
-
-const (
-	ShadowModeNormal     ShadowMode = 0
-	ShadowModeContinuous ShadowMode = 1
-)
-
-// ShadowMode_Values returns all recognized values of ShadowMode.
-func ShadowMode_Values() []ShadowMode {
-	return []ShadowMode{
-		ShadowModeNormal,
-		ShadowModeContinuous,
-	}
+type WorkflowParams struct {
+	Domain        *string         `json:"domain,omitempty"`
+	TaskList      *string         `json:"taskList,omitempty"`
+	WorkflowQuery *string         `json:"workflowQuery,omitempty"`
+	NextPageToken []byte          `json:"nextPageToken,omitempty"`
+	SamplingRate  *float64        `json:"samplingRate,omitempty"`
+	ShadowMode    *Mode           `json:"shadowMode,omitempty"`
+	ExitCondition *ExitCondition  `json:"exitCondition,omitempty"`
+	Concurrency   *int32          `json:"concurrency,omitempty"`
+	LastRunResult *WorkflowResult `json:"lastRunResult,omitempty"`
 }
 
-// UnmarshalText tries to decode ShadowMode from a byte slice
-// containing its name.
-//
-//   var v ShadowMode
-//   err := v.UnmarshalText([]byte("Normal"))
-func (v *ShadowMode) UnmarshalText(value []byte) error {
-	switch string(value) {
-	case "Normal":
-		*v = ShadowModeNormal
-		return nil
-	case "Continuous":
-		*v = ShadowModeContinuous
-		return nil
-	default:
-		return fmt.Errorf("unknown enum value %q for %q", value, "ShadowMode")
-	}
-}
-
-// Ptr returns a pointer to this enum value.
-func (v ShadowMode) Ptr() *ShadowMode {
-	return &v
-}
-
-// ToWire translates ShadowMode into a Thrift-level intermediate
-// representation. This intermediate representation may be serialized
-// into bytes using a ThriftRW protocol implementation.
-//
-// Enums are represented as 32-bit integers over the wire.
-func (v ShadowMode) ToWire() (wire.Value, error) {
-	return wire.NewValueI32(int32(v)), nil
-}
-
-// FromWire deserializes ShadowMode from its Thrift-level
-// representation.
-//
-//   x, err := binaryProtocol.Decode(reader, wire.TI32)
-//   if err != nil {
-//     return ShadowMode(0), err
-//   }
-//
-//   var v ShadowMode
-//   if err := v.FromWire(x); err != nil {
-//     return ShadowMode(0), err
-//   }
-//   return v, nil
-func (v *ShadowMode) FromWire(w wire.Value) error {
-	*v = (ShadowMode)(w.GetI32())
-	return nil
-}
-
-// String returns a readable string representation of ShadowMode.
-func (v ShadowMode) String() string {
-	w := int32(v)
-	switch w {
-	case 0:
-		return "Normal"
-	case 1:
-		return "Continuous"
-	}
-	return fmt.Sprintf("ShadowMode(%d)", w)
-}
-
-// Equals returns true if this ShadowMode value matches the provided
-// value.
-func (v ShadowMode) Equals(rhs ShadowMode) bool {
-	return v == rhs
-}
-
-// MarshalJSON serializes ShadowMode into JSON.
-//
-// If the enum value is recognized, its name is returned. Otherwise,
-// its integer value is returned.
-//
-// This implements json.Marshaler.
-func (v ShadowMode) MarshalJSON() ([]byte, error) {
-	switch int32(v) {
-	case 0:
-		return ([]byte)("\"Normal\""), nil
-	case 1:
-		return ([]byte)("\"Continuous\""), nil
-	}
-	return ([]byte)(strconv.FormatInt(int64(v), 10)), nil
-}
-
-// UnmarshalJSON attempts to decode ShadowMode from its JSON
-// representation.
-//
-// This implementation supports both, numeric and string inputs. If a
-// string is provided, it must be a known enum name.
-//
-// This implements json.Unmarshaler.
-func (v *ShadowMode) UnmarshalJSON(text []byte) error {
-	d := json.NewDecoder(bytes.NewReader(text))
-	d.UseNumber()
-	t, err := d.Token()
-	if err != nil {
-		return err
-	}
-
-	switch w := t.(type) {
-	case json.Number:
-		x, err := w.Int64()
-		if err != nil {
-			return err
-		}
-		if x > math.MaxInt32 {
-			return fmt.Errorf("enum overflow from JSON %q for %q", text, "ShadowMode")
-		}
-		if x < math.MinInt32 {
-			return fmt.Errorf("enum underflow from JSON %q for %q", text, "ShadowMode")
-		}
-		*v = (ShadowMode)(x)
-		return nil
-	case string:
-		return v.UnmarshalText([]byte(w))
-	default:
-		return fmt.Errorf("invalid JSON value %q (%T) to unmarshal into %q", t, t, "ShadowMode")
-	}
-}
-
-type ShadowWorkflowParams struct {
-	Domain        *string               `json:"domain,omitempty"`
-	TaskList      *string               `json:"taskList,omitempty"`
-	WorkflowQuery *string               `json:"workflowQuery,omitempty"`
-	NextPageToken []byte                `json:"nextPageToken,omitempty"`
-	SamplingRate  *float64              `json:"samplingRate,omitempty"`
-	ShadowMode    *ShadowMode           `json:"shadowMode,omitempty"`
-	ExitCondition *ExitCondition        `json:"exitCondition,omitempty"`
-	Concurrency   *int32                `json:"concurrency,omitempty"`
-	LastRunResult *ShadowWorkflowResult `json:"lastRunResult,omitempty"`
-}
-
-// ToWire translates a ShadowWorkflowParams struct into a Thrift-level intermediate
+// ToWire translates a WorkflowParams struct into a Thrift-level intermediate
 // representation. This intermediate representation may be serialized
 // into bytes using a ThriftRW protocol implementation.
 //
@@ -1150,7 +1150,7 @@ type ShadowWorkflowParams struct {
 //   if err := binaryProtocol.Encode(x, writer); err != nil {
 //     return err
 //   }
-func (v *ShadowWorkflowParams) ToWire() (wire.Value, error) {
+func (v *WorkflowParams) ToWire() (wire.Value, error) {
 	var (
 		fields [9]wire.Field
 		i      int = 0
@@ -1234,8 +1234,8 @@ func (v *ShadowWorkflowParams) ToWire() (wire.Value, error) {
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
 }
 
-func _ShadowMode_Read(w wire.Value) (ShadowMode, error) {
-	var v ShadowMode
+func _Mode_Read(w wire.Value) (Mode, error) {
+	var v Mode
 	err := v.FromWire(w)
 	return v, err
 }
@@ -1246,17 +1246,17 @@ func _ExitCondition_Read(w wire.Value) (*ExitCondition, error) {
 	return &v, err
 }
 
-func _ShadowWorkflowResult_Read(w wire.Value) (*ShadowWorkflowResult, error) {
-	var v ShadowWorkflowResult
+func _WorkflowResult_Read(w wire.Value) (*WorkflowResult, error) {
+	var v WorkflowResult
 	err := v.FromWire(w)
 	return &v, err
 }
 
-// FromWire deserializes a ShadowWorkflowParams struct from its Thrift-level
+// FromWire deserializes a WorkflowParams struct from its Thrift-level
 // representation. The Thrift-level representation may be obtained
 // from a ThriftRW protocol implementation.
 //
-// An error is returned if we were unable to build a ShadowWorkflowParams struct
+// An error is returned if we were unable to build a WorkflowParams struct
 // from the provided intermediate representation.
 //
 //   x, err := binaryProtocol.Decode(reader, wire.TStruct)
@@ -1264,12 +1264,12 @@ func _ShadowWorkflowResult_Read(w wire.Value) (*ShadowWorkflowResult, error) {
 //     return nil, err
 //   }
 //
-//   var v ShadowWorkflowParams
+//   var v WorkflowParams
 //   if err := v.FromWire(x); err != nil {
 //     return nil, err
 //   }
 //   return &v, nil
-func (v *ShadowWorkflowParams) FromWire(w wire.Value) error {
+func (v *WorkflowParams) FromWire(w wire.Value) error {
 	var err error
 
 	for _, field := range w.GetStruct().Fields {
@@ -1324,8 +1324,8 @@ func (v *ShadowWorkflowParams) FromWire(w wire.Value) error {
 			}
 		case 60:
 			if field.Value.Type() == wire.TI32 {
-				var x ShadowMode
-				x, err = _ShadowMode_Read(field.Value)
+				var x Mode
+				x, err = _Mode_Read(field.Value)
 				v.ShadowMode = &x
 				if err != nil {
 					return err
@@ -1352,7 +1352,7 @@ func (v *ShadowWorkflowParams) FromWire(w wire.Value) error {
 			}
 		case 90:
 			if field.Value.Type() == wire.TStruct {
-				v.LastRunResult, err = _ShadowWorkflowResult_Read(field.Value)
+				v.LastRunResult, err = _WorkflowResult_Read(field.Value)
 				if err != nil {
 					return err
 				}
@@ -1364,9 +1364,9 @@ func (v *ShadowWorkflowParams) FromWire(w wire.Value) error {
 	return nil
 }
 
-// String returns a readable string representation of a ShadowWorkflowParams
+// String returns a readable string representation of a WorkflowParams
 // struct.
-func (v *ShadowWorkflowParams) String() string {
+func (v *WorkflowParams) String() string {
 	if v == nil {
 		return "<nil>"
 	}
@@ -1410,10 +1410,10 @@ func (v *ShadowWorkflowParams) String() string {
 		i++
 	}
 
-	return fmt.Sprintf("ShadowWorkflowParams{%v}", strings.Join(fields[:i], ", "))
+	return fmt.Sprintf("WorkflowParams{%v}", strings.Join(fields[:i], ", "))
 }
 
-func _ShadowMode_EqualsPtr(lhs, rhs *ShadowMode) bool {
+func _Mode_EqualsPtr(lhs, rhs *Mode) bool {
 	if lhs != nil && rhs != nil {
 
 		x := *lhs
@@ -1423,11 +1423,11 @@ func _ShadowMode_EqualsPtr(lhs, rhs *ShadowMode) bool {
 	return lhs == nil && rhs == nil
 }
 
-// Equals returns true if all the fields of this ShadowWorkflowParams match the
-// provided ShadowWorkflowParams.
+// Equals returns true if all the fields of this WorkflowParams match the
+// provided WorkflowParams.
 //
 // This function performs a deep comparison.
-func (v *ShadowWorkflowParams) Equals(rhs *ShadowWorkflowParams) bool {
+func (v *WorkflowParams) Equals(rhs *WorkflowParams) bool {
 	if !_String_EqualsPtr(v.Domain, rhs.Domain) {
 		return false
 	}
@@ -1443,7 +1443,7 @@ func (v *ShadowWorkflowParams) Equals(rhs *ShadowWorkflowParams) bool {
 	if !_Double_EqualsPtr(v.SamplingRate, rhs.SamplingRate) {
 		return false
 	}
-	if !_ShadowMode_EqualsPtr(v.ShadowMode, rhs.ShadowMode) {
+	if !_Mode_EqualsPtr(v.ShadowMode, rhs.ShadowMode) {
 		return false
 	}
 	if !((v.ExitCondition == nil && rhs.ExitCondition == nil) || (v.ExitCondition != nil && rhs.ExitCondition != nil && v.ExitCondition.Equals(rhs.ExitCondition))) {
@@ -1461,7 +1461,7 @@ func (v *ShadowWorkflowParams) Equals(rhs *ShadowWorkflowParams) bool {
 
 // GetDomain returns the value of Domain if it is set or its
 // zero value if it is unset.
-func (v *ShadowWorkflowParams) GetDomain() (o string) {
+func (v *WorkflowParams) GetDomain() (o string) {
 	if v.Domain != nil {
 		return *v.Domain
 	}
@@ -1471,7 +1471,7 @@ func (v *ShadowWorkflowParams) GetDomain() (o string) {
 
 // GetTaskList returns the value of TaskList if it is set or its
 // zero value if it is unset.
-func (v *ShadowWorkflowParams) GetTaskList() (o string) {
+func (v *WorkflowParams) GetTaskList() (o string) {
 	if v.TaskList != nil {
 		return *v.TaskList
 	}
@@ -1481,7 +1481,7 @@ func (v *ShadowWorkflowParams) GetTaskList() (o string) {
 
 // GetWorkflowQuery returns the value of WorkflowQuery if it is set or its
 // zero value if it is unset.
-func (v *ShadowWorkflowParams) GetWorkflowQuery() (o string) {
+func (v *WorkflowParams) GetWorkflowQuery() (o string) {
 	if v.WorkflowQuery != nil {
 		return *v.WorkflowQuery
 	}
@@ -1491,7 +1491,7 @@ func (v *ShadowWorkflowParams) GetWorkflowQuery() (o string) {
 
 // GetSamplingRate returns the value of SamplingRate if it is set or its
 // zero value if it is unset.
-func (v *ShadowWorkflowParams) GetSamplingRate() (o float64) {
+func (v *WorkflowParams) GetSamplingRate() (o float64) {
 	if v.SamplingRate != nil {
 		return *v.SamplingRate
 	}
@@ -1501,7 +1501,7 @@ func (v *ShadowWorkflowParams) GetSamplingRate() (o float64) {
 
 // GetShadowMode returns the value of ShadowMode if it is set or its
 // zero value if it is unset.
-func (v *ShadowWorkflowParams) GetShadowMode() (o ShadowMode) {
+func (v *WorkflowParams) GetShadowMode() (o Mode) {
 	if v.ShadowMode != nil {
 		return *v.ShadowMode
 	}
@@ -1511,7 +1511,7 @@ func (v *ShadowWorkflowParams) GetShadowMode() (o ShadowMode) {
 
 // GetConcurrency returns the value of Concurrency if it is set or its
 // zero value if it is unset.
-func (v *ShadowWorkflowParams) GetConcurrency() (o int32) {
+func (v *WorkflowParams) GetConcurrency() (o int32) {
 	if v.Concurrency != nil {
 		return *v.Concurrency
 	}
@@ -1519,13 +1519,13 @@ func (v *ShadowWorkflowParams) GetConcurrency() (o int32) {
 	return
 }
 
-type ShadowWorkflowResult struct {
+type WorkflowResult struct {
 	Succeeded *int32 `json:"succeeded,omitempty"`
 	Skipped   *int32 `json:"skipped,omitempty"`
 	Failed    *int32 `json:"failed,omitempty"`
 }
 
-// ToWire translates a ShadowWorkflowResult struct into a Thrift-level intermediate
+// ToWire translates a WorkflowResult struct into a Thrift-level intermediate
 // representation. This intermediate representation may be serialized
 // into bytes using a ThriftRW protocol implementation.
 //
@@ -1540,7 +1540,7 @@ type ShadowWorkflowResult struct {
 //   if err := binaryProtocol.Encode(x, writer); err != nil {
 //     return err
 //   }
-func (v *ShadowWorkflowResult) ToWire() (wire.Value, error) {
+func (v *WorkflowResult) ToWire() (wire.Value, error) {
 	var (
 		fields [3]wire.Field
 		i      int = 0
@@ -1576,11 +1576,11 @@ func (v *ShadowWorkflowResult) ToWire() (wire.Value, error) {
 	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
 }
 
-// FromWire deserializes a ShadowWorkflowResult struct from its Thrift-level
+// FromWire deserializes a WorkflowResult struct from its Thrift-level
 // representation. The Thrift-level representation may be obtained
 // from a ThriftRW protocol implementation.
 //
-// An error is returned if we were unable to build a ShadowWorkflowResult struct
+// An error is returned if we were unable to build a WorkflowResult struct
 // from the provided intermediate representation.
 //
 //   x, err := binaryProtocol.Decode(reader, wire.TStruct)
@@ -1588,12 +1588,12 @@ func (v *ShadowWorkflowResult) ToWire() (wire.Value, error) {
 //     return nil, err
 //   }
 //
-//   var v ShadowWorkflowResult
+//   var v WorkflowResult
 //   if err := v.FromWire(x); err != nil {
 //     return nil, err
 //   }
 //   return &v, nil
-func (v *ShadowWorkflowResult) FromWire(w wire.Value) error {
+func (v *WorkflowResult) FromWire(w wire.Value) error {
 	var err error
 
 	for _, field := range w.GetStruct().Fields {
@@ -1634,9 +1634,9 @@ func (v *ShadowWorkflowResult) FromWire(w wire.Value) error {
 	return nil
 }
 
-// String returns a readable string representation of a ShadowWorkflowResult
+// String returns a readable string representation of a WorkflowResult
 // struct.
-func (v *ShadowWorkflowResult) String() string {
+func (v *WorkflowResult) String() string {
 	if v == nil {
 		return "<nil>"
 	}
@@ -1656,14 +1656,14 @@ func (v *ShadowWorkflowResult) String() string {
 		i++
 	}
 
-	return fmt.Sprintf("ShadowWorkflowResult{%v}", strings.Join(fields[:i], ", "))
+	return fmt.Sprintf("WorkflowResult{%v}", strings.Join(fields[:i], ", "))
 }
 
-// Equals returns true if all the fields of this ShadowWorkflowResult match the
-// provided ShadowWorkflowResult.
+// Equals returns true if all the fields of this WorkflowResult match the
+// provided WorkflowResult.
 //
 // This function performs a deep comparison.
-func (v *ShadowWorkflowResult) Equals(rhs *ShadowWorkflowResult) bool {
+func (v *WorkflowResult) Equals(rhs *WorkflowResult) bool {
 	if !_I32_EqualsPtr(v.Succeeded, rhs.Succeeded) {
 		return false
 	}
@@ -1679,7 +1679,7 @@ func (v *ShadowWorkflowResult) Equals(rhs *ShadowWorkflowResult) bool {
 
 // GetSucceeded returns the value of Succeeded if it is set or its
 // zero value if it is unset.
-func (v *ShadowWorkflowResult) GetSucceeded() (o int32) {
+func (v *WorkflowResult) GetSucceeded() (o int32) {
 	if v.Succeeded != nil {
 		return *v.Succeeded
 	}
@@ -1689,7 +1689,7 @@ func (v *ShadowWorkflowResult) GetSucceeded() (o int32) {
 
 // GetSkipped returns the value of Skipped if it is set or its
 // zero value if it is unset.
-func (v *ShadowWorkflowResult) GetSkipped() (o int32) {
+func (v *WorkflowResult) GetSkipped() (o int32) {
 	if v.Skipped != nil {
 		return *v.Skipped
 	}
@@ -1699,7 +1699,7 @@ func (v *ShadowWorkflowResult) GetSkipped() (o int32) {
 
 // GetFailed returns the value of Failed if it is set or its
 // zero value if it is unset.
-func (v *ShadowWorkflowResult) GetFailed() (o int32) {
+func (v *WorkflowResult) GetFailed() (o int32) {
 	if v.Failed != nil {
 		return *v.Failed
 	}

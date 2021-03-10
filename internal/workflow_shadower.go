@@ -47,17 +47,16 @@ const (
 type (
 	// WorkflowShadowerOptions is used to configure a WorkflowShadower.
 	WorkflowShadowerOptions struct {
-		Domain string
-
 		WorkflowQuery           string
 		WorkflowTypes           []string
 		WorkflowStatus          []string
 		WorkflowStartTimeFilter *TimeFilter
 		SamplingRate            float64
 
-		ExitCondition *WorkflowShadowerExitCondition
+		Mode          ShadowMode
+		ExitCondition *ShadowExitCondition
 
-		Logger *zap.Logger
+		Concurrency int
 	}
 
 	// TimeFilter represents a time range through the min and max timestamp
@@ -66,17 +65,21 @@ type (
 		MaxTimestamp time.Time
 	}
 
-	// WorkflowShadowerExitCondition configures when the workflow shadower should exit.
+	ShadowMode int
+
+	// ShadowExitCondition configures when the workflow shadower should exit.
 	// If not specified shadower will exit after replaying all workflows satisfying the visibility query.
-	WorkflowShadowerExitCondition struct {
-		ExpirationTime time.Duration
-		ShadowingCount int
+	ShadowExitCondition struct {
+		ExpirationInterval time.Duration
+		ShadowingCount     int
 	}
 
 	// WorkflowShadower retrieves and replays workflow history from Cadence service to determine if there's any nondeterministic changes in the workflow definition
 	WorkflowShadower struct {
 		service  workflowserviceclient.Interface
+		domain   string
 		options  *WorkflowShadowerOptions
+		logger   *zap.Logger
 		replayer *WorkflowReplayer
 
 		status     int32
@@ -87,17 +90,36 @@ type (
 	}
 )
 
+const (
+	ShadowModeNormal ShadowMode = iota
+	ShadowModeContinuous
+)
+
 // NewWorkflowShadower creates an instance of the WorkflowShadower
 func NewWorkflowShadower(
 	service workflowserviceclient.Interface,
+	domain string,
 	options *WorkflowShadowerOptions,
+	logger *zap.Logger,
 ) (*WorkflowShadower, error) {
+	if len(domain) == 0 {
+		return nil, errors.New("domain is not set")
+	}
+
 	if err := options.validateAndPopulateFields(); err != nil {
 		return nil, err
 	}
+
+	// use no-op logger if not specified
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	return &WorkflowShadower{
 		service:  service,
+		domain:   domain,
 		options:  options,
+		logger:   logger,
 		replayer: NewWorkflowReplayer(),
 
 		status:     statusInitialized,
@@ -135,7 +157,7 @@ func (s *WorkflowShadower) Stop() {
 	close(s.shutdownCh)
 
 	if success := util.AwaitWaitGroup(&s.shutdownWG, time.Minute); !success {
-		s.options.Logger.Warn("Workflow Shadower timedout on shutdown")
+		s.logger.Warn("Workflow Shadower timedout on shutdown")
 	}
 }
 
@@ -144,18 +166,18 @@ func (s *WorkflowShadower) shadowWorker() error {
 	defer s.shutdownWG.Done()
 
 	scanRequest := shadower.ScanWorkflowActivityParams{
-		Domain:        common.StringPtr(s.options.Domain),
+		Domain:        common.StringPtr(s.domain),
 		WorkflowQuery: common.StringPtr(s.options.WorkflowQuery),
 		SamplingRate:  common.Float64Ptr(s.options.SamplingRate),
 	}
-	s.options.Logger.Info("Shadow workflow query",
+	s.logger.Info("Shadow workflow query",
 		zap.String(tagVisibilityQuery, s.options.WorkflowQuery),
 	)
 
 	ctx := context.Background()
 	expirationTime := time.Unix(0, math.MaxInt64)
-	if s.options.ExitCondition != nil && s.options.ExitCondition.ExpirationTime != 0 {
-		expirationTime = s.clock.Now().Add(s.options.ExitCondition.ExpirationTime)
+	if s.options.ExitCondition != nil && s.options.ExitCondition.ExpirationInterval != 0 {
+		expirationTime = s.clock.Now().Add(s.options.ExitCondition.ExpirationInterval)
 	}
 
 	replayCount := 0
@@ -165,7 +187,7 @@ func (s *WorkflowShadower) shadowWorker() error {
 	}
 	rand.Seed(s.clock.Now().UnixNano())
 	for {
-		scanResult, err := scanWorkflowExecutionsHelper(ctx, s.service, scanRequest, s.options.Logger)
+		scanResult, err := scanWorkflowExecutionsHelper(ctx, s.service, scanRequest, s.logger)
 		if err != nil {
 			return err
 		}
@@ -179,8 +201,8 @@ func (s *WorkflowShadower) shadowWorker() error {
 				ctx,
 				s.replayer,
 				s.service,
-				s.options.Logger,
-				s.options.Domain,
+				s.logger,
+				s.domain,
 				WorkflowExecution{
 					ID:    execution.GetWorkflowId(),
 					RunID: execution.GetRunId(),
@@ -198,7 +220,7 @@ func (s *WorkflowShadower) shadowWorker() error {
 			}
 		}
 
-		if len(scanResult.NextPageToken) == 0 {
+		if len(scanResult.NextPageToken) == 0 && s.options.Mode == ShadowModeNormal {
 			return nil
 		}
 
@@ -208,9 +230,9 @@ func (s *WorkflowShadower) shadowWorker() error {
 }
 
 func (o *WorkflowShadowerOptions) validateAndPopulateFields() error {
-	// validate domain
-	if len(o.Domain) == 0 {
-		return fmt.Errorf("Domain is not set in options")
+	exitConditionSpecified := o.ExitCondition != nil && (o.ExitCondition.ExpirationInterval > 0 || o.ExitCondition.ShadowingCount > 0)
+	if o.Mode == ShadowModeContinuous && !exitConditionSpecified {
+		return errors.New("exit condition must be specified if shadow mode is set to continuous")
 	}
 
 	// validate workflow status
@@ -242,11 +264,6 @@ func (o *WorkflowShadowerOptions) validateAndPopulateFields() error {
 		o.SamplingRate = 1
 	}
 
-	// use no-op logger if not specified
-	if o.Logger == nil {
-		o.Logger = zap.NewNop()
-	}
-
 	return nil
 }
 
@@ -256,4 +273,26 @@ func (t *TimeFilter) validateAndPopulateFields() error {
 	}
 
 	return nil
+}
+
+func (m ShadowMode) toThriftPtr() *shadower.Mode {
+	switch m {
+	case ShadowModeNormal:
+		return shadower.ModeNormal.Ptr()
+	case ShadowModeContinuous:
+		return shadower.ModeContinuous.Ptr()
+	default:
+		panic(fmt.Sprintf("unknown shadow mode %v", m))
+	}
+}
+
+func (e *ShadowExitCondition) toThriftPtr() *shadower.ExitCondition {
+	if e == nil {
+		return nil
+	}
+
+	return &shadower.ExitCondition{
+		ShadowCount:                 common.Int32Ptr(int32(e.ShadowingCount)),
+		ExpirationIntervalInSeconds: common.Int32Ptr(int32(e.ExpirationInterval.Seconds())),
+	}
 }

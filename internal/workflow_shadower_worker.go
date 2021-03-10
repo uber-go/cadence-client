@@ -30,6 +30,7 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/backoff"
+	"go.uber.org/zap"
 )
 
 type (
@@ -40,6 +41,7 @@ type (
 		domain   string
 		taskList string
 		options  *WorkflowShadowerOptions
+		logger   *zap.Logger
 	}
 )
 
@@ -78,6 +80,7 @@ func newShadowWorker(
 		domain:   domain,
 		taskList: params.TaskList,
 		options:  shadowOptions,
+		logger:   params.Logger,
 	}
 }
 
@@ -88,6 +91,14 @@ func (sw *shadowWorker) Start() error {
 
 	if err := sw.options.validateAndPopulateFields(); err != nil {
 		return err
+	}
+
+	if err := verifyDomainExist(sw.service, sw.domain, sw.logger); err != nil {
+		return err
+	}
+
+	if len(sw.taskList) == 0 {
+		return errTaskListNotSet
 	}
 
 	if err := sw.startShadowWorkflow(); err != nil {
@@ -143,7 +154,7 @@ func (sw *shadowWorker) startShadowWorkflow() error {
 			}
 		}
 
-		return nil
+		return err
 	}
 
 	return backoff.Retry(ctx, startWorkflowOp, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)

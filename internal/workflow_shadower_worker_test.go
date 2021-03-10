@@ -217,7 +217,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 	shadowWorker.Stop()
 
 	s.Equal(shadower.LocalDomainName, startRequest.GetDomain())
-	s.Equal(testDomain+shadower.ScanWorkflowIDSuffix, startRequest.GetWorkflowId())
+	s.Equal(testDomain+shadower.WorkflowIDSuffix, startRequest.GetWorkflowId())
 	s.Equal(shadower.WorkflowName, startRequest.WorkflowType.GetName())
 	s.Equal(shadower.TaskList, startRequest.TaskList.GetName())
 	s.NotZero(startRequest.GetExecutionStartToCloseTimeoutSeconds())

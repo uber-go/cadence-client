@@ -132,7 +132,7 @@ func (sw *shadowWorker) startShadowWorkflow() error {
 
 	startWorkflowRequest := &shared.StartWorkflowExecutionRequest{
 		Domain:       common.StringPtr(shadower.LocalDomainName),
-		WorkflowId:   common.StringPtr(sw.domain + shadower.ScanWorkflowIDSuffix),
+		WorkflowId:   common.StringPtr(sw.domain + shadower.WorkflowIDSuffix),
 		WorkflowType: workflowTypePtr(*workflowType),
 		TaskList: &shared.TaskList{
 			Name: common.StringPtr(shadower.TaskList),

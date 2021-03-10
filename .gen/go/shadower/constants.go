@@ -37,8 +37,8 @@ const ReplayWorkflowActivityName string = "replayWorkflowActivity"
 
 const ScanWorkflowActivityName string = "scanWorkflowActivity"
 
-const ScanWorkflowIDSuffix string = "-shadow-workflow"
-
 const TaskList string = "cadence-shadower-tl"
+
+const WorkflowIDSuffix string = "-shadow-workflow"
 
 const WorkflowName string = "cadence-shadow-workflow"

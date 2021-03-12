@@ -1116,7 +1116,7 @@ func newAggregatedWorker(
 		shadowWorker = newShadowWorker(
 			service,
 			domain,
-			wOptions.ShadowerOptions,
+			wOptions.ShadowOptions,
 			workerParams,
 			registry,
 		)

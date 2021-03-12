@@ -215,7 +215,7 @@ type (
 		// Required if EnableShadowWorker is set to true
 		// Configures workflow shadowing details
 		// default: no defaults
-		ShadowerOptions *ShadowOptions
+		ShadowOptions *ShadowOptions
 	}
 )
 

@@ -40,7 +40,7 @@ type (
 		service  workflowserviceclient.Interface
 		domain   string
 		taskList string
-		options  *WorkflowShadowerOptions
+		options  *ShadowOptions
 		logger   *zap.Logger
 	}
 )
@@ -48,7 +48,7 @@ type (
 func newShadowWorker(
 	service workflowserviceclient.Interface,
 	domain string,
-	shadowOptions *WorkflowShadowerOptions,
+	shadowOptions *ShadowOptions,
 	params workerExecutionParameters,
 	registry *registry,
 ) *shadowWorker {

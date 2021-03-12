@@ -65,7 +65,7 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&WorkflowShadowerOptions{},
+		&ShadowOptions{},
 		workerExecutionParameters{
 			TaskList:    testTaskList,
 			UserContext: context.Background(),
@@ -105,7 +105,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&WorkflowShadowerOptions{
+		&ShadowOptions{
 			Mode: ShadowModeContinuous, // exit condition is not specified
 		},
 		workerExecutionParameters{
@@ -125,7 +125,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&WorkflowShadowerOptions{},
+		&ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
 			Logger:   zaptest.NewLogger(s.T()),
@@ -144,7 +144,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&WorkflowShadowerOptions{},
+		&ShadowOptions{},
 		workerExecutionParameters{},
 		newRegistry(),
 	)
@@ -164,7 +164,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&WorkflowShadowerOptions{},
+		&ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
 		},
@@ -180,7 +180,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 	concurrency := 10
 	shadowMode := ShadowModeContinuous
 	exitCondition := &ShadowExitCondition{
-		ShadowingCount: 100,
+		ShadowCount: 100,
 	}
 
 	var startRequest *shared.StartWorkflowExecutionRequest
@@ -200,7 +200,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&WorkflowShadowerOptions{
+		&ShadowOptions{
 			WorkflowQuery: workflowQuery,
 			SamplingRate:  samplingRate,
 			Mode:          shadowMode,

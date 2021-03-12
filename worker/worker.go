@@ -176,8 +176,8 @@ type (
 	// Options is used to configure a worker instance.
 	Options = internal.WorkerOptions
 
-	// WorkflowShadowerOptions is used to configure a WorkflowShadower.
-	WorkflowShadowerOptions = internal.WorkflowShadowerOptions
+	// ShadowOptions is used to configure a WorkflowShadower.
+	ShadowOptions = internal.ShadowOptions
 	// TimeFilter represents a time range through the min and max timestamp
 	TimeFilter = internal.TimeFilter
 	// WorkflowShadowerExitCondition configures when the workflow shadower should exit.
@@ -229,7 +229,7 @@ func NewWorkflowReplayer() WorkflowReplayer {
 func NewWorkflowShadower(
 	service workflowserviceclient.Interface,
 	domain string,
-	options *WorkflowShadowerOptions,
+	options *ShadowOptions,
 	logger *zap.Logger,
 ) (WorkflowShadower, error) {
 	return internal.NewWorkflowShadower(service, domain, options, logger)

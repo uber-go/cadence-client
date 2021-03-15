@@ -179,7 +179,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 	samplingRate := 0.5
 	concurrency := 10
 	shadowMode := ShadowModeContinuous
-	exitCondition := &ShadowExitCondition{
+	exitCondition := ShadowExitCondition{
 		ShadowCount: 100,
 	}
 

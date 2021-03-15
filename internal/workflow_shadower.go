@@ -66,7 +66,7 @@ type (
 		// Optional: Min and Max workflow start timestamp.
 		// Timestamps will be used to construct WorkflowQuery. Only workflows started within the time range will be replayed.
 		// default: no time filter, which matches all workflow start timestamp
-		WorkflowStartTimeFilter *TimeFilter
+		WorkflowStartTimeFilter TimeFilter
 
 		// Optional: sampling rate for the workflows matches WorkflowQuery
 		// only sampled workflows will be replayed
@@ -79,7 +79,7 @@ type (
 		Mode ShadowMode
 
 		// Reqired if Mode is set to ShadowModeContinuous: controls when shadowing should complete
-		ExitCondition *ShadowExitCondition
+		ExitCondition ShadowExitCondition
 
 		// Optional: workflow shadowing concurrency (# of concurrent workflow replay activities)
 		// Note: this field only applies to shadow worker. For the local WorkflowShadower,
@@ -224,13 +224,13 @@ func (s *WorkflowShadower) shadowWorker() error {
 
 	ctx := context.Background()
 	expirationTime := time.Unix(0, math.MaxInt64)
-	if s.options.ExitCondition != nil && s.options.ExitCondition.ExpirationInterval != 0 {
+	if s.options.ExitCondition.ExpirationInterval != 0 {
 		expirationTime = s.clock.Now().Add(s.options.ExitCondition.ExpirationInterval)
 	}
 
 	replayCount := 0
 	maxReplayCount := math.MaxInt64
-	if s.options.ExitCondition != nil && s.options.ExitCondition.ShadowCount != 0 {
+	if s.options.ExitCondition.ShadowCount != 0 {
 		maxReplayCount = s.options.ExitCondition.ShadowCount
 	}
 	rand.Seed(s.clock.Now().UnixNano())
@@ -278,7 +278,7 @@ func (s *WorkflowShadower) shadowWorker() error {
 }
 
 func (o *ShadowOptions) validateAndPopulateFields() error {
-	exitConditionSpecified := o.ExitCondition != nil && (o.ExitCondition.ExpirationInterval > 0 || o.ExitCondition.ShadowCount > 0)
+	exitConditionSpecified := o.ExitCondition.ExpirationInterval > 0 || o.ExitCondition.ShadowCount > 0
 	if o.Mode == ShadowModeContinuous && !exitConditionSpecified {
 		return errors.New("exit condition must be specified if shadow mode is set to continuous")
 	}
@@ -304,7 +304,7 @@ func (o *ShadowOptions) validateAndPopulateFields() error {
 		}
 		queryBuilder.WorkflowStatus(statuses)
 
-		if o.WorkflowStartTimeFilter != nil {
+		if !o.WorkflowStartTimeFilter.isEmpty() {
 			if err := o.WorkflowStartTimeFilter.validateAndPopulateFields(); err != nil {
 				return fmt.Errorf("invalid start time filter, error: %v", err)
 			}
@@ -332,6 +332,10 @@ func (t *TimeFilter) validateAndPopulateFields() error {
 		t.MaxTimestamp = maxTimestamp
 	}
 
+	if t.MaxTimestamp.Before(t.MinTimestamp) {
+		return errors.New("maxTimestamp should be after minTimestamp")
+	}
+
 	return nil
 }
 
@@ -354,11 +358,7 @@ func (m ShadowMode) toThriftPtr() *shadower.Mode {
 	}
 }
 
-func (e *ShadowExitCondition) toThriftPtr() *shadower.ExitCondition {
-	if e == nil {
-		return nil
-	}
-
+func (e ShadowExitCondition) toThriftPtr() *shadower.ExitCondition {
 	return &shadower.ExitCondition{
 		ShadowCount:                 common.Int32Ptr(int32(e.ShadowCount)),
 		ExpirationIntervalInSeconds: common.Int32Ptr(int32(e.ExpirationInterval.Seconds())),

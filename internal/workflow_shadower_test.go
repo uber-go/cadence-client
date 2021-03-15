@@ -82,6 +82,14 @@ func (s *workflowShadowerSuite) TestTimeFilterValidation() {
 		validationFn func(TimeFilter)
 	}{
 		{
+			msg: "maxTimestamp before minTimestamp",
+			timeFilter: TimeFilter{
+				MinTimestamp: s.testTimestamp.Add(time.Hour),
+				MaxTimestamp: s.testTimestamp,
+			},
+			expectErr: true,
+		},
+		{
 			msg:        "neither timestamp is specified",
 			timeFilter: TimeFilter{},
 			expectErr:  false,
@@ -178,7 +186,7 @@ func (s *workflowShadowerSuite) TestShadowOptionsValidation() {
 			msg: "both query and other filters are specified",
 			options: ShadowOptions{
 				WorkflowQuery: "some random query",
-				WorkflowStartTimeFilter: &TimeFilter{
+				WorkflowStartTimeFilter: TimeFilter{
 					MinTimestamp: time.Now(),
 				},
 			},
@@ -199,7 +207,7 @@ func (s *workflowShadowerSuite) TestShadowOptionsValidation() {
 			options: ShadowOptions{
 				WorkflowTypes:  []string{"testWorkflowType"},
 				WorkflowStatus: []string{"open"},
-				WorkflowStartTimeFilter: &TimeFilter{
+				WorkflowStartTimeFilter: TimeFilter{
 					MinTimestamp: s.testTimestamp.Add(-time.Hour),
 					MaxTimestamp: s.testTimestamp,
 				},
@@ -238,7 +246,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 	timePerWorkflow := 7 * time.Second
 	expirationTime := time.Minute
 
-	s.testShadower.options.ExitCondition = &ShadowExitCondition{
+	s.testShadower.options.ExitCondition = ShadowExitCondition{
 		ExpirationInterval: expirationTime,
 	}
 
@@ -259,7 +267,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_MaxShadowingCount() {
 	maxShadowCount := 50
 
-	s.testShadower.options.ExitCondition = &ShadowExitCondition{
+	s.testShadower.options.ExitCondition = ShadowExitCondition{
 		ShadowCount: maxShadowCount,
 	}
 

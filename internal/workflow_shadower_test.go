@@ -57,9 +57,7 @@ func (s *workflowShadowerSuite) SetupTest() {
 	s.mockService = workflowservicetest.NewMockClient(s.controller)
 
 	var err error
-	s.testShadower, err = NewWorkflowShadower(s.mockService, &WorkflowShadowerOptions{
-		Domain: "testDomain",
-	})
+	s.testShadower, err = NewWorkflowShadower(s.mockService, "testDomain", &ShadowOptions{}, nil)
 	s.NoError(err)
 
 	// overwrite shadower clock to be a mock clock
@@ -83,6 +81,14 @@ func (s *workflowShadowerSuite) TestTimeFilterValidation() {
 		expectErr    bool
 		validationFn func(TimeFilter)
 	}{
+		{
+			msg: "maxTimestamp before minTimestamp",
+			timeFilter: TimeFilter{
+				MinTimestamp: s.testTimestamp.Add(time.Hour),
+				MaxTimestamp: s.testTimestamp,
+			},
+			expectErr: true,
+		},
 		{
 			msg:        "neither timestamp is specified",
 			timeFilter: TimeFilter{},
@@ -130,43 +136,84 @@ func (s *workflowShadowerSuite) TestTimeFilterValidation() {
 	}
 }
 
-func (s *workflowShadowerSuite) TestShadowerOptionValidation() {
+func (s *workflowShadowerSuite) TestTimeFilterIsEmpty() {
 	testCases := []struct {
-		msg          string
-		options      WorkflowShadowerOptions
-		expectErr    bool
-		validationFn func(*WorkflowShadowerOptions)
+		msg     string
+		filter  *TimeFilter
+		isEmpty bool
 	}{
 		{
-			msg:       "domain not specified",
-			options:   WorkflowShadowerOptions{},
+			msg:     "nil pointer",
+			filter:  nil,
+			isEmpty: true,
+		},
+		{
+			msg:     "neither field is specified",
+			filter:  &TimeFilter{},
+			isEmpty: true,
+		},
+		{
+			msg: "not empty",
+			filter: &TimeFilter{
+				MaxTimestamp: time.Now(),
+			},
+			isEmpty: false,
+		},
+	}
+
+	for _, test := range testCases {
+		s.T().Run(test.msg, func(t *testing.T) {
+			s.Equal(test.isEmpty, test.filter.isEmpty())
+		})
+	}
+}
+
+func (s *workflowShadowerSuite) TestShadowOptionsValidation() {
+	testCases := []struct {
+		msg          string
+		options      ShadowOptions
+		expectErr    bool
+		validationFn func(*ShadowOptions)
+	}{
+		{
+			msg: "exit condition not specified in continuous mode",
+			options: ShadowOptions{
+				Mode: ShadowModeContinuous,
+			},
 			expectErr: true,
 		},
 		{
-			msg: "populate sampling rate and logger",
-			options: WorkflowShadowerOptions{
-				Domain: "testDomain",
+			msg: "both query and other filters are specified",
+			options: ShadowOptions{
+				WorkflowQuery: "some random query",
+				WorkflowStartTimeFilter: TimeFilter{
+					MinTimestamp: time.Now(),
+				},
 			},
+			expectErr: true,
+		},
+		{
+			msg:       "populate sampling rate and concurrency",
+			options:   ShadowOptions{},
 			expectErr: false,
-			validationFn: func(options *WorkflowShadowerOptions) {
+			validationFn: func(options *ShadowOptions) {
 				s.Empty(options.WorkflowQuery)
 				s.Equal(1.0, options.SamplingRate)
-				s.NotNil(options.Logger)
+				s.Equal(1, options.Concurrency)
 			},
 		},
 		{
 			msg: "construct query",
-			options: WorkflowShadowerOptions{
-				Domain:         "testDomain",
+			options: ShadowOptions{
 				WorkflowTypes:  []string{"testWorkflowType"},
 				WorkflowStatus: []string{"open"},
-				WorkflowStartTimeFilter: &TimeFilter{
+				WorkflowStartTimeFilter: TimeFilter{
 					MinTimestamp: s.testTimestamp.Add(-time.Hour),
 					MaxTimestamp: s.testTimestamp,
 				},
 			},
 			expectErr: false,
-			validationFn: func(options *WorkflowShadowerOptions) {
+			validationFn: func(options *ShadowOptions) {
 				expectedQuery := NewQueryBuilder().
 					WorkflowTypes([]string{"testWorkflowType"}).
 					WorkflowStatus([]WorkflowStatus{WorkflowStatusOpen}).
@@ -199,8 +246,8 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 	timePerWorkflow := 7 * time.Second
 	expirationTime := time.Minute
 
-	s.testShadower.options.ExitCondition = &WorkflowShadowerExitCondition{
-		ExpirationTime: expirationTime,
+	s.testShadower.options.ExitCondition = ShadowExitCondition{
+		ExpirationInterval: expirationTime,
 	}
 
 	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
@@ -218,19 +265,19 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 }
 
 func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_MaxShadowingCount() {
-	maxShadowingCount := 50
+	maxShadowCount := 50
 
-	s.testShadower.options.ExitCondition = &WorkflowShadowerExitCondition{
-		ShadowingCount: maxShadowingCount,
+	s.testShadower.options.ExitCondition = ShadowExitCondition{
+		ShadowCount: maxShadowCount,
 	}
 
 	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
-		Executions:    newTestWorkflowExecutions(maxShadowingCount * 2),
+		Executions:    newTestWorkflowExecutions(maxShadowCount * 2),
 		NextPageToken: []byte{1, 2, 3},
 	}, nil).Times(1)
 	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
 		History: s.testWorkflowHistory,
-	}, nil).Times(maxShadowingCount)
+	}, nil).Times(maxShadowCount)
 
 	s.NoError(s.testShadower.shadowWorker())
 }

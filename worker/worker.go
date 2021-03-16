@@ -176,13 +176,15 @@ type (
 	// Options is used to configure a worker instance.
 	Options = internal.WorkerOptions
 
-	// WorkflowShadowerOptions is used to configure a WorkflowShadower.
-	WorkflowShadowerOptions = internal.WorkflowShadowerOptions
+	// ShadowOptions is used to configure a WorkflowShadower.
+	ShadowOptions = internal.ShadowOptions
+	// ShadowMode is an enum for configuring if shadowing should continue after all workflows matches the WorkflowQuery have been replayed.
+	ShadowMode = internal.ShadowMode
 	// TimeFilter represents a time range through the min and max timestamp
 	TimeFilter = internal.TimeFilter
-	// WorkflowShadowerExitCondition configures when the workflow shadower should exit.
+	// ShadowExitCondition configures when the workflow shadower should exit.
 	// If not specified shadower will exit after replaying all workflows satisfying the visibility query.
-	WorkflowShadowerExitCondition = internal.WorkflowShadowerExitCondition
+	ShadowExitCondition = internal.ShadowExitCondition
 
 	// NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 	// mismatched history events (presumably arising from non-deterministic workflow definitions).
@@ -202,6 +204,17 @@ const (
 	// Whereas default does *NOT* reply anything back to the server, fail workflow replies back with a request
 	// to fail the workflow execution.
 	NonDeterministicWorkflowPolicyFailWorkflow = internal.NonDeterministicWorkflowPolicyFailWorkflow
+)
+
+const (
+	// ShadowModeNormal is the default mode for workflow shadowing.
+	// Shadowing will complete after all workflows matches WorkflowQuery have been replayed.
+	ShadowModeNormal = internal.ShadowModeNormal
+	// ShadowModeContinuous mode will start a new round of shadowing
+	// after all workflows matches WorkflowQuery have been replayed.
+	// Shadowing will complete only when ExitCondition is met.
+	// ExitCondition must be specified when using this mode
+	ShadowModeContinuous = internal.ShadowModeContinuous
 )
 
 // New creates an instance of worker for managing workflow and activity executions.
@@ -228,9 +241,11 @@ func NewWorkflowReplayer() WorkflowReplayer {
 // NewWorkflowShadower creates a WorkflowShadower instance.
 func NewWorkflowShadower(
 	service workflowserviceclient.Interface,
-	options *WorkflowShadowerOptions,
+	domain string,
+	options *ShadowOptions,
+	logger *zap.Logger,
 ) (WorkflowShadower, error) {
-	return internal.NewWorkflowShadower(service, options)
+	return internal.NewWorkflowShadower(service, domain, options, logger)
 }
 
 // EnableVerboseLogging enable or disable verbose logging of internal Cadence library components.

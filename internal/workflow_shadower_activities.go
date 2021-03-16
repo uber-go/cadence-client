@@ -46,15 +46,6 @@ const (
 	workflowReplayerContextKey contextKey = "workflowReplayer"
 )
 
-func registerShadowerActivities(w *aggregatedWorker) {
-	w.RegisterActivityWithOptions(scanWorkflowActivity, RegisterActivityOptions{
-		Name: shadower.ScanWorkflowActivityName,
-	})
-	w.RegisterActivityWithOptions(replayWorkflowActivity, RegisterActivityOptions{
-		Name: shadower.ReplayWorkflowActivityName,
-	})
-}
-
 func scanWorkflowActivity(
 	ctx context.Context,
 	params shadower.ScanWorkflowActivityParams,

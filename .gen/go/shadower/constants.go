@@ -31,14 +31,14 @@ const ErrReasonInvalidQuery string = "invalid visibility query"
 
 const ErrReasonWorkflowTypeNotRegistered string = "workflow type not registered"
 
+const LocalDomainName string = "cadence-shadower"
+
 const ReplayWorkflowActivityName string = "replayWorkflowActivity"
 
 const ScanWorkflowActivityName string = "scanWorkflowActivity"
 
-const ScanWorkflowIDSuffix string = "-shadow-workflow"
+const TaskList string = "cadence-shadower-tl"
 
-const ShadowWorkflowName string = "cadence-shadow-workflow"
+const WorkflowIDSuffix string = "-shadow-workflow"
 
-const ShadowerLocalDomainName string = "cadence-shadower"
-
-const ShadowerTaskList string = "cadence-shadower-tl"
+const WorkflowName string = "cadence-shadow-workflow"

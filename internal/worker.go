@@ -205,6 +205,17 @@ type (
 		// Optional: Sets opentracing Tracer that is to be used to emit tracing information
 		// default: no tracer - opentracing.NoopTracer
 		Tracer opentracing.Tracer
+
+		// Optional: Enable worker for running shadowing workflows to replay existing workflows
+		// If set to true, worker will run in shadow mode and all other workers (decision, activity, session)
+		// will be disabled to prevent them from updating existing workflow states.
+		// default: false
+		EnableShadowWorker bool
+
+		// Required if EnableShadowWorker is set to true
+		// Configures workflow shadowing details
+		// default: no defaults
+		ShadowOptions *ShadowOptions
 	}
 )
 

@@ -37,6 +37,7 @@ import (
 
 var (
 	errDomainNotSet                  = errors.New("domain is not set")
+	errTaskListNotSet                = errors.New("task list is not set")
 	errWorkflowIDNotSet              = errors.New("workflowId is not set")
 	errLocalActivityParamsBadRequest = errors.New("missing local activity parameters through context, check LocalActivityOptions")
 	errActivityParamsBadRequest      = errors.New("missing activity parameters through context, check ActivityOptions")

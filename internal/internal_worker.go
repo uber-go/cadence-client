@@ -785,6 +785,7 @@ type aggregatedWorker struct {
 	activityWorker                  *activityWorker
 	locallyDispatchedActivityWorker *activityWorker
 	sessionWorker                   *sessionWorker
+	shadowWorker                    *shadowWorker
 	logger                          *zap.Logger
 	registry                        *registry
 }
@@ -862,6 +863,23 @@ func (aw *aggregatedWorker) Start() error {
 				aw.locallyDispatchedActivityWorker.Stop()
 			}
 			return err
+		}
+	}
+
+	if !isInterfaceNil(aw.shadowWorker) {
+		if err := aw.shadowWorker.Start(); err != nil {
+			if !isInterfaceNil(aw.workflowWorker) {
+				aw.workflowWorker.Stop()
+			}
+			if !isInterfaceNil(aw.activityWorker) {
+				aw.activityWorker.Stop()
+			}
+			if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+				aw.locallyDispatchedActivityWorker.Stop()
+			}
+			if !isInterfaceNil(aw.sessionWorker) {
+				aw.sessionWorker.Stop()
+			}
 		}
 	}
 
@@ -952,6 +970,9 @@ func (aw *aggregatedWorker) Stop() {
 	}
 	if !isInterfaceNil(aw.sessionWorker) {
 		aw.sessionWorker.Stop()
+	}
+	if !isInterfaceNil(aw.shadowWorker) {
+		aw.shadowWorker.Stop()
 	}
 	aw.logger.Info("Stopped Worker")
 }
@@ -1090,11 +1111,23 @@ func newAggregatedWorker(
 
 	}
 
+	var shadowWorker *shadowWorker
+	if wOptions.EnableShadowWorker {
+		shadowWorker = newShadowWorker(
+			service,
+			domain,
+			wOptions.ShadowOptions,
+			workerParams,
+			registry,
+		)
+	}
+
 	return &aggregatedWorker{
 		workflowWorker:                  workflowWorker,
 		activityWorker:                  activityWorker,
 		locallyDispatchedActivityWorker: locallyDispatchedActivityWorker,
 		sessionWorker:                   sessionWorker,
+		shadowWorker:                    shadowWorker,
 		logger:                          logger,
 		registry:                        registry,
 	}
@@ -1237,6 +1270,13 @@ func augmentWorkerOptions(options WorkerOptions) WorkerOptions {
 	} else {
 		options.Tracer = opentracing.NoopTracer{}
 	}
+
+	if options.EnableShadowWorker {
+		options.DisableActivityWorker = true
+		options.DisableWorkflowWorker = true
+		options.EnableSessionWorker = false
+	}
+
 	return options
 }
 

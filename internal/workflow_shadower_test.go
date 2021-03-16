@@ -21,6 +21,7 @@
 package internal
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -282,7 +283,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_MaxShadowingCount(
 	s.NoError(s.testShadower.shadowWorker())
 }
 
-func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_FullScan() {
+func (s *workflowShadowerSuite) TestShadowWorker_NormalMode() {
 	workflowExecutions := newTestWorkflowExecutions(10)
 	numScan := 3
 	totalWorkflows := len(workflowExecutions) * numScan
@@ -305,7 +306,49 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_FullScan() {
 	s.NoError(s.testShadower.shadowWorker())
 }
 
-func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ReplayFailed() {
+func (s *workflowShadowerSuite) TestShadowWorker_ContinuousMode() {
+	workflowExecutions := newTestWorkflowExecutions(10)
+	numScan := 3
+	totalWorkflows := len(workflowExecutions) * numScan
+
+	s.testShadower.options.Mode = ShadowModeContinuous
+	s.testShadower.options.ExitCondition = ShadowExitCondition{
+		ShadowCount: totalWorkflows,
+	}
+
+	for i := 0; i != numScan; i++ {
+		scanResp := &shared.ListWorkflowExecutionsResponse{
+			Executions: workflowExecutions,
+		}
+		s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(scanResp, nil).Times(1)
+	}
+
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+		History: s.testWorkflowHistory,
+	}, nil).Times(totalWorkflows)
+
+	doneCh := make(chan struct{})
+	var advanceTimeWG sync.WaitGroup
+	advanceTimeWG.Add(1)
+	go func() {
+		defer advanceTimeWG.Done()
+		for {
+			time.Sleep(100 * time.Millisecond)
+			select {
+			case <-doneCh:
+				return
+			default:
+				s.testShadower.clock.(*clock.Mock).Add(defaultWaitDurationPerIteration)
+			}
+		}
+	}()
+
+	s.NoError(s.testShadower.shadowWorker())
+	close(doneCh)
+	advanceTimeWG.Wait()
+}
+
+func (s *workflowShadowerSuite) TestShadowWorker_ReplayFailed() {
 	successfullyReplayed := 5
 	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
 		Executions:    newTestWorkflowExecutions(successfullyReplayed * 2),
@@ -321,7 +364,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ReplayFailed() {
 	s.Error(s.testShadower.shadowWorker())
 }
 
-func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpectedReplayError() {
+func (s *workflowShadowerSuite) TestShadowWorker_ExpectedReplayError() {
 	testCases := []struct {
 		msg                string
 		getHistoryErr      error

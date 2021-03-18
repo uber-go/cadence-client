@@ -62,9 +62,11 @@ func newShadowWorker(
 	replayer := NewWorkflowReplayer()
 	replayer.registry = registry
 
-	// include domain name in tasklist to avoid confliction
-	// since all shadow workflow will be run in a single system domain
-	params.TaskList = domain + "-" + params.TaskList
+	if len(params.TaskList) != 0 {
+		// include domain name in tasklist to avoid confliction
+		// since all shadow workflow will be run in a single system domain
+		params.TaskList = generateShadowTaskList(domain, params.TaskList)
+	}
 
 	params.UserContext = context.WithValue(params.UserContext, serviceClientContextKey, service)
 	params.UserContext = context.WithValue(params.UserContext, workflowReplayerContextKey, replayer)
@@ -162,4 +164,8 @@ func (sw *shadowWorker) startShadowWorkflow() error {
 	}
 
 	return backoff.Retry(ctx, startWorkflowOp, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+}
+
+func generateShadowTaskList(domain, taskList string) string {
+	return domain + "-" + taskList
 }

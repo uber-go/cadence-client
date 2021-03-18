@@ -229,7 +229,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 	var workflowParams shadower.WorkflowParams
 	getDefaultDataConverter().FromData(startRequest.Input, &workflowParams)
 	s.Equal(testDomain, workflowParams.GetDomain())
-	s.Equal(testTaskList, workflowParams.GetTaskList())
+	s.Equal(generateShadowTaskList(testDomain, testTaskList), workflowParams.GetTaskList())
 	s.Equal(workflowQuery, workflowParams.GetWorkflowQuery())
 	s.Equal(samplingRate, workflowParams.GetSamplingRate())
 	s.Equal(shadowMode.toThriftPtr(), workflowParams.ShadowMode)

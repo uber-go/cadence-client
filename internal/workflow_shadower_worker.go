@@ -62,6 +62,10 @@ func newShadowWorker(
 	replayer := NewWorkflowReplayer()
 	replayer.registry = registry
 
+	// include domain name in tasklist to avoid confliction
+	// since all shadow workflow will be run in a single system domain
+	params.TaskList = domain + "-" + params.TaskList
+
 	params.UserContext = context.WithValue(params.UserContext, serviceClientContextKey, service)
 	params.UserContext = context.WithValue(params.UserContext, workflowReplayerContextKey, replayer)
 

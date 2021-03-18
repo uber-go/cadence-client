@@ -85,6 +85,9 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 	s.True(ok)
 	_, ok = userContext.Value(workflowReplayerContextKey).(*WorkflowReplayer)
 	s.True(ok)
+
+	taskList := shadowWorker.activityWorker.executionParameters.TaskList
+	s.Contains(taskList, testDomain)
 }
 
 func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_ShadowOptionNotSpecified() {

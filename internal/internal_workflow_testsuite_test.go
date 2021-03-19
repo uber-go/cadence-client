@@ -2438,8 +2438,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
 		if err != nil {
 			return "", err
 		}
-
-		Sleep(ctx, time.Hour)
 		return result, nil
 	}
 

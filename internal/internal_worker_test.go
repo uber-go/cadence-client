@@ -194,7 +194,7 @@ func testActivityMultipleArgsWithStruct(_ context.Context, i int, s testActivity
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorker() {
-	worker := createWorkerWithThrottle(s.service, float64(500.0), nil)
+	worker := createWorkerWithThrottle(s.service, float64(500.0), nil, nil)
 	err := worker.Start()
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
@@ -207,6 +207,14 @@ func (s *internalWorkerTestSuite) TestCreateWorker_WithDataConverter() {
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
 	worker.Stop()
+}
+
+func (s *internalWorkerTestSuite) TestCreateShadowWorker() {
+	worker := createShadowWorker(s.service, &ShadowOptions{})
+	s.Nil(worker.workflowWorker)
+	s.Nil(worker.activityWorker)
+	s.Nil(worker.locallyDispatchedActivityWorker)
+	s.Nil(worker.sessionWorker)
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
@@ -278,6 +286,24 @@ func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
 	}
 }
 
+func (s *internalWorkerTestSuite) TestStartShadowWorkerFailWithInvalidOptions() {
+	invalidOptions := []*ShadowOptions{
+		{
+			Mode: ShadowModeContinuous,
+		},
+		{
+			WorkflowQuery: "workflow query",
+			WorkflowTypes: []string{"workflowTypeName"},
+		},
+	}
+
+	for _, opt := range invalidOptions {
+		worker := createShadowWorker(s.service, opt)
+		err := worker.Start()
+		assert.Error(s.T(), err, "worker.Start() should fail given invalid shadow options")
+	}
+}
+
 func ofPollForActivityTaskRequest(tps float64) gomock.Matcher {
 	return &mockPollForActivityTaskRequest{tps: tps}
 }
@@ -298,12 +324,24 @@ func (m *mockPollForActivityTaskRequest) String() string {
 	return "PollForActivityTaskRequest"
 }
 
-func createWorker(service *workflowservicetest.MockClient) *aggregatedWorker {
-	return createWorkerWithThrottle(service, float64(0.0), nil)
+func createWorker(
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(service, float64(0.0), nil, nil)
+}
+
+func createShadowWorker(
+	service *workflowservicetest.MockClient,
+	shadowOptions *ShadowOptions,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(service, float64(0.0), nil, shadowOptions)
 }
 
 func createWorkerWithThrottle(
-	service *workflowservicetest.MockClient, activitiesPerSecond float64, dc DataConverter,
+	service *workflowservicetest.MockClient,
+	activitiesPerSecond float64,
+	dc DataConverter,
+	shadowOptions *ShadowOptions,
 ) *aggregatedWorker {
 	domain := "testDomain"
 	domainStatus := shared.DomainStatusRegistered
@@ -342,6 +380,11 @@ func createWorkerWithThrottle(
 	}
 	workerOptions.EnableSessionWorker = true
 
+	if shadowOptions != nil {
+		workerOptions.EnableShadowWorker = true
+		workerOptions.ShadowOptions = shadowOptions
+	}
+
 	// Start Worker.
 	worker := NewWorker(
 		service,
@@ -351,8 +394,10 @@ func createWorkerWithThrottle(
 	return worker
 }
 
-func createWorkerWithDataConverter(service *workflowservicetest.MockClient) *aggregatedWorker {
-	return createWorkerWithThrottle(service, float64(0.0), newTestDataConverter())
+func createWorkerWithDataConverter(
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(service, float64(0.0), newTestDataConverter(), nil)
 }
 
 func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions) {

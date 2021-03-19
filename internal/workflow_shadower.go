@@ -44,6 +44,10 @@ const (
 	statusStopped     int32 = 2
 )
 
+const (
+	defaultWaitDurationPerIteration = 5 * time.Minute
+)
+
 type (
 	// ShadowOptions is used to configure workflow shadowing.
 	ShadowOptions struct {
@@ -134,6 +138,8 @@ const (
 	ShadowModeNormal ShadowMode = iota
 	// ShadowModeContinuous mode will start a new round of shadowing
 	// after all workflows matches WorkflowQuery have been replayed.
+	// There will be a 5 min wait period between each round,
+	// currently this wait period is not configurable.
 	// Shadowing will complete only when ExitCondition is met.
 	// ExitCondition must be specified when using this mode
 	ShadowModeContinuous
@@ -268,8 +274,12 @@ func (s *WorkflowShadower) shadowWorker() error {
 			}
 		}
 
-		if len(scanResult.NextPageToken) == 0 && s.options.Mode == ShadowModeNormal {
-			return nil
+		if len(scanResult.NextPageToken) == 0 {
+			if s.options.Mode == ShadowModeNormal || s.clock.Now().Add(defaultWaitDurationPerIteration).After(expirationTime) {
+				return nil
+			}
+
+			s.clock.Sleep(defaultWaitDurationPerIteration)
 		}
 
 		scanRequest.NextPageToken = scanResult.NextPageToken

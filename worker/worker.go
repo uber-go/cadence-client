@@ -212,6 +212,8 @@ const (
 	ShadowModeNormal = internal.ShadowModeNormal
 	// ShadowModeContinuous mode will start a new round of shadowing
 	// after all workflows matches WorkflowQuery have been replayed.
+	// There will be a 5 min wait period between each round,
+	// currently this wait period is not configurable.
 	// Shadowing will complete only when ExitCondition is met.
 	// ExitCondition must be specified when using this mode
 	ShadowModeContinuous = internal.ShadowModeContinuous

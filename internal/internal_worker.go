@@ -864,6 +864,7 @@ func (aw *aggregatedWorker) Start() error {
 			}
 			return err
 		}
+		aw.logger.Info("Started Session Worker")
 	}
 
 	if !isInterfaceNil(aw.shadowWorker) {
@@ -882,6 +883,7 @@ func (aw *aggregatedWorker) Start() error {
 			}
 			return err
 		}
+		aw.logger.Info("Started Shadow Worker")
 	}
 
 	return nil

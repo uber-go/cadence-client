@@ -880,6 +880,7 @@ func (aw *aggregatedWorker) Start() error {
 			if !isInterfaceNil(aw.sessionWorker) {
 				aw.sessionWorker.Stop()
 			}
+			return err
 		}
 	}
 

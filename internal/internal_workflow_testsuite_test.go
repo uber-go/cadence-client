@@ -2398,16 +2398,23 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityHeartbeatRetry() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
-
-	localActivityFn := func(ctx context.Context) (int32, error) {
-		info := GetActivityInfo(ctx)
-		if info.Attempt < 2 {
-			return int32(-1), NewCustomError("bad-luck")
-		}
-		return info.Attempt, nil
+	nonretriableCount := 0
+	nonretriableFn := func(ctx context.Context) (string, error) {
+		nonretriableCount++
+		return "", NewCustomError("bad-bug")
 	}
 
-	workflowFn := func(ctx Context) (int32, error) {
+	retriableCount := 0
+	retriableFn := func(ctx context.Context) (string, error) {
+		retriableCount++
+		info := GetActivityInfo(ctx)
+		if info.Attempt < 2 {
+			return "", NewCustomError("bad-luck")
+		}
+		return "retry-done", nil
+	}
+
+	workflowFn := func(ctx Context) (string, error) {
 		lao := LocalActivityOptions{
 			ScheduleToCloseTimeout: time.Minute,
 			RetryPolicy: &RetryPolicy{
@@ -2421,11 +2428,18 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
 		}
 		ctx = WithLocalActivityOptions(ctx, lao)
 
-		var result int32
-		err := ExecuteLocalActivity(ctx, localActivityFn).Get(ctx, &result)
+		err := ExecuteLocalActivity(ctx, nonretriableFn).Get(ctx, nil)
+		badBug, ok := err.(*CustomError)
+		s.True(ok)
+		s.Equal("bad-bug", badBug.Reason())
+
+		var result string
+		err = ExecuteLocalActivity(ctx, retriableFn).Get(ctx, &result)
 		if err != nil {
-			return int32(-1), err
+			return "", err
 		}
+
+		Sleep(ctx, time.Hour)
 		return result, nil
 	}
 
@@ -2435,9 +2449,11 @@ func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetry() {
 
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
-	var result int32
+	var result string
 	s.NoError(env.GetWorkflowResult(&result))
-	s.Equal(int32(2), result)
+	s.Equal("retry-done", result)
+	s.Equal(1, nonretriableCount)
+	s.Equal(3, retriableCount)
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_LocalActivityRetryOnCancel() {

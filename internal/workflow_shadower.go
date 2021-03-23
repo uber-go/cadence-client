@@ -63,8 +63,8 @@ type (
 
 		// Optional: A list of workflow status.
 		// The list will be used to construct WorkflowQuery. Only workflows with status listed will be replayed.
-		// accepted values (case-insensitive): OPEN, CLOSED, COMPLETED, FAILED, CANCELED, TERMINATED, CONTINUED_AS_NEW, TIMED_OUT
-		// default: empty list, which matches all workflow status
+		// accepted values (case-insensitive): OPEN, CLOSED, ALL, COMPLETED, FAILED, CANCELED, TERMINATED, CONTINUED_AS_NEW, TIMED_OUT
+		// default: OPEN, which matches only open workflows
 		WorkflowStatus []string
 
 		// Optional: Min and Max workflow start timestamp.
@@ -311,6 +311,9 @@ func (o *ShadowOptions) validateAndPopulateFields() error {
 				return err
 			}
 			statuses = append(statuses, status)
+		}
+		if len(statuses) == 0 {
+			statuses = []WorkflowStatus{WorkflowStatusOpen}
 		}
 		queryBuilder.WorkflowStatus(statuses)
 

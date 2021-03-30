@@ -39,6 +39,8 @@ const (
 	WorkflowStatusOpen WorkflowStatus = "OPEN"
 	// WorkflowStatusClosed is the WorkflowStatus for closed workflows
 	WorkflowStatusClosed WorkflowStatus = "CLOSED"
+	// WorkflowStatusALL is the WorkflowStatus for all workflows
+	WorkflowStatusALL WorkflowStatus = "ALL"
 )
 
 var (
@@ -104,6 +106,9 @@ func (q *queryBuilderImpl) WorkflowStatus(statuses []WorkflowStatus) QueryBuilde
 			statusQuery = keyCloseTime + " = missing"
 		case WorkflowStatusClosed:
 			statusQuery = keyCloseTime + " != missing"
+		case WorkflowStatusALL:
+			// no query needed
+			return q
 		default:
 			statusQuery = keyCloseStatus + ` = "` + string(status) + `"`
 		}

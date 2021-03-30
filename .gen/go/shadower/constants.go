@@ -25,6 +25,8 @@ package shadower
 
 
 
+const ErrNonRetryableType string = "com.uber.cadence.internal.shadowing.NonRetryableException"
+
 const ErrReasonDomainNotExists string = "domain not exists"
 
 const ErrReasonInvalidQuery string = "invalid visibility query"

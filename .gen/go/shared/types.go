@@ -35245,6 +35245,7 @@ type SignalWithStartWorkflowExecutionRequest struct {
 	Memo                                *Memo                  `json:"memo,omitempty"`
 	SearchAttributes                    *SearchAttributes      `json:"searchAttributes,omitempty"`
 	Header                              *Header                `json:"header,omitempty"`
+	DelayStartSeconds                   *int32                 `json:"delayStartSeconds,omitempty"`
 }
 
 // ToWire translates a SignalWithStartWorkflowExecutionRequest struct into a Thrift-level intermediate
@@ -35264,7 +35265,7 @@ type SignalWithStartWorkflowExecutionRequest struct {
 //   }
 func (v *SignalWithStartWorkflowExecutionRequest) ToWire() (wire.Value, error) {
 	var (
-		fields [18]wire.Field
+		fields [19]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -35412,6 +35413,14 @@ func (v *SignalWithStartWorkflowExecutionRequest) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 170, Value: w}
+		i++
+	}
+	if v.DelayStartSeconds != nil {
+		w, err = wire.NewValueI32(*(v.DelayStartSeconds)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 180, Value: w}
 		i++
 	}
 
@@ -35608,6 +35617,16 @@ func (v *SignalWithStartWorkflowExecutionRequest) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 180:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.DelayStartSeconds = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -35621,7 +35640,7 @@ func (v *SignalWithStartWorkflowExecutionRequest) String() string {
 		return "<nil>"
 	}
 
-	var fields [18]string
+	var fields [19]string
 	i := 0
 	if v.Domain != nil {
 		fields[i] = fmt.Sprintf("Domain: %v", *(v.Domain))
@@ -35695,6 +35714,10 @@ func (v *SignalWithStartWorkflowExecutionRequest) String() string {
 		fields[i] = fmt.Sprintf("Header: %v", v.Header)
 		i++
 	}
+	if v.DelayStartSeconds != nil {
+		fields[i] = fmt.Sprintf("DelayStartSeconds: %v", *(v.DelayStartSeconds))
+		i++
+	}
 
 	return fmt.Sprintf("SignalWithStartWorkflowExecutionRequest{%v}", strings.Join(fields[:i], ", "))
 }
@@ -35766,6 +35789,9 @@ func (v *SignalWithStartWorkflowExecutionRequest) Equals(rhs *SignalWithStartWor
 		return false
 	}
 	if !((v.Header == nil && rhs.Header == nil) || (v.Header != nil && rhs.Header != nil && v.Header.Equals(rhs.Header))) {
+		return false
+	}
+	if !_I32_EqualsPtr(v.DelayStartSeconds, rhs.DelayStartSeconds) {
 		return false
 	}
 
@@ -35857,6 +35883,16 @@ func (v *SignalWithStartWorkflowExecutionRequest) GetSignalName() (o string) {
 func (v *SignalWithStartWorkflowExecutionRequest) GetCronSchedule() (o string) {
 	if v.CronSchedule != nil {
 		return *v.CronSchedule
+	}
+
+	return
+}
+
+// GetDelayStartSeconds returns the value of DelayStartSeconds if it is set or its
+// zero value if it is unset.
+func (v *SignalWithStartWorkflowExecutionRequest) GetDelayStartSeconds() (o int32) {
+	if v.DelayStartSeconds != nil {
+		return *v.DelayStartSeconds
 	}
 
 	return
@@ -37023,6 +37059,7 @@ type StartChildWorkflowExecutionInitiatedEventAttributes struct {
 	Header                              *Header                `json:"header,omitempty"`
 	Memo                                *Memo                  `json:"memo,omitempty"`
 	SearchAttributes                    *SearchAttributes      `json:"searchAttributes,omitempty"`
+	DelayStartSeconds                   *int32                 `json:"delayStartSeconds,omitempty"`
 }
 
 // ToWire translates a StartChildWorkflowExecutionInitiatedEventAttributes struct into a Thrift-level intermediate
@@ -37042,7 +37079,7 @@ type StartChildWorkflowExecutionInitiatedEventAttributes struct {
 //   }
 func (v *StartChildWorkflowExecutionInitiatedEventAttributes) ToWire() (wire.Value, error) {
 	var (
-		fields [16]wire.Field
+		fields [17]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -37174,6 +37211,14 @@ func (v *StartChildWorkflowExecutionInitiatedEventAttributes) ToWire() (wire.Val
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 160, Value: w}
+		i++
+	}
+	if v.DelayStartSeconds != nil {
+		w, err = wire.NewValueI32(*(v.DelayStartSeconds)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 170, Value: w}
 		i++
 	}
 
@@ -37346,6 +37391,16 @@ func (v *StartChildWorkflowExecutionInitiatedEventAttributes) FromWire(w wire.Va
 				}
 
 			}
+		case 170:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.DelayStartSeconds = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -37359,7 +37414,7 @@ func (v *StartChildWorkflowExecutionInitiatedEventAttributes) String() string {
 		return "<nil>"
 	}
 
-	var fields [16]string
+	var fields [17]string
 	i := 0
 	if v.Domain != nil {
 		fields[i] = fmt.Sprintf("Domain: %v", *(v.Domain))
@@ -37425,6 +37480,10 @@ func (v *StartChildWorkflowExecutionInitiatedEventAttributes) String() string {
 		fields[i] = fmt.Sprintf("SearchAttributes: %v", v.SearchAttributes)
 		i++
 	}
+	if v.DelayStartSeconds != nil {
+		fields[i] = fmt.Sprintf("DelayStartSeconds: %v", *(v.DelayStartSeconds))
+		i++
+	}
 
 	return fmt.Sprintf("StartChildWorkflowExecutionInitiatedEventAttributes{%v}", strings.Join(fields[:i], ", "))
 }
@@ -37480,6 +37539,9 @@ func (v *StartChildWorkflowExecutionInitiatedEventAttributes) Equals(rhs *StartC
 		return false
 	}
 	if !((v.SearchAttributes == nil && rhs.SearchAttributes == nil) || (v.SearchAttributes != nil && rhs.SearchAttributes != nil && v.SearchAttributes.Equals(rhs.SearchAttributes))) {
+		return false
+	}
+	if !_I32_EqualsPtr(v.DelayStartSeconds, rhs.DelayStartSeconds) {
 		return false
 	}
 
@@ -37561,6 +37623,16 @@ func (v *StartChildWorkflowExecutionInitiatedEventAttributes) GetWorkflowIdReuse
 func (v *StartChildWorkflowExecutionInitiatedEventAttributes) GetCronSchedule() (o string) {
 	if v.CronSchedule != nil {
 		return *v.CronSchedule
+	}
+
+	return
+}
+
+// GetDelayStartSeconds returns the value of DelayStartSeconds if it is set or its
+// zero value if it is unset.
+func (v *StartChildWorkflowExecutionInitiatedEventAttributes) GetDelayStartSeconds() (o int32) {
+	if v.DelayStartSeconds != nil {
+		return *v.DelayStartSeconds
 	}
 
 	return
@@ -37886,6 +37958,7 @@ type StartWorkflowExecutionRequest struct {
 	Memo                                *Memo                  `json:"memo,omitempty"`
 	SearchAttributes                    *SearchAttributes      `json:"searchAttributes,omitempty"`
 	Header                              *Header                `json:"header,omitempty"`
+	DelayStartSeconds                   *int32                 `json:"delayStartSeconds,omitempty"`
 }
 
 // ToWire translates a StartWorkflowExecutionRequest struct into a Thrift-level intermediate
@@ -37905,7 +37978,7 @@ type StartWorkflowExecutionRequest struct {
 //   }
 func (v *StartWorkflowExecutionRequest) ToWire() (wire.Value, error) {
 	var (
-		fields [15]wire.Field
+		fields [16]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -38029,6 +38102,14 @@ func (v *StartWorkflowExecutionRequest) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 150, Value: w}
+		i++
+	}
+	if v.DelayStartSeconds != nil {
+		w, err = wire.NewValueI32(*(v.DelayStartSeconds)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 160, Value: w}
 		i++
 	}
 
@@ -38193,6 +38274,16 @@ func (v *StartWorkflowExecutionRequest) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 160:
+			if field.Value.Type() == wire.TI32 {
+				var x int32
+				x, err = field.Value.GetI32(), error(nil)
+				v.DelayStartSeconds = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -38206,7 +38297,7 @@ func (v *StartWorkflowExecutionRequest) String() string {
 		return "<nil>"
 	}
 
-	var fields [15]string
+	var fields [16]string
 	i := 0
 	if v.Domain != nil {
 		fields[i] = fmt.Sprintf("Domain: %v", *(v.Domain))
@@ -38268,6 +38359,10 @@ func (v *StartWorkflowExecutionRequest) String() string {
 		fields[i] = fmt.Sprintf("Header: %v", v.Header)
 		i++
 	}
+	if v.DelayStartSeconds != nil {
+		fields[i] = fmt.Sprintf("DelayStartSeconds: %v", *(v.DelayStartSeconds))
+		i++
+	}
 
 	return fmt.Sprintf("StartWorkflowExecutionRequest{%v}", strings.Join(fields[:i], ", "))
 }
@@ -38320,6 +38415,9 @@ func (v *StartWorkflowExecutionRequest) Equals(rhs *StartWorkflowExecutionReques
 		return false
 	}
 	if !((v.Header == nil && rhs.Header == nil) || (v.Header != nil && rhs.Header != nil && v.Header.Equals(rhs.Header))) {
+		return false
+	}
+	if !_I32_EqualsPtr(v.DelayStartSeconds, rhs.DelayStartSeconds) {
 		return false
 	}
 
@@ -38401,6 +38499,16 @@ func (v *StartWorkflowExecutionRequest) GetWorkflowIdReusePolicy() (o WorkflowId
 func (v *StartWorkflowExecutionRequest) GetCronSchedule() (o string) {
 	if v.CronSchedule != nil {
 		return *v.CronSchedule
+	}
+
+	return
+}
+
+// GetDelayStartSeconds returns the value of DelayStartSeconds if it is set or its
+// zero value if it is unset.
+func (v *StartWorkflowExecutionRequest) GetDelayStartSeconds() (o int32) {
+	if v.DelayStartSeconds != nil {
+		return *v.DelayStartSeconds
 	}
 
 	return

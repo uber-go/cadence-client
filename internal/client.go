@@ -392,6 +392,11 @@ type (
 		// supported when Cadence server is using ElasticSearch). The key and value type must be registered on Cadence server side.
 		// Use GetSearchAttributes API to get valid key and corresponding value type.
 		SearchAttributes map[string]interface{}
+
+		// DelayStartSeconds - Seconds to delay the workflow start
+		// The resolution is seconds.
+		// Optional: defaulted to 0 seconds
+		DelayStart time.Duration
 	}
 
 	// RetryPolicy defines the retry policy.

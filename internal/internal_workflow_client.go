@@ -473,6 +473,7 @@ func (wc *workflowClient) TerminateWorkflow(ctx context.Context, workflowID stri
 			RunId:      getRunID(runID),
 		},
 		Reason:   common.StringPtr(reason),
+		Details:  details,
 		Identity: common.StringPtr(wc.identity),
 	}
 

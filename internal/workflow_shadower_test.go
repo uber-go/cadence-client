@@ -194,11 +194,11 @@ func (s *workflowShadowerSuite) TestShadowOptionsValidation() {
 			expectErr: true,
 		},
 		{
-			msg:       "populate sampling rate and concurrency",
+			msg:       "populate sampling rate, concurrency and status",
 			options:   ShadowOptions{},
 			expectErr: false,
 			validationFn: func(options *ShadowOptions) {
-				s.Empty(options.WorkflowQuery)
+				s.Equal("(CloseTime = missing)", options.WorkflowQuery)
 				s.Equal(1.0, options.SamplingRate)
 				s.Equal(1, options.Concurrency)
 			},

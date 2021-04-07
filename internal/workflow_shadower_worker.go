@@ -66,6 +66,8 @@ func newShadowWorker(
 		// include domain name in tasklist to avoid confliction
 		// since all shadow workflow will be run in a single system domain
 		params.TaskList = generateShadowTaskList(domain, params.TaskList)
+		params.MetricsScope = tagScope(params.MetricsScope, tagTaskList, params.TaskList)
+		params.Logger = params.Logger.With(zap.String(tagTaskList, params.TaskList))
 	}
 
 	params.UserContext = context.WithValue(params.UserContext, serviceClientContextKey, service)

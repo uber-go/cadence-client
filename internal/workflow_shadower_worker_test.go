@@ -96,7 +96,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_ShadowOptionNotSpecifie
 		testDomain,
 		nil,
 		workerExecutionParameters{
-			TaskList: testTaskList,
+			TaskList:    testTaskList,
+			UserContext: context.Background(),
 		},
 		newRegistry(),
 	)
@@ -112,7 +113,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 			Mode: ShadowModeContinuous, // exit condition is not specified
 		},
 		workerExecutionParameters{
-			TaskList: testTaskList,
+			TaskList:    testTaskList,
+			UserContext: context.Background(),
 		},
 		newRegistry(),
 	)
@@ -130,8 +132,9 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 		testDomain,
 		&ShadowOptions{},
 		workerExecutionParameters{
-			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			TaskList:    testTaskList,
+			Logger:      zaptest.NewLogger(s.T()),
+			UserContext: context.Background(),
 		},
 		newRegistry(),
 	)
@@ -148,7 +151,9 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 		s.mockService,
 		testDomain,
 		&ShadowOptions{},
-		workerExecutionParameters{},
+		workerExecutionParameters{
+			UserContext: context.Background(),
+		},
 		newRegistry(),
 	)
 
@@ -169,7 +174,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 		testDomain,
 		&ShadowOptions{},
 		workerExecutionParameters{
-			TaskList: testTaskList,
+			TaskList:    testTaskList,
+			UserContext: context.Background(),
 		},
 		newRegistry(),
 	)
@@ -211,7 +217,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 			Concurrency:   concurrency,
 		},
 		workerExecutionParameters{
-			TaskList: testTaskList,
+			TaskList:    testTaskList,
+			UserContext: context.Background(),
 		},
 		newRegistry(),
 	)

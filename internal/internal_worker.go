@@ -226,6 +226,9 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 		params.DataConverter = getDefaultDataConverter()
 		params.Logger.Info("No DataConverter configured for cadence worker. Use default one.")
 	}
+	if params.UserContext == nil {
+		params.UserContext = context.Background()
+	}
 }
 
 // verifyDomainExist does a DescribeDomain operation on the specified domain with backoff/retry
@@ -391,9 +394,7 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	env *registry,
 	maxConcurrentSessionExecutionSize int,
 ) *sessionWorker {
-	if params.Identity == "" {
-		params.Identity = getWorkerIdentity(params.TaskList)
-	}
+	ensureRequiredParams(&params)
 	// For now resourceID is hidden from user so we will always create a unique one for each worker.
 	if params.SessionResourceID == "" {
 		params.SessionResourceID = uuid.New()

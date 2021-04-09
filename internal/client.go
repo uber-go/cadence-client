@@ -114,6 +114,7 @@ type (
 		// The errors it can return:
 		//	- EntityNotExistsError
 		//	- InternalServiceError
+		//	- WorkflowExecutionAlreadyCompletedError
 		SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error
 
 		// SignalWithStartWorkflow sends a signal to a running workflow.
@@ -136,6 +137,7 @@ type (
 		//	- EntityNotExistsError
 		//	- BadRequestError
 		//	- InternalServiceError
+		//	- WorkflowExecutionAlreadyCompletedError
 		CancelWorkflow(ctx context.Context, workflowID string, runID string) error
 
 		// TerminateWorkflow terminates a workflow execution.
@@ -146,6 +148,7 @@ type (
 		//	- EntityNotExistsError
 		//	- BadRequestError
 		//	- InternalServiceError
+		//	- WorkflowExecutionAlreadyCompletedError
 		TerminateWorkflow(ctx context.Context, workflowID string, runID string, reason string, details []byte) error
 
 		// GetWorkflowHistory gets history events of a particular workflow

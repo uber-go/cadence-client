@@ -67,6 +67,7 @@ func isServiceTransientError(err error) bool {
 	case *s.BadRequestError,
 		*s.EntityNotExistsError,
 		*s.WorkflowExecutionAlreadyStartedError,
+		*s.WorkflowExecutionAlreadyCompletedError,
 		*s.DomainAlreadyExistsError,
 		*s.QueryFailedError,
 		*s.DomainNotActiveError,

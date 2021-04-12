@@ -243,6 +243,14 @@ func NewWorkflowReplayer() WorkflowReplayer {
 	return internal.NewWorkflowReplayer()
 }
 
+// NewWorkflowReplayerWithOptions creates an instance of the WorkflowReplayer
+// with provided replay worker options
+func NewWorkflowReplayerWithOptions(
+	options ReplayOptions,
+) WorkflowReplayer {
+	return internal.NewWorkflowReplayerWithOptions(options)
+}
+
 // NewWorkflowShadower creates a WorkflowShadower instance.
 func NewWorkflowShadower(
 	service workflowserviceclient.Interface,

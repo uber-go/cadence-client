@@ -293,6 +293,9 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		return nil
 	}
 
+	// TODO: the following result will not be executed if nextPageToken is not nil, which is probably fine as the actual workflow task
+	// processing logic does not have such check. If we want to always execute this check for closed workflows, we need to dump the
+	// entire history before starting the replay as otherwise we can't get the last event here.
 	// compare workflow results
 	if resp != nil {
 		completeReq, ok := resp.(*shared.RespondDecisionTaskCompletedRequest)

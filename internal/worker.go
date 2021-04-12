@@ -184,7 +184,7 @@ type (
 		// default: false
 		EnableSessionWorker bool
 
-		// Uncomment this option when we support automatic restablish failed sessions.
+		// Uncomment this option when we support automatic reestablish failed sessions.
 		// Optional: The identifier of the resource consumed by sessions.
 		// It's the user's responsibility to ensure there's only one worker using this resourceID.
 		// For now, if user doesn't specify one, a new uuid will be used as the resourceID.
@@ -207,8 +207,14 @@ type (
 		Tracer opentracing.Tracer
 
 		// Optional: Enable worker for running shadowing workflows to replay existing workflows
-		// If set to true, worker will run in shadow mode and all other workers (decision, activity, session)
+		// If set to true:
+		// 1. Worker will run in shadow mode and all other workers (decision, activity, session)
 		// will be disabled to prevent them from updating existing workflow states.
+		// 2. DataConverter, WorkflowInterceptorChainFactories, ContextPropagators, Tracer will be
+		// used as ReplayOptions and forwarded to the underlying WorkflowReplayer.
+		// The actual shadower activity worker will not use them.
+		// 3. TaskList will become Domain-TaskList, to prevent conflict across domains as there's
+		// only one shadowing domain which is responsible for shadowing workflows for all domains.
 		// default: false
 		EnableShadowWorker bool
 
@@ -236,15 +242,7 @@ const (
 	// Whereas default does *NOT* reply anything back to the server, fail workflow replies back with a request
 	// to fail the workflow execution.
 	NonDeterministicWorkflowPolicyFailWorkflow
-
-	// ReplayDomainName is domainName for replay because startEvent doesn't contain it
-	ReplayDomainName = "ReplayDomain"
 )
-
-// IsReplayDomain checks if the domainName is from replay
-func IsReplayDomain(dn string) bool {
-	return ReplayDomainName == dn
-}
 
 // NewWorker creates an instance of worker for managing workflow and activity executions.
 // service 	- thrift connection to the cadence server.

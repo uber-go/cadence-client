@@ -186,6 +186,9 @@ type (
 	// If not specified shadower will exit after replaying all workflows satisfying the visibility query.
 	ShadowExitCondition = internal.ShadowExitCondition
 
+	// ReplayOptions is used to configure the replay decision task worker.
+	ReplayOptions = internal.ReplayOptions
+
 	// NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 	// mismatched history events (presumably arising from non-deterministic workflow definitions).
 	NonDeterministicWorkflowPolicy = internal.NonDeterministicWorkflowPolicy
@@ -244,10 +247,11 @@ func NewWorkflowReplayer() WorkflowReplayer {
 func NewWorkflowShadower(
 	service workflowserviceclient.Interface,
 	domain string,
-	options *ShadowOptions,
+	shadowOptions ShadowOptions,
+	replayOptions ReplayOptions,
 	logger *zap.Logger,
 ) (WorkflowShadower, error) {
-	return internal.NewWorkflowShadower(service, domain, options, logger)
+	return internal.NewWorkflowShadower(service, domain, shadowOptions, replayOptions, logger)
 }
 
 // EnableVerboseLogging enable or disable verbose logging of internal Cadence library components.

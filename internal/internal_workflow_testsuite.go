@@ -536,7 +536,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 			StartToCloseTimeoutSeconds:    600,
 		},
 		activityFn,
-		args,
+		args...,
 	)
 }
 

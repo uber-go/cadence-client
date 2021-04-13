@@ -24,6 +24,7 @@ import (
 	"context"
 	"math/rand"
 	"strings"
+	"time"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shadower"
@@ -44,6 +45,12 @@ type (
 const (
 	serviceClientContextKey    contextKey = "serviceClient"
 	workflowReplayerContextKey contextKey = "workflowReplayer"
+)
+
+const (
+	minScanWorkflowResultSize   = 10
+	ratioToCompleteScanWorkflow = 0.8
+	scanWorkflowWaitPeriod      = 100 * time.Millisecond
 )
 
 func scanWorkflowActivity(
@@ -70,6 +77,10 @@ func scanWorkflowExecutionsHelper(
 	logger *zap.Logger,
 ) (shadower.ScanWorkflowActivityResult, error) {
 
+	info := GetActivityInfo(ctx)
+	now := time.Now()
+	activityTimeout := info.Deadline.Sub(now)
+	completionTime := now.Add(time.Duration(ratioToCompleteScanWorkflow * float32(activityTimeout)))
 	request := &shared.ListWorkflowExecutionsRequest{
 		Domain:        params.Domain,
 		Query:         params.WorkflowQuery,
@@ -77,39 +88,48 @@ func scanWorkflowExecutionsHelper(
 		PageSize:      params.PageSize,
 	}
 
-	var resp *shared.ListWorkflowExecutionsResponse
-	if err := backoff.Retry(ctx,
-		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+	result := shadower.ScanWorkflowActivityResult{}
+	for {
+		var resp *shared.ListWorkflowExecutionsResponse
+		if err := backoff.Retry(ctx,
+			func() error {
+				tchCtx, cancel, opt := newChannelContext(ctx)
 
-			var err error
-			resp, err = service.ScanWorkflowExecutions(tchCtx, request, opt...)
-			cancel()
+				var err error
+				resp, err = service.ScanWorkflowExecutions(tchCtx, request, opt...)
+				cancel()
 
-			return err
-		},
-		createDynamicServiceRetryPolicy(ctx),
-		isServiceTransientError,
-	); err != nil {
-		logger.Error("Failed to scan workflow executions",
-			zap.String(tagDomain, params.GetDomain()),
-			zap.String(tagVisibilityQuery, params.GetWorkflowQuery()),
-			zap.Error(err),
-		)
-		return shadower.ScanWorkflowActivityResult{}, err
-	}
-
-	executions := make([]*shared.WorkflowExecution, 0, len(resp.Executions))
-	for _, execution := range resp.Executions {
-		if shouldReplay(params.GetSamplingRate()) {
-			executions = append(executions, execution.Execution)
+				return err
+			},
+			createDynamicServiceRetryPolicy(ctx),
+			isServiceTransientError,
+		); err != nil {
+			logger.Error("Failed to scan workflow executions",
+				zap.String(tagDomain, params.GetDomain()),
+				zap.String(tagVisibilityQuery, params.GetWorkflowQuery()),
+				zap.Error(err),
+			)
+			return shadower.ScanWorkflowActivityResult{}, err
 		}
+
+		for _, execution := range resp.Executions {
+			if shouldReplay(params.GetSamplingRate()) {
+				result.Executions = append(result.Executions, execution.Execution)
+			}
+		}
+
+		request.NextPageToken = resp.NextPageToken
+		if len(request.NextPageToken) == 0 ||
+			len(result.Executions) >= minScanWorkflowResultSize ||
+			time.Now().After(completionTime) {
+			result.NextPageToken = request.NextPageToken
+			break
+		}
+
+		time.Sleep(scanWorkflowWaitPeriod)
 	}
 
-	return shadower.ScanWorkflowActivityResult{
-		Executions:    executions,
-		NextPageToken: resp.NextPageToken,
-	}, nil
+	return result, nil
 }
 
 func shouldReplay(probability float64) bool {

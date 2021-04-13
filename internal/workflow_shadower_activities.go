@@ -76,11 +76,13 @@ func scanWorkflowExecutionsHelper(
 	params shadower.ScanWorkflowActivityParams,
 	logger *zap.Logger,
 ) (shadower.ScanWorkflowActivityResult, error) {
+	var completionTime time.Time
+	if deadline, ok := ctx.Deadline(); ok {
+		now := time.Now()
+		activityTimeout := deadline.Sub(now)
+		completionTime = now.Add(time.Duration(ratioToCompleteScanWorkflow * float32(activityTimeout)))
+	}
 
-	info := GetActivityInfo(ctx)
-	now := time.Now()
-	activityTimeout := info.Deadline.Sub(now)
-	completionTime := now.Add(time.Duration(ratioToCompleteScanWorkflow * float32(activityTimeout)))
 	request := &shared.ListWorkflowExecutionsRequest{
 		Domain:        params.Domain,
 		Query:         params.WorkflowQuery,
@@ -121,7 +123,7 @@ func scanWorkflowExecutionsHelper(
 		request.NextPageToken = resp.NextPageToken
 		if len(request.NextPageToken) == 0 ||
 			len(result.Executions) >= minScanWorkflowResultSize ||
-			time.Now().After(completionTime) {
+			(!completionTime.IsZero() && time.Now().After(completionTime)) {
 			result.NextPageToken = request.NextPageToken
 			break
 		}

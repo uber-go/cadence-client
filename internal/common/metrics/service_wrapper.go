@@ -121,6 +121,7 @@ func (s *operationScope) handleError(err error) {
 			*shared.BadRequestError,
 			*shared.DomainAlreadyExistsError,
 			*shared.WorkflowExecutionAlreadyStartedError,
+			*shared.WorkflowExecutionAlreadyCompletedError,
 			*shared.QueryFailedError:
 			s.scope.Counter(CadenceInvalidRequest).Inc(1)
 		default:

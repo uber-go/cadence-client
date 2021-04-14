@@ -2027,7 +2027,7 @@ func (env *testWorkflowEnvironmentImpl) signalWorkflowByID(workflowID, signalNam
 
 	if workflowHandle, ok := env.runningWorkflows[workflowID]; ok {
 		if workflowHandle.handled {
-			return &shared.EntityNotExistsError{Message: fmt.Sprintf("Workflow %v already completed", workflowID)}
+			return &shared.WorkflowExecutionAlreadyCompletedError{Message: fmt.Sprintf("Workflow %v already completed", workflowID)}
 		}
 		workflowHandle.env.postCallback(func() {
 			workflowHandle.env.signalHandler(signalName, data)

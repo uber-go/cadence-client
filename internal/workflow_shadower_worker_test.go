@@ -33,7 +33,6 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
-	"go.uber.org/zap/zaptest"
 )
 
 type shadowWorkerSuite struct {
@@ -67,8 +66,7 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 		testDomain,
 		&ShadowOptions{},
 		workerExecutionParameters{
-			TaskList:    testTaskList,
-			UserContext: context.Background(),
+			TaskList: testTaskList,
 		},
 		registry,
 	)
@@ -96,8 +94,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_ShadowOptionNotSpecifie
 		testDomain,
 		nil,
 		workerExecutionParameters{
-			TaskList:    testTaskList,
-			UserContext: context.Background(),
+			TaskList: testTaskList,
 		},
 		newRegistry(),
 	)
@@ -113,8 +110,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 			Mode: ShadowModeContinuous, // exit condition is not specified
 		},
 		workerExecutionParameters{
-			TaskList:    testTaskList,
-			UserContext: context.Background(),
+			TaskList: testTaskList,
 		},
 		newRegistry(),
 	)
@@ -132,9 +128,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 		testDomain,
 		&ShadowOptions{},
 		workerExecutionParameters{
-			TaskList:    testTaskList,
-			Logger:      zaptest.NewLogger(s.T()),
-			UserContext: context.Background(),
+			TaskList: testTaskList,
 		},
 		newRegistry(),
 	)
@@ -151,9 +145,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 		s.mockService,
 		testDomain,
 		&ShadowOptions{},
-		workerExecutionParameters{
-			UserContext: context.Background(),
-		},
+		workerExecutionParameters{},
 		newRegistry(),
 	)
 
@@ -174,8 +166,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 		testDomain,
 		&ShadowOptions{},
 		workerExecutionParameters{
-			TaskList:    testTaskList,
-			UserContext: context.Background(),
+			TaskList: testTaskList,
 		},
 		newRegistry(),
 	)
@@ -217,8 +208,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 			Concurrency:   concurrency,
 		},
 		workerExecutionParameters{
-			TaskList:    testTaskList,
-			UserContext: context.Background(),
+			TaskList: testTaskList,
 		},
 		newRegistry(),
 	)

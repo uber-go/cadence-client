@@ -58,7 +58,7 @@ func (s *workflowShadowerSuite) SetupTest() {
 	s.mockService = workflowservicetest.NewMockClient(s.controller)
 
 	var err error
-	s.testShadower, err = NewWorkflowShadower(s.mockService, "testDomain", &ShadowOptions{}, nil)
+	s.testShadower, err = NewWorkflowShadower(s.mockService, "testDomain", ShadowOptions{}, ReplayOptions{}, nil)
 	s.NoError(err)
 
 	// overwrite shadower clock to be a mock clock
@@ -247,7 +247,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 	timePerWorkflow := 7 * time.Second
 	expirationTime := time.Minute
 
-	s.testShadower.options.ExitCondition = ShadowExitCondition{
+	s.testShadower.shadowOptions.ExitCondition = ShadowExitCondition{
 		ExpirationInterval: expirationTime,
 	}
 
@@ -268,7 +268,7 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_MaxShadowingCount() {
 	maxShadowCount := 50
 
-	s.testShadower.options.ExitCondition = ShadowExitCondition{
+	s.testShadower.shadowOptions.ExitCondition = ShadowExitCondition{
 		ShadowCount: maxShadowCount,
 	}
 
@@ -311,8 +311,8 @@ func (s *workflowShadowerSuite) TestShadowWorker_ContinuousMode() {
 	numScan := 3
 	totalWorkflows := len(workflowExecutions) * numScan
 
-	s.testShadower.options.Mode = ShadowModeContinuous
-	s.testShadower.options.ExitCondition = ShadowExitCondition{
+	s.testShadower.shadowOptions.Mode = ShadowModeContinuous
+	s.testShadower.shadowOptions.ExitCondition = ShadowExitCondition{
 		ShadowCount: totalWorkflows,
 	}
 

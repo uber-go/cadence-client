@@ -1744,7 +1744,7 @@ func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {
 		i.cancelHandler()
 		isActivityCancelled = true
 
-	case *s.EntityNotExistsError, *s.DomainNotActiveError:
+	case *s.EntityNotExistsError, *s.WorkflowExecutionAlreadyCompletedError, *s.DomainNotActiveError:
 		// We will pass these through as cancellation for now but something we can change
 		// later when we have setter on cancel handler.
 		i.cancelHandler()

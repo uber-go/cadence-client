@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shadower"
@@ -59,7 +60,12 @@ func newShadowWorker(
 		Name: shadower.ReplayWorkflowActivityName,
 	})
 
-	replayer := NewWorkflowReplayer()
+	replayer := NewWorkflowReplayerWithOptions(ReplayOptions{
+		DataConverter:                     params.DataConverter,
+		ContextPropagators:                params.ContextPropagators,
+		WorkflowInterceptorChainFactories: params.WorkflowInterceptors,
+		Tracer:                            params.Tracer,
+	})
 	replayer.registry = registry
 
 	ensureRequiredParams(&params)
@@ -73,6 +79,15 @@ func newShadowWorker(
 
 	params.UserContext = context.WithValue(params.UserContext, serviceClientContextKey, service)
 	params.UserContext = context.WithValue(params.UserContext, workflowReplayerContextKey, replayer)
+
+	// data converter, interceptors, context propagators, tracers provided by user is for replay
+	// for the actual shadowing workflow use default values.
+	// this is required for data converter, for the other three, it should be ok to still use
+	// the value provided by user.
+	params.DataConverter = getDefaultDataConverter()
+	params.WorkflowInterceptors = []WorkflowInterceptorFactory{}
+	params.ContextPropagators = []ContextPropagator{}
+	params.Tracer = opentracing.NoopTracer{}
 
 	activityWorker := newActivityWorker(
 		service,

@@ -30,6 +30,7 @@ import (
 	"math"
 
 	"github.com/golang/mock/gomock"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
@@ -39,6 +40,15 @@ import (
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/serializer"
 	"go.uber.org/zap"
+)
+
+const (
+	replayDomainName             = "ReplayDomain"
+	replayTaskListName           = "ReplayTaskList"
+	replayWorkflowID             = "ReplayId"
+	replayWorkerIdentity         = "replayID"
+	replayPreviousStartedEventID = math.MaxInt64
+	replayTaskToken              = "ReplayTaskToken"
 )
 
 var (
@@ -51,11 +61,48 @@ var (
 // WorkflowReplayer is used to replay workflow code from an event history
 type WorkflowReplayer struct {
 	registry *registry
+	options  ReplayOptions
+}
+
+// ReplayOptions is used to configure the replay decision task worker.
+type ReplayOptions struct {
+	// Optional: Sets DataConverter to customize serialization/deserialization of arguments in Cadence
+	// default: defaultDataConverter, an combination of thriftEncoder and jsonEncoder
+	DataConverter DataConverter
+
+	// Optional: Specifies factories used to instantiate workflow interceptor chain
+	// The chain is instantiated per each replay of a workflow execution
+	WorkflowInterceptorChainFactories []WorkflowInterceptorFactory
+
+	// Optional: Sets ContextPropagators that allows users to control the context information passed through a workflow
+	// default: no ContextPropagators
+	ContextPropagators []ContextPropagator
+
+	// Optional: Sets opentracing Tracer that is to be used to emit tracing information
+	// default: no tracer - opentracing.NoopTracer
+	Tracer opentracing.Tracer
+}
+
+// IsReplayDomain checks if the domainName is from replay
+func IsReplayDomain(dn string) bool {
+	return replayDomainName == dn
 }
 
 // NewWorkflowReplayer creates an instance of the WorkflowReplayer
 func NewWorkflowReplayer() *WorkflowReplayer {
-	return &WorkflowReplayer{registry: newRegistry()}
+	return NewWorkflowReplayerWithOptions(ReplayOptions{})
+}
+
+// NewWorkflowReplayerWithOptions creates an instance of the WorkflowReplayer
+// with provided replay worker options
+func NewWorkflowReplayerWithOptions(
+	options ReplayOptions,
+) *WorkflowReplayer {
+	augmentReplayOptions(&options)
+	return &WorkflowReplayer{
+		registry: newRegistry(),
+		options:  options,
+	}
 }
 
 // RegisterWorkflow registers workflow function to replay
@@ -80,7 +127,7 @@ func (r *WorkflowReplayer) ReplayWorkflowHistory(logger *zap.Logger, history *sh
 	controller := gomock.NewController(testReporter)
 	service := workflowservicetest.NewMockClient(controller)
 
-	return r.replayWorkflowHistory(logger, service, ReplayDomainName, history)
+	return r.replayWorkflowHistory(logger, service, replayDomainName, nil, history, nil)
 }
 
 // ReplayWorkflowHistoryFromJSONFile executes a single decision task for the given json history file.
@@ -90,7 +137,7 @@ func (r *WorkflowReplayer) ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger,
 	return r.ReplayPartialWorkflowHistoryFromJSONFile(logger, jsonfileName, 0)
 }
 
-// ReplayPartialWorkflowHistoryFromJSONFile executes a single decision task for the given json history file upto provided
+// ReplayPartialWorkflowHistoryFromJSONFile executes a single decision task for the given json history file up to provided
 // lastEventID(inclusive).
 // Use for testing backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.
@@ -109,10 +156,11 @@ func (r *WorkflowReplayer) ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.
 	controller := gomock.NewController(testReporter)
 	service := workflowservicetest.NewMockClient(controller)
 
-	return r.replayWorkflowHistory(logger, service, ReplayDomainName, history)
+	return r.replayWorkflowHistory(logger, service, replayDomainName, nil, history, nil)
 }
 
 // ReplayWorkflowExecution replays workflow execution loading it from Cadence service.
+// The logger is an optional parameter. Defaults to the noop logger.
 func (r *WorkflowReplayer) ReplayWorkflowExecution(
 	ctx context.Context,
 	service workflowserviceclient.Interface,
@@ -161,16 +209,17 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 		hResponse.History = history
 	}
 
-	return r.replayWorkflowHistory(logger, service, domain, hResponse.History)
+	return r.replayWorkflowHistory(logger, service, domain, &execution, hResponse.History, hResponse.NextPageToken)
 }
 
 func (r *WorkflowReplayer) replayWorkflowHistory(
 	logger *zap.Logger,
 	service workflowserviceclient.Interface,
 	domain string,
+	execution *WorkflowExecution,
 	history *shared.History,
+	nextPageToken []byte,
 ) error {
-	taskList := "ReplayTaskList"
 	events := history.Events
 	if events == nil {
 		return errReplayEmptyHistory
@@ -189,41 +238,52 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		return errReplayCorruptedStartedEvent
 	}
 	workflowType := attr.WorkflowType
-	execution := &shared.WorkflowExecution{
-		RunId:      common.StringPtr(uuid.NewRandom().String()),
-		WorkflowId: common.StringPtr("ReplayId"),
-	}
-	if first.WorkflowExecutionStartedEventAttributes.GetOriginalExecutionRunId() != "" {
-		execution.RunId = common.StringPtr(first.WorkflowExecutionStartedEventAttributes.GetOriginalExecutionRunId())
+	if execution == nil {
+		execution = &WorkflowExecution{
+			ID:    replayWorkflowID,
+			RunID: uuid.NewRandom().String(),
+		}
+		if first.WorkflowExecutionStartedEventAttributes.GetOriginalExecutionRunId() != "" {
+			execution.RunID = first.WorkflowExecutionStartedEventAttributes.GetOriginalExecutionRunId()
+		}
 	}
 
 	task := &shared.PollForDecisionTaskResponse{
-		Attempt:                common.Int64Ptr(0),
-		TaskToken:              []byte("ReplayTaskToken"),
-		WorkflowType:           workflowType,
-		WorkflowExecution:      execution,
+		Attempt:      common.Int64Ptr(int64(attr.GetAttempt())),
+		TaskToken:    []byte(replayTaskToken),
+		WorkflowType: workflowType,
+		WorkflowExecution: &shared.WorkflowExecution{
+			WorkflowId: common.StringPtr(execution.ID),
+			RunId:      common.StringPtr(execution.RunID),
+		},
 		History:                history,
-		PreviousStartedEventId: common.Int64Ptr(math.MaxInt64),
+		PreviousStartedEventId: common.Int64Ptr(replayPreviousStartedEventID),
+		NextPageToken:          nextPageToken,
 	}
 	if logger == nil {
 		logger = zap.NewNop()
+	}
+	workerParams := workerExecutionParameters{
+		TaskList:               replayTaskListName,
+		Identity:               replayWorkerIdentity,
+		DataConverter:          r.options.DataConverter,
+		ContextPropagators:     r.options.ContextPropagators,
+		WorkflowInterceptors:   r.options.WorkflowInterceptorChainFactories,
+		Tracer:                 r.options.Tracer,
+		Logger:                 logger,
+		DisableStickyExecution: true,
 	}
 
 	metricScope := tally.NoopScope
 	iterator := &historyIteratorImpl{
 		nextPageToken: task.NextPageToken,
 		execution:     task.WorkflowExecution,
-		domain:        ReplayDomainName,
+		domain:        domain,
 		service:       service,
 		metricsScope:  metricScope,
 		maxEventID:    task.GetStartedEventId(),
 	}
-	params := workerExecutionParameters{
-		TaskList: taskList,
-		Identity: "replayID",
-		Logger:   logger,
-	}
-	taskHandler := newWorkflowTaskHandler(domain, params, nil, r.registry)
+	taskHandler := newWorkflowTaskHandler(domain, workerParams, nil, r.registry)
 	resp, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator}, nil)
 	if err != nil {
 		return err
@@ -232,33 +292,42 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted && last.GetEventType() != shared.EventTypeWorkflowExecutionContinuedAsNew {
 		return nil
 	}
-	err = fmt.Errorf("replay workflow doesn't return the same result as the last event, resp: %v, last: %v", resp, last)
+
+	// TODO: the following result will not be executed if nextPageToken is not nil, which is probably fine as the actual workflow task
+	// processing logic does not have such check. If we want to always execute this check for closed workflows, we need to dump the
+	// entire history before starting the replay as otherwise we can't get the last event here.
+	// compare workflow results
 	if resp != nil {
 		completeReq, ok := resp.(*shared.RespondDecisionTaskCompletedRequest)
 		if ok {
 			for _, d := range completeReq.Decisions {
-				if d.GetDecisionType() == shared.DecisionTypeContinueAsNewWorkflowExecution {
-					if last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
-						inputA := d.ContinueAsNewWorkflowExecutionDecisionAttributes.Input
-						inputB := last.WorkflowExecutionContinuedAsNewEventAttributes.Input
-						if bytes.Compare(inputA, inputB) == 0 {
-							return nil
-						}
+				if d.GetDecisionType() == shared.DecisionTypeContinueAsNewWorkflowExecution &&
+					last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
+					inputA := d.ContinueAsNewWorkflowExecutionDecisionAttributes.Input
+					inputB := last.WorkflowExecutionContinuedAsNewEventAttributes.Input
+					if bytes.Compare(inputA, inputB) == 0 {
+						return nil
 					}
 				}
-				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution {
-					if last.GetEventType() == shared.EventTypeWorkflowExecutionCompleted {
-						resultA := last.WorkflowExecutionCompletedEventAttributes.Result
-						resultB := d.CompleteWorkflowExecutionDecisionAttributes.Result
-						if bytes.Compare(resultA, resultB) == 0 {
-							return nil
-						}
+				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution &&
+					last.GetEventType() == shared.EventTypeWorkflowExecutionCompleted {
+					resultA := last.WorkflowExecutionCompletedEventAttributes.Result
+					resultB := d.CompleteWorkflowExecutionDecisionAttributes.Result
+					if bytes.Compare(resultA, resultB) == 0 {
+						return nil
 					}
+				}
+				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution &&
+					last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
+					// for cron and retry workflow, decision will be completed workflow and
+					// and server side will convert it to a continue as new event.
+					// there's nothing to compare here
+					return nil
 				}
 			}
 		}
 	}
-	return err
+	return fmt.Errorf("replay workflow doesn't return the same result as the last event, resp: %v, last: %v", resp, last)
 }
 
 func extractHistoryFromFile(jsonfileName string, lastEventID int64) (*shared.History, error) {
@@ -283,10 +352,21 @@ func extractHistoryFromFile(jsonfileName string, lastEventID int64) (*shared.His
 	for _, event := range deserializedEvents {
 		events = append(events, event)
 		if event.GetEventId() == lastEventID {
-			// Copy history upto last event (inclusive)
+			// Copy history up to last event (inclusive)
 			break
 		}
 	}
 
 	return &shared.History{Events: events}, nil
+}
+
+func augmentReplayOptions(
+	options *ReplayOptions,
+) {
+	// if the user passes in a tracer then add a tracing context propagator
+	if options.Tracer != nil {
+		options.ContextPropagators = append(options.ContextPropagators, NewTracingContextPropagator(zap.NewNop(), options.Tracer))
+	} else {
+		options.Tracer = opentracing.NoopTracer{}
+	}
 }

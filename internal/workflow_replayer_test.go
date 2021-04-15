@@ -22,6 +22,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -54,9 +55,14 @@ func (s *workflowReplayerSuite) SetupTest() {
 	s.Assertions = require.New(s.T())
 
 	s.logger = getTestLogger(s.T())
-	s.replayer = NewWorkflowReplayer()
+	s.replayer = NewWorkflowReplayerWithOptions(ReplayOptions{
+		ContextPropagators: []ContextPropagator{
+			NewStringMapPropagator([]string{testHeader}),
+		},
+	})
 	s.replayer.RegisterWorkflow(testReplayWorkflow)
 	s.replayer.RegisterWorkflow(testReplayWorkflowLocalActivity)
+	s.replayer.RegisterWorkflow(testReplayWorkflowContextPropagator)
 	s.replayer.RegisterWorkflow(testReplayWorkflowFromFile)
 	s.replayer.RegisterWorkflow(testReplayWorkflowFromFileParent)
 	s.replayer.RegisterWorkflow(localActivitiesCallingOptionsWorkflow{s.T()}.Execute)
@@ -67,8 +73,33 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full() {
 	s.NoError(err)
 }
 
-func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Partial() {
-	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowPartialHistory())
+func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full_ResultMisMatch() {
+	fullHistory := getTestReplayWorkflowFullHistory()
+	completedEvent := fullHistory.Events[len(fullHistory.Events)-1]
+	s.Equal(shared.EventTypeWorkflowExecutionCompleted, completedEvent.GetEventType())
+	completedEvent.WorkflowExecutionCompletedEventAttributes.Result = []byte("some random result")
+
+	err := s.replayer.ReplayWorkflowHistory(s.logger, fullHistory)
+	s.Error(err)
+}
+
+func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full_ContinueAsNew() {
+	fullHistory := getTestReplayWorkflowFullHistory()
+	completedEventIdx := len(fullHistory.Events) - 1
+	s.Equal(shared.EventTypeWorkflowExecutionCompleted, fullHistory.Events[completedEventIdx].GetEventType())
+	fullHistory.Events[completedEventIdx] = createTestEventWorkflowExecutionContinuedAsNew(int64(completedEventIdx+1), nil)
+
+	err := s.replayer.ReplayWorkflowHistory(s.logger, fullHistory)
+	s.NoError(err)
+}
+
+func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Partial_WithDecisionEvents() {
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowPartialHistoryWithDecisionEvents())
+	s.NoError(err)
+}
+
+func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Partial_NoDecisionEvents() {
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowPartialHistoryNoDecisionEvents())
 	s.NoError(err)
 }
 
@@ -85,6 +116,11 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistory_LocalActivity_Result_M
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_LocalActivity_Activity_Type_Mismatch() {
 	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowLocalActivityTypeMismatchHistory())
 	s.Error(err)
+}
+
+func (s *workflowReplayerSuite) TestReplayWorkflowHistory_ContextPropagator() {
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowContextPropagatorHistory())
+	s.NoError(err)
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistoryFromFileLocalActivities() {
@@ -127,6 +163,16 @@ func testReplayWorkflowLocalActivity(ctx Context) error {
 		panic("Failed workflow")
 	}
 	return err
+}
+
+func testReplayWorkflowContextPropagator(ctx Context) error {
+	value := ctx.Value(contextKey(testHeader))
+	if val, ok := value.(string); ok && val != "" {
+		testReplayWorkflow(ctx)
+		return nil
+	}
+
+	return errors.New("context propagator is not setup correctly for workflow replayer")
 }
 
 func testReplayWorkflowFromFile(ctx Context) error {
@@ -282,7 +328,7 @@ func getTestReplayWorkflowFullHistory() *shared.History {
 	}
 }
 
-func getTestReplayWorkflowPartialHistory() *shared.History {
+func getTestReplayWorkflowPartialHistoryWithDecisionEvents() *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
@@ -298,6 +344,23 @@ func getTestReplayWorkflowPartialHistory() *shared.History {
 				ActivityType: &shared.ActivityType{Name: common.StringPtr("testActivity-fm")},
 				TaskList:     &shared.TaskList{Name: &testTaskList},
 			}),
+		},
+	}
+}
+
+func getTestReplayWorkflowPartialHistoryNoDecisionEvents() *shared.History {
+	return &shared.History{
+		Events: []*shared.HistoryEvent{
+			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
+				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
+				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+			}),
+			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskStarted(3),
+			createTestEventDecisionTaskFailed(4, &shared.DecisionTaskFailedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
+			createTestEventDecisionTaskScheduled(5, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskStarted(6),
 		},
 	}
 }
@@ -396,6 +459,15 @@ func getTestReplayWorkflowLocalActivityTypeMismatchHistory() *shared.History {
 			}),
 		},
 	}
+}
+
+func getTestReplayWorkflowContextPropagatorHistory() *shared.History {
+	history := getTestReplayWorkflowFullHistory()
+	history.Events[0].WorkflowExecutionStartedEventAttributes.WorkflowType.Name = common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowContextPropagator")
+	history.Events[0].WorkflowExecutionStartedEventAttributes.Header = &shared.Header{
+		Fields: map[string][]byte{testHeader: []byte("testValue")},
+	}
+	return history
 }
 
 func createLocalActivityMarkerDataForTest(activityID, activityType string) []byte {

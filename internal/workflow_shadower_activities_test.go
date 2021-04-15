@@ -22,8 +22,10 @@ package internal
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -104,6 +106,57 @@ func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_Succeed() {
 	s.NotNil(result.NextPageToken)
 	s.True(len(result.Executions) > 0)
 	s.True(len(result.Executions) < numExecutions)
+}
+
+func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_MinResultSize() {
+	numExecutionsPerScan := 3
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
+		Executions:    newTestWorkflowExecutions(numExecutionsPerScan),
+		NextPageToken: []byte{1, 2, 3},
+	}, nil).Times(int(math.Ceil(float64(minScanWorkflowResultSize) / float64(numExecutionsPerScan))))
+
+	params := shadower.ScanWorkflowActivityParams{
+		Domain:        common.StringPtr(defaultTestDomain),
+		WorkflowQuery: common.StringPtr("some random workflow visibility query"),
+		SamplingRate:  common.Float64Ptr(1),
+	}
+
+	resultValue, err := s.env.ExecuteActivity(shadower.ScanWorkflowActivityName, params)
+	s.NoError(err)
+
+	var result shadower.ScanWorkflowActivityResult
+	s.NoError(resultValue.Get(&result))
+	s.NotNil(result.NextPageToken)
+	s.True(len(result.Executions) >= minScanWorkflowResultSize)
+}
+
+func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_CompletionTime() {
+	activityTimeoutSeconds := int32(1)
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
+		Executions:    newTestWorkflowExecutions(1),
+		NextPageToken: []byte{1, 2, 3},
+	}, nil).MaxTimes(int(time.Duration(activityTimeoutSeconds) * time.Second / scanWorkflowWaitPeriod))
+
+	params := shadower.ScanWorkflowActivityParams{
+		Domain:        common.StringPtr(defaultTestDomain),
+		WorkflowQuery: common.StringPtr("some random workflow visibility query"),
+		SamplingRate:  common.Float64Ptr(0.00000001),
+	}
+
+	resultValue, err := s.env.impl.executeActivityWithOptions(
+		activityOptions{
+			ScheduleToCloseTimeoutSeconds: activityTimeoutSeconds,
+			StartToCloseTimeoutSeconds:    activityTimeoutSeconds,
+		},
+		shadower.ScanWorkflowActivityName,
+		params,
+	)
+	s.NoError(err)
+
+	var result shadower.ScanWorkflowActivityResult
+	s.NoError(resultValue.Get(&result))
+	s.NotNil(result.NextPageToken)
+	s.Empty(result.Executions)
 }
 
 func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_InvalidQuery() {

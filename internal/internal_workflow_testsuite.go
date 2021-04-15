@@ -530,6 +530,21 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	activityFn interface{},
 	args ...interface{},
 ) (Value, error) {
+	return env.executeActivityWithOptions(
+		activityOptions{
+			ScheduleToCloseTimeoutSeconds: 600,
+			StartToCloseTimeoutSeconds:    600,
+		},
+		activityFn,
+		args...,
+	)
+}
+
+func (env *testWorkflowEnvironmentImpl) executeActivityWithOptions(
+	activityOptions activityOptions,
+	activityFn interface{},
+	args ...interface{},
+) (Value, error) {
 	activityType, err := getValidatedActivityFunction(activityFn, args, env.registry)
 	if err != nil {
 		panic(err)
@@ -541,13 +556,10 @@ func (env *testWorkflowEnvironmentImpl) executeActivity(
 	}
 
 	params := executeActivityParams{
-		activityOptions: activityOptions{
-			ScheduleToCloseTimeoutSeconds: 600,
-			StartToCloseTimeoutSeconds:    600,
-		},
-		ActivityType: *activityType,
-		Input:        input,
-		Header:       env.header,
+		activityOptions: activityOptions,
+		ActivityType:    *activityType,
+		Input:           input,
+		Header:          env.header,
 	}
 
 	task := newTestActivityTask(

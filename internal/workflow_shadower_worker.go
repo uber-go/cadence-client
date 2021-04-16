@@ -22,7 +22,6 @@ package internal
 
 import (
 	"context"
-	"errors"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
@@ -41,7 +40,7 @@ type (
 		service  workflowserviceclient.Interface
 		domain   string
 		taskList string
-		options  *ShadowOptions
+		options  ShadowOptions
 		logger   *zap.Logger
 	}
 )
@@ -49,7 +48,7 @@ type (
 func newShadowWorker(
 	service workflowserviceclient.Interface,
 	domain string,
-	shadowOptions *ShadowOptions,
+	shadowOptions ShadowOptions,
 	params workerExecutionParameters,
 	registry *registry,
 ) *shadowWorker {
@@ -109,10 +108,6 @@ func newShadowWorker(
 }
 
 func (sw *shadowWorker) Start() error {
-	if sw.options == nil {
-		return errors.New("shadowerOptions must be specified when shadow worker is enabled")
-	}
-
 	if err := sw.options.validateAndPopulateFields(); err != nil {
 		return err
 	}

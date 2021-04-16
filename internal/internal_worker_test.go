@@ -382,7 +382,7 @@ func createWorkerWithThrottle(
 
 	if shadowOptions != nil {
 		workerOptions.EnableShadowWorker = true
-		workerOptions.ShadowOptions = shadowOptions
+		workerOptions.ShadowOptions = *shadowOptions
 	}
 
 	// Start Worker.

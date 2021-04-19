@@ -56,7 +56,8 @@ func newShadowWorker(
 		Name: shadower.ScanWorkflowActivityName,
 	})
 	registry.RegisterActivityWithOptions(replayWorkflowActivity, RegisterActivityOptions{
-		Name: shadower.ReplayWorkflowActivityName,
+		Name:                shadower.ReplayWorkflowActivityName,
+		EnableAutoHeartbeat: true,
 	})
 
 	replayer := NewWorkflowReplayerWithOptions(ReplayOptions{

@@ -22,8 +22,8 @@ package internal
 
 import (
 	"context"
-	"errors"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shadower"
@@ -40,7 +40,7 @@ type (
 		service  workflowserviceclient.Interface
 		domain   string
 		taskList string
-		options  *ShadowOptions
+		options  ShadowOptions
 		logger   *zap.Logger
 	}
 )
@@ -48,7 +48,7 @@ type (
 func newShadowWorker(
 	service workflowserviceclient.Interface,
 	domain string,
-	shadowOptions *ShadowOptions,
+	shadowOptions ShadowOptions,
 	params workerExecutionParameters,
 	registry *registry,
 ) *shadowWorker {
@@ -56,10 +56,16 @@ func newShadowWorker(
 		Name: shadower.ScanWorkflowActivityName,
 	})
 	registry.RegisterActivityWithOptions(replayWorkflowActivity, RegisterActivityOptions{
-		Name: shadower.ReplayWorkflowActivityName,
+		Name:                shadower.ReplayWorkflowActivityName,
+		EnableAutoHeartbeat: true,
 	})
 
-	replayer := NewWorkflowReplayer()
+	replayer := NewWorkflowReplayerWithOptions(ReplayOptions{
+		DataConverter:                     params.DataConverter,
+		ContextPropagators:                params.ContextPropagators,
+		WorkflowInterceptorChainFactories: params.WorkflowInterceptors,
+		Tracer:                            params.Tracer,
+	})
 	replayer.registry = registry
 
 	ensureRequiredParams(&params)
@@ -73,6 +79,15 @@ func newShadowWorker(
 
 	params.UserContext = context.WithValue(params.UserContext, serviceClientContextKey, service)
 	params.UserContext = context.WithValue(params.UserContext, workflowReplayerContextKey, replayer)
+
+	// data converter, interceptors, context propagators, tracers provided by user is for replay
+	// for the actual shadowing workflow use default values.
+	// this is required for data converter, for the other three, it should be ok to still use
+	// the value provided by user.
+	params.DataConverter = getDefaultDataConverter()
+	params.WorkflowInterceptors = []WorkflowInterceptorFactory{}
+	params.ContextPropagators = []ContextPropagator{}
+	params.Tracer = opentracing.NoopTracer{}
 
 	activityWorker := newActivityWorker(
 		service,
@@ -94,10 +109,6 @@ func newShadowWorker(
 }
 
 func (sw *shadowWorker) Start() error {
-	if sw.options == nil {
-		return errors.New("shadowerOptions must be specified when shadow worker is enabled")
-	}
-
 	if err := sw.options.validateAndPopulateFields(); err != nil {
 		return err
 	}

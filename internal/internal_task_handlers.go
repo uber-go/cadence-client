@@ -268,6 +268,10 @@ func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.
 	return result, markers, checksum, err
 }
 
+func (eh *history) HasNextDecisionEvents() bool {
+	return len(eh.next) != 0 || eh.currentIndex != len(eh.loadedEvents) || eh.hasMoreEvents()
+}
+
 func (eh *history) hasMoreEvents() bool {
 	historyIterator := eh.workflowTask.historyIterator
 	return historyIterator != nil && historyIterator.HasNextPage()
@@ -468,7 +472,7 @@ func (w *workflowExecutionContextImpl) Lock() {
 
 func (w *workflowExecutionContextImpl) Unlock(err error) {
 	if err != nil || w.err != nil || w.isWorkflowCompleted || (w.wth.disableStickyExecution && !w.hasPendingLocalActivityWork()) {
-		// TODO: in case of closed, it asumes the close decision always succeed. need server side change to return
+		// TODO: in case of closed, it assumes the close decision always succeed. need server side change to return
 		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
 		// if the close decision failed, the next decision will have to rebuild the state.
 		if getWorkflowCache().Exist(w.workflowInfo.WorkflowExecution.RunID) {
@@ -818,6 +822,7 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	var respondEvents []*s.HistoryEvent
 
 	skipReplayCheck := w.skipReplayCheck()
+	isReplayTest := task.GetPreviousStartedEventId() == replayPreviousStartedEventID
 	// Process events
 ProcessEvents:
 	for {
@@ -888,7 +893,8 @@ ProcessEvents:
 			}
 		}
 		isReplay := len(reorderedEvents) > 0 && reorderedHistory.IsReplayEvent(reorderedEvents[len(reorderedEvents)-1])
-		if isReplay {
+		lastDecisionEventsForReplayTest := isReplayTest && !reorderedHistory.HasNextDecisionEvents()
+		if isReplay && !lastDecisionEventsForReplayTest {
 			eventDecisions := eventHandler.decisionsHelper.getDecisions(true)
 			if len(eventDecisions) > 0 && !skipReplayCheck {
 				replayDecisions = append(replayDecisions, eventDecisions...)
@@ -904,14 +910,14 @@ ProcessEvents:
 	// the replay of that event will panic on the decision state machine and the workflow will be marked as completed
 	// with the panic error.
 	var nonDeterministicErr error
-	if !skipReplayCheck && !w.isWorkflowCompleted {
+	if !skipReplayCheck && !w.isWorkflowCompleted || isReplayTest {
 		// check if decisions from reply matches to the history events
 		if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
 			nonDeterministicErr = err
 		}
 	}
 	if nonDeterministicErr == nil && w.err != nil {
-		if panicErr, ok := w.err.(*PanicError); ok && panicErr.value != nil {
+		if panicErr, ok := w.err.(*workflowPanicError); ok && panicErr.value != nil {
 			if _, isStateMachinePanic := panicErr.value.(stateMachineIllegalStatePanic); isStateMachinePanic {
 				nonDeterministicErr = panicErr
 			}
@@ -1445,7 +1451,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	// for query task
 	if task.Query != nil {
 		queryCompletedRequest := &s.RespondQueryTaskCompletedRequest{TaskToken: task.TaskToken}
-		if panicErr, ok := workflowContext.err.(*PanicError); ok {
+		if panicErr, ok := workflowContext.err.(*workflowPanicError); ok {
 			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
 			queryCompletedRequest.ErrorMessage = common.StringPtr("Workflow panic: " + panicErr.Error())
 			return queryCompletedRequest
@@ -1738,7 +1744,7 @@ func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {
 		i.cancelHandler()
 		isActivityCancelled = true
 
-	case *s.EntityNotExistsError, *s.DomainNotActiveError:
+	case *s.EntityNotExistsError, *s.WorkflowExecutionAlreadyCompletedError, *s.DomainNotActiveError:
 		// We will pass these through as cancellation for now but something we can change
 		// later when we have setter on cancel handler.
 		i.cancelHandler()

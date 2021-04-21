@@ -132,6 +132,10 @@ func createTestEventWorkflowExecutionCompleted(eventID int64, attr *s.WorkflowEx
 	return &s.HistoryEvent{EventId: common.Int64Ptr(eventID), EventType: common.EventTypePtr(s.EventTypeWorkflowExecutionCompleted), WorkflowExecutionCompletedEventAttributes: attr}
 }
 
+func createTestEventWorkflowExecutionContinuedAsNew(eventID int64, attr *s.WorkflowExecutionContinuedAsNewEventAttributes) *s.HistoryEvent {
+	return &s.HistoryEvent{EventId: common.Int64Ptr(eventID), EventType: common.EventTypePtr(s.EventTypeWorkflowExecutionContinuedAsNew), WorkflowExecutionContinuedAsNewEventAttributes: attr}
+}
+
 func createTestEventWorkflowExecutionStarted(eventID int64, attr *s.WorkflowExecutionStartedEventAttributes) *s.HistoryEvent {
 	return &s.HistoryEvent{EventId: common.Int64Ptr(eventID), EventType: common.EventTypePtr(s.EventTypeWorkflowExecutionStarted), WorkflowExecutionStartedEventAttributes: attr}
 }
@@ -629,8 +633,7 @@ func (t *TaskHandlersTestSuite) TestWithTruncatedHistory() {
 		previousStartedEventID int64
 		isResultErr            bool
 	}{
-		{0, 0, false},
-		{0, 3, false},
+		{0, 6, false},
 		{10, 0, true},
 		{10, 6, true},
 	}
@@ -648,7 +651,7 @@ func (t *TaskHandlersTestSuite) TestWithTruncatedHistory() {
 			t.Error(err, "testcase %v failed", i)
 			t.Nil(request)
 			t.Contains(err.Error(), "premature end of stream")
-			t.EqualValues(getWorkflowCache().Size(), 0)
+			t.EqualValues(getWorkflowCache().Size(), 1)
 			continue
 		}
 

@@ -118,11 +118,11 @@ type (
 	// WorkflowShadower retrieves and replays workflow history from Cadence service
 	// to determine if there's any nondeterministic changes in the workflow definition
 	WorkflowShadower struct {
-		service  workflowserviceclient.Interface
-		domain   string
-		options  *ShadowOptions
-		logger   *zap.Logger
-		replayer *WorkflowReplayer
+		service       workflowserviceclient.Interface
+		domain        string
+		shadowOptions ShadowOptions
+		logger        *zap.Logger
+		replayer      *WorkflowReplayer
 
 		status     int32
 		shutdownCh chan struct{}
@@ -146,35 +146,36 @@ const (
 )
 
 // NewWorkflowShadower creates an instance of the WorkflowShadower for testing
+// The logger is an optional parameter. Defaults to noop logger if not provided and will override the logger in WorkerOptions
 func NewWorkflowShadower(
 	service workflowserviceclient.Interface,
 	domain string,
-	options *ShadowOptions,
+	shadowOptions ShadowOptions,
+	replayOptions ReplayOptions,
 	logger *zap.Logger,
 ) (*WorkflowShadower, error) {
 	if len(domain) == 0 {
 		return nil, errors.New("domain is not set")
 	}
 
-	if err := options.validateAndPopulateFields(); err != nil {
+	if err := shadowOptions.validateAndPopulateFields(); err != nil {
 		return nil, err
 	}
 
-	if options.Concurrency > 1 {
+	if shadowOptions.Concurrency > 1 {
 		return nil, errors.New("local workflow shadower doesn't support concurrency > 1")
 	}
 
-	// use no-op logger if not specified
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
 	return &WorkflowShadower{
-		service:  service,
-		domain:   domain,
-		options:  options,
-		logger:   logger,
-		replayer: NewWorkflowReplayer(),
+		service:       service,
+		domain:        domain,
+		shadowOptions: shadowOptions,
+		logger:        logger,
+		replayer:      NewWorkflowReplayerWithOptions(replayOptions),
 
 		status:     statusInitialized,
 		shutdownCh: make(chan struct{}),
@@ -221,23 +222,23 @@ func (s *WorkflowShadower) shadowWorker() error {
 
 	scanRequest := shadower.ScanWorkflowActivityParams{
 		Domain:        common.StringPtr(s.domain),
-		WorkflowQuery: common.StringPtr(s.options.WorkflowQuery),
-		SamplingRate:  common.Float64Ptr(s.options.SamplingRate),
+		WorkflowQuery: common.StringPtr(s.shadowOptions.WorkflowQuery),
+		SamplingRate:  common.Float64Ptr(s.shadowOptions.SamplingRate),
 	}
 	s.logger.Info("Shadow workflow query",
-		zap.String(tagVisibilityQuery, s.options.WorkflowQuery),
+		zap.String(tagVisibilityQuery, s.shadowOptions.WorkflowQuery),
 	)
 
 	ctx := context.Background()
 	expirationTime := time.Unix(0, math.MaxInt64)
-	if s.options.ExitCondition.ExpirationInterval != 0 {
-		expirationTime = s.clock.Now().Add(s.options.ExitCondition.ExpirationInterval)
+	if s.shadowOptions.ExitCondition.ExpirationInterval != 0 {
+		expirationTime = s.clock.Now().Add(s.shadowOptions.ExitCondition.ExpirationInterval)
 	}
 
 	replayCount := 0
 	maxReplayCount := math.MaxInt64
-	if s.options.ExitCondition.ShadowCount != 0 {
-		maxReplayCount = s.options.ExitCondition.ShadowCount
+	if s.shadowOptions.ExitCondition.ShadowCount != 0 {
+		maxReplayCount = s.shadowOptions.ExitCondition.ShadowCount
 	}
 	rand.Seed(s.clock.Now().UnixNano())
 	for {
@@ -275,7 +276,7 @@ func (s *WorkflowShadower) shadowWorker() error {
 		}
 
 		if len(scanResult.NextPageToken) == 0 {
-			if s.options.Mode == ShadowModeNormal || s.clock.Now().Add(defaultWaitDurationPerIteration).After(expirationTime) {
+			if s.shadowOptions.Mode == ShadowModeNormal || s.clock.Now().Add(defaultWaitDurationPerIteration).After(expirationTime) {
 				return nil
 			}
 

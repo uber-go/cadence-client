@@ -70,7 +70,7 @@
     "activityTaskScheduledEventAttributes": {
       "activityId": "1",
       "activityType": {
-        "name": "toUpperWithDelay"
+        "name": "Prefix_ToUpperWithDelay"
       },
       "taskList": {
         "name": "tl-1"
@@ -91,7 +91,7 @@
     "activityTaskScheduledEventAttributes": {
       "activityId": "2",
       "activityType": {
-        "name": "toUpper"
+        "name": "Prefix_ToUpper"
       },
       "taskList": {
         "name": "bad_tl"
@@ -112,7 +112,7 @@
     "activityTaskScheduledEventAttributes": {
       "activityId": "3",
       "activityType": {
-        "name": "toUpper"
+        "name": "Prefix_ToUpper"
       },
       "taskList": {
         "name": "bad_tl"

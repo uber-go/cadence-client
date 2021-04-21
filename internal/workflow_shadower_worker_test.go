@@ -64,7 +64,7 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&ShadowOptions{},
+		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
 		},
@@ -88,25 +88,11 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 	s.Contains(taskList, testDomain)
 }
 
-func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_ShadowOptionNotSpecified() {
-	shadowWorker := newShadowWorker(
-		s.mockService,
-		testDomain,
-		nil,
-		workerExecutionParameters{
-			TaskList: testTaskList,
-		},
-		newRegistry(),
-	)
-
-	s.Error(shadowWorker.Start())
-}
-
 func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&ShadowOptions{
+		ShadowOptions{
 			Mode: ShadowModeContinuous, // exit condition is not specified
 		},
 		workerExecutionParameters{
@@ -126,7 +112,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&ShadowOptions{},
+		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
 		},
@@ -144,7 +130,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&ShadowOptions{},
+		ShadowOptions{},
 		workerExecutionParameters{},
 		newRegistry(),
 	)
@@ -164,7 +150,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&ShadowOptions{},
+		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
 		},
@@ -200,7 +186,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 	shadowWorker := newShadowWorker(
 		s.mockService,
 		testDomain,
-		&ShadowOptions{
+		ShadowOptions{
 			WorkflowQuery: workflowQuery,
 			SamplingRate:  samplingRate,
 			Mode:          shadowMode,

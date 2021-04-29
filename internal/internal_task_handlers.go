@@ -917,9 +917,13 @@ ProcessEvents:
 		}
 	}
 	if nonDeterministicErr == nil && w.err != nil {
-		if panicErr, ok := w.err.(*workflowPanicError); ok && panicErr.value != nil {
-			if _, isStateMachinePanic := panicErr.value.(stateMachineIllegalStatePanic); isStateMachinePanic {
-				nonDeterministicErr = panicErr
+		if isReplayTest {
+			// NOTE: we should check the following error regardless if it's in replay test or not
+			// but since we are not checking it previously, it may break existing customers workflow
+			if panicErr, ok := w.err.(*workflowPanicError); ok && panicErr.value != nil {
+				if _, isStateMachinePanic := panicErr.value.(stateMachineIllegalStatePanic); isStateMachinePanic {
+					nonDeterministicErr = panicErr
+				}
 			}
 		}
 	}

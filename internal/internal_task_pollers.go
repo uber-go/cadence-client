@@ -603,8 +603,8 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 				zap.String(tagWorkflowID, task.params.WorkflowInfo.WorkflowExecution.ID),
 				zap.String(tagRunID, task.params.WorkflowInfo.WorkflowExecution.RunID),
 				zap.String(tagActivityType, activityType),
-				zap.String("PanicError", fmt.Sprintf("%v", p)),
-				zap.String("PanicStack", st))
+				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+				zap.String(tagPanicStack, st))
 			metricsScope.Counter(metrics.LocalActivityPanicCounter).Inc(1)
 			panicErr := newPanicError(p, st)
 			result = &localActivityResult{

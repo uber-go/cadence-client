@@ -1474,6 +1474,8 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			wth.logger.Warn("Encountered PanicError in workflow query task",
 				zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
 				zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
+				zap.String(tagPanicError, panicErr.Error()),
+				zap.String(tagPanicStack, panicErr.StackTrace()),
 			)
 
 			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
@@ -1487,8 +1489,8 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 			wth.logger.Warn("Ignored workflow panic error for query, query result may be partial",
 				zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
 				zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
-				zap.String("PanicError", workflowPanicErr.Error()),
-				zap.String("PanicStack", workflowPanicErr.StackTrace()),
+				zap.String(tagPanicError, workflowPanicErr.Error()),
+				zap.String(tagPanicStack, workflowPanicErr.StackTrace()),
 			)
 		}
 
@@ -1512,8 +1514,8 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		wth.logger.Error("Workflow panic.",
 			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
 			zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
-			zap.String("PanicError", panicErr.Error()),
-			zap.String("PanicStack", panicErr.StackTrace()))
+			zap.String(tagPanicError, panicErr.Error()),
+			zap.String(tagPanicStack, panicErr.StackTrace()))
 		return errorToFailDecisionTask(task.TaskToken, panicErr, wth.identity)
 	}
 
@@ -1871,8 +1873,8 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 				zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
 				zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
 				zap.String(tagActivityType, activityType),
-				zap.String("PanicError", fmt.Sprintf("%v", p)),
-				zap.String("PanicStack", st))
+				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+				zap.String(tagPanicStack, st))
 			metricsScope.Counter(metrics.ActivityTaskPanicCounter).Inc(1)
 			panicErr := newPanicError(p, st)
 			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr, ath.dataConverter), nil

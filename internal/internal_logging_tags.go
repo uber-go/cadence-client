@@ -38,4 +38,6 @@ const (
 	tagLocalActivityType = "LocalActivityType"
 	tagQueryType         = "QueryType"
 	tagVisibilityQuery   = "VisibilityQuery"
+	tagPanicError        = "PanicError"
+	tagPanicStack        = "PanicStack"
 )

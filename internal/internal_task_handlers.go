@@ -1491,6 +1491,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 				zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
 				zap.String(tagPanicError, workflowPanicErr.Error()),
 				zap.String(tagPanicStack, workflowPanicErr.StackTrace()),
+				zap.Int64("PreviousStartedEventID", task.GetPreviousStartedEventId()),
 			)
 		}
 

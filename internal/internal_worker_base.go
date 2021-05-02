@@ -313,8 +313,8 @@ func (bw *baseWorker) processTask(task interface{}) {
 			topLine := fmt.Sprintf("base worker for %s [panic]:", bw.options.workerType)
 			st := getStackTraceRaw(topLine, 7, 0)
 			bw.logger.Error("Unhandled panic.",
-				zap.String("PanicError", fmt.Sprintf("%v", p)),
-				zap.String("PanicStack", st))
+				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+				zap.String(tagPanicStack, st))
 		}
 
 		if isPolledTask {

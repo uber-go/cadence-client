@@ -823,6 +823,13 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 
 	skipReplayCheck := w.skipReplayCheck()
 	isReplayTest := task.GetPreviousStartedEventId() == replayPreviousStartedEventID
+	if isReplayTest {
+		w.wth.logger.Info("Processing workflow task in replay test mode",
+			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
+			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
+			zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
+		)
+	}
 	// Process events
 ProcessEvents:
 	for {
@@ -917,12 +924,19 @@ ProcessEvents:
 		}
 	}
 	if nonDeterministicErr == nil && w.err != nil {
-		if isReplayTest {
-			// NOTE: we should check the following error regardless if it's in replay test or not
-			// but since we are not checking it previously, it may break existing customers workflow
-			if panicErr, ok := w.err.(*workflowPanicError); ok && panicErr.value != nil {
-				if _, isStateMachinePanic := panicErr.value.(stateMachineIllegalStatePanic); isStateMachinePanic {
+		if panicErr, ok := w.err.(*workflowPanicError); ok && panicErr.value != nil {
+			if _, isStateMachinePanic := panicErr.value.(stateMachineIllegalStatePanic); isStateMachinePanic {
+				if isReplayTest {
+					// NOTE: we should do this regardless if it's in replay test or not
+					// but since previously we checked the wrong error type, it may break existing customers workflow
 					nonDeterministicErr = panicErr
+				} else {
+					w.wth.logger.Warn("Ignored workflow panic error",
+						zap.String(tagWorkflowType, task.WorkflowType.GetName()),
+						zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
+						zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
+						zap.Error(nonDeterministicErr),
+					)
 				}
 			}
 		}
@@ -1455,10 +1469,30 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	// for query task
 	if task.Query != nil {
 		queryCompletedRequest := &s.RespondQueryTaskCompletedRequest{TaskToken: task.TaskToken}
-		if panicErr, ok := workflowContext.err.(*workflowPanicError); ok {
+		if panicErr, ok := workflowContext.err.(*PanicError); ok {
+			// NOTE: this code path should never be executed, we should check for workflowPanicError instead of PanicError
+			wth.logger.Warn("Encountered PanicError in workflow query task",
+				zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
+				zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
+				zap.String(tagPanicError, panicErr.Error()),
+				zap.String(tagPanicStack, panicErr.StackTrace()),
+			)
+
 			queryCompletedRequest.CompletedType = common.QueryTaskCompletedTypePtr(s.QueryTaskCompletedTypeFailed)
 			queryCompletedRequest.ErrorMessage = common.StringPtr("Workflow panic: " + panicErr.Error())
 			return queryCompletedRequest
+		}
+
+		if workflowPanicErr, ok := workflowContext.err.(*workflowPanicError); ok {
+			// NOTE: in this case we should return complete query task with CompletedTypeFailed
+			// but we didn't check for the right error type before, this may break existing customer
+			wth.logger.Warn("Ignored workflow panic error for query, query result may be partial",
+				zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
+				zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
+				zap.String(tagPanicError, workflowPanicErr.Error()),
+				zap.String(tagPanicStack, workflowPanicErr.StackTrace()),
+				zap.Int64("PreviousStartedEventID", task.GetPreviousStartedEventId()),
+			)
 		}
 
 		result, err := eventHandler.ProcessQuery(task.Query.GetQueryType(), task.Query.QueryArgs)
@@ -1481,8 +1515,8 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		wth.logger.Error("Workflow panic.",
 			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
 			zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
-			zap.String("PanicError", panicErr.Error()),
-			zap.String("PanicStack", panicErr.StackTrace()))
+			zap.String(tagPanicError, panicErr.Error()),
+			zap.String(tagPanicStack, panicErr.StackTrace()))
 		return errorToFailDecisionTask(task.TaskToken, panicErr, wth.identity)
 	}
 
@@ -1840,8 +1874,8 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 				zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
 				zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
 				zap.String(tagActivityType, activityType),
-				zap.String("PanicError", fmt.Sprintf("%v", p)),
-				zap.String("PanicStack", st))
+				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+				zap.String(tagPanicStack, st))
 			metricsScope.Counter(metrics.ActivityTaskPanicCounter).Inc(1)
 			panicErr := newPanicError(p, st)
 			result, err = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr, ath.dataConverter), nil

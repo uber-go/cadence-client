@@ -24,17 +24,20 @@
 package workflowservicefx
 
 import (
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/fx"
-	"go.uber.org/yarpc"
-	"go.uber.org/yarpc/encoding/thrift"
+	workflowserviceclient "go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	fx "go.uber.org/fx"
+	yarpc "go.uber.org/yarpc"
+	transport "go.uber.org/yarpc/api/transport"
+	restriction "go.uber.org/yarpc/api/x/restriction"
+	thrift "go.uber.org/yarpc/encoding/thrift"
 )
 
 // Params defines the dependencies for the WorkflowService client.
 type Params struct {
 	fx.In
 
-	Provider yarpc.ClientConfig
+	Provider    yarpc.ClientConfig
+	Restriction restriction.Checker `optional:"true"`
 }
 
 // Result defines the output of the WorkflowService client module. It provides a
@@ -58,7 +61,13 @@ type Result struct {
 // 	)
 func Client(name string, opts ...thrift.ClientOption) interface{} {
 	return func(p Params) Result {
-		client := workflowserviceclient.New(p.Provider.ClientConfig(name), opts...)
+		cc := p.Provider.ClientConfig(name)
+		if namer, ok := cc.GetUnaryOutbound().(transport.Namer); ok && p.Restriction != nil {
+			if err := p.Restriction.Check(thrift.Encoding, namer.TransportName()); err != nil {
+				panic(err.Error())
+			}
+		}
+		client := workflowserviceclient.New(cc, opts...)
 		return Result{Client: client}
 	}
 }

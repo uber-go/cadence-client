@@ -905,9 +905,7 @@ func newGetHistoryPageFunc(
 		//   Those events will be buffered. If there're too many buffer events, the current decision will be failed and events passed
 		//   startEventID may be returned. In that case, the last event after truncation is still decision task started event not completed.
 		// - For query tasks startEventID is not assigned so this check is never executed.
-		size := len(h.Events)
-		if size > 0 && atDecisionTaskCompletedEventID > 0 &&
-			h.Events[size-1].GetEventId() > atDecisionTaskCompletedEventID {
+		if shouldTruncateHistory(h, atDecisionTaskCompletedEventID) {
 			first := h.Events[0].GetEventId() // eventIds start from 1
 			h.Events = h.Events[:atDecisionTaskCompletedEventID-first+1]
 			if h.Events[len(h.Events)-1].GetEventType() != s.EventTypeDecisionTaskCompleted {
@@ -917,12 +915,10 @@ func newGetHistoryPageFunc(
 			return h, nil, nil
 		}
 
-		// atDecisionTaskCompletedEventID (startedEventID) is 0 for query task
-		// maxEventID is 0 for old version of the server
 		// TODO: Apply the check to decision tasks (remove the last condition)
 		// after validating maxEventID always equal to atDecisionTaskCompletedEventID (startedEventID).
 		// For now only apply to query task to be safe.
-		if size > 0 && maxEventID != 0 && h.Events[size-1].GetEventId() > maxEventID && atDecisionTaskCompletedEventID == 0 {
+		if shouldTruncateHistory(h, maxEventID) && isQueryTask(atDecisionTaskCompletedEventID) {
 			first := h.Events[0].GetEventId()
 			h.Events = h.Events[:maxEventID-first+1]
 			return h, nil, nil
@@ -930,6 +926,15 @@ func newGetHistoryPageFunc(
 
 		return h, resp.NextPageToken, nil
 	}
+}
+
+func shouldTruncateHistory(h *s.History, maxEventID int64) bool {
+	size := len(h.Events)
+	return size > 0 && maxEventID > 0 && h.Events[size-1].GetEventId() > maxEventID
+}
+
+func isQueryTask(atDecisionTaskCompletedEventID int64) bool {
+	return atDecisionTaskCompletedEventID == 0
 }
 
 func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserviceclient.Interface,

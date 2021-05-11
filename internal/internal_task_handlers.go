@@ -169,7 +169,11 @@ func newHistory(task *workflowTask, eventsHandler *workflowExecutionEventHandler
 		eventsHandler: eventsHandler,
 		loadedEvents:  task.task.History.Events,
 		currentIndex:  0,
-		lastEventID:   task.task.GetStartedEventId(),
+		// don't set lastEventID to task.GetNextEventId()
+		// as for sticky query, the history in workflow task will be empty
+		// and query will be run based on existing workflow state.
+		// so the sanity check in verifyAllEventsProcessed will fail
+		lastEventID: task.task.GetStartedEventId(),
 	}
 	if len(result.loadedEvents) > 0 {
 		result.nextEventID = result.loadedEvents[0].GetEventId()
@@ -931,6 +935,7 @@ ProcessEvents:
 					// but since previously we checked the wrong error type, it may break existing customers workflow
 					nonDeterministicErr = panicErr
 				} else {
+					fmt.Println("Ignored workflow panic error", panicErr)
 					w.wth.logger.Warn("Ignored workflow panic error",
 						zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 						zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),

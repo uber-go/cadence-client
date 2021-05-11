@@ -276,12 +276,12 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 
 	metricScope := tally.NoopScope
 	iterator := &historyIteratorImpl{
-		nextPageToken: task.NextPageToken,
-		execution:     task.WorkflowExecution,
-		domain:        domain,
-		service:       service,
-		metricsScope:  metricScope,
-		maxEventID:    task.GetStartedEventId(),
+		nextPageToken:  task.NextPageToken,
+		execution:      task.WorkflowExecution,
+		domain:         domain,
+		service:        service,
+		metricsScope:   metricScope,
+		startedEventID: task.GetStartedEventId(),
 	}
 	taskHandler := newWorkflowTaskHandler(domain, workerParams, nil, r.registry)
 	resp, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator}, nil)

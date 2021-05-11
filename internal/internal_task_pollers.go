@@ -105,13 +105,14 @@ type (
 	}
 
 	historyIteratorImpl struct {
-		iteratorFunc  func(nextPageToken []byte) (*s.History, []byte, error)
-		execution     *s.WorkflowExecution
-		nextPageToken []byte
-		domain        string
-		service       workflowserviceclient.Interface
-		metricsScope  tally.Scope
-		maxEventID    int64
+		iteratorFunc   func(nextPageToken []byte) (*s.History, []byte, error)
+		execution      *s.WorkflowExecution
+		nextPageToken  []byte
+		domain         string
+		service        workflowserviceclient.Interface
+		metricsScope   tally.Scope
+		startedEventID int64
+		maxEventID     int64
 	}
 
 	localActivityTaskPoller struct {
@@ -798,13 +799,25 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 }
 
 func (wtp *workflowTaskPoller) toWorkflowTask(response *s.PollForDecisionTaskResponse) *workflowTask {
+	startEventID := response.GetStartedEventId()
+	nextEventID := response.GetNextEventId()
+	if nextEventID != 0 &&
+		startEventID != 0 &&
+		nextEventID-1 != startEventID {
+		wtp.logger.Warn("Invalid PollForDecisionTaskResponse, nextEventID doesn't match startedEventID",
+			zap.Int64("StartedEventID", startEventID),
+			zap.Int64("NextEventID", nextEventID),
+		)
+		wtp.metricsScope.Counter(metrics.DecisionPollInvalidCounter).Inc(1)
+	}
 	historyIterator := &historyIteratorImpl{
-		nextPageToken: response.NextPageToken,
-		execution:     response.WorkflowExecution,
-		domain:        wtp.domain,
-		service:       wtp.service,
-		metricsScope:  wtp.metricsScope,
-		maxEventID:    response.GetStartedEventId(),
+		nextPageToken:  response.NextPageToken,
+		execution:      response.WorkflowExecution,
+		domain:         wtp.domain,
+		service:        wtp.service,
+		metricsScope:   wtp.metricsScope,
+		startedEventID: startEventID,
+		maxEventID:     nextEventID - 1,
 	}
 	task := &workflowTask{
 		task:            response,
@@ -820,6 +833,7 @@ func (h *historyIteratorImpl) GetNextPage() (*s.History, error) {
 			h.service,
 			h.domain,
 			h.execution,
+			h.startedEventID,
 			h.maxEventID,
 			h.metricsScope)
 	}
@@ -846,6 +860,7 @@ func newGetHistoryPageFunc(
 	domain string,
 	execution *s.WorkflowExecution,
 	atDecisionTaskCompletedEventID int64,
+	maxEventID int64,
 	metricsScope tally.Scope,
 ) func(nextPageToken []byte) (*s.History, []byte, error) {
 	return func(nextPageToken []byte) (*s.History, []byte, error) {
@@ -885,6 +900,11 @@ func newGetHistoryPageFunc(
 			h = resp.History
 		}
 
+		// TODO: is this check valid/useful? atDecisionTaskCompletedEventID is startedEventID in pollForDecisionTaskResponse and
+		// - For decision tasks, since there's only one inflight decision task, there won't be any event after startEventID.
+		//   Those events will be buffered. If there're too many buffer events, the current decision will be failed and events passed
+		//   startEventID may be returned. In that case, the last event after truncation is still decision task started event not completed.
+		// - For query tasks startEventID is not assigned so this check is never executed.
 		size := len(h.Events)
 		if size > 0 && atDecisionTaskCompletedEventID > 0 &&
 			h.Events[size-1].GetEventId() > atDecisionTaskCompletedEventID {
@@ -896,6 +916,18 @@ func newGetHistoryPageFunc(
 			}
 			return h, nil, nil
 		}
+
+		// atDecisionTaskCompletedEventID (startedEventID) is 0 for query task
+		// maxEventID is 0 for old version of the server
+		// TODO: Apply the check to decision tasks (remove the last condition)
+		// after validating maxEventID always equal to atDecisionTaskCompletedEventID (startedEventID).
+		// For now only apply to query task to be safe.
+		if size > 0 && maxEventID != 0 && h.Events[size-1].GetEventId() > maxEventID && atDecisionTaskCompletedEventID == 0 {
+			first := h.Events[0].GetEventId()
+			h.Events = h.Events[:maxEventID-first+1]
+			return h, nil, nil
+		}
+
 		return h, resp.NextPageToken, nil
 	}
 }

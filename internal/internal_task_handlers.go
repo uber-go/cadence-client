@@ -935,7 +935,6 @@ ProcessEvents:
 					// but since previously we checked the wrong error type, it may break existing customers workflow
 					nonDeterministicErr = panicErr
 				} else {
-					fmt.Println("Ignored workflow panic error", panicErr)
 					w.wth.logger.Warn("Ignored workflow panic error",
 						zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 						zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),

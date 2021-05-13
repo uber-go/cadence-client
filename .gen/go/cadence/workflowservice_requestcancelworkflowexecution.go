@@ -440,12 +440,6 @@ func _CancellationAlreadyRequestedError_Read(w wire.Value) (*shared.Cancellation
 	return &v, err
 }
 
-func _WorkflowExecutionAlreadyCompletedError_Read(w wire.Value) (*shared.WorkflowExecutionAlreadyCompletedError, error) {
-	var v shared.WorkflowExecutionAlreadyCompletedError
-	err := v.FromWire(w)
-	return &v, err
-}
-
 // FromWire deserializes a WorkflowService_RequestCancelWorkflowExecution_Result struct from its Thrift-level
 // representation. The Thrift-level representation may be obtained
 // from a ThriftRW protocol implementation.

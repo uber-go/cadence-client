@@ -228,6 +228,8 @@ func init() {
 			return true
 		case *shared.ClientVersionNotSupportedError:
 			return true
+		case *shared.WorkflowExecutionAlreadyCompletedError:
+			return true
 		default:
 			return false
 		}
@@ -269,6 +271,11 @@ func init() {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RespondActivityTaskFailed_Result.ClientVersionNotSupportedError")
 			}
 			return &WorkflowService_RespondActivityTaskFailed_Result{ClientVersionNotSupportedError: e}, nil
+		case *shared.WorkflowExecutionAlreadyCompletedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RespondActivityTaskFailed_Result.WorkflowExecutionAlreadyCompletedError")
+			}
+			return &WorkflowService_RespondActivityTaskFailed_Result{WorkflowExecutionAlreadyCompletedError: e}, nil
 		}
 
 		return nil, err
@@ -298,6 +305,10 @@ func init() {
 			err = result.ClientVersionNotSupportedError
 			return
 		}
+		if result.WorkflowExecutionAlreadyCompletedError != nil {
+			err = result.WorkflowExecutionAlreadyCompletedError
+			return
+		}
 		return
 	}
 
@@ -307,12 +318,13 @@ func init() {
 //
 // The result of a RespondActivityTaskFailed execution is sent and received over the wire as this struct.
 type WorkflowService_RespondActivityTaskFailed_Result struct {
-	BadRequestError                *shared.BadRequestError                `json:"badRequestError,omitempty"`
-	EntityNotExistError            *shared.EntityNotExistsError           `json:"entityNotExistError,omitempty"`
-	DomainNotActiveError           *shared.DomainNotActiveError           `json:"domainNotActiveError,omitempty"`
-	LimitExceededError             *shared.LimitExceededError             `json:"limitExceededError,omitempty"`
-	ServiceBusyError               *shared.ServiceBusyError               `json:"serviceBusyError,omitempty"`
-	ClientVersionNotSupportedError *shared.ClientVersionNotSupportedError `json:"clientVersionNotSupportedError,omitempty"`
+	BadRequestError                        *shared.BadRequestError                        `json:"badRequestError,omitempty"`
+	EntityNotExistError                    *shared.EntityNotExistsError                   `json:"entityNotExistError,omitempty"`
+	DomainNotActiveError                   *shared.DomainNotActiveError                   `json:"domainNotActiveError,omitempty"`
+	LimitExceededError                     *shared.LimitExceededError                     `json:"limitExceededError,omitempty"`
+	ServiceBusyError                       *shared.ServiceBusyError                       `json:"serviceBusyError,omitempty"`
+	ClientVersionNotSupportedError         *shared.ClientVersionNotSupportedError         `json:"clientVersionNotSupportedError,omitempty"`
+	WorkflowExecutionAlreadyCompletedError *shared.WorkflowExecutionAlreadyCompletedError `json:"workflowExecutionAlreadyCompletedError,omitempty"`
 }
 
 // ToWire translates a WorkflowService_RespondActivityTaskFailed_Result struct into a Thrift-level intermediate
@@ -332,7 +344,7 @@ type WorkflowService_RespondActivityTaskFailed_Result struct {
 //   }
 func (v *WorkflowService_RespondActivityTaskFailed_Result) ToWire() (wire.Value, error) {
 	var (
-		fields [6]wire.Field
+		fields [7]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -384,6 +396,14 @@ func (v *WorkflowService_RespondActivityTaskFailed_Result) ToWire() (wire.Value,
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 7, Value: w}
+		i++
+	}
+	if v.WorkflowExecutionAlreadyCompletedError != nil {
+		w, err = v.WorkflowExecutionAlreadyCompletedError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 8, Value: w}
 		i++
 	}
 
@@ -464,6 +484,14 @@ func (v *WorkflowService_RespondActivityTaskFailed_Result) FromWire(w wire.Value
 				}
 
 			}
+		case 8:
+			if field.Value.Type() == wire.TStruct {
+				v.WorkflowExecutionAlreadyCompletedError, err = _WorkflowExecutionAlreadyCompletedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -486,6 +514,9 @@ func (v *WorkflowService_RespondActivityTaskFailed_Result) FromWire(w wire.Value
 	if v.ClientVersionNotSupportedError != nil {
 		count++
 	}
+	if v.WorkflowExecutionAlreadyCompletedError != nil {
+		count++
+	}
 	if count > 1 {
 		return fmt.Errorf("WorkflowService_RespondActivityTaskFailed_Result should have at most one field: got %v fields", count)
 	}
@@ -500,7 +531,7 @@ func (v *WorkflowService_RespondActivityTaskFailed_Result) String() string {
 		return "<nil>"
 	}
 
-	var fields [6]string
+	var fields [7]string
 	i := 0
 	if v.BadRequestError != nil {
 		fields[i] = fmt.Sprintf("BadRequestError: %v", v.BadRequestError)
@@ -524,6 +555,10 @@ func (v *WorkflowService_RespondActivityTaskFailed_Result) String() string {
 	}
 	if v.ClientVersionNotSupportedError != nil {
 		fields[i] = fmt.Sprintf("ClientVersionNotSupportedError: %v", v.ClientVersionNotSupportedError)
+		i++
+	}
+	if v.WorkflowExecutionAlreadyCompletedError != nil {
+		fields[i] = fmt.Sprintf("WorkflowExecutionAlreadyCompletedError: %v", v.WorkflowExecutionAlreadyCompletedError)
 		i++
 	}
 
@@ -551,6 +586,9 @@ func (v *WorkflowService_RespondActivityTaskFailed_Result) Equals(rhs *WorkflowS
 		return false
 	}
 	if !((v.ClientVersionNotSupportedError == nil && rhs.ClientVersionNotSupportedError == nil) || (v.ClientVersionNotSupportedError != nil && rhs.ClientVersionNotSupportedError != nil && v.ClientVersionNotSupportedError.Equals(rhs.ClientVersionNotSupportedError))) {
+		return false
+	}
+	if !((v.WorkflowExecutionAlreadyCompletedError == nil && rhs.WorkflowExecutionAlreadyCompletedError == nil) || (v.WorkflowExecutionAlreadyCompletedError != nil && rhs.WorkflowExecutionAlreadyCompletedError != nil && v.WorkflowExecutionAlreadyCompletedError.Equals(rhs.WorkflowExecutionAlreadyCompletedError))) {
 		return false
 	}
 

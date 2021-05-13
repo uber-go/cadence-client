@@ -227,6 +227,8 @@ func init() {
 			return true
 		case *shared.ClientVersionNotSupportedError:
 			return true
+		case *shared.WorkflowExecutionAlreadyCompletedError:
+			return true
 		default:
 			return false
 		}
@@ -268,6 +270,11 @@ func init() {
 				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RecordActivityTaskHeartbeat_Result.ClientVersionNotSupportedError")
 			}
 			return &WorkflowService_RecordActivityTaskHeartbeat_Result{ClientVersionNotSupportedError: e}, nil
+		case *shared.WorkflowExecutionAlreadyCompletedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RecordActivityTaskHeartbeat_Result.WorkflowExecutionAlreadyCompletedError")
+			}
+			return &WorkflowService_RecordActivityTaskHeartbeat_Result{WorkflowExecutionAlreadyCompletedError: e}, nil
 		}
 
 		return nil, err
@@ -297,6 +304,10 @@ func init() {
 			err = result.ClientVersionNotSupportedError
 			return
 		}
+		if result.WorkflowExecutionAlreadyCompletedError != nil {
+			err = result.WorkflowExecutionAlreadyCompletedError
+			return
+		}
 
 		if result.Success != nil {
 			success = result.Success
@@ -316,13 +327,14 @@ func init() {
 // Success is set only if the function did not throw an exception.
 type WorkflowService_RecordActivityTaskHeartbeat_Result struct {
 	// Value returned by RecordActivityTaskHeartbeat after a successful execution.
-	Success                        *shared.RecordActivityTaskHeartbeatResponse `json:"success,omitempty"`
-	BadRequestError                *shared.BadRequestError                     `json:"badRequestError,omitempty"`
-	EntityNotExistError            *shared.EntityNotExistsError                `json:"entityNotExistError,omitempty"`
-	DomainNotActiveError           *shared.DomainNotActiveError                `json:"domainNotActiveError,omitempty"`
-	LimitExceededError             *shared.LimitExceededError                  `json:"limitExceededError,omitempty"`
-	ServiceBusyError               *shared.ServiceBusyError                    `json:"serviceBusyError,omitempty"`
-	ClientVersionNotSupportedError *shared.ClientVersionNotSupportedError      `json:"clientVersionNotSupportedError,omitempty"`
+	Success                                *shared.RecordActivityTaskHeartbeatResponse    `json:"success,omitempty"`
+	BadRequestError                        *shared.BadRequestError                        `json:"badRequestError,omitempty"`
+	EntityNotExistError                    *shared.EntityNotExistsError                   `json:"entityNotExistError,omitempty"`
+	DomainNotActiveError                   *shared.DomainNotActiveError                   `json:"domainNotActiveError,omitempty"`
+	LimitExceededError                     *shared.LimitExceededError                     `json:"limitExceededError,omitempty"`
+	ServiceBusyError                       *shared.ServiceBusyError                       `json:"serviceBusyError,omitempty"`
+	ClientVersionNotSupportedError         *shared.ClientVersionNotSupportedError         `json:"clientVersionNotSupportedError,omitempty"`
+	WorkflowExecutionAlreadyCompletedError *shared.WorkflowExecutionAlreadyCompletedError `json:"workflowExecutionAlreadyCompletedError,omitempty"`
 }
 
 // ToWire translates a WorkflowService_RecordActivityTaskHeartbeat_Result struct into a Thrift-level intermediate
@@ -342,7 +354,7 @@ type WorkflowService_RecordActivityTaskHeartbeat_Result struct {
 //   }
 func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) ToWire() (wire.Value, error) {
 	var (
-		fields [7]wire.Field
+		fields [8]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -404,6 +416,14 @@ func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) ToWire() (wire.Valu
 		fields[i] = wire.Field{ID: 7, Value: w}
 		i++
 	}
+	if v.WorkflowExecutionAlreadyCompletedError != nil {
+		w, err = v.WorkflowExecutionAlreadyCompletedError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 8, Value: w}
+		i++
+	}
 
 	if i != 1 {
 		return wire.Value{}, fmt.Errorf("WorkflowService_RecordActivityTaskHeartbeat_Result should have exactly one field: got %v fields", i)
@@ -414,6 +434,12 @@ func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) ToWire() (wire.Valu
 
 func _RecordActivityTaskHeartbeatResponse_Read(w wire.Value) (*shared.RecordActivityTaskHeartbeatResponse, error) {
 	var v shared.RecordActivityTaskHeartbeatResponse
+	err := v.FromWire(w)
+	return &v, err
+}
+
+func _WorkflowExecutionAlreadyCompletedError_Read(w wire.Value) (*shared.WorkflowExecutionAlreadyCompletedError, error) {
+	var v shared.WorkflowExecutionAlreadyCompletedError
 	err := v.FromWire(w)
 	return &v, err
 }
@@ -496,6 +522,14 @@ func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) FromWire(w wire.Val
 				}
 
 			}
+		case 8:
+			if field.Value.Type() == wire.TStruct {
+				v.WorkflowExecutionAlreadyCompletedError, err = _WorkflowExecutionAlreadyCompletedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -521,6 +555,9 @@ func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) FromWire(w wire.Val
 	if v.ClientVersionNotSupportedError != nil {
 		count++
 	}
+	if v.WorkflowExecutionAlreadyCompletedError != nil {
+		count++
+	}
 	if count != 1 {
 		return fmt.Errorf("WorkflowService_RecordActivityTaskHeartbeat_Result should have exactly one field: got %v fields", count)
 	}
@@ -535,7 +572,7 @@ func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) String() string {
 		return "<nil>"
 	}
 
-	var fields [7]string
+	var fields [8]string
 	i := 0
 	if v.Success != nil {
 		fields[i] = fmt.Sprintf("Success: %v", v.Success)
@@ -563,6 +600,10 @@ func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) String() string {
 	}
 	if v.ClientVersionNotSupportedError != nil {
 		fields[i] = fmt.Sprintf("ClientVersionNotSupportedError: %v", v.ClientVersionNotSupportedError)
+		i++
+	}
+	if v.WorkflowExecutionAlreadyCompletedError != nil {
+		fields[i] = fmt.Sprintf("WorkflowExecutionAlreadyCompletedError: %v", v.WorkflowExecutionAlreadyCompletedError)
 		i++
 	}
 
@@ -593,6 +634,9 @@ func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) Equals(rhs *Workflo
 		return false
 	}
 	if !((v.ClientVersionNotSupportedError == nil && rhs.ClientVersionNotSupportedError == nil) || (v.ClientVersionNotSupportedError != nil && rhs.ClientVersionNotSupportedError != nil && v.ClientVersionNotSupportedError.Equals(rhs.ClientVersionNotSupportedError))) {
+		return false
+	}
+	if !((v.WorkflowExecutionAlreadyCompletedError == nil && rhs.WorkflowExecutionAlreadyCompletedError == nil) || (v.WorkflowExecutionAlreadyCompletedError != nil && rhs.WorkflowExecutionAlreadyCompletedError != nil && v.WorkflowExecutionAlreadyCompletedError.Equals(rhs.WorkflowExecutionAlreadyCompletedError))) {
 		return false
 	}
 

@@ -304,6 +304,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 		StartedEventId:         common.Int64Ptr(3),
 		History:                &m.History{Events: testEvents[0:3]},
 		NextPageToken:          nil,
+		NextEventId:            common.Int64Ptr(4),
 	}
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(task, nil).Times(1)
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, &m.InternalServiceError{}).AnyTimes()
@@ -357,6 +358,174 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 
 	s.True(isWorkflowCompleted)
 	s.Equal(2, localActivityCalledCount)
+}
+
+func (s *WorkersTestSuite) TestQueryTask_WorkflowCacheEvicted() {
+	domain := "testDomain"
+	taskList := "query-task-cache-evicted-tl"
+	workflowType := "query-task-cache-evicted-workflow"
+	workflowID := "query-task-cache-evicted-workflow-id"
+	runID := "query-task-cache-evicted-workflow-run-id"
+	activityType := "query-task-cache-evicted-activity"
+	queryType := "state"
+	doneCh := make(chan struct{})
+
+	activityFn := func(ctx context.Context) error {
+		return nil
+	}
+
+	queryWorkflowFn := func(ctx Context) error {
+		queryResult := "started"
+		// setup query handler for query type "state"
+		if err := SetQueryHandler(ctx, queryType, func(input []byte) (string, error) {
+			return queryResult, nil
+		}); err != nil {
+			return err
+		}
+
+		queryResult = "waiting on timer"
+		NewTimer(ctx, time.Minute*2).Get(ctx, nil)
+
+		queryResult = "waiting on activity"
+		ctx = WithActivityOptions(ctx, ActivityOptions{
+			ScheduleToStartTimeout: 10 * time.Second,
+			StartToCloseTimeout:    10 * time.Second,
+		})
+		if err := ExecuteActivity(ctx, activityFn).Get(ctx, nil); err != nil {
+			return err
+		}
+		queryResult = "done"
+		return nil
+	}
+
+	testEvents := []*m.HistoryEvent{
+		{
+			EventId:   common.Int64Ptr(1),
+			EventType: common.EventTypePtr(m.EventTypeWorkflowExecutionStarted),
+			WorkflowExecutionStartedEventAttributes: &m.WorkflowExecutionStartedEventAttributes{
+				TaskList:                            &m.TaskList{Name: &taskList},
+				ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(180),
+				TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(2),
+				WorkflowType:                        &m.WorkflowType{Name: common.StringPtr(workflowType)},
+			},
+		},
+		createTestEventDecisionTaskScheduled(2, &m.DecisionTaskScheduledEventAttributes{TaskList: &m.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &m.DecisionTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
+		{
+			EventId:   common.Int64Ptr(5),
+			EventType: common.EventTypePtr(m.EventTypeTimerStarted),
+			TimerStartedEventAttributes: &m.TimerStartedEventAttributes{
+				TimerId:                      common.StringPtr("0"),
+				StartToFireTimeoutSeconds:    common.Int64Ptr(120),
+				DecisionTaskCompletedEventId: common.Int64Ptr(4),
+			},
+		},
+		{
+			EventId:   common.Int64Ptr(6),
+			EventType: common.EventTypePtr(m.EventTypeTimerFired),
+			TimerFiredEventAttributes: &m.TimerFiredEventAttributes{
+				TimerId:        common.StringPtr("0"),
+				StartedEventId: common.Int64Ptr(5),
+			},
+		},
+		createTestEventDecisionTaskScheduled(7, &m.DecisionTaskScheduledEventAttributes{TaskList: &m.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(8),
+		createTestEventDecisionTaskCompleted(9, &m.DecisionTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
+		createTestEventActivityTaskScheduled(10, &m.ActivityTaskScheduledEventAttributes{
+			ActivityId: common.StringPtr("1"),
+			ActivityType: &m.ActivityType{
+				Name: common.StringPtr(activityType),
+			},
+			Domain: common.StringPtr(domain),
+			TaskList: &m.TaskList{
+				Name: common.StringPtr(taskList),
+			},
+			ScheduleToStartTimeoutSeconds: common.Int32Ptr(10),
+			StartToCloseTimeoutSeconds:    common.Int32Ptr(10),
+			DecisionTaskCompletedEventId:  common.Int64Ptr(9),
+		}),
+	}
+
+	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil).AnyTimes()
+	task := &m.PollForDecisionTaskResponse{
+		TaskToken: []byte("test-token"),
+		WorkflowExecution: &m.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      common.StringPtr(runID),
+		},
+		WorkflowType: &m.WorkflowType{
+			Name: common.StringPtr(workflowType),
+		},
+		PreviousStartedEventId: common.Int64Ptr(0),
+		StartedEventId:         common.Int64Ptr(3),
+		History:                &m.History{Events: testEvents[0:3]},
+		NextPageToken:          nil,
+		NextEventId:            common.Int64Ptr(4),
+	}
+	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(task, nil).Times(1)
+	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(ctx context.Context, request *m.RespondDecisionTaskCompletedRequest, opts ...yarpc.CallOption,
+	) (success *m.RespondDecisionTaskCompletedResponse, err error) {
+		s.Equal(1, len(request.Decisions))
+		s.Equal(m.DecisionTypeStartTimer, request.Decisions[0].GetDecisionType())
+		return &m.RespondDecisionTaskCompletedResponse{}, nil
+	}).Times(1)
+	queryTask := &m.PollForDecisionTaskResponse{
+		TaskToken: []byte("test-token"),
+		WorkflowExecution: &m.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      common.StringPtr(runID),
+		},
+		WorkflowType: &m.WorkflowType{
+			Name: common.StringPtr(workflowType),
+		},
+		PreviousStartedEventId: common.Int64Ptr(3),
+		History:                &m.History{}, // sticky query, so there's no history
+		NextPageToken:          nil,
+		NextEventId:            common.Int64Ptr(5),
+		Query: &m.WorkflowQuery{
+			QueryType: common.StringPtr(queryType),
+		},
+	}
+	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(ctx context.Context, request *m.PollForDecisionTaskRequest, opts ...yarpc.CallOption,
+	) (success *m.PollForDecisionTaskResponse, err error) {
+		getWorkflowCache().Delete(runID) // force remove the workflow state
+		return queryTask, nil
+	}).Times(1)
+	s.service.EXPECT().ResetStickyTaskList(gomock.Any(), gomock.Any(), callOptions...).Return(&m.ResetStickyTaskListResponse{}, nil).AnyTimes()
+	s.service.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&m.GetWorkflowExecutionHistoryResponse{
+		History: &m.History{Events: testEvents}, // workflow has made progress, return all available events
+	}, nil).Times(1)
+	dc := getDefaultDataConverter()
+	expectedResult, err := dc.ToData("waiting on timer")
+	s.NoError(err)
+	s.service.EXPECT().RespondQueryTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(ctx context.Context, request *m.RespondQueryTaskCompletedRequest, opts ...yarpc.CallOption) error {
+		s.Equal(m.QueryTaskCompletedTypeCompleted, request.GetCompletedType())
+		s.Equal(expectedResult, request.GetQueryResult())
+		close(doneCh)
+		return nil
+	}).Times(1)
+	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, &m.InternalServiceError{}).AnyTimes()
+
+	options := WorkerOptions{
+		Logger:                zap.NewNop(),
+		DisableActivityWorker: true,
+		Identity:              "test-worker-identity",
+		DataConverter:         dc,
+	}
+	worker := newAggregatedWorker(s.service, domain, taskList, options)
+	worker.RegisterWorkflowWithOptions(
+		queryWorkflowFn,
+		RegisterWorkflowOptions{Name: workflowType},
+	)
+	worker.RegisterActivityWithOptions(
+		activityFn,
+		RegisterActivityOptions{Name: activityType},
+	)
+
+	worker.Start()
+	<-doneCh
+	worker.Stop()
 }
 
 func (s *WorkersTestSuite) TestMultipleLocalActivities() {
@@ -441,6 +610,7 @@ func (s *WorkersTestSuite) TestMultipleLocalActivities() {
 		StartedEventId:         common.Int64Ptr(3),
 		History:                &m.History{Events: testEvents[0:3]},
 		NextPageToken:          nil,
+		NextEventId:            common.Int64Ptr(4),
 	}
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(task, nil).Times(1)
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, &m.InternalServiceError{}).AnyTimes()
@@ -554,6 +724,7 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 		StartedEventId:         common.Int64Ptr(3),
 		History:                &m.History{Events: testEvents[0:3]},
 		NextPageToken:          nil,
+		NextEventId:            common.Int64Ptr(4),
 	}
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(task, nil).Times(1)
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, &m.InternalServiceError{}).AnyTimes()
@@ -666,6 +837,7 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 		StartedEventId:         common.Int64Ptr(3),
 		History:                &m.History{Events: testEvents[0:3]},
 		NextPageToken:          nil,
+		NextEventId:            common.Int64Ptr(4),
 	}
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(task, nil).Times(1)
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, &m.InternalServiceError{}).AnyTimes()

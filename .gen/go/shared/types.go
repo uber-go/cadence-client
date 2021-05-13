@@ -23895,6 +23895,7 @@ type PollForDecisionTaskResponse struct {
 	ScheduledTimestamp        *int64                    `json:"scheduledTimestamp,omitempty"`
 	StartedTimestamp          *int64                    `json:"startedTimestamp,omitempty"`
 	Queries                   map[string]*WorkflowQuery `json:"queries,omitempty"`
+	NextEventId               *int64                    `json:"nextEventId,omitempty"`
 }
 
 type _Map_String_WorkflowQuery_MapItemList map[string]*WorkflowQuery
@@ -23952,7 +23953,7 @@ func (_Map_String_WorkflowQuery_MapItemList) Close() {}
 //   }
 func (v *PollForDecisionTaskResponse) ToWire() (wire.Value, error) {
 	var (
-		fields [14]wire.Field
+		fields [15]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -24068,6 +24069,14 @@ func (v *PollForDecisionTaskResponse) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 120, Value: w}
+		i++
+	}
+	if v.NextEventId != nil {
+		w, err = wire.NewValueI64(*(v.NextEventId)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 130, Value: w}
 		i++
 	}
 
@@ -24254,6 +24263,16 @@ func (v *PollForDecisionTaskResponse) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 130:
+			if field.Value.Type() == wire.TI64 {
+				var x int64
+				x, err = field.Value.GetI64(), error(nil)
+				v.NextEventId = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -24267,7 +24286,7 @@ func (v *PollForDecisionTaskResponse) String() string {
 		return "<nil>"
 	}
 
-	var fields [14]string
+	var fields [15]string
 	i := 0
 	if v.TaskToken != nil {
 		fields[i] = fmt.Sprintf("TaskToken: %v", v.TaskToken)
@@ -24323,6 +24342,10 @@ func (v *PollForDecisionTaskResponse) String() string {
 	}
 	if v.Queries != nil {
 		fields[i] = fmt.Sprintf("Queries: %v", v.Queries)
+		i++
+	}
+	if v.NextEventId != nil {
+		fields[i] = fmt.Sprintf("NextEventId: %v", *(v.NextEventId))
 		i++
 	}
 
@@ -24393,6 +24416,9 @@ func (v *PollForDecisionTaskResponse) Equals(rhs *PollForDecisionTaskResponse) b
 	if !((v.Queries == nil && rhs.Queries == nil) || (v.Queries != nil && rhs.Queries != nil && _Map_String_WorkflowQuery_Equals(v.Queries, rhs.Queries))) {
 		return false
 	}
+	if !_I64_EqualsPtr(v.NextEventId, rhs.NextEventId) {
+		return false
+	}
 
 	return true
 }
@@ -24452,6 +24478,16 @@ func (v *PollForDecisionTaskResponse) GetScheduledTimestamp() (o int64) {
 func (v *PollForDecisionTaskResponse) GetStartedTimestamp() (o int64) {
 	if v.StartedTimestamp != nil {
 		return *v.StartedTimestamp
+	}
+
+	return
+}
+
+// GetNextEventId returns the value of NextEventId if it is set or its
+// zero value if it is unset.
+func (v *PollForDecisionTaskResponse) GetNextEventId() (o int64) {
+	if v.NextEventId != nil {
+		return *v.NextEventId
 	}
 
 	return
@@ -44928,6 +44964,7 @@ type WorkflowExecutionInfo struct {
 	SearchAttributes *SearchAttributes             `json:"searchAttributes,omitempty"`
 	AutoResetPoints  *ResetPoints                  `json:"autoResetPoints,omitempty"`
 	TaskList         *string                       `json:"taskList,omitempty"`
+	IsCron           *bool                         `json:"isCron,omitempty"`
 }
 
 // ToWire translates a WorkflowExecutionInfo struct into a Thrift-level intermediate
@@ -44947,7 +44984,7 @@ type WorkflowExecutionInfo struct {
 //   }
 func (v *WorkflowExecutionInfo) ToWire() (wire.Value, error) {
 	var (
-		fields [13]wire.Field
+		fields [14]wire.Field
 		i      int = 0
 		w      wire.Value
 		err    error
@@ -45055,6 +45092,14 @@ func (v *WorkflowExecutionInfo) ToWire() (wire.Value, error) {
 			return w, err
 		}
 		fields[i] = wire.Field{ID: 120, Value: w}
+		i++
+	}
+	if v.IsCron != nil {
+		w, err = wire.NewValueBool(*(v.IsCron)), error(nil)
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 130, Value: w}
 		i++
 	}
 
@@ -45207,6 +45252,16 @@ func (v *WorkflowExecutionInfo) FromWire(w wire.Value) error {
 				}
 
 			}
+		case 130:
+			if field.Value.Type() == wire.TBool {
+				var x bool
+				x, err = field.Value.GetBool(), error(nil)
+				v.IsCron = &x
+				if err != nil {
+					return err
+				}
+
+			}
 		}
 	}
 
@@ -45220,7 +45275,7 @@ func (v *WorkflowExecutionInfo) String() string {
 		return "<nil>"
 	}
 
-	var fields [13]string
+	var fields [14]string
 	i := 0
 	if v.Execution != nil {
 		fields[i] = fmt.Sprintf("Execution: %v", v.Execution)
@@ -45274,6 +45329,10 @@ func (v *WorkflowExecutionInfo) String() string {
 		fields[i] = fmt.Sprintf("TaskList: %v", *(v.TaskList))
 		i++
 	}
+	if v.IsCron != nil {
+		fields[i] = fmt.Sprintf("IsCron: %v", *(v.IsCron))
+		i++
+	}
 
 	return fmt.Sprintf("WorkflowExecutionInfo{%v}", strings.Join(fields[:i], ", "))
 }
@@ -45320,6 +45379,9 @@ func (v *WorkflowExecutionInfo) Equals(rhs *WorkflowExecutionInfo) bool {
 		return false
 	}
 	if !_String_EqualsPtr(v.TaskList, rhs.TaskList) {
+		return false
+	}
+	if !_Bool_EqualsPtr(v.IsCron, rhs.IsCron) {
 		return false
 	}
 
@@ -45391,6 +45453,16 @@ func (v *WorkflowExecutionInfo) GetExecutionTime() (o int64) {
 func (v *WorkflowExecutionInfo) GetTaskList() (o string) {
 	if v.TaskList != nil {
 		return *v.TaskList
+	}
+
+	return
+}
+
+// GetIsCron returns the value of IsCron if it is set or its
+// zero value if it is unset.
+func (v *WorkflowExecutionInfo) GetIsCron() (o bool) {
+	if v.IsCron != nil {
+		return *v.IsCron
 	}
 
 	return

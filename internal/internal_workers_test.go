@@ -501,7 +501,7 @@ func (s *WorkersTestSuite) TestQueryTask_WorkflowCacheEvicted() {
 	s.NoError(err)
 	s.service.EXPECT().RespondQueryTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(ctx context.Context, request *m.RespondQueryTaskCompletedRequest, opts ...yarpc.CallOption) error {
 		s.Equal(m.QueryTaskCompletedTypeCompleted, request.GetCompletedType())
-		s.Equal(expectedResult, request.GetQueryResult())
+		s.Equal(expectedResult, request.QueryResult)
 		close(doneCh)
 		return nil
 	}).Times(1)

@@ -105,13 +105,14 @@ type (
 	}
 
 	historyIteratorImpl struct {
-		iteratorFunc  func(nextPageToken []byte) (*s.History, []byte, error)
-		execution     *s.WorkflowExecution
-		nextPageToken []byte
-		domain        string
-		service       workflowserviceclient.Interface
-		metricsScope  tally.Scope
-		maxEventID    int64
+		iteratorFunc   func(nextPageToken []byte) (*s.History, []byte, error)
+		execution      *s.WorkflowExecution
+		nextPageToken  []byte
+		domain         string
+		service        workflowserviceclient.Interface
+		metricsScope   tally.Scope
+		startedEventID int64
+		maxEventID     int64
 	}
 
 	localActivityTaskPoller struct {
@@ -603,8 +604,8 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 				zap.String(tagWorkflowID, task.params.WorkflowInfo.WorkflowExecution.ID),
 				zap.String(tagRunID, task.params.WorkflowInfo.WorkflowExecution.RunID),
 				zap.String(tagActivityType, activityType),
-				zap.String("PanicError", fmt.Sprintf("%v", p)),
-				zap.String("PanicStack", st))
+				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+				zap.String(tagPanicStack, st))
 			metricsScope.Counter(metrics.LocalActivityPanicCounter).Inc(1)
 			panicErr := newPanicError(p, st)
 			result = &localActivityResult{
@@ -798,13 +799,25 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 }
 
 func (wtp *workflowTaskPoller) toWorkflowTask(response *s.PollForDecisionTaskResponse) *workflowTask {
+	startEventID := response.GetStartedEventId()
+	nextEventID := response.GetNextEventId()
+	if nextEventID != 0 &&
+		startEventID != 0 &&
+		nextEventID-1 != startEventID {
+		wtp.logger.Warn("Invalid PollForDecisionTaskResponse, nextEventID doesn't match startedEventID",
+			zap.Int64("StartedEventID", startEventID),
+			zap.Int64("NextEventID", nextEventID),
+		)
+		wtp.metricsScope.Counter(metrics.DecisionPollInvalidCounter).Inc(1)
+	}
 	historyIterator := &historyIteratorImpl{
-		nextPageToken: response.NextPageToken,
-		execution:     response.WorkflowExecution,
-		domain:        wtp.domain,
-		service:       wtp.service,
-		metricsScope:  wtp.metricsScope,
-		maxEventID:    response.GetStartedEventId(),
+		nextPageToken:  response.NextPageToken,
+		execution:      response.WorkflowExecution,
+		domain:         wtp.domain,
+		service:        wtp.service,
+		metricsScope:   wtp.metricsScope,
+		startedEventID: startEventID,
+		maxEventID:     nextEventID - 1,
 	}
 	task := &workflowTask{
 		task:            response,
@@ -820,6 +833,7 @@ func (h *historyIteratorImpl) GetNextPage() (*s.History, error) {
 			h.service,
 			h.domain,
 			h.execution,
+			h.startedEventID,
 			h.maxEventID,
 			h.metricsScope)
 	}
@@ -846,6 +860,7 @@ func newGetHistoryPageFunc(
 	domain string,
 	execution *s.WorkflowExecution,
 	atDecisionTaskCompletedEventID int64,
+	maxEventID int64,
 	metricsScope tally.Scope,
 ) func(nextPageToken []byte) (*s.History, []byte, error) {
 	return func(nextPageToken []byte) (*s.History, []byte, error) {
@@ -885,9 +900,12 @@ func newGetHistoryPageFunc(
 			h = resp.History
 		}
 
-		size := len(h.Events)
-		if size > 0 && atDecisionTaskCompletedEventID > 0 &&
-			h.Events[size-1].GetEventId() > atDecisionTaskCompletedEventID {
+		// TODO: is this check valid/useful? atDecisionTaskCompletedEventID is startedEventID in pollForDecisionTaskResponse and
+		// - For decision tasks, since there's only one inflight decision task, there won't be any event after startEventID.
+		//   Those events will be buffered. If there're too many buffer events, the current decision will be failed and events passed
+		//   startEventID may be returned. In that case, the last event after truncation is still decision task started event not completed.
+		// - For query tasks startEventID is not assigned so this check is never executed.
+		if shouldTruncateHistory(h, atDecisionTaskCompletedEventID) {
 			first := h.Events[0].GetEventId() // eventIds start from 1
 			h.Events = h.Events[:atDecisionTaskCompletedEventID-first+1]
 			if h.Events[len(h.Events)-1].GetEventType() != s.EventTypeDecisionTaskCompleted {
@@ -896,8 +914,27 @@ func newGetHistoryPageFunc(
 			}
 			return h, nil, nil
 		}
+
+		// TODO: Apply the check to decision tasks (remove the last condition)
+		// after validating maxEventID always equal to atDecisionTaskCompletedEventID (startedEventID).
+		// For now only apply to query task to be safe.
+		if shouldTruncateHistory(h, maxEventID) && isQueryTask(atDecisionTaskCompletedEventID) {
+			first := h.Events[0].GetEventId()
+			h.Events = h.Events[:maxEventID-first+1]
+			return h, nil, nil
+		}
+
 		return h, resp.NextPageToken, nil
 	}
+}
+
+func shouldTruncateHistory(h *s.History, maxEventID int64) bool {
+	size := len(h.Events)
+	return size > 0 && maxEventID > 0 && h.Events[size-1].GetEventId() > maxEventID
+}
+
+func isQueryTask(atDecisionTaskCompletedEventID int64) bool {
+	return atDecisionTaskCompletedEventID == 0
 }
 
 func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserviceclient.Interface,

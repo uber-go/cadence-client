@@ -781,8 +781,8 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 			topLine := fmt.Sprintf("process event for %s [panic]:", weh.workflowInfo.TaskListName)
 			st := getStackTraceRaw(topLine, 7, 0)
 			weh.logger.Error("ProcessEvent panic.",
-				zap.String("PanicError", fmt.Sprintf("%v", p)),
-				zap.String("PanicStack", st))
+				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+				zap.String(tagPanicStack, st))
 
 			weh.Complete(nil, newWorkflowPanicError(p, st))
 		}

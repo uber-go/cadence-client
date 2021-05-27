@@ -487,6 +487,9 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_QueryWorkflow_NonSticky() {
 		Logger:   t.logger,
 	}
 
+	// TODO: the following comment is not true, previousStartEventID is either 0 or points to a valid decisionTaskStartedID
+	// we need to fix the test
+	//
 	// query after first decision task (notice the previousStartEventID is always the last eventID for query task)
 	task := createQueryTask(testEvents[0:3], 3, "HelloWorld_Workflow", queryType)
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)

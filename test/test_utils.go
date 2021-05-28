@@ -30,8 +30,8 @@ import (
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/transport/tchannel"
 
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/workflow"
+	"go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
+	"go.uber.org/cadence/v1/workflow"
 )
 
 type (

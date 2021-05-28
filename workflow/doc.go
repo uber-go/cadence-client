@@ -42,7 +42,7 @@ the sole parameter it receives as part of its initialization as a parameter to t
 	import (
 		"time"
 
-		"go.uber.org/cadence/workflow"
+		"go.uber.org/cadence/v1/workflow"
 	)
 
 	func init() {
@@ -487,7 +487,7 @@ The code below implements the unit tests for the SimpleWorkflow sample.
 		"github.com/stretchr/testify/mock"
 		"github.com/stretchr/testify/suite"
 
-		"go.uber.org/cadence/testsuite"
+		"go.uber.org/cadence/v1/testsuite"
 	)
 
 	type UnitTestSuite struct {

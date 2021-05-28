@@ -33,12 +33,12 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence"
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/client"
-	"go.uber.org/cadence/interceptors"
-	"go.uber.org/cadence/worker"
-	"go.uber.org/cadence/workflow"
+	"go.uber.org/cadence/v1"
+	"go.uber.org/cadence/v1/.gen/go/shared"
+	"go.uber.org/cadence/v1/client"
+	"go.uber.org/cadence/v1/interceptors"
+	"go.uber.org/cadence/v1/worker"
+	"go.uber.org/cadence/v1/workflow"
 	"go.uber.org/goleak"
 	"go.uber.org/zap"
 )
@@ -123,7 +123,7 @@ func (ts *IntegrationTestSuite) TearDownSuite() {
 			ts.FailNow("leaks timed out but no error, should be impossible")
 		case <-time.After(time.Second):
 			// https://github.com/uber-go/cadence-client/issues/739
-			last = goleak.Find(goleak.IgnoreTopFunction("go.uber.org/cadence/internal.(*coroutineState).initialYield"))
+			last = goleak.Find(goleak.IgnoreTopFunction("go.uber.org/cadence/v1/internal.(*coroutineState).initialYield"))
 			if last == nil {
 				// no leak, done waiting
 				return
@@ -166,7 +166,7 @@ func (ts *IntegrationTestSuite) TestBasic() {
 	ts.NoError(err)
 	ts.EqualValues(expected, ts.activities.invoked())
 	ts.Equal([]string{"ExecuteWorkflow begin", "ExecuteActivity", "ExecuteActivity", "ExecuteWorkflow end"},
-		ts.tracer.GetTrace("go.uber.org/cadence/test.(*Workflows).Basic"))
+		ts.tracer.GetTrace("go.uber.org/cadence/v1/test.(*Workflows).Basic"))
 }
 
 func (ts *IntegrationTestSuite) TestActivityRetryOnError() {
@@ -261,7 +261,7 @@ func (ts *IntegrationTestSuite) TestStackTraceQuery() {
 	ts.NotNil(value)
 	var trace string
 	ts.Nil(value.Get(&trace))
-	ts.True(strings.Contains(trace, "go.uber.org/cadence/test.(*Workflows).Basic"))
+	ts.True(strings.Contains(trace, "go.uber.org/cadence/v1/test.(*Workflows).Basic"))
 }
 
 func (ts *IntegrationTestSuite) TestConsistentQuery() {
@@ -380,7 +380,7 @@ func (ts *IntegrationTestSuite) TestChildWFWithMemoAndSearchAttributes() {
 	ts.EqualValues([]string{"getMemoAndSearchAttr"}, ts.activities.invoked())
 	ts.Equal("memoVal, searchAttrVal", result)
 	ts.Equal([]string{"ExecuteWorkflow begin", "ExecuteChildWorkflow", "ExecuteWorkflow end"},
-		ts.tracer.GetTrace("go.uber.org/cadence/test.(*Workflows).ChildWorkflowSuccess"))
+		ts.tracer.GetTrace("go.uber.org/cadence/v1/test.(*Workflows).ChildWorkflowSuccess"))
 }
 
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {

@@ -32,9 +32,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
 	"github.com/uber/tchannel-go/thrift"
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	s "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
+	"go.uber.org/cadence/v1/.gen/go/cadence/workflowservicetest"
+	s "go.uber.org/cadence/v1/.gen/go/shared"
 	"go.uber.org/yarpc"
 )
 

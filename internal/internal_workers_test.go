@@ -31,9 +31,9 @@ import (
 	"github.com/pborman/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	m "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/v1/.gen/go/cadence/workflowservicetest"
+	m "go.uber.org/cadence/v1/.gen/go/shared"
+	"go.uber.org/cadence/v1/internal/common"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
 )

@@ -23,7 +23,7 @@ package workflow
 import (
 	"time"
 
-	"go.uber.org/cadence/internal"
+	"go.uber.org/cadence/v1/internal"
 )
 
 // ActivityOptions stores all activity-specific invocation parameters that will be stored inside of a context.

@@ -32,9 +32,9 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
-	"go.uber.org/cadence/internal/common/metrics"
+	s "go.uber.org/cadence/v1/.gen/go/shared"
+	"go.uber.org/cadence/v1/internal/common"
+	"go.uber.org/cadence/v1/internal/common/metrics"
 	"go.uber.org/yarpc"
 )
 

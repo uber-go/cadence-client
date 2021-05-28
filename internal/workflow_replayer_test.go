@@ -29,8 +29,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/v1/.gen/go/shared"
+	"go.uber.org/cadence/v1/internal/common"
 	"go.uber.org/zap"
 )
 
@@ -296,7 +296,7 @@ func getTestReplayWorkflowFullHistory() *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
+				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v1/internal.testReplayWorkflow")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
 				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 			}),
@@ -332,7 +332,7 @@ func getTestReplayWorkflowPartialHistoryWithDecisionEvents() *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
+				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v1/internal.testReplayWorkflow")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
 				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 			}),
@@ -352,7 +352,7 @@ func getTestReplayWorkflowPartialHistoryNoDecisionEvents() *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
+				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v1/internal.testReplayWorkflow")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
 				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 			}),
@@ -369,7 +369,7 @@ func getTestReplayWorkflowMismatchHistory() *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
+				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v1/internal.testReplayWorkflow")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
 				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 			}),
@@ -389,7 +389,7 @@ func getTestReplayWorkflowLocalActivityHistory() *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
+				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v1/internal.testReplayWorkflowLocalActivity")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
 				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 			}),
@@ -399,7 +399,7 @@ func getTestReplayWorkflowLocalActivityHistory() *shared.History {
 
 			createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
 				MarkerName:                   common.StringPtr(localActivityMarkerName),
-				Details:                      createLocalActivityMarkerDataForTest("0", "go.uber.org/cadence/internal.testActivity"),
+				Details:                      createLocalActivityMarkerDataForTest("0", "go.uber.org/cadence/v1/internal.testActivity"),
 				DecisionTaskCompletedEventId: common.Int64Ptr(4),
 			}),
 
@@ -414,7 +414,7 @@ func getTestReplayWorkflowLocalActivityResultMismatchHistory() *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
+				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v1/internal.testReplayWorkflowLocalActivity")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
 				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 			}),
@@ -440,7 +440,7 @@ func getTestReplayWorkflowLocalActivityTypeMismatchHistory() *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
+				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v1/internal.testReplayWorkflowLocalActivity")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
 				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
 			}),
@@ -463,7 +463,7 @@ func getTestReplayWorkflowLocalActivityTypeMismatchHistory() *shared.History {
 
 func getTestReplayWorkflowContextPropagatorHistory() *shared.History {
 	history := getTestReplayWorkflowFullHistory()
-	history.Events[0].WorkflowExecutionStartedEventAttributes.WorkflowType.Name = common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowContextPropagator")
+	history.Events[0].WorkflowExecutionStartedEventAttributes.WorkflowType.Name = common.StringPtr("go.uber.org/cadence/v1/internal.testReplayWorkflowContextPropagator")
 	history.Events[0].WorkflowExecutionStartedEventAttributes.Header = &shared.Header{
 		Fields: map[string][]byte{testHeader: []byte("testValue")},
 	}

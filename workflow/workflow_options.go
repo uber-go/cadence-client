@@ -23,8 +23,8 @@ package workflow
 import (
 	"time"
 
-	"go.uber.org/cadence/encoded"
-	"go.uber.org/cadence/internal"
+	"go.uber.org/cadence/v1/encoded"
+	"go.uber.org/cadence/v1/internal"
 )
 
 // WithChildOptions adds all workflow options to the context.

@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	jaeger_config "github.com/uber/jaeger-client-go/config"
-	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/v1/.gen/go/shared"
 	"go.uber.org/zap"
 )
 

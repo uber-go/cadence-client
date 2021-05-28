@@ -37,9 +37,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/v1/.gen/go/cadence/workflowservicetest"
+	"go.uber.org/cadence/v1/.gen/go/shared"
+	"go.uber.org/cadence/v1/internal/common"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
@@ -609,30 +609,30 @@ func (w activitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte) (re
 	require.True(w.t, **rStruct2Ptr == testActivityResult{Index: 10})
 
 	// By names.
-	err = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityByteArgs", input).Get(ctx, nil)
+	err = ExecuteActivity(ctx, "go.uber.org/cadence/v1/internal.testActivityByteArgs", input).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
 	err = ExecuteActivity(ctx, "testActivityMultipleArgs", 2, []string{"test"}, true).Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	err = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityNoResult", 2, "test").Get(ctx, nil)
+	err = ExecuteActivity(ctx, "go.uber.org/cadence/v1/internal.testActivityNoResult", 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	err = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityNoContextArg", 2, "test").Get(ctx, nil)
+	err = ExecuteActivity(ctx, "go.uber.org/cadence/v1/internal.testActivityNoContextArg", 2, "test").Get(ctx, nil)
 	require.NoError(w.t, err, err)
 
-	f = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityReturnString")
+	f = ExecuteActivity(ctx, "go.uber.org/cadence/v1/internal.testActivityReturnString")
 	err = f.Get(ctx, &rString)
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, "testActivity", rString, rString)
 
-	f = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityReturnEmptyString")
+	f = ExecuteActivity(ctx, "go.uber.org/cadence/v1/internal.testActivityReturnEmptyString")
 	var r2sString string
 	err = f.Get(ctx, &r2String)
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, "", r2sString)
 
-	f = ExecuteActivity(ctx, "go.uber.org/cadence/internal.testActivityReturnEmptyStruct")
+	f = ExecuteActivity(ctx, "go.uber.org/cadence/v1/internal.testActivityReturnEmptyStruct")
 	err = f.Get(ctx, &r2Struct)
 	require.NoError(w.t, err, err)
 	require.Equal(w.t, testActivityResult{}, r2Struct)

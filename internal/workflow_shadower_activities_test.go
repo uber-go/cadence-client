@@ -30,10 +30,10 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	"go.uber.org/cadence/.gen/go/shadower"
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
+	"go.uber.org/cadence/v1/.gen/go/cadence/workflowservicetest"
+	"go.uber.org/cadence/v1/.gen/go/shadower"
+	"go.uber.org/cadence/v1/.gen/go/shared"
+	"go.uber.org/cadence/v1/internal/common"
 	"go.uber.org/zap/zaptest"
 )
 

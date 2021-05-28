@@ -20,7 +20,7 @@
 
 package cadence
 
-import "go.uber.org/cadence/internal"
+import "go.uber.org/cadence/v1/internal"
 
 // LibraryVersion is a semver string that represents
 // the version of this cadence client library

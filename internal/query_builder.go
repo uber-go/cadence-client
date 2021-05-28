@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/v1/.gen/go/shared"
 )
 
 type (

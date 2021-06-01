@@ -28,19 +28,23 @@ import (
 	"strings"
 
 	"go.uber.org/yarpc"
+	"go.uber.org/yarpc/transport/grpc"
 	"go.uber.org/yarpc/transport/tchannel"
 
 	"go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
+	apiv1 "go.uber.org/cadence/v1/.gen/proto/api/v1"
+	"go.uber.org/cadence/v1/internal/api"
 	"go.uber.org/cadence/v1/workflow"
 )
 
 type (
 	// Config contains the integration test configuration
 	Config struct {
-		ServiceAddr string
-		ServiceName string
-		IsStickyOff bool
-		Debug       bool
+		ServiceAddr     string
+		ServiceGRPCAddr string
+		ServiceName     string
+		IsStickyOff     bool
+		Debug           bool
 	}
 
 	// context.WithValue need this type instead of basic type string to avoid lint error
@@ -49,15 +53,19 @@ type (
 
 func newConfig() Config {
 	cfg := Config{
-		ServiceName: "cadence-frontend",
-		ServiceAddr: "127.0.0.1:7933",
-		IsStickyOff: true,
+		ServiceName:     "cadence-frontend",
+		ServiceAddr:     "127.0.0.1:7933",
+		ServiceGRPCAddr: "127.0.0.1:7833",
+		IsStickyOff:     true,
 	}
 	if name := getEnvServiceName(); name != "" {
 		cfg.ServiceName = name
 	}
 	if addr := getEnvServiceAddr(); addr != "" {
 		cfg.ServiceAddr = addr
+	}
+	if grpcAddr := getEnvServiceGRPCAddr(); grpcAddr != "" {
+		cfg.ServiceGRPCAddr = grpcAddr
 	}
 	if so := getEnvStickyOff(); so != "" {
 		cfg.IsStickyOff = so == "true"
@@ -76,12 +84,59 @@ func getEnvServiceAddr() string {
 	return strings.TrimSpace(os.Getenv("SERVICE_ADDR"))
 }
 
+func getEnvServiceGRPCAddr() string {
+	return strings.TrimSpace(os.Getenv("SERVICE_GRPC_ADDR"))
+}
+
 func getEnvStickyOff() string {
 	return strings.ToLower(strings.TrimSpace(os.Getenv("STICKY_OFF")))
 }
 
 func getDebug() string {
 	return strings.ToLower(strings.TrimSpace(os.Getenv("DEBUG")))
+}
+
+type cadenceAPI struct {
+	apiv1.DomainAPIYARPCClient
+	apiv1.WorkflowAPIYARPCClient
+	apiv1.VisibilityAPIYARPCClient
+	apiv1.WorkerAPIYARPCClient
+}
+
+type grpcClient struct {
+	api.Interface
+	dispatcher *yarpc.Dispatcher
+}
+
+func (c *grpcClient) Close() {
+	c.dispatcher.Stop()
+}
+
+// newGRPCClient builds and returns a new grpc client that is able to
+// make calls to the localhost cadence-server container
+func newGRPCClient(
+	serviceName string, serviceAddr string) (*grpcClient, error) {
+	transport := grpc.NewTransport()
+	outbound := transport.NewSingleOutbound(serviceAddr)
+	dispatcher := yarpc.NewDispatcher(yarpc.Config{
+		Name: "integration-test",
+		Outbounds: yarpc.Outbounds{
+			serviceName: {
+				Unary: outbound,
+			},
+		},
+	})
+	if err := dispatcher.Start(); err != nil {
+		return nil, err
+	}
+	clientConfig := dispatcher.ClientConfig(serviceName)
+	service := cadenceAPI{
+		DomainAPIYARPCClient:     apiv1.NewDomainAPIYARPCClient(clientConfig),
+		VisibilityAPIYARPCClient: apiv1.NewVisibilityAPIYARPCClient(clientConfig),
+		WorkflowAPIYARPCClient:   apiv1.NewWorkflowAPIYARPCClient(clientConfig),
+		WorkerAPIYARPCClient:     apiv1.NewWorkerAPIYARPCClient(clientConfig),
+	}
+	return &grpcClient{Interface: service, dispatcher: dispatcher}, nil
 }
 
 type rpcClient struct {

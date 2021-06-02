@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/apache/thrift v0.13.0
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a
+	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/mock v1.4.4
 	github.com/kisielk/errcheck v1.2.0
 	github.com/opentracing/opentracing-go v1.1.0
@@ -16,6 +17,7 @@ require (
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/tchannel-go v1.16.0
 	go.uber.org/atomic v1.7.0
+	go.uber.org/fx v1.10.0 // indirect
 	go.uber.org/goleak v1.0.0
 	go.uber.org/multierr v1.6.0
 	go.uber.org/thriftrw v1.25.0

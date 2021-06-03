@@ -541,7 +541,7 @@ func (env *sessionEnvironmentImpl) AddSessionToken() {
 func (env *sessionEnvironmentImpl) SignalCreationResponse(ctx context.Context, sessionID string) error {
 	activityEnv := getActivityEnv(ctx)
 
-	signalInput, err := encodeArg(activityEnv.dataConverter, env.getCreationResponse())
+	signalInput, err := encodeArg(getDefaultDataConverter(), env.getCreationResponse())
 	if err != nil {
 		return err
 	}

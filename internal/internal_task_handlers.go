@@ -1812,8 +1812,8 @@ func (i *cadenceInvoker) Close(flushBufferedHeartbeat bool) {
 	}
 }
 
-func (i *cadenceInvoker) GetClient(domain string, options *ClientOptions) Client {
-	return NewClient(i.service, domain, options)
+func (i *cadenceInvoker) SignalWorkflow(ctx context.Context, domain, workflowID, runID, signalName string, signalInput []byte) error {
+	return signalWorkflow(ctx, i.service, i.identity, domain, workflowID, runID, signalName, signalInput)
 }
 
 func newServiceInvoker(
@@ -1967,6 +1967,34 @@ func createNewDecision(decisionType s.DecisionType) *s.Decision {
 	return &s.Decision{
 		DecisionType: common.DecisionTypePtr(decisionType),
 	}
+}
+func signalWorkflow(
+	ctx context.Context,
+	service workflowserviceclient.Interface,
+	identity string,
+	domain string,
+	workflowID string,
+	runID string,
+	signalName string,
+	signalInput []byte,
+) error {
+	request := &s.SignalWorkflowExecutionRequest{
+		Domain: common.StringPtr(domain),
+		WorkflowExecution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      getRunID(runID),
+		},
+		SignalName: common.StringPtr(signalName),
+		Input:      signalInput,
+		Identity:   common.StringPtr(identity),
+	}
+
+	return backoff.Retry(ctx,
+		func() error {
+			tchCtx, cancel, opt := newChannelContext(ctx)
+			defer cancel()
+			return service.SignalWorkflowExecution(tchCtx, request, opt...)
+		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 }
 
 func recordActivityHeartbeat(

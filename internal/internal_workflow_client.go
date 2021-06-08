@@ -326,24 +326,7 @@ func (wc *workflowClient) SignalWorkflow(ctx context.Context, workflowID string,
 	if err != nil {
 		return err
 	}
-
-	request := &s.SignalWorkflowExecutionRequest{
-		Domain: common.StringPtr(wc.domain),
-		WorkflowExecution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      getRunID(runID),
-		},
-		SignalName: common.StringPtr(signalName),
-		Input:      input,
-		Identity:   common.StringPtr(wc.identity),
-	}
-
-	return backoff.Retry(ctx,
-		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
-			defer cancel()
-			return wc.workflowService.SignalWorkflowExecution(tchCtx, request, opt...)
-		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+	return signalWorkflow(ctx, wc.workflowService, wc.identity, wc.domain, workflowID, runID, signalName, input)
 }
 
 // SignalWithStartWorkflow sends a signal to a running workflow.

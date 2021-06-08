@@ -95,9 +95,13 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 	ts.activities = newActivities()
 	ts.workflows = &Workflows{}
 	ts.Nil(waitForTCP(time.Minute, ts.config.ServiceAddr))
-	rpcClient, err := newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
+	var err error
+	if ts.config.EnableGrpcAdapter {
+		ts.rpcClient, err = newGRPCAdapterClient(ts.config.ServiceName, ts.config.ServiceAddr)
+	} else {
+		ts.rpcClient, err = newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
+	}
 	ts.NoError(err)
-	ts.rpcClient = rpcClient
 	ts.libClient = client.NewClient(ts.rpcClient.Interface, domainName,
 		&client.Options{
 			ContextPropagators: []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},

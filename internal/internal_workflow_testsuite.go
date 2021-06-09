@@ -305,6 +305,7 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *regist
 	}
 
 	var callOptions []interface{}
+	yarpcCallOptions := getYarpcCallOptions(FeatureFlags{})
 	for range yarpcCallOptions {
 		callOptions = append(callOptions, gomock.Any())
 	}

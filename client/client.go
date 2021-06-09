@@ -47,6 +47,9 @@ type (
 	// Options are optional parameters for Client creation.
 	Options = internal.ClientOptions
 
+	// FeatureFlags define which breaking changes can be enabled for client
+	FeatureFlags = internal.FeatureFlags
+
 	// StartWorkflowOptions configuration parameters for starting a workflow execution.
 	StartWorkflowOptions = internal.StartWorkflowOptions
 

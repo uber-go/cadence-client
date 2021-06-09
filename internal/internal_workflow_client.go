@@ -66,6 +66,7 @@ type (
 		dataConverter      DataConverter
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
+		featureFlags       FeatureFlags
 	}
 
 	// domainClient is the client for managing domains.
@@ -73,6 +74,7 @@ type (
 		workflowService workflowserviceclient.Interface
 		metricsScope    tally.Scope
 		identity        string
+		featureFlags    FeatureFlags
 	}
 
 	// WorkflowRun represents a started non child workflow
@@ -232,7 +234,7 @@ func (wc *workflowClient) StartWorkflow(
 	// Start creating workflow request.
 	err = backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 
 			var err1 error
@@ -326,7 +328,7 @@ func (wc *workflowClient) SignalWorkflow(ctx context.Context, workflowID string,
 	if err != nil {
 		return err
 	}
-	return signalWorkflow(ctx, wc.workflowService, wc.identity, wc.domain, workflowID, runID, signalName, input)
+	return signalWorkflow(ctx, wc.workflowService, wc.identity, wc.domain, workflowID, runID, signalName, input, wc.featureFlags)
 }
 
 // SignalWithStartWorkflow sends a signal to a running workflow.
@@ -414,7 +416,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 	// Start creating workflow request.
 	err = backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 
 			var err1 error
@@ -452,7 +454,7 @@ func (wc *workflowClient) CancelWorkflow(ctx context.Context, workflowID string,
 
 	return backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			return wc.workflowService.RequestCancelWorkflowExecution(tchCtx, request, opt...)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
@@ -475,7 +477,7 @@ func (wc *workflowClient) TerminateWorkflow(ctx context.Context, workflowID stri
 
 	err := backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			return wc.workflowService.TerminateWorkflowExecution(tchCtx, request, opt...)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
@@ -513,7 +515,7 @@ func (wc *workflowClient) GetWorkflowHistory(
 			err = backoff.Retry(ctx,
 				func() error {
 					var err1 error
-					tchCtx, cancel, opt := newChannelContext(ctx, func(builder *contextBuilder) {
+					tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags, func(builder *contextBuilder) {
 						if isLongPoll {
 							builder.Timeout = defaultGetHistoryTimeoutInSecs * time.Second
 						}
@@ -586,7 +588,7 @@ func (wc *workflowClient) CompleteActivity(ctx context.Context, taskToken []byte
 		}
 	}
 	request := convertActivityResultToRespondRequest(wc.identity, taskToken, data, err, wc.dataConverter)
-	return reportActivityComplete(ctx, wc.workflowService, request, wc.metricsScope)
+	return reportActivityComplete(ctx, wc.workflowService, request, wc.metricsScope, wc.featureFlags)
 }
 
 // CompleteActivityById reports activity completed. Similar to CompleteActivity
@@ -608,7 +610,7 @@ func (wc *workflowClient) CompleteActivityByID(ctx context.Context, domain, work
 	}
 
 	request := convertActivityResultToRespondRequestByID(wc.identity, domain, workflowID, runID, activityID, data, err, wc.dataConverter)
-	return reportActivityCompleteByID(ctx, wc.workflowService, request, wc.metricsScope)
+	return reportActivityCompleteByID(ctx, wc.workflowService, request, wc.metricsScope, wc.featureFlags)
 }
 
 // RecordActivityHeartbeat records heartbeat for an activity.
@@ -617,7 +619,7 @@ func (wc *workflowClient) RecordActivityHeartbeat(ctx context.Context, taskToken
 	if err != nil {
 		return err
 	}
-	return recordActivityHeartbeat(ctx, wc.workflowService, wc.identity, taskToken, data)
+	return recordActivityHeartbeat(ctx, wc.workflowService, wc.identity, taskToken, data, wc.featureFlags)
 }
 
 // RecordActivityHeartbeatByID records heartbeat for an activity.
@@ -627,7 +629,7 @@ func (wc *workflowClient) RecordActivityHeartbeatByID(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	return recordActivityHeartbeatByID(ctx, wc.workflowService, wc.identity, domain, workflowID, runID, activityID, data)
+	return recordActivityHeartbeatByID(ctx, wc.workflowService, wc.identity, domain, workflowID, runID, activityID, data, wc.featureFlags)
 }
 
 // ListClosedWorkflow gets closed workflow executions based on request filters
@@ -643,7 +645,7 @@ func (wc *workflowClient) ListClosedWorkflow(ctx context.Context, request *s.Lis
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ListClosedWorkflowExecutions(tchCtx, request, opt...)
 			return err1
@@ -667,7 +669,7 @@ func (wc *workflowClient) ListOpenWorkflow(ctx context.Context, request *s.ListO
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ListOpenWorkflowExecutions(tchCtx, request, opt...)
 			return err1
@@ -687,7 +689,7 @@ func (wc *workflowClient) ListWorkflow(ctx context.Context, request *s.ListWorkf
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ListWorkflowExecutions(tchCtx, request, opt...)
 			return err1
@@ -719,7 +721,7 @@ func (wc *workflowClient) ListArchivedWorkflow(ctx context.Context, request *s.L
 					}
 				}
 			}
-			tchCtx, cancel, opt := newChannelContext(ctx, chanTimeout(timeout))
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags, chanTimeout(timeout))
 			defer cancel()
 			response, err1 = wc.workflowService.ListArchivedWorkflowExecutions(tchCtx, request, opt...)
 			return err1
@@ -739,7 +741,7 @@ func (wc *workflowClient) ScanWorkflow(ctx context.Context, request *s.ListWorkf
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ScanWorkflowExecutions(tchCtx, request, opt...)
 			return err1
@@ -759,7 +761,7 @@ func (wc *workflowClient) CountWorkflow(ctx context.Context, request *s.CountWor
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.CountWorkflowExecutions(tchCtx, request, opt...)
 			return err1
@@ -779,7 +781,7 @@ func (wc *workflowClient) ResetWorkflow(ctx context.Context, request *s.ResetWor
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ResetWorkflowExecution(tchCtx, request, opt...)
 			return err1
@@ -796,7 +798,7 @@ func (wc *workflowClient) GetSearchAttributes(ctx context.Context) (*s.GetSearch
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.GetSearchAttributes(tchCtx, opt...)
 			return err1
@@ -824,7 +826,7 @@ func (wc *workflowClient) DescribeWorkflowExecution(ctx context.Context, workflo
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.DescribeWorkflowExecution(tchCtx, request, opt...)
 			return err1
@@ -932,7 +934,7 @@ func (wc *workflowClient) QueryWorkflowWithOptions(ctx context.Context, request 
 	var resp *s.QueryWorkflowResponse
 	err := backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContextForQuery(ctx)
+			tchCtx, cancel, opt := newChannelContextForQuery(ctx, wc.featureFlags)
 			defer cancel()
 			var err error
 			resp, err = wc.workflowService.QueryWorkflow(tchCtx, req, opt...)
@@ -972,7 +974,7 @@ func (wc *workflowClient) DescribeTaskList(ctx context.Context, tasklist string,
 	var resp *s.DescribeTaskListResponse
 	err := backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			var err error
 			resp, err = wc.workflowService.DescribeTaskList(tchCtx, request, opt...)
@@ -1004,7 +1006,7 @@ func (wc *workflowClient) getWorkflowHeader(ctx context.Context) *s.Header {
 func (dc *domainClient) Register(ctx context.Context, request *s.RegisterDomainRequest) error {
 	return backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, dc.featureFlags)
 			defer cancel()
 			return dc.workflowService.RegisterDomain(tchCtx, request, opt...)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
@@ -1026,7 +1028,7 @@ func (dc *domainClient) Describe(ctx context.Context, name string) (*s.DescribeD
 	var response *s.DescribeDomainResponse
 	err := backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, dc.featureFlags)
 			defer cancel()
 			var err error
 			response, err = dc.workflowService.DescribeDomain(tchCtx, request, opt...)
@@ -1046,7 +1048,7 @@ func (dc *domainClient) Describe(ctx context.Context, name string) (*s.DescribeD
 func (dc *domainClient) Update(ctx context.Context, request *s.UpdateDomainRequest) error {
 	return backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, dc.featureFlags)
 			defer cancel()
 			_, err := dc.workflowService.UpdateDomain(tchCtx, request, opt...)
 			return err

@@ -37,11 +37,12 @@ type (
 	shadowWorker struct {
 		activityWorker *activityWorker
 
-		service  workflowserviceclient.Interface
-		domain   string
-		taskList string
-		options  ShadowOptions
-		logger   *zap.Logger
+		service      workflowserviceclient.Interface
+		domain       string
+		taskList     string
+		options      ShadowOptions
+		logger       *zap.Logger
+		featureFlags FeatureFlags
 	}
 )
 
@@ -65,6 +66,7 @@ func newShadowWorker(
 		ContextPropagators:                params.ContextPropagators,
 		WorkflowInterceptorChainFactories: params.WorkflowInterceptors,
 		Tracer:                            params.Tracer,
+		FeatureFlags:                      params.FeatureFlags,
 	})
 	replayer.registry = registry
 
@@ -100,11 +102,12 @@ func newShadowWorker(
 	return &shadowWorker{
 		activityWorker: activityWorker,
 
-		service:  service,
-		domain:   domain,
-		taskList: params.TaskList,
-		options:  shadowOptions,
-		logger:   params.Logger,
+		service:      service,
+		domain:       domain,
+		taskList:     params.TaskList,
+		options:      shadowOptions,
+		logger:       params.Logger,
+		featureFlags: params.FeatureFlags,
 	}
 }
 
@@ -113,7 +116,7 @@ func (sw *shadowWorker) Start() error {
 		return err
 	}
 
-	if err := verifyDomainExist(sw.service, sw.domain, sw.logger); err != nil {
+	if err := verifyDomainExist(sw.service, sw.domain, sw.logger, sw.featureFlags); err != nil {
 		return err
 	}
 
@@ -165,7 +168,7 @@ func (sw *shadowWorker) startShadowWorkflow() error {
 	}
 
 	startWorkflowOp := func() error {
-		tchCtx, cancel, opt := newChannelContext(ctx)
+		tchCtx, cancel, opt := newChannelContext(ctx, sw.featureFlags)
 		defer cancel()
 		_, err := sw.service.StartWorkflowExecution(tchCtx, startWorkflowRequest, opt...)
 		if err != nil {

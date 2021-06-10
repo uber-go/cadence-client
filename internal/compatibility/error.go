@@ -98,6 +98,10 @@ func thriftError(err error) error {
 				ClientImpl:        details.ClientImpl,
 				SupportedVersions: details.SupportedVersions,
 			}
+		case *apiv1.FeatureNotEnabledError:
+			return &shared.FeatureNotEnabledError{
+				FeatureFlag: details.FeatureFlag,
+			}
 		case *apiv1.DomainNotActiveError:
 			return &shared.DomainNotActiveError{
 				Message:        status.Message(),

@@ -2384,10 +2384,7 @@ func (m *ListWorkflowExecutionsRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -2506,10 +2503,7 @@ func (m *ListWorkflowExecutionsResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -2751,10 +2745,7 @@ func (m *ListOpenWorkflowExecutionsRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -2873,10 +2864,7 @@ func (m *ListOpenWorkflowExecutionsResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -3153,10 +3141,7 @@ func (m *ListClosedWorkflowExecutionsRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -3275,10 +3260,7 @@ func (m *ListClosedWorkflowExecutionsResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -3446,10 +3428,7 @@ func (m *ListArchivedWorkflowExecutionsRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -3568,10 +3547,7 @@ func (m *ListArchivedWorkflowExecutionsResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -3739,10 +3715,7 @@ func (m *ScanWorkflowExecutionsRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -3861,10 +3834,7 @@ func (m *ScanWorkflowExecutionsResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -3979,10 +3949,7 @@ func (m *CountWorkflowExecutionsRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -4052,10 +4019,7 @@ func (m *CountWorkflowExecutionsResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -4106,10 +4070,7 @@ func (m *GetSearchAttributesRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {
@@ -4256,7 +4217,7 @@ func (m *GetSearchAttributesResponse) Unmarshal(dAtA []byte) error {
 					if err != nil {
 						return err
 					}
-					if skippy < 0 {
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
 						return ErrInvalidLengthServiceVisibility
 					}
 					if (iNdEx + skippy) > postIndex {
@@ -4273,10 +4234,7 @@ func (m *GetSearchAttributesResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceVisibility
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceVisibility
 			}
 			if (iNdEx + skippy) > l {

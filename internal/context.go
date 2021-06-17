@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 )
 
 const activeSpanContextKey contextKey = "activeSpanContextKey"
@@ -175,7 +175,7 @@ var ErrCanceled = NewCanceledError()
 
 // ErrDeadlineExceeded is the error returned by Context.Err when the context's
 // deadline passes.
-var ErrDeadlineExceeded = NewTimeoutError(shared.TimeoutTypeScheduleToClose)
+var ErrDeadlineExceeded = NewTimeoutError(apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_CLOSE)
 
 // A CancelFunc tells an operation to abandon its work.
 // A CancelFunc does not wait for the work to stop.

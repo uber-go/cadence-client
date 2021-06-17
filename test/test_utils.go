@@ -27,14 +27,11 @@ import (
 	"os"
 	"strings"
 
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
+	"go.uber.org/cadence/v2/workflow"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/transport/grpc"
-	"go.uber.org/yarpc/transport/tchannel"
-
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
-	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
-	"go.uber.org/cadence/v2/compatibility"
-	"go.uber.org/cadence/v2/workflow"
 )
 
 type (
@@ -43,7 +40,6 @@ type (
 		ServiceAddr       string
 		ServiceName       string
 		IsStickyOff       bool
-		EnableGrpcAdapter bool
 		Debug             bool
 	}
 
@@ -54,8 +50,7 @@ type (
 func newConfig() Config {
 	cfg := Config{
 		ServiceName:       "cadence-frontend",
-		ServiceAddr:       "127.0.0.1:7933",
-		EnableGrpcAdapter: false,
+		ServiceAddr:       "127.0.0.1:7833",
 		IsStickyOff:       true,
 	}
 	if name := getEnvServiceName(); name != "" {
@@ -66,9 +61,6 @@ func newConfig() Config {
 	}
 	if so := getEnvStickyOff(); so != "" {
 		cfg.IsStickyOff = so == "true"
-	}
-	if grpc := getEnableGrpcAdapter(); grpc != "" {
-		cfg.EnableGrpcAdapter = grpc == "true"
 	}
 	if debug := getDebug(); debug != "" {
 		cfg.Debug = debug == "true"
@@ -88,16 +80,19 @@ func getEnvStickyOff() string {
 	return strings.ToLower(strings.TrimSpace(os.Getenv("STICKY_OFF")))
 }
 
-func getEnableGrpcAdapter() string {
-	return strings.ToLower(strings.TrimSpace(os.Getenv("ENABLE_GRPC_ADAPTER")))
-}
-
 func getDebug() string {
 	return strings.ToLower(strings.TrimSpace(os.Getenv("DEBUG")))
 }
 
+type cadenceAPI struct {
+	apiv1.DomainAPIYARPCClient
+	apiv1.WorkflowAPIYARPCClient
+	apiv1.VisibilityAPIYARPCClient
+	apiv1.WorkerAPIYARPCClient
+}
+
 type rpcClient struct {
-	workflowserviceclient.Interface
+	api.Interface
 	dispatcher *yarpc.Dispatcher
 }
 
@@ -108,30 +103,6 @@ func (c *rpcClient) Close() {
 // newRPCClient builds and returns a new rpc client that is able to
 // make calls to the localhost cadence-server container
 func newRPCClient(
-	serviceName string, serviceAddr string) (*rpcClient, error) {
-	transport, err := tchannel.NewTransport(tchannel.ServiceName("integration-test"))
-	if err != nil {
-		return nil, err
-	}
-	outbound := transport.NewSingleOutbound(serviceAddr)
-	dispatcher := yarpc.NewDispatcher(yarpc.Config{
-		Name: "integration-test",
-		Outbounds: yarpc.Outbounds{
-			serviceName: {
-				Unary: outbound,
-			},
-		},
-	})
-	if err := dispatcher.Start(); err != nil {
-		return nil, err
-	}
-	client := workflowserviceclient.New(dispatcher.ClientConfig(serviceName))
-	return &rpcClient{Interface: client, dispatcher: dispatcher}, nil
-}
-
-// newRPCClient builds and returns a new rpc client that is able to
-// make calls to the localhost cadence-server container via grpc adapter
-func newGRPCAdapterClient(
 	serviceName string, serviceAddr string) (*rpcClient, error) {
 	transport := grpc.NewTransport()
 	outbound := transport.NewSingleOutbound(serviceAddr)
@@ -147,12 +118,13 @@ func newGRPCAdapterClient(
 		return nil, err
 	}
 	clientConfig := dispatcher.ClientConfig(serviceName)
-	adapter := compatibility.NewThrift2ProtoAdapter(
-		apiv1.NewDomainAPIYARPCClient(clientConfig),
-		apiv1.NewWorkflowAPIYARPCClient(clientConfig),
-		apiv1.NewWorkerAPIYARPCClient(clientConfig),
-		apiv1.NewVisibilityAPIYARPCClient(clientConfig))
-	return &rpcClient{Interface: adapter, dispatcher: dispatcher}, nil
+	service := cadenceAPI{
+		DomainAPIYARPCClient:     apiv1.NewDomainAPIYARPCClient(clientConfig),
+		VisibilityAPIYARPCClient: apiv1.NewVisibilityAPIYARPCClient(clientConfig),
+		WorkflowAPIYARPCClient:   apiv1.NewWorkflowAPIYARPCClient(clientConfig),
+		WorkerAPIYARPCClient:     apiv1.NewWorkerAPIYARPCClient(clientConfig),
+	}
+	return &rpcClient{Interface: service, dispatcher: dispatcher}, nil
 }
 
 // stringMapPropagator propagates the list of keys across a workflow,

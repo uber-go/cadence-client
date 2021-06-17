@@ -22,8 +22,6 @@ package common
 
 import (
 	"math"
-
-	s "go.uber.org/cadence/v2/.gen/go/shared"
 )
 
 // Int32Ceil return the int32 ceil of a float64
@@ -59,34 +57,4 @@ func StringPtr(v string) *string {
 // BoolPtr makes a copy and returns the pointer to a string.
 func BoolPtr(v bool) *bool {
 	return &v
-}
-
-// TaskListPtr makes a copy and returns the pointer to a TaskList.
-func TaskListPtr(v s.TaskList) *s.TaskList {
-	return &v
-}
-
-// DecisionTypePtr makes a copy and returns the pointer to a DecisionType.
-func DecisionTypePtr(t s.DecisionType) *s.DecisionType {
-	return &t
-}
-
-// EventTypePtr makes a copy and returns the pointer to a EventType.
-func EventTypePtr(t s.EventType) *s.EventType {
-	return &t
-}
-
-// QueryTaskCompletedTypePtr makes a copy and returns the pointer to a QueryTaskCompletedType.
-func QueryTaskCompletedTypePtr(t s.QueryTaskCompletedType) *s.QueryTaskCompletedType {
-	return &t
-}
-
-// TaskListKindPtr makes a copy and returns the pointer to a TaskListKind.
-func TaskListKindPtr(t s.TaskListKind) *s.TaskListKind {
-	return &t
-}
-
-// QueryResultTypePtr makes a copy and returns the pointer to a QueryResultType.
-func QueryResultTypePtr(t s.QueryResultType) *s.QueryResultType {
-	return &t
 }

@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 )
 
 func Test_byteSliceToString(t *testing.T) {
@@ -39,4 +40,27 @@ func Test_byteSliceToString(t *testing.T) {
 	strVal2 := valueToString(v2)
 
 	require.Equal(t, "[len=3]", strVal2)
+}
+
+func Test_GetHistoryEventType(t *testing.T) {
+	event := apiv1.HistoryEvent{Attributes: &apiv1.HistoryEvent_WorkflowExecutionCompletedEventAttributes{}}
+	eventType := GetHistoryEventType(&event)
+	require.Equal(t, "WorkflowExecutionCompleted", eventType)
+}
+
+func Test_GetDecisionType(t *testing.T) {
+	decision := apiv1.Decision{Attributes: &apiv1.Decision_StartChildWorkflowExecutionDecisionAttributes{}}
+	eventType := GetDecisionType(&decision)
+	require.Equal(t, "StartChildWorkflowExecution", eventType)
+}
+
+func Test_HistoryEventToString(t *testing.T) {
+	event := apiv1.HistoryEvent{Attributes: &apiv1.HistoryEvent_WorkflowExecutionCompletedEventAttributes{
+		WorkflowExecutionCompletedEventAttributes: &apiv1.WorkflowExecutionCompletedEventAttributes {
+			Result: &apiv1.Payload{Data: []byte{'a','b','c'}},
+			DecisionTaskCompletedEventId: 123,
+		},
+	}}
+	str := HistoryEventToString(&event)
+	require.Equal(t, "WorkflowExecutionCompleted: (WorkflowExecutionCompletedEventAttributes:(Result:(Data:[abc]), DecisionTaskCompletedEventId:123))", str)
 }

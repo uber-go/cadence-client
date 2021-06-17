@@ -25,7 +25,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gogo/protobuf/proto"
 	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
+	"go.uber.org/cadence/v2/internal/api/thrift"
 	"go.uber.org/thriftrw/protocol"
 	"go.uber.org/thriftrw/wire"
 )
@@ -45,11 +49,11 @@ const (
 
 var (
 	// MissingBinaryEncodingVersion indicate that the encoding version is missing
-	MissingBinaryEncodingVersion = &shared.BadRequestError{Message: "Missing binary encoding version."}
+	MissingBinaryEncodingVersion = &api.BadRequestError{Message: "Missing binary encoding version."}
 	// InvalidBinaryEncodingVersion indicate that the encoding version is incorrect
-	InvalidBinaryEncodingVersion = &shared.BadRequestError{Message: "Invalid binary encoding version."}
+	InvalidBinaryEncodingVersion = &api.BadRequestError{Message: "Invalid binary encoding version."}
 	// MsgPayloadNotThriftEncoded indicate message is not thrift encoded
-	MsgPayloadNotThriftEncoded = &shared.BadRequestError{Message: "Message payload is not thrift encoded."}
+	MsgPayloadNotThriftEncoded = &api.BadRequestError{Message: "Message payload is not thrift encoded."}
 )
 
 // Decode decode the object
@@ -95,25 +99,28 @@ func Encode(obj ThriftObject) ([]byte, error) {
 }
 
 // SerializeBatchEvents will serialize history event data to blob data
-func SerializeBatchEvents(events []*shared.HistoryEvent, encodingType shared.EncodingType) (*shared.DataBlob, error) {
+func SerializeBatchEvents(events []*apiv1.HistoryEvent, encodingType apiv1.EncodingType) (*apiv1.DataBlob, error) {
 	return serialize(events, encodingType)
 }
 
 // DeserializeBatchEvents will deserialize blob data to history event data
-func DeserializeBatchEvents(data *shared.DataBlob) ([]*shared.HistoryEvent, error) {
+func DeserializeBatchEvents(data *apiv1.DataBlob) ([]*apiv1.HistoryEvent, error) {
 	if data == nil {
 		return nil, nil
 	}
-	var events []*shared.HistoryEvent
+	var events []*apiv1.HistoryEvent
 	if data != nil && len(data.Data) == 0 {
 		return events, nil
 	}
-	err := deserialize(data, &events)
+	events, err := deserialize(data)
+	if err != nil {
+		return nil, fmt.Errorf("DeserializeBatchEvents encoding: \"%v\", error: %v", data.EncodingType, err.Error())
+	}
 	return events, err
 }
 
-func serialize(input interface{}, encodingType shared.EncodingType) (*shared.DataBlob, error) {
-	if input == nil {
+func serialize(events []*apiv1.HistoryEvent, encodingType apiv1.EncodingType) (*apiv1.DataBlob, error) {
+	if events == nil {
 		return nil, nil
 	}
 
@@ -121,11 +128,13 @@ func serialize(input interface{}, encodingType shared.EncodingType) (*shared.Dat
 	var err error
 
 	switch encodingType {
-	case shared.EncodingTypeThriftRW:
-		data, err = thriftrwEncode(input)
-	case shared.EncodingTypeJSON: // For backward-compatibility
-		encodingType = shared.EncodingTypeJSON
-		data, err = json.Marshal(input)
+	case apiv1.EncodingType_ENCODING_TYPE_THRIFTRW:
+		data, err = thriftrwEncode(events)
+	case apiv1.EncodingType_ENCODING_TYPE_JSON: // For backward-compatibility
+		encodingType = apiv1.EncodingType_ENCODING_TYPE_JSON
+		data, err = json.Marshal(events)
+	case apiv1.EncodingType_ENCODING_TYPE_PROTO3:
+		data, err = proto.Marshal(&apiv1.History{Events: events})
 	default:
 		return nil, fmt.Errorf("unknown or unsupported encoding type %v", encodingType)
 	}
@@ -155,27 +164,48 @@ func thriftrwEncode(input interface{}) ([]byte, error) {
 	}
 }
 
-func deserialize(data *shared.DataBlob, target interface{}) error {
+func deserializeThrift(blob []byte) ([]*apiv1.HistoryEvent, error) {
+	var target []*shared.HistoryEvent
+	if err := thriftrwDecode(blob, target); err != nil {
+		return nil, err
+	}
+	return thrift.ToHistoryEvents(target), nil
+}
+
+func deserializeThriftBasedJson(blob []byte) ([]*apiv1.HistoryEvent, error) {
+	var target []*shared.HistoryEvent
+	if err := json.Unmarshal(blob, target); err != nil {
+		return nil, err
+	}
+	return thrift.ToHistoryEvents(target), nil
+}
+
+func deserializeProto(blob []byte) ([]*apiv1.HistoryEvent, error) {
+	var target apiv1.History
+	if err := proto.Unmarshal(blob, &target); err != nil {
+		return nil, err
+	}
+	return target.Events, nil
+}
+
+func deserialize(data *apiv1.DataBlob) ([]*apiv1.HistoryEvent, error) {
 	if data == nil {
-		return nil
+		return nil, nil
 	}
 	if len(data.Data) == 0 {
-		return errors.New("DeserializeEvent empty data")
-	}
-	var err error
-
-	switch *(data.EncodingType) {
-	case shared.EncodingTypeThriftRW:
-		err = thriftrwDecode(data.Data, target)
-	case shared.EncodingTypeJSON: // For backward-compatibility
-		err = json.Unmarshal(data.Data, target)
-
+		return nil, errors.New("DeserializeEvent empty data")
 	}
 
-	if err != nil {
-		return fmt.Errorf("DeserializeBatchEvents encoding: \"%v\", error: %v", data.EncodingType, err.Error())
+	switch data.EncodingType {
+	case apiv1.EncodingType_ENCODING_TYPE_THRIFTRW:
+		return deserializeThrift(data.Data)
+	case apiv1.EncodingType_ENCODING_TYPE_JSON: // For backward-compatibility
+		return deserializeThriftBasedJson(data.Data)
+	case apiv1.EncodingType_ENCODING_TYPE_PROTO3:
+		return deserializeProto(data.Data)
 	}
-	return nil
+
+	return nil, nil
 }
 
 func thriftrwDecode(data []byte, target interface{}) error {
@@ -203,23 +233,23 @@ func thriftrwDecode(data []byte, target interface{}) error {
 }
 
 // NewDataBlob creates new blob data
-func NewDataBlob(data []byte, encodingType shared.EncodingType) *shared.DataBlob {
+func NewDataBlob(data []byte, encodingType apiv1.EncodingType) *apiv1.DataBlob {
 	if data == nil || len(data) == 0 {
 		return nil
 	}
 
-	return &shared.DataBlob{
+	return &apiv1.DataBlob{
 		Data:         data,
-		EncodingType: &encodingType,
+		EncodingType: encodingType,
 	}
 }
 
 // DeserializeBlobDataToHistoryEvents deserialize the blob data to history event data
 func DeserializeBlobDataToHistoryEvents(
-	dataBlobs []*shared.DataBlob, filterType shared.HistoryEventFilterType,
-) (*shared.History, error) {
+	dataBlobs []*apiv1.DataBlob, filterType apiv1.EventFilterType,
+) (*apiv1.History, error) {
 
-	var historyEvents []*shared.HistoryEvent
+	var historyEvents []*apiv1.HistoryEvent
 
 	for _, batch := range dataBlobs {
 		events, err := DeserializeBatchEvents(batch)
@@ -227,7 +257,7 @@ func DeserializeBlobDataToHistoryEvents(
 			return nil, err
 		}
 		if len(events) == 0 {
-			return nil, &shared.InternalServiceError{
+			return nil, &api.InternalServiceError{
 				Message: fmt.Sprintf("corrupted history event batch, empty events"),
 			}
 		}
@@ -235,8 +265,8 @@ func DeserializeBlobDataToHistoryEvents(
 		historyEvents = append(historyEvents, events...)
 	}
 
-	if filterType == shared.HistoryEventFilterTypeCloseEvent {
-		historyEvents = []*shared.HistoryEvent{historyEvents[len(historyEvents)-1]}
+	if filterType == apiv1.EventFilterType_EVENT_FILTER_TYPE_CLOSE_EVENT {
+		historyEvents = []*apiv1.HistoryEvent{historyEvents[len(historyEvents)-1]}
 	}
-	return &shared.History{Events: historyEvents}, nil
+	return &apiv1.History{Events: historyEvents}, nil
 }

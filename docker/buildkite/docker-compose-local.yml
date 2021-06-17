@@ -25,6 +25,7 @@ services:
   cadence:
     image: ubercadence/server:master-auto-setup
     ports:
+      - "7833:7833"
       - "7933:7933"
       - "7833:7833"
       - "7934:7934"
@@ -53,7 +54,7 @@ services:
       - |
         make integ_test_sticky_off
     environment:
-      - "SERVICE_ADDR=cadence:7933"
+      - "SERVICE_ADDR=cadence:7833"
       - "GO111MODULE=on"
     depends_on:
       - cadence
@@ -75,7 +76,7 @@ services:
       - |
         make integ_test_sticky_on
     environment:
-      - "SERVICE_ADDR=cadence:7933"
+      - "SERVICE_ADDR=cadence:7833"
       - "GO111MODULE=on"
     depends_on:
       - cadence

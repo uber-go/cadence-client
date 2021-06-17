@@ -27,11 +27,9 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/v2/.gen/go/shadower"
-	"go.uber.org/cadence/v2/.gen/go/shared"
-	"go.uber.org/cadence/v2/internal/common"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/yarpc"
 )
 
@@ -40,7 +38,7 @@ type shadowWorkerSuite struct {
 	suite.Suite
 
 	controller  *gomock.Controller
-	mockService *workflowservicetest.MockClient
+	mockService *api.MockInterface
 }
 
 func TestShadowWorkerSuite(t *testing.T) {
@@ -52,7 +50,7 @@ func (s *shadowWorkerSuite) SetupTest() {
 	s.Assertions = require.New(s.T())
 
 	s.controller = gomock.NewController(s.T())
-	s.mockService = workflowservicetest.NewMockClient(s.controller)
+	s.mockService = api.NewMockInterface(s.controller)
 }
 
 func (s *shadowWorkerSuite) TearDownTest() {
@@ -79,7 +77,7 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 
 	// check if background context is updated with necessary components
 	userContext := shadowWorker.activityWorker.executionParameters.UserContext
-	_, ok = userContext.Value(serviceClientContextKey).(workflowserviceclient.Interface)
+	_, ok = userContext.Value(serviceClientContextKey).(api.Interface)
 	s.True(ok)
 	_, ok = userContext.Value(workflowReplayerContextKey).(*WorkflowReplayer)
 	s.True(ok)
@@ -105,9 +103,9 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 }
 
 func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
-	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
-		Name: common.StringPtr(testDomain),
-	}, callOptions...).Return(nil, &shared.EntityNotExistsError{}).Times(1)
+	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &apiv1.DescribeDomainRequest{
+		DescribeBy: &apiv1.DescribeDomainRequest_Name{Name: testDomain},
+	}, callOptions...).Return(nil, &api.EntityNotExistsError{}).Times(1)
 
 	shadowWorker := newShadowWorker(
 		s.mockService,
@@ -123,9 +121,9 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 }
 
 func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() {
-	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
-		Name: common.StringPtr(testDomain),
-	}, callOptions...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
+	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &apiv1.DescribeDomainRequest{
+		DescribeBy: &apiv1.DescribeDomainRequest_Name{Name: testDomain},
+	}, callOptions...).Return(&apiv1.DescribeDomainResponse{}, nil).Times(1)
 
 	shadowWorker := newShadowWorker(
 		s.mockService,
@@ -139,13 +137,13 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 }
 
 func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
-	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
-		Name: common.StringPtr(testDomain),
-	}, callOptions...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
+	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &apiv1.DescribeDomainRequest{
+		DescribeBy: &apiv1.DescribeDomainRequest_Name{Name: testDomain},
+	}, callOptions...).Return(&apiv1.DescribeDomainResponse{}, nil).Times(1)
 	// first return a retryable error to check if retry policy is configured
-	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(nil, &shared.ServiceBusyError{}).Times(1)
+	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(nil, &api.ServiceBusyError{}).Times(1)
 	// then return a non-retryable error
-	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(nil, &shared.BadRequestError{}).Times(1)
+	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(nil, &api.BadRequestError{}).Times(1)
 
 	shadowWorker := newShadowWorker(
 		s.mockService,
@@ -169,17 +167,17 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 		ShadowCount: 100,
 	}
 
-	var startRequest *shared.StartWorkflowExecutionRequest
-	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
-		Name: common.StringPtr(testDomain),
-	}, callOptions...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
-	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
-		Name: common.StringPtr(shadower.LocalDomainName),
-	}, callOptions...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
+	var startRequest *apiv1.StartWorkflowExecutionRequest
+	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &apiv1.DescribeDomainRequest{
+		DescribeBy: &apiv1.DescribeDomainRequest_Name{Name: testDomain},
+	}, callOptions...).Return(&apiv1.DescribeDomainResponse{}, nil).Times(1)
+	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &apiv1.DescribeDomainRequest{
+		DescribeBy: &apiv1.DescribeDomainRequest_Name{Name: shadower.LocalDomainName},
+	}, callOptions...).Return(&apiv1.DescribeDomainResponse{}, nil).Times(1)
 	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(
-		func(_ context.Context, request *shared.StartWorkflowExecutionRequest, _ ...yarpc.CallOption) (*shared.StartWorkflowExecutionResponse, error) {
+		func(_ context.Context, request *apiv1.StartWorkflowExecutionRequest, _ ...yarpc.CallOption) (*apiv1.StartWorkflowExecutionResponse, error) {
 			startRequest = request
-			return nil, &shared.WorkflowExecutionAlreadyStartedError{}
+			return nil, &api.WorkflowExecutionAlreadyStartedError{}
 		},
 	).Times(1)
 
@@ -206,11 +204,11 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 	s.Equal(testDomain+shadower.WorkflowIDSuffix, startRequest.GetWorkflowId())
 	s.Equal(shadower.WorkflowName, startRequest.WorkflowType.GetName())
 	s.Equal(shadower.TaskList, startRequest.TaskList.GetName())
-	s.NotZero(startRequest.GetExecutionStartToCloseTimeoutSeconds())
-	s.Equal(shared.WorkflowIdReusePolicyAllowDuplicate, startRequest.GetWorkflowIdReusePolicy())
+	s.NotZero(startRequest.GetExecutionStartToCloseTimeout())
+	s.Equal(apiv1.WorkflowIdReusePolicy_WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE, startRequest.GetWorkflowIdReusePolicy())
 
 	var workflowParams shadower.WorkflowParams
-	getDefaultDataConverter().FromData(startRequest.Input, &workflowParams)
+	getDefaultDataConverter().FromData(startRequest.Input.GetData(), &workflowParams)
 	s.Equal(testDomain, workflowParams.GetDomain())
 	s.Equal(generateShadowTaskList(testDomain, testTaskList), workflowParams.GetTaskList())
 	s.Equal(workflowQuery, workflowParams.GetWorkflowQuery())

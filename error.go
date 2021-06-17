@@ -23,6 +23,7 @@ package cadence
 import (
 	"go.uber.org/cadence/v2/.gen/go/shared"
 	"go.uber.org/cadence/v2/internal"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/workflow"
 )
 
@@ -32,6 +33,21 @@ type (
 
 	// CanceledError returned when operation was canceled.
 	CanceledError = internal.CanceledError
+
+	AccessDeniedError = api.AccessDeniedError
+	BadRequestError = api.BadRequestError
+	CancellationAlreadyRequestedError = api.CancellationAlreadyRequestedError
+	ClientVersionNotSupportedError = api.ClientVersionNotSupportedError
+	DomainAlreadyExistsError = api.DomainAlreadyExistsError
+	DomainNotActiveError = api.DomainNotActiveError
+	EntityNotExistsError = api.EntityNotExistsError
+	WorkflowExecutionAlreadyCompletedError = api.WorkflowExecutionAlreadyCompletedError
+	InternalServiceError = api.InternalServiceError
+	LimitExceededError = api.LimitExceededError
+	QueryFailedError = api.QueryFailedError
+	ServiceBusyError = api.ServiceBusyError
+	WorkflowExecutionAlreadyStartedError = api.WorkflowExecutionAlreadyStartedError
+	EventAlreadyStartedError = api.EventAlreadyStartedError
 )
 
 // ErrNoData is returned when trying to extract strong typed data while there is no data available.

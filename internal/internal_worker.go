@@ -41,8 +41,8 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/internal/common/backoff"
 	"go.uber.org/cadence/v2/internal/common/metrics"
 	"go.uber.org/cadence/v2/internal/common/util"
@@ -79,7 +79,7 @@ type (
 	// task list names they might have to manage 'n' workers for 'n' task lists.
 	workflowWorker struct {
 		executionParameters workerExecutionParameters
-		workflowService     workflowserviceclient.Interface
+		workflowService     api.Interface
 		domain              string
 		poller              taskPoller // taskPoller to poll and process the tasks.
 		worker              *baseWorker
@@ -92,7 +92,7 @@ type (
 	// TODO: Worker doing heartbeating automatically while activity task is running
 	activityWorker struct {
 		executionParameters workerExecutionParameters
-		workflowService     workflowserviceclient.Interface
+		workflowService     api.Interface
 		domain              string
 		poller              taskPoller
 		worker              *baseWorker
@@ -197,7 +197,7 @@ type (
 
 // newWorkflowWorker returns an instance of the workflow worker.
 func newWorkflowWorker(
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
@@ -238,7 +238,7 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 // It returns an error, if the server returns an EntityNotExist or BadRequest error
 // On any other transient error, this method will just return success
 func verifyDomainExist(
-	client workflowserviceclient.Interface,
+	client api.Interface,
 	domain string,
 	logger *zap.Logger,
 	featureFlags FeatureFlags,
@@ -247,13 +247,14 @@ func verifyDomainExist(
 	descDomainOp := func() error {
 		tchCtx, cancel, opt := newChannelContext(ctx, featureFlags)
 		defer cancel()
-		_, err := client.DescribeDomain(tchCtx, &shared.DescribeDomainRequest{Name: &domain}, opt...)
+		_, err := client.DescribeDomain(tchCtx, &apiv1.DescribeDomainRequest{DescribeBy: &apiv1.DescribeDomainRequest_Name{Name: domain}}, opt...)
+		err = api.ConvertError(err)
 		if err != nil {
-			if _, ok := err.(*shared.EntityNotExistsError); ok {
+			if _, ok := err.(*api.EntityNotExistsError); ok {
 				logger.Error("domain does not exist", zap.String("domain", domain), zap.Error(err))
 				return err
 			}
-			if _, ok := err.(*shared.BadRequestError); ok {
+			if _, ok := err.(*api.BadRequestError); ok {
 				logger.Error("domain does not exist", zap.String("domain", domain), zap.Error(err))
 				return err
 			}
@@ -272,7 +273,7 @@ func verifyDomainExist(
 }
 
 func newWorkflowWorkerInternal(
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	params workerExecutionParameters,
 	ppMgr pressurePointMgr,
@@ -295,7 +296,7 @@ func newWorkflowWorkerInternal(
 
 func newWorkflowTaskWorkerInternal(
 	taskHandler WorkflowTaskHandler,
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	params workerExecutionParameters,
 	stopC chan struct{},
@@ -395,7 +396,7 @@ func (ww *workflowWorker) Stop() {
 	ww.worker.Stop()
 }
 
-func newSessionWorker(service workflowserviceclient.Interface,
+func newSessionWorker(service api.Interface,
 	domain string,
 	params workerExecutionParameters,
 	overrides *workerOverrides,
@@ -452,7 +453,7 @@ func (sw *sessionWorker) Stop() {
 }
 
 func newActivityWorker(
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	params workerExecutionParameters,
 	overrides *workerOverrides,
@@ -487,7 +488,7 @@ func newActivityWorker(
 }
 
 func newActivityTaskWorker(
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	workerParams workerExecutionParameters,
 	sessionTokenBucket *sessionTokenBucket,
@@ -993,7 +994,7 @@ func (aw *aggregatedWorker) Stop() {
 // poller size. The typical RTT (round-trip time) is below 1ms within data center. And the poll API latency is about 5ms.
 // With 2 poller, we could achieve around 300~400 RPS.
 func newAggregatedWorker(
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	taskList string,
 	options WorkerOptions,

@@ -30,7 +30,7 @@ package internal
 import (
 	"time"
 
-	s "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 )
 
 type (
@@ -39,7 +39,7 @@ type (
 	// HistoryIterator iterator through history events
 	HistoryIterator interface {
 		// GetNextPage returns next page of history events
-		GetNextPage() (*s.History, error)
+		GetNextPage() (*apiv1.History, error)
 		// Reset resets the internal state so next GetNextPage() call will return first page of events from beginning.
 		Reset()
 		// HasNextPage returns if there are more page of events
@@ -64,7 +64,7 @@ type (
 		CompleteDecisionTask(workflowTask *workflowTask, waitLocalActivity bool) interface{}
 		// GetDecisionTimeout returns the TaskStartToCloseTimeout
 		GetDecisionTimeout() time.Duration
-		GetCurrentDecisionTask() *s.PollForDecisionTaskResponse
+		GetCurrentDecisionTask() *apiv1.PollForDecisionTaskResponse
 		IsDestroyed() bool
 		StackTrace() string
 	}
@@ -89,7 +89,7 @@ type (
 		// - RespondActivityTaskCompletedRequest
 		// - RespondActivityTaskFailedRequest
 		// - RespondActivityTaskCanceledRequest
-		Execute(taskList string, task *s.PollForActivityTaskResponse) (interface{}, error)
+		Execute(taskList string, task *apiv1.PollForActivityTaskResponse) (interface{}, error)
 	}
 )
 

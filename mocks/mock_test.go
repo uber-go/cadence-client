@@ -22,11 +22,11 @@ package mocks
 
 import (
 	"context"
-	"go.uber.org/cadence/v2/.gen/go/shared"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/client"
 	"go.uber.org/cadence/v2/workflow"
 )
@@ -84,10 +84,10 @@ func Test_MockClient(t *testing.T) {
 
 	mockHistoryIter := &HistoryEventIterator{}
 	mockHistoryIter.On("HasNext").Return(true).Once()
-	mockHistoryIter.On("Next").Return(&shared.HistoryEvent{}, nil).Once()
+	mockHistoryIter.On("Next").Return(&apiv1.HistoryEvent{}, nil).Once()
 	mockClient.On("GetWorkflowHistory", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(mockHistoryIter).Once()
-	historyIter := mockClient.GetWorkflowHistory(context.Background(), testWorkflowID, testRunID, true, shared.HistoryEventFilterTypeCloseEvent)
+	historyIter := mockClient.GetWorkflowHistory(context.Background(), testWorkflowID, testRunID, true, apiv1.EventFilterType_EVENT_FILTER_TYPE_CLOSE_EVENT)
 	mockClient.AssertExpectations(t)
 	require.NotNil(t, historyIter)
 	require.Equal(t, true, historyIter.HasNext())

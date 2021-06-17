@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	s "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 )
 
 func TestChannelBuilderOptions(t *testing.T) {
@@ -121,16 +121,16 @@ func TestGetErrorDetails_TimeoutError(t *testing.T) {
 	require.NoError(t, err)
 
 	val := newEncodedValues(details, dc).(*EncodedValues)
-	timeoutErr1 := NewTimeoutError(s.TimeoutTypeScheduleToStart, val)
+	timeoutErr1 := NewTimeoutError(apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_START, val)
 	reason, data := getErrorDetails(timeoutErr1, dc)
-	require.Equal(t, fmt.Sprintf("%v %v", errReasonTimeout, s.TimeoutTypeScheduleToStart), reason)
+	require.Equal(t, fmt.Sprintf("%v %v", errReasonTimeout, timeoutTypeString(apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_START)), reason)
 	require.Equal(t, val.values, data)
 
-	timeoutErr2 := NewTimeoutError(s.TimeoutTypeHeartbeat, testErrorDetails4)
+	timeoutErr2 := NewTimeoutError(apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT, testErrorDetails4)
 	val2, err := encodeArgs(dc, []interface{}{testErrorDetails4})
 	require.NoError(t, err)
 	reason, data = getErrorDetails(timeoutErr2, dc)
-	require.Equal(t, fmt.Sprintf("%v %v", errReasonTimeout, s.TimeoutTypeHeartbeat), reason)
+	require.Equal(t, fmt.Sprintf("%v %v", errReasonTimeout, timeoutTypeString(apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT)), reason)
 	require.Equal(t, val2, data)
 }
 
@@ -140,7 +140,7 @@ func TestConstructError_TimeoutError(t *testing.T) {
 	details, err := dc.ToData(testErrorDetails1)
 	require.NoError(t, err)
 
-	reason := fmt.Sprintf("%v %v", errReasonTimeout, s.TimeoutTypeHeartbeat)
+	reason := fmt.Sprintf("%v %v", errReasonTimeout, timeoutTypeString(apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT))
 	constructedErr := constructError(reason, details, dc)
 	timeoutErr, ok := constructedErr.(*TimeoutError)
 	require.True(t, ok)
@@ -152,10 +152,10 @@ func TestConstructError_TimeoutError(t *testing.T) {
 
 	// Backward compatibility test
 	reason = errReasonTimeout
-	details, err = dc.ToData(s.TimeoutTypeHeartbeat)
+	details, err = dc.ToData(apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT)
 	constructedErr = constructError(reason, details, dc)
 	timeoutErr, ok = constructedErr.(*TimeoutError)
 	require.True(t, ok)
-	require.Equal(t, s.TimeoutTypeHeartbeat, timeoutErr.TimeoutType())
+	require.Equal(t, apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT, timeoutErr.TimeoutType())
 	require.False(t, timeoutErr.HasDetails())
 }

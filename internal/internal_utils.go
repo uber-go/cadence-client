@@ -25,6 +25,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -33,8 +34,7 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
-	s "go.uber.org/cadence/v2/.gen/go/shared"
-	"go.uber.org/cadence/v2/internal/common"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/internal/common/metrics"
 	"go.uber.org/yarpc"
 )
@@ -82,20 +82,18 @@ var (
 	}
 )
 
-func fromInternalFeatureFlags(featureFlags FeatureFlags) s.FeatureFlags {
+func fromInternalFeatureFlags(featureFlags FeatureFlags) apiv1.FeatureFlags {
 	// if we are using client-side-only flags in client.FeatureFlags;
 	// don't include them in shared.FeatureFlags and drop them here
-	return s.FeatureFlags{
-		WorkflowExecutionAlreadyCompletedErrorEnabled: common.BoolPtr(featureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled),
+	return apiv1.FeatureFlags{
+		WorkflowExecutionAlreadyCompletedErrorEnabled: featureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled,
 	}
 }
 
-func toInternalFeatureFlags(featureFlags *s.FeatureFlags) FeatureFlags {
+func toInternalFeatureFlags(featureFlags *apiv1.FeatureFlags) FeatureFlags {
 	flags := FeatureFlags{}
 	if featureFlags != nil {
-		if featureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled != nil {
-			flags.WorkflowExecutionAlreadyCompletedErrorEnabled = *featureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled
-		}
+		flags.WorkflowExecutionAlreadyCompletedErrorEnabled = featureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled
 	}
 	return flags
 }
@@ -213,20 +211,6 @@ func getWorkerTaskList(stickyUUID string) string {
 	return fmt.Sprintf("%s:%s", getHostName(), stickyUUID)
 }
 
-// ActivityTypePtr makes a copy and returns the pointer to a ActivityType.
-func activityTypePtr(v ActivityType) *s.ActivityType {
-	return &s.ActivityType{Name: common.StringPtr(v.Name)}
-}
-
-func flowWorkflowTypeFrom(v s.WorkflowType) WorkflowType {
-	return WorkflowType{Name: v.GetName()}
-}
-
-// WorkflowTypePtr makes a copy and returns the pointer to a WorkflowType.
-func workflowTypePtr(t WorkflowType) *s.WorkflowType {
-	return &s.WorkflowType{Name: common.StringPtr(t.Name)}
-}
-
 // getErrorDetails gets reason and details.
 func getErrorDetails(err error, dataConverter DataConverter) (string, []byte) {
 	switch err := err.(type) {
@@ -280,7 +264,7 @@ func getErrorDetails(err error, dataConverter DataConverter) (string, []byte) {
 		if err0 != nil {
 			panic(err0)
 		}
-		return fmt.Sprintf("%v %v", errReasonTimeout, err.timeoutType), data
+		return fmt.Sprintf("%v %v", errReasonTimeout, timeoutTypeString(err.timeoutType)), data
 	default:
 		// will be convert to GenericError when receiving from server.
 		return errReasonGeneric, []byte(err.Error())
@@ -338,12 +322,25 @@ func getMetricsScopeForLocalActivity(ts *metrics.TaggedScope, workflowType, loca
 	return ts.GetTaggedScope(tagWorkflowType, workflowType, tagLocalActivityType, localActivityType)
 }
 
-func getTimeoutTypeFromErrReason(reason string) (s.TimeoutType, error) {
+func getTimeoutTypeFromErrReason(reason string) (apiv1.TimeoutType, error) {
 	timeoutTypeStr := reason[strings.Index(reason, " ")+1:]
-	var timeoutType s.TimeoutType
-	if err := timeoutType.UnmarshalText([]byte(timeoutTypeStr)); err != nil {
-		// this happens when the timeout error reason is constructed by an prior constructed by prior client version
-		return 0, err
+
+	switch timeoutTypeStr {
+	case "START_TO_CLOSE":    return apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE, nil
+	case "SCHEDULE_TO_START": return apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_START, nil
+	case "SCHEDULE_TO_CLOSE": return apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_CLOSE, nil
+	case "HEARTBEAT":         return apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT, nil
 	}
-	return timeoutType, nil
+	// this happens when the timeout error reason is constructed by an prior constructed by prior client version
+	return 0, errors.New("invalid TimeoutType")
+}
+
+func timeoutTypeString(timeoutType apiv1.TimeoutType) string {
+	switch timeoutType {
+	case apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE: return "START_TO_CLOSE"
+	case apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_START: return "SCHEDULE_TO_START"
+	case apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_CLOSE: return "SCHEDULE_TO_CLOSE"
+	case apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT: return "HEARTBEAT"
+	}
+	return "INVALID"
 }

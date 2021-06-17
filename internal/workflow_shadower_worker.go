@@ -25,9 +25,9 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/v2/.gen/go/shadower"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/internal/common"
 	"go.uber.org/cadence/v2/internal/common/backoff"
 	"go.uber.org/zap"
@@ -37,7 +37,7 @@ type (
 	shadowWorker struct {
 		activityWorker *activityWorker
 
-		service      workflowserviceclient.Interface
+		service      api.Interface
 		domain       string
 		taskList     string
 		options      ShadowOptions
@@ -47,7 +47,7 @@ type (
 )
 
 func newShadowWorker(
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	shadowOptions ShadowOptions,
 	params workerExecutionParameters,
@@ -153,26 +153,27 @@ func (sw *shadowWorker) startShadowWorkflow() error {
 		return err
 	}
 
-	startWorkflowRequest := &shared.StartWorkflowExecutionRequest{
-		Domain:       common.StringPtr(shadower.LocalDomainName),
-		WorkflowId:   common.StringPtr(sw.domain + shadower.WorkflowIDSuffix),
-		WorkflowType: workflowTypePtr(*workflowType),
-		TaskList: &shared.TaskList{
-			Name: common.StringPtr(shadower.TaskList),
+	startWorkflowRequest := &apiv1.StartWorkflowExecutionRequest{
+		Domain:       shadower.LocalDomainName,
+		WorkflowId:   sw.domain + shadower.WorkflowIDSuffix,
+		WorkflowType: &apiv1.WorkflowType{Name: workflowType.Name},
+		TaskList: &apiv1.TaskList{
+			Name: shadower.TaskList,
 		},
-		Input:                               input,
-		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(864000),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(60),
-		RequestId:                           common.StringPtr(uuid.New()),
-		WorkflowIdReusePolicy:               shared.WorkflowIdReusePolicyAllowDuplicate.Ptr(),
+		Input:                               &apiv1.Payload{Data: input},
+		ExecutionStartToCloseTimeout:        api.SecondsToProto(864000),
+		TaskStartToCloseTimeout:             api.SecondsToProto(60),
+		RequestId:                           uuid.New(),
+		WorkflowIdReusePolicy:               apiv1.WorkflowIdReusePolicy_WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
 	}
 
 	startWorkflowOp := func() error {
 		tchCtx, cancel, opt := newChannelContext(ctx, sw.featureFlags)
 		defer cancel()
 		_, err := sw.service.StartWorkflowExecution(tchCtx, startWorkflowRequest, opt...)
+		err = api.ConvertError(err)
 		if err != nil {
-			if _, ok := err.(*shared.WorkflowExecutionAlreadyStartedError); ok {
+			if _, ok := err.(*api.WorkflowExecutionAlreadyStartedError); ok {
 				return nil
 			}
 		}

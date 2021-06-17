@@ -32,8 +32,8 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/v2/.gen/go/shared"
-	"go.uber.org/cadence/v2/internal/common"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/zap"
 )
 
@@ -64,7 +64,7 @@ type (
 		HeartbeatTimeoutSeconds       int32
 		WaitForCancellation           bool
 		OriginalTaskListName          string
-		RetryPolicy                   *shared.RetryPolicy
+		RetryPolicy                   *apiv1.RetryPolicy
 	}
 
 	localActivityOptions struct {
@@ -77,7 +77,7 @@ type (
 		ActivityType  ActivityType
 		Input         []byte
 		DataConverter DataConverter
-		Header        *shared.Header
+		Header        *apiv1.Header
 	}
 
 	executeLocalActivityParams struct {
@@ -89,7 +89,7 @@ type (
 		DataConverter DataConverter
 		Attempt       int32
 		ScheduledTime time.Time
-		Header        *shared.Header
+		Header        *apiv1.Header
 	}
 
 	// asyncActivityClient for requesting activity execution
@@ -215,31 +215,31 @@ func getValidatedLocalActivityOptions(ctx Context) (*localActivityOptions, error
 	return p, nil
 }
 
-func validateRetryPolicy(p *shared.RetryPolicy) error {
+func validateRetryPolicy(p *apiv1.RetryPolicy) error {
 	if p == nil {
 		return nil
 	}
 
-	if p.GetInitialIntervalInSeconds() <= 0 {
-		return errors.New("missing or negative InitialIntervalInSeconds on retry policy")
+	if api.DurationFromProto(p.InitialInterval) <= 0 {
+		return errors.New("missing or negative InitialInterval on retry policy")
 	}
-	if p.GetMaximumIntervalInSeconds() < 0 {
-		return errors.New("negative MaximumIntervalInSeconds on retry policy is invalid")
+	if api.DurationFromProto(p.MaximumInterval) < 0 {
+		return errors.New("negative MaximumInterval on retry policy is invalid")
 	}
-	if p.GetMaximumIntervalInSeconds() == 0 {
+	if api.DurationFromProto(p.MaximumInterval) == 0 {
 		// if not set, default to 100x of initial interval
-		p.MaximumIntervalInSeconds = common.Int32Ptr(100 * p.GetInitialIntervalInSeconds())
+		p.MaximumInterval = api.DurationToProto(100 * api.DurationFromProto(p.InitialInterval))
 	}
 	if p.GetMaximumAttempts() < 0 {
 		return errors.New("negative MaximumAttempts on retry policy is invalid")
 	}
-	if p.GetExpirationIntervalInSeconds() < 0 {
+	if api.DurationFromProto(p.ExpirationInterval) < 0 {
 		return errors.New("ExpirationIntervalInSeconds cannot be less than 0 on retry policy")
 	}
 	if p.GetBackoffCoefficient() < 1 {
 		return errors.New("BackoffCoefficient on retry policy cannot be less than 1.0")
 	}
-	if p.GetMaximumAttempts() == 0 && p.GetExpirationIntervalInSeconds() == 0 {
+	if p.GetMaximumAttempts() == 0 && api.DurationFromProto(p.ExpirationInterval) == 0 {
 		return errors.New("both MaximumAttempts and ExpirationIntervalInSeconds on retry policy are not set, at least one of them must be set")
 	}
 
@@ -440,7 +440,7 @@ func setActivityParametersIfNotExist(ctx Context) Context {
 	if params != nil {
 		newParams = *params
 		if params.RetryPolicy != nil {
-			var newRetryPolicy shared.RetryPolicy
+			var newRetryPolicy apiv1.RetryPolicy
 			newRetryPolicy = *newParams.RetryPolicy
 			newParams.RetryPolicy = &newRetryPolicy
 		}

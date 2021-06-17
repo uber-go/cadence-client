@@ -23,8 +23,8 @@ package internal
 import (
 	"container/list"
 	"fmt"
-	s "go.uber.org/cadence/v2/.gen/go/shared"
-	"go.uber.org/cadence/v2/internal/common"
+
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/internal/common/util"
 )
 
@@ -41,7 +41,7 @@ type (
 		getState() decisionState
 		getID() decisionID
 		isDone() bool
-		getDecision() *s.Decision // return nil if there is no decision in current state
+		getDecision() *apiv1.Decision // return nil if there is no decision in current state
 		cancel()
 
 		handleStartedEvent()
@@ -68,23 +68,23 @@ type (
 
 	activityDecisionStateMachine struct {
 		*decisionStateMachineBase
-		attributes *s.ScheduleActivityTaskDecisionAttributes
+		attributes *apiv1.ScheduleActivityTaskDecisionAttributes
 	}
 
 	timerDecisionStateMachine struct {
 		*decisionStateMachineBase
-		attributes *s.StartTimerDecisionAttributes
+		attributes *apiv1.StartTimerDecisionAttributes
 		canceled   bool
 	}
 
 	childWorkflowDecisionStateMachine struct {
 		*decisionStateMachineBase
-		attributes *s.StartChildWorkflowExecutionDecisionAttributes
+		attributes *apiv1.StartChildWorkflowExecutionDecisionAttributes
 	}
 
 	naiveDecisionStateMachine struct {
 		*decisionStateMachineBase
-		decision *s.Decision
+		decision *apiv1.Decision
 	}
 
 	// only possible state transition is: CREATED->SENT->INITIATED->COMPLETED
@@ -225,7 +225,7 @@ func (h *decisionsHelper) newDecisionStateMachineBase(decisionType decisionType,
 	}
 }
 
-func (h *decisionsHelper) newActivityDecisionStateMachine(attributes *s.ScheduleActivityTaskDecisionAttributes) *activityDecisionStateMachine {
+func (h *decisionsHelper) newActivityDecisionStateMachine(attributes *apiv1.ScheduleActivityTaskDecisionAttributes) *activityDecisionStateMachine {
 	base := h.newDecisionStateMachineBase(decisionTypeActivity, attributes.GetActivityId())
 	return &activityDecisionStateMachine{
 		decisionStateMachineBase: base,
@@ -233,7 +233,7 @@ func (h *decisionsHelper) newActivityDecisionStateMachine(attributes *s.Schedule
 	}
 }
 
-func (h *decisionsHelper) newTimerDecisionStateMachine(attributes *s.StartTimerDecisionAttributes) *timerDecisionStateMachine {
+func (h *decisionsHelper) newTimerDecisionStateMachine(attributes *apiv1.StartTimerDecisionAttributes) *timerDecisionStateMachine {
 	base := h.newDecisionStateMachineBase(decisionTypeTimer, attributes.GetTimerId())
 	return &timerDecisionStateMachine{
 		decisionStateMachineBase: base,
@@ -241,7 +241,7 @@ func (h *decisionsHelper) newTimerDecisionStateMachine(attributes *s.StartTimerD
 	}
 }
 
-func (h *decisionsHelper) newChildWorkflowDecisionStateMachine(attributes *s.StartChildWorkflowExecutionDecisionAttributes) *childWorkflowDecisionStateMachine {
+func (h *decisionsHelper) newChildWorkflowDecisionStateMachine(attributes *apiv1.StartChildWorkflowExecutionDecisionAttributes) *childWorkflowDecisionStateMachine {
 	base := h.newDecisionStateMachineBase(decisionTypeChildWorkflow, attributes.GetWorkflowId())
 	return &childWorkflowDecisionStateMachine{
 		decisionStateMachineBase: base,
@@ -249,7 +249,7 @@ func (h *decisionsHelper) newChildWorkflowDecisionStateMachine(attributes *s.Sta
 	}
 }
 
-func (h *decisionsHelper) newNaiveDecisionStateMachine(decisionType decisionType, id string, decision *s.Decision) *naiveDecisionStateMachine {
+func (h *decisionsHelper) newNaiveDecisionStateMachine(decisionType decisionType, id string, decision *apiv1.Decision) *naiveDecisionStateMachine {
 	base := h.newDecisionStateMachineBase(decisionType, id)
 	return &naiveDecisionStateMachine{
 		decisionStateMachineBase: base,
@@ -257,33 +257,45 @@ func (h *decisionsHelper) newNaiveDecisionStateMachine(decisionType decisionType
 	}
 }
 
-func (h *decisionsHelper) newMarkerDecisionStateMachine(id string, attributes *s.RecordMarkerDecisionAttributes) *markerDecisionStateMachine {
-	d := createNewDecision(s.DecisionTypeRecordMarker)
-	d.RecordMarkerDecisionAttributes = attributes
+func (h *decisionsHelper) newMarkerDecisionStateMachine(id string, attributes *apiv1.RecordMarkerDecisionAttributes) *markerDecisionStateMachine {
+	d := &apiv1.Decision{
+		Attributes: &apiv1.Decision_RecordMarkerDecisionAttributes{
+			RecordMarkerDecisionAttributes: attributes,
+		},
+	}
 	return &markerDecisionStateMachine{
 		naiveDecisionStateMachine: h.newNaiveDecisionStateMachine(decisionTypeMarker, id, d),
 	}
 }
 
-func (h *decisionsHelper) newCancelExternalWorkflowStateMachine(attributes *s.RequestCancelExternalWorkflowExecutionDecisionAttributes, cancellationID string) *cancelExternalWorkflowDecisionStateMachine {
-	d := createNewDecision(s.DecisionTypeRequestCancelExternalWorkflowExecution)
-	d.RequestCancelExternalWorkflowExecutionDecisionAttributes = attributes
+func (h *decisionsHelper) newCancelExternalWorkflowStateMachine(attributes *apiv1.RequestCancelExternalWorkflowExecutionDecisionAttributes, cancellationID string) *cancelExternalWorkflowDecisionStateMachine {
+	d := &apiv1.Decision{
+		Attributes: &apiv1.Decision_RequestCancelExternalWorkflowExecutionDecisionAttributes{
+			RequestCancelExternalWorkflowExecutionDecisionAttributes: attributes,
+		},
+	}
 	return &cancelExternalWorkflowDecisionStateMachine{
 		naiveDecisionStateMachine: h.newNaiveDecisionStateMachine(decisionTypeCancellation, cancellationID, d),
 	}
 }
 
-func (h *decisionsHelper) newSignalExternalWorkflowStateMachine(attributes *s.SignalExternalWorkflowExecutionDecisionAttributes, signalID string) *signalExternalWorkflowDecisionStateMachine {
-	d := createNewDecision(s.DecisionTypeSignalExternalWorkflowExecution)
-	d.SignalExternalWorkflowExecutionDecisionAttributes = attributes
+func (h *decisionsHelper) newSignalExternalWorkflowStateMachine(attributes *apiv1.SignalExternalWorkflowExecutionDecisionAttributes, signalID string) *signalExternalWorkflowDecisionStateMachine {
+	d := &apiv1.Decision{
+		Attributes: &apiv1.Decision_SignalExternalWorkflowExecutionDecisionAttributes{
+			SignalExternalWorkflowExecutionDecisionAttributes: attributes,
+		},
+	}
 	return &signalExternalWorkflowDecisionStateMachine{
 		naiveDecisionStateMachine: h.newNaiveDecisionStateMachine(decisionTypeSignal, signalID, d),
 	}
 }
 
-func (h *decisionsHelper) newUpsertSearchAttributesStateMachine(attributes *s.UpsertWorkflowSearchAttributesDecisionAttributes, upsertID string) *upsertSearchAttributesDecisionStateMachine {
-	d := createNewDecision(s.DecisionTypeUpsertWorkflowSearchAttributes)
-	d.UpsertWorkflowSearchAttributesDecisionAttributes = attributes
+func (h *decisionsHelper) newUpsertSearchAttributesStateMachine(attributes *apiv1.UpsertWorkflowSearchAttributesDecisionAttributes, upsertID string) *upsertSearchAttributesDecisionStateMachine {
+	d := &apiv1.Decision{
+		Attributes: &apiv1.Decision_UpsertWorkflowSearchAttributesDecisionAttributes{
+			UpsertWorkflowSearchAttributesDecisionAttributes: attributes,
+		},
+	}
 	return &upsertSearchAttributesDecisionStateMachine{
 		naiveDecisionStateMachine: h.newNaiveDecisionStateMachine(decisionTypeUpsertSearchAttributes, upsertID, d),
 	}
@@ -425,18 +437,22 @@ func (d *decisionStateMachineBase) String() string {
 		d.id, d.state, d.isDone(), d.history)
 }
 
-func (d *activityDecisionStateMachine) getDecision() *s.Decision {
+func (d *activityDecisionStateMachine) getDecision() *apiv1.Decision {
 	switch d.state {
 	case decisionStateCreated:
-		decision := createNewDecision(s.DecisionTypeScheduleActivityTask)
-		decision.ScheduleActivityTaskDecisionAttributes = d.attributes
-		return decision
-	case decisionStateCanceledAfterInitiated:
-		decision := createNewDecision(s.DecisionTypeRequestCancelActivityTask)
-		decision.RequestCancelActivityTaskDecisionAttributes = &s.RequestCancelActivityTaskDecisionAttributes{
-			ActivityId: d.attributes.ActivityId,
+		return &apiv1.Decision{
+			Attributes: &apiv1.Decision_ScheduleActivityTaskDecisionAttributes{
+				ScheduleActivityTaskDecisionAttributes: d.attributes,
+			},
 		}
-		return decision
+	case decisionStateCanceledAfterInitiated:
+		return &apiv1.Decision{
+			Attributes: &apiv1.Decision_RequestCancelActivityTaskDecisionAttributes{
+				RequestCancelActivityTaskDecisionAttributes: &apiv1.RequestCancelActivityTaskDecisionAttributes{
+					ActivityId: d.attributes.ActivityId,
+				},
+			},
+		}
 	default:
 		return nil
 	}
@@ -487,37 +503,47 @@ func (d *timerDecisionStateMachine) handleCancelFailedEvent() {
 	}
 }
 
-func (d *timerDecisionStateMachine) getDecision() *s.Decision {
+func (d *timerDecisionStateMachine) getDecision() *apiv1.Decision {
 	switch d.state {
 	case decisionStateCreated:
-		decision := createNewDecision(s.DecisionTypeStartTimer)
-		decision.StartTimerDecisionAttributes = d.attributes
-		return decision
-	case decisionStateCanceledAfterInitiated:
-		decision := createNewDecision(s.DecisionTypeCancelTimer)
-		decision.CancelTimerDecisionAttributes = &s.CancelTimerDecisionAttributes{
-			TimerId: d.attributes.TimerId,
+		return &apiv1.Decision{
+			Attributes: &apiv1.Decision_StartTimerDecisionAttributes{
+				StartTimerDecisionAttributes: d.attributes,
+			},
 		}
-		return decision
+	case decisionStateCanceledAfterInitiated:
+		return &apiv1.Decision{
+			Attributes: &apiv1.Decision_CancelTimerDecisionAttributes{
+				CancelTimerDecisionAttributes: &apiv1.CancelTimerDecisionAttributes{
+					TimerId: d.attributes.TimerId,
+				},
+			},
+		}
 	default:
 		return nil
 	}
 }
 
-func (d *childWorkflowDecisionStateMachine) getDecision() *s.Decision {
+func (d *childWorkflowDecisionStateMachine) getDecision() *apiv1.Decision {
 	switch d.state {
 	case decisionStateCreated:
-		decision := createNewDecision(s.DecisionTypeStartChildWorkflowExecution)
-		decision.StartChildWorkflowExecutionDecisionAttributes = d.attributes
-		return decision
-	case decisionStateCanceledAfterStarted:
-		decision := createNewDecision(s.DecisionTypeRequestCancelExternalWorkflowExecution)
-		decision.RequestCancelExternalWorkflowExecutionDecisionAttributes = &s.RequestCancelExternalWorkflowExecutionDecisionAttributes{
-			Domain:            d.attributes.Domain,
-			WorkflowId:        d.attributes.WorkflowId,
-			ChildWorkflowOnly: common.BoolPtr(true),
+		return &apiv1.Decision{
+			Attributes: &apiv1.Decision_StartChildWorkflowExecutionDecisionAttributes{
+				StartChildWorkflowExecutionDecisionAttributes: d.attributes,
+			},
 		}
-		return decision
+	case decisionStateCanceledAfterStarted:
+		return &apiv1.Decision{
+			Attributes: &apiv1.Decision_RequestCancelExternalWorkflowExecutionDecisionAttributes{
+				RequestCancelExternalWorkflowExecutionDecisionAttributes: &apiv1.RequestCancelExternalWorkflowExecutionDecisionAttributes{
+					Domain:            d.attributes.Domain,
+					WorkflowExecution: &apiv1.WorkflowExecution{
+						WorkflowId: d.attributes.WorkflowId,
+					},
+					ChildWorkflowOnly: true,
+				},
+			},
+		}
 	default:
 		return nil
 	}
@@ -579,7 +605,7 @@ func (d *childWorkflowDecisionStateMachine) handleCompletionEvent() {
 	}
 }
 
-func (d *naiveDecisionStateMachine) getDecision() *s.Decision {
+func (d *naiveDecisionStateMachine) getDecision() *apiv1.Decision {
 	switch d.state {
 	case decisionStateCreated:
 		return d.decision
@@ -709,7 +735,7 @@ func (h *decisionsHelper) addDecision(decision decisionStateMachine) {
 	h.decisions[decision.getID()] = element
 }
 
-func (h *decisionsHelper) scheduleActivityTask(attributes *s.ScheduleActivityTaskDecisionAttributes) decisionStateMachine {
+func (h *decisionsHelper) scheduleActivityTask(attributes *apiv1.ScheduleActivityTaskDecisionAttributes) decisionStateMachine {
 	decision := h.newActivityDecisionStateMachine(attributes)
 	h.addDecision(decision)
 	return decision
@@ -750,19 +776,19 @@ func (h *decisionsHelper) handleRequestCancelActivityTaskFailed(activityID strin
 	decision.handleCancelFailedEvent()
 }
 
-func (h *decisionsHelper) getActivityID(event *s.HistoryEvent) string {
+func (h *decisionsHelper) getActivityID(event *apiv1.HistoryEvent) string {
 	var scheduledEventID int64 = -1
-	switch event.GetEventType() {
-	case s.EventTypeActivityTaskCanceled:
-		scheduledEventID = event.ActivityTaskCanceledEventAttributes.GetScheduledEventId()
-	case s.EventTypeActivityTaskCompleted:
-		scheduledEventID = event.ActivityTaskCompletedEventAttributes.GetScheduledEventId()
-	case s.EventTypeActivityTaskFailed:
-		scheduledEventID = event.ActivityTaskFailedEventAttributes.GetScheduledEventId()
-	case s.EventTypeActivityTaskTimedOut:
-		scheduledEventID = event.ActivityTaskTimedOutEventAttributes.GetScheduledEventId()
+	switch attr := event.Attributes.(type) {
+	case *apiv1.HistoryEvent_ActivityTaskCanceledEventAttributes:
+		scheduledEventID = attr.ActivityTaskCanceledEventAttributes.GetScheduledEventId()
+	case *apiv1.HistoryEvent_ActivityTaskCompletedEventAttributes:
+		scheduledEventID = attr.ActivityTaskCompletedEventAttributes.GetScheduledEventId()
+	case *apiv1.HistoryEvent_ActivityTaskFailedEventAttributes:
+		scheduledEventID = attr.ActivityTaskFailedEventAttributes.GetScheduledEventId()
+	case *apiv1.HistoryEvent_ActivityTaskTimedOutEventAttributes:
+		scheduledEventID = attr.ActivityTaskTimedOutEventAttributes.GetScheduledEventId()
 	default:
-		panicIllegalState(fmt.Sprintf("unexpected event type %v", event.GetEventType()))
+		panicIllegalState(fmt.Sprintf("unexpected event type %v", util.GetHistoryEventType(event)))
 	}
 
 	activityID, ok := h.scheduledEventIDToActivityID[scheduledEventID]
@@ -779,9 +805,9 @@ func (h *decisionsHelper) recordVersionMarker(changeID string, version Version, 
 		panic(err)
 	}
 
-	recordMarker := &s.RecordMarkerDecisionAttributes{
-		MarkerName: common.StringPtr(versionMarkerName),
-		Details:    details, // Keep
+	recordMarker := &apiv1.RecordMarkerDecisionAttributes{
+		MarkerName: versionMarkerName,
+		Details:    &apiv1.Payload{Data: details}, // Keep
 	}
 
 	decision := h.newMarkerDecisionStateMachine(markerID, recordMarker)
@@ -791,9 +817,9 @@ func (h *decisionsHelper) recordVersionMarker(changeID string, version Version, 
 
 func (h *decisionsHelper) recordSideEffectMarker(sideEffectID int32, data []byte) decisionStateMachine {
 	markerID := fmt.Sprintf("%v_%v", sideEffectMarkerName, sideEffectID)
-	attributes := &s.RecordMarkerDecisionAttributes{
-		MarkerName: common.StringPtr(sideEffectMarkerName),
-		Details:    data,
+	attributes := &apiv1.RecordMarkerDecisionAttributes{
+		MarkerName: sideEffectMarkerName,
+		Details:    &apiv1.Payload{Data: data},
 	}
 	decision := h.newMarkerDecisionStateMachine(markerID, attributes)
 	h.addDecision(decision)
@@ -802,9 +828,9 @@ func (h *decisionsHelper) recordSideEffectMarker(sideEffectID int32, data []byte
 
 func (h *decisionsHelper) recordLocalActivityMarker(activityID string, result []byte) decisionStateMachine {
 	markerID := fmt.Sprintf("%v_%v", localActivityMarkerName, activityID)
-	attributes := &s.RecordMarkerDecisionAttributes{
-		MarkerName: common.StringPtr(localActivityMarkerName),
-		Details:    result,
+	attributes := &apiv1.RecordMarkerDecisionAttributes{
+		MarkerName: localActivityMarkerName,
+		Details:    &apiv1.Payload{Data: result},
 	}
 	decision := h.newMarkerDecisionStateMachine(markerID, attributes)
 	h.addDecision(decision)
@@ -813,16 +839,16 @@ func (h *decisionsHelper) recordLocalActivityMarker(activityID string, result []
 
 func (h *decisionsHelper) recordMutableSideEffectMarker(mutableSideEffectID string, data []byte) decisionStateMachine {
 	markerID := fmt.Sprintf("%v_%v", mutableSideEffectMarkerName, mutableSideEffectID)
-	attributes := &s.RecordMarkerDecisionAttributes{
-		MarkerName: common.StringPtr(mutableSideEffectMarkerName),
-		Details:    data,
+	attributes := &apiv1.RecordMarkerDecisionAttributes{
+		MarkerName: mutableSideEffectMarkerName,
+		Details:    &apiv1.Payload{Data: data},
 	}
 	decision := h.newMarkerDecisionStateMachine(markerID, attributes)
 	h.addDecision(decision)
 	return decision
 }
 
-func (h *decisionsHelper) startChildWorkflowExecution(attributes *s.StartChildWorkflowExecutionDecisionAttributes) decisionStateMachine {
+func (h *decisionsHelper) startChildWorkflowExecution(attributes *apiv1.StartChildWorkflowExecutionDecisionAttributes) decisionStateMachine {
 	decision := h.newChildWorkflowDecisionStateMachine(attributes)
 	h.addDecision(decision)
 	return decision
@@ -871,12 +897,14 @@ func (h *decisionsHelper) requestCancelExternalWorkflowExecution(domain, workflo
 	if len(cancellationID) == 0 {
 		panic("cancellation on external workflow should use cancellation ID")
 	}
-	attributes := &s.RequestCancelExternalWorkflowExecutionDecisionAttributes{
-		Domain:            common.StringPtr(domain),
-		WorkflowId:        common.StringPtr(workflowID),
-		RunId:             common.StringPtr(runID),
+	attributes := &apiv1.RequestCancelExternalWorkflowExecutionDecisionAttributes{
+		Domain:            domain,
+		WorkflowExecution: &apiv1.WorkflowExecution{
+			WorkflowId:        workflowID,
+			RunId:             runID,
+		},
 		Control:           []byte(cancellationID),
-		ChildWorkflowOnly: common.BoolPtr(false),
+		ChildWorkflowOnly: false,
 	}
 	decision := h.newCancelExternalWorkflowStateMachine(attributes, cancellationID)
 	h.addDecision(decision)
@@ -927,24 +955,24 @@ func (h *decisionsHelper) handleRequestCancelExternalWorkflowExecutionFailed(ini
 }
 
 func (h *decisionsHelper) signalExternalWorkflowExecution(domain, workflowID, runID, signalName string, input []byte, signalID string, childWorkflowOnly bool) decisionStateMachine {
-	attributes := &s.SignalExternalWorkflowExecutionDecisionAttributes{
-		Domain: common.StringPtr(domain),
-		Execution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      common.StringPtr(runID),
+	attributes := &apiv1.SignalExternalWorkflowExecutionDecisionAttributes{
+		Domain: domain,
+		WorkflowExecution: &apiv1.WorkflowExecution{
+			WorkflowId: workflowID,
+			RunId:      runID,
 		},
-		SignalName:        common.StringPtr(signalName),
-		Input:             input,
+		SignalName:        signalName,
+		Input:             &apiv1.Payload{Data: input},
 		Control:           []byte(signalID),
-		ChildWorkflowOnly: common.BoolPtr(childWorkflowOnly),
+		ChildWorkflowOnly: childWorkflowOnly,
 	}
 	decision := h.newSignalExternalWorkflowStateMachine(attributes, signalID)
 	h.addDecision(decision)
 	return decision
 }
 
-func (h *decisionsHelper) upsertSearchAttributes(upsertID string, searchAttr *s.SearchAttributes) decisionStateMachine {
-	attributes := &s.UpsertWorkflowSearchAttributesDecisionAttributes{
+func (h *decisionsHelper) upsertSearchAttributes(upsertID string, searchAttr *apiv1.SearchAttributes) decisionStateMachine {
+	attributes := &apiv1.UpsertWorkflowSearchAttributesDecisionAttributes{
 		SearchAttributes: searchAttr,
 	}
 	decision := h.newUpsertSearchAttributesStateMachine(attributes, upsertID)
@@ -978,7 +1006,7 @@ func (h *decisionsHelper) getSignalID(initiatedEventID int64) string {
 	return signalID
 }
 
-func (h *decisionsHelper) startTimer(attributes *s.StartTimerDecisionAttributes) decisionStateMachine {
+func (h *decisionsHelper) startTimer(attributes *apiv1.StartTimerDecisionAttributes) decisionStateMachine {
 	decision := h.newTimerDecisionStateMachine(attributes)
 	h.addDecision(decision)
 	return decision
@@ -1029,8 +1057,8 @@ func (h *decisionsHelper) handleChildWorkflowExecutionCanceled(workflowID string
 	return decision
 }
 
-func (h *decisionsHelper) getDecisions(markAsSent bool) []*s.Decision {
-	var result []*s.Decision
+func (h *decisionsHelper) getDecisions(markAsSent bool) []*apiv1.Decision {
+	var result []*apiv1.Decision
 	for curr := h.orderedDecisions.Front(); curr != nil; {
 		next := curr.Next() // get next item here as we might need to remove curr in the loop
 		d := curr.Value.(decisionStateMachine)

@@ -35,8 +35,7 @@ import (
 
 	"github.com/robfig/cron"
 	"go.uber.org/atomic"
-	"go.uber.org/cadence/v2/.gen/go/shared"
-	s "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/internal/common"
 	"go.uber.org/cadence/v2/internal/common/metrics"
 	"go.uber.org/cadence/v2/internal/common/util"
@@ -177,7 +176,7 @@ type (
 		queryHandlers                       map[string]func([]byte) ([]byte, error)
 		workflowIDReusePolicy               WorkflowIDReusePolicy
 		dataConverter                       DataConverter
-		retryPolicy                         *shared.RetryPolicy
+		retryPolicy                         *apiv1.RetryPolicy
 		cronSchedule                        string
 		contextPropagators                  []ContextPropagator
 		memo                                map[string]interface{}
@@ -189,7 +188,7 @@ type (
 		workflowOptions
 		workflowType         *WorkflowType
 		input                []byte
-		header               *shared.Header
+		header               *apiv1.Header
 		attempt              int32     // used by test framework to support child workflow retry
 		scheduledTime        time.Time // used by test framework to support child workflow retry
 		lastCompletionResult []byte    // used by test framework to support cron
@@ -451,7 +450,7 @@ func newWorkflowInterceptors(
 	return interceptor, envInterceptor
 }
 
-func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header *shared.Header, input []byte) {
+func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header *apiv1.Header, input []byte) {
 	interceptors, envInterceptor := newWorkflowInterceptors(env, env.GetWorkflowInterceptors())
 	dispatcher, rootCtx := newDispatcher(newWorkflowContext(env, interceptors, envInterceptor), func(ctx Context) {
 		r := &workflowResult{}
@@ -1177,7 +1176,7 @@ func getValidatedWorkflowOptions(ctx Context) (*workflowOptions, error) {
 		return nil, errors.New("missing or negative DecisionTaskStartToCloseTimeout")
 	}
 	if *p.taskStartToCloseTimeoutSeconds == 0 {
-		p.taskStartToCloseTimeoutSeconds = common.Int32Ptr(defaultDecisionTaskTimeoutInSecs)
+		p.taskStartToCloseTimeoutSeconds = common.Int32Ptr(common.Int32Ceil(defaultDecisionTaskTimeout.Seconds()))
 	}
 	if p.executionStartToCloseTimeoutSeconds == nil || *p.executionStartToCloseTimeoutSeconds <= 0 {
 		return nil, errors.New("missing or invalid ExecutionStartToCloseTimeout")
@@ -1242,9 +1241,9 @@ func getContextPropagatorsFromWorkflowContext(ctx Context) []ContextPropagator {
 	return options.contextPropagators
 }
 
-func getHeadersFromContext(ctx Context) *shared.Header {
-	header := &s.Header{
-		Fields: make(map[string][]byte),
+func getHeadersFromContext(ctx Context) *apiv1.Header {
+	header := &apiv1.Header{
+		Fields: make(map[string]*apiv1.Payload),
 	}
 	contextPropagators := getContextPropagatorsFromWorkflowContext(ctx)
 	for _, ctxProp := range contextPropagators {

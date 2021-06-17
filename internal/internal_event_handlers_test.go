@@ -26,7 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	s "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -157,7 +157,7 @@ func Test_ValidateAndSerializeSearchAttributes(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(searchAttr.IndexedFields))
 	var resp int
-	json.Unmarshal(searchAttr.IndexedFields["key"], &resp)
+	json.Unmarshal(searchAttr.IndexedFields["key"].GetData(), &resp)
 	require.Equal(t, 1, resp)
 }
 
@@ -187,41 +187,41 @@ func Test_MergeSearchAttributes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
-		current  *s.SearchAttributes
-		upsert   *s.SearchAttributes
-		expected *s.SearchAttributes
+		current  *apiv1.SearchAttributes
+		upsert   *apiv1.SearchAttributes
+		expected *apiv1.SearchAttributes
 	}{
 		{
 			name:     "currentIsNil",
 			current:  nil,
-			upsert:   &s.SearchAttributes{},
+			upsert:   &apiv1.SearchAttributes{},
 			expected: nil,
 		},
 		{
 			name:     "currentIsEmpty",
-			current:  &s.SearchAttributes{IndexedFields: make(map[string][]byte)},
-			upsert:   &s.SearchAttributes{},
+			current:  &apiv1.SearchAttributes{IndexedFields: make(map[string]*apiv1.Payload)},
+			upsert:   &apiv1.SearchAttributes{},
 			expected: nil,
 		},
 		{
 			name: "normalMerge",
-			current: &s.SearchAttributes{
-				IndexedFields: map[string][]byte{
-					"CustomIntField":     []byte(`1`),
-					"CustomKeywordField": []byte(`keyword`),
+			current: &apiv1.SearchAttributes{
+				IndexedFields: map[string]*apiv1.Payload{
+					"CustomIntField":     {Data: []byte(`1`)},
+					"CustomKeywordField": {Data: []byte(`keyword`)},
 				},
 			},
-			upsert: &s.SearchAttributes{
-				IndexedFields: map[string][]byte{
-					"CustomIntField":  []byte(`2`),
-					"CustomBoolField": []byte(`true`),
+			upsert: &apiv1.SearchAttributes{
+				IndexedFields: map[string]*apiv1.Payload{
+					"CustomIntField":  {Data: []byte(`2`)},
+					"CustomBoolField": {Data: []byte(`true`)},
 				},
 			},
-			expected: &s.SearchAttributes{
-				IndexedFields: map[string][]byte{
-					"CustomIntField":     []byte(`2`),
-					"CustomKeywordField": []byte(`keyword`),
-					"CustomBoolField":    []byte(`true`),
+			expected: &apiv1.SearchAttributes{
+				IndexedFields: map[string]*apiv1.Payload{
+					"CustomIntField":     {Data: []byte(`2`)},
+					"CustomKeywordField": {Data: []byte(`keyword`)},
+					"CustomBoolField":    {Data: []byte(`true`)},
 				},
 			},
 		},

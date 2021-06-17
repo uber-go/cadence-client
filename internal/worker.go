@@ -27,8 +27,8 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/zap"
 )
 
@@ -248,13 +248,13 @@ const (
 )
 
 // NewWorker creates an instance of worker for managing workflow and activity executions.
-// service 	- thrift connection to the cadence server.
+// service 	- API interface to the cadence server.
 // domain - the name of the cadence domain.
 // taskList 	- is the task list name you use to identify your client worker, also
 // 		  identifies group of workflow and activity implementations that are hosted by a single worker process.
 // options 	-  configure any worker specific options like logger, metrics, identity.
 func NewWorker(
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	taskList string,
 	options WorkerOptions,
@@ -269,7 +269,7 @@ func NewWorker(
 // This method is kept to maintain backward compatibility and should not be used.
 func ReplayWorkflowExecution(
 	ctx context.Context,
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	logger *zap.Logger,
 	domain string,
 	execution WorkflowExecution,
@@ -283,7 +283,7 @@ func ReplayWorkflowExecution(
 // The logger is an optional parameter. Defaults to the noop logger.
 // Deprecated: Global workflow replay methods are replaced by equivalent WorkflowReplayer instance methods.
 // This method is kept to maintain backward compatibility and should not be used.
-func ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
+func ReplayWorkflowHistory(logger *zap.Logger, history *apiv1.History) error {
 	r := NewWorkflowReplayer()
 	return r.ReplayWorkflowHistory(logger, history)
 }

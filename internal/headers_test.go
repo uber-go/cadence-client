@@ -24,36 +24,36 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 )
 
 func TestHeaderWriter(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
-		initial  *shared.Header
-		expected *shared.Header
+		initial  *apiv1.Header
+		expected *apiv1.Header
 		vals     map[string][]byte
 	}{
 		{
 			"no values",
-			&shared.Header{
-				Fields: map[string][]byte{},
+			&apiv1.Header{
+				Fields: map[string]*apiv1.Payload{},
 			},
-			&shared.Header{
-				Fields: map[string][]byte{},
+			&apiv1.Header{
+				Fields: map[string]*apiv1.Payload{},
 			},
 			map[string][]byte{},
 		},
 		{
 			"add values",
-			&shared.Header{
-				Fields: map[string][]byte{},
+			&apiv1.Header{
+				Fields: map[string]*apiv1.Payload{},
 			},
-			&shared.Header{
-				Fields: map[string][]byte{
-					"key1": []byte("val1"),
-					"key2": []byte("val2"),
+			&apiv1.Header{
+				Fields: map[string]*apiv1.Payload{
+					"key1": {Data: []byte("val1")},
+					"key2": {Data: []byte("val2")},
 				},
 			},
 			map[string][]byte{
@@ -63,15 +63,15 @@ func TestHeaderWriter(t *testing.T) {
 		},
 		{
 			"overwrite values",
-			&shared.Header{
-				Fields: map[string][]byte{
-					"key1": []byte("unexpected"),
+			&apiv1.Header{
+				Fields: map[string]*apiv1.Payload{
+					"key1": {Data: []byte("unexpected")},
 				},
 			},
-			&shared.Header{
-				Fields: map[string][]byte{
-					"key1": []byte("val1"),
-					"key2": []byte("val2"),
+			&apiv1.Header{
+				Fields: map[string]*apiv1.Payload{
+					"key1": {Data: []byte("val1")},
+					"key2": {Data: []byte("val2")},
 				},
 			},
 			map[string][]byte{
@@ -98,16 +98,16 @@ func TestHeaderReader(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
-		header  *shared.Header
+		header  *apiv1.Header
 		keys    map[string]struct{}
 		isError bool
 	}{
 		{
 			"valid values",
-			&shared.Header{
-				Fields: map[string][]byte{
-					"key1": []byte("val1"),
-					"key2": []byte("val2"),
+			&apiv1.Header{
+				Fields: map[string]*apiv1.Payload{
+					"key1": {Data: []byte("val1")},
+					"key2": {Data: []byte("val2")},
 				},
 			},
 			map[string]struct{}{"key1": struct{}{}, "key2": struct{}{}},
@@ -115,10 +115,10 @@ func TestHeaderReader(t *testing.T) {
 		},
 		{
 			"invalid values",
-			&shared.Header{
-				Fields: map[string][]byte{
-					"key1": []byte("val1"),
-					"key2": []byte("val2"),
+			&apiv1.Header{
+				Fields: map[string]*apiv1.Payload{
+					"key1": {Data: []byte("val1")},
+					"key2": {Data: []byte("val2")},
 				},
 			},
 			map[string]struct{}{"key2": struct{}{}},

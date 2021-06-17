@@ -34,14 +34,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gogo/protobuf/types"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowservicetest"
-	m "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/internal"
-	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/worker"
 	"go.uber.org/yarpc"
 	"golang.org/x/net/context"
@@ -64,14 +64,14 @@ type (
 	CacheEvictionSuite struct {
 		suite.Suite
 		mockCtrl *gomock.Controller
-		service  *workflowservicetest.MockClient
+		service *api.MockInterface
 	}
 )
 
 // Test suite.
 func (s *CacheEvictionSuite) SetupTest() {
 	s.mockCtrl = gomock.NewController(s.T())
-	s.service = workflowservicetest.NewMockClient(s.mockCtrl)
+	s.service = api.NewMockInterface(s.mockCtrl)
 }
 
 func (s *CacheEvictionSuite) TearDownTest() {
@@ -89,61 +89,59 @@ func TestWorkersTestSuite(t *testing.T) {
 // this is the mock for yarpcCallOptions, make sure length are the same
 var callOptions = []interface{}{gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()}
 
-func createTestEventWorkflowExecutionStarted(eventID int64, attr *m.WorkflowExecutionStartedEventAttributes) *m.HistoryEvent {
-	return &m.HistoryEvent{
-		EventId:                                 common.Int64Ptr(eventID),
-		EventType:                               common.EventTypePtr(m.EventTypeWorkflowExecutionStarted),
-		WorkflowExecutionStartedEventAttributes: attr,
+func createTestEventWorkflowExecutionStarted(eventID int64, attr *apiv1.WorkflowExecutionStartedEventAttributes) *apiv1.HistoryEvent {
+	return &apiv1.HistoryEvent{
+		EventId:    eventID,
+		Attributes: &apiv1.HistoryEvent_WorkflowExecutionStartedEventAttributes{WorkflowExecutionStartedEventAttributes: attr},
 	}
 }
 
-func createTestEventDecisionTaskScheduled(eventID int64, attr *m.DecisionTaskScheduledEventAttributes) *m.HistoryEvent {
-	return &m.HistoryEvent{
-		EventId:                              common.Int64Ptr(eventID),
-		EventType:                            common.EventTypePtr(m.EventTypeDecisionTaskScheduled),
-		DecisionTaskScheduledEventAttributes: attr,
+func createTestEventDecisionTaskScheduled(eventID int64, attr *apiv1.DecisionTaskScheduledEventAttributes) *apiv1.HistoryEvent {
+	return &apiv1.HistoryEvent{
+		EventId:                              eventID,
+		Attributes: &apiv1.HistoryEvent_DecisionTaskScheduledEventAttributes{DecisionTaskScheduledEventAttributes: attr},
 	}
 }
 
 func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
-	testEvents := []*m.HistoryEvent{
-		createTestEventWorkflowExecutionStarted(1, &m.WorkflowExecutionStartedEventAttributes{
-			TaskList: &m.TaskList{Name: common.StringPtr("tasklist")},
+	testEvents := []*apiv1.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &apiv1.WorkflowExecutionStartedEventAttributes{
+			TaskList: &apiv1.TaskList{Name: "tasklist"},
 		}),
-		createTestEventDecisionTaskScheduled(2, &m.DecisionTaskScheduledEventAttributes{}),
+		createTestEventDecisionTaskScheduled(2, &apiv1.DecisionTaskScheduledEventAttributes{}),
 	}
 
 	var taskCounter atomic.Int32 // lambda variable to keep count
 	// mock that manufactures unique decision tasks
 	mockPollForDecisionTask := func(
 		ctx context.Context,
-		_PollRequest *m.PollForDecisionTaskRequest,
+		_PollRequest *apiv1.PollForDecisionTaskRequest,
 		opts ...yarpc.CallOption,
-	) (success *m.PollForDecisionTaskResponse, err error) {
+	) (success *apiv1.PollForDecisionTaskResponse, err error) {
 		taskID := taskCounter.Inc()
-		workflowID := common.StringPtr("testID" + strconv.Itoa(int(taskID)))
-		runID := common.StringPtr("runID" + strconv.Itoa(int(taskID)))
+		workflowID := "testID" + strconv.Itoa(int(taskID))
+		runID := "runID" + strconv.Itoa(int(taskID))
 		// how we initialize the response here is the result of a series of trial and error
 		// the goal is we want to fabricate a response that looks real enough to our worker
 		// that it will actually go along with processing it instead of just tossing it out
 		// after polling it or giving an error
-		ret := &m.PollForDecisionTaskResponse{
+		ret := &apiv1.PollForDecisionTaskResponse{
 			TaskToken:              make([]byte, 5),
-			WorkflowExecution:      &m.WorkflowExecution{WorkflowId: workflowID, RunId: runID},
-			WorkflowType:           &m.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v2/evictiontest.testReplayWorkflow")},
-			History:                &m.History{Events: testEvents},
-			PreviousStartedEventId: common.Int64Ptr(5)}
+			WorkflowExecution:      &apiv1.WorkflowExecution{WorkflowId: workflowID, RunId: runID},
+			WorkflowType:           &apiv1.WorkflowType{Name: "go.uber.org/cadence/v2/evictiontest.testReplayWorkflow"},
+			History:                &apiv1.History{Events: testEvents},
+			PreviousStartedEventId: &types.Int64Value{Value: 5}}
 		return ret, nil
 	}
 
 	resetStickyAPICalled := make(chan struct{})
 	mockResetStickyTaskList := func(
 		ctx context.Context,
-		_ResetRequest *m.ResetStickyTaskListRequest,
+		_ResetRequest *apiv1.ResetStickyTaskListRequest,
 		opts ...yarpc.CallOption,
-	) (success *m.ResetStickyTaskListResponse, err error) {
+	) (success *apiv1.ResetStickyTaskListResponse, err error) {
 		resetStickyAPICalled <- struct{}{}
-		return &m.ResetStickyTaskListResponse{}, nil
+		return &apiv1.ResetStickyTaskListResponse{}, nil
 	}
 	// pick 5 as cache size because it's not too big and not too small.
 	cacheSize := 5
@@ -159,9 +157,9 @@ func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
 	// these will get tossed away immediately after polled, but we still need them so gomock doesn't compain about unexpected calls.
 	// this is because our worker's poller doesn't stop, it keeps polling on the service client as long
 	// as Stop() is not called on the worker
-	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, nil).AnyTimes()
+	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.PollForDecisionTaskResponse{}, nil).AnyTimes()
 	// this gets called after polled decision tasks are processed, any number of times doesn't matter
-	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(&m.RespondDecisionTaskCompletedResponse{}, nil).AnyTimes()
+	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.RespondDecisionTaskCompletedResponse{}, nil).AnyTimes()
 	// this is the critical point of the test.
 	// ResetSticky should be called exactly once because our workflow cache evicts when full
 	// so if our worker puts *cacheSize* entries in the cache, it should evict exactly one

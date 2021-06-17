@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	jaeger_config "github.com/uber/jaeger-client-go/config"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/zap"
 )
 
@@ -42,8 +42,8 @@ func TestTracingContextPropagator(t *testing.T) {
 	span := tracer.StartSpan("test-operation")
 	ctx := context.Background()
 	ctx = opentracing.ContextWithSpan(ctx, span)
-	header := &shared.Header{
-		Fields: map[string][]byte{},
+	header := &apiv1.Header{
+		Fields: map[string]*apiv1.Payload{},
 	}
 
 	err = ctxProp.Inject(ctx, NewHeaderWriter(header))
@@ -61,8 +61,8 @@ func TestTracingContextPropagatorNoSpan(t *testing.T) {
 	t.Parallel()
 	ctxProp := NewTracingContextPropagator(zap.NewNop(), opentracing.NoopTracer{})
 
-	header := &shared.Header{
-		Fields: map[string][]byte{},
+	header := &apiv1.Header{
+		Fields: map[string]*apiv1.Payload{},
 	}
 	err := ctxProp.Inject(context.Background(), NewHeaderWriter(header))
 	require.NoError(t, err)
@@ -82,8 +82,8 @@ func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
 	span := tracer.StartSpan("test-operation")
 	assert.NotNil(t, span.Context())
 	ctx := contextWithSpan(Background(), span.Context())
-	header := &shared.Header{
-		Fields: map[string][]byte{},
+	header := &apiv1.Header{
+		Fields: map[string]*apiv1.Payload{},
 	}
 
 	err = ctxProp.InjectFromWorkflow(ctx, NewHeaderWriter(header))
@@ -106,8 +106,8 @@ func TestTracingContextPropagatorWorkflowContextNoSpan(t *testing.T) {
 	t.Parallel()
 	ctxProp := NewTracingContextPropagator(zap.NewNop(), opentracing.NoopTracer{})
 
-	header := &shared.Header{
-		Fields: map[string][]byte{},
+	header := &apiv1.Header{
+		Fields: map[string]*apiv1.Payload{},
 	}
 	err := ctxProp.InjectFromWorkflow(Background(), NewHeaderWriter(header))
 	require.NoError(t, err)
@@ -130,8 +130,8 @@ func TestConsistentInjectionExtraction(t *testing.T) {
 	span.SetBaggageItem("request-tenancy", baggageVal)
 	assert.NotNil(t, span.Context())
 	ctx := contextWithSpan(Background(), span.Context())
-	header := &shared.Header{
-		Fields: map[string][]byte{},
+	header := &apiv1.Header{
+		Fields: map[string]*apiv1.Payload{},
 	}
 	err = ctxProp.InjectFromWorkflow(ctx, NewHeaderWriter(header))
 	require.NoError(t, err)

@@ -33,7 +33,8 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/internal/common/backoff"
 	"go.uber.org/cadence/v2/internal/common/metrics"
 	"go.uber.org/cadence/v2/internal/common/util"
@@ -97,7 +98,7 @@ type (
 
 	// WorkflowDefinition wraps the code that can execute a workflow.
 	workflowDefinition interface {
-		Execute(env workflowEnvironment, header *shared.Header, input []byte)
+		Execute(env workflowEnvironment, header *apiv1.Header, input []byte)
 		// Called for each non timed out startDecision event.
 		// Executed after all history events since the previous decision are applied to workflowDefinition
 		OnDecisionTaskStarted()
@@ -292,8 +293,8 @@ func isNonRetriableError(err error) bool {
 		return false
 	}
 	switch err.(type) {
-	case *shared.BadRequestError,
-		*shared.ClientVersionNotSupportedError:
+	case *api.BadRequestError,
+		*api.ClientVersionNotSupportedError:
 		return true
 	}
 	return false

@@ -121,7 +121,13 @@ API to allow you to capture a stack trace from any failed workflow execution his
 */
 package cadence
 
-import "go.uber.org/cadence/v2/internal"
+import (
+	"go.uber.org/cadence/v2/internal"
+	"go.uber.org/cadence/v2/internal/api"
+)
 
 // RetryPolicy defines the retry policy for activity/workflow.
 type RetryPolicy = internal.RetryPolicy
+
+// Interface is an API interface to the Cadence server.
+type Interface = api.Interface

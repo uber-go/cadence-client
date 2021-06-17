@@ -29,9 +29,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowservicetest"
-	"go.uber.org/cadence/v2/.gen/go/shared"
-	"go.uber.org/cadence/v2/internal/common"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 )
 
 type workflowShadowerSuite struct {
@@ -39,10 +38,10 @@ type workflowShadowerSuite struct {
 	suite.Suite
 
 	controller  *gomock.Controller
-	mockService *workflowservicetest.MockClient
+	mockService *api.MockInterface
 
 	testShadower        *WorkflowShadower
-	testWorkflowHistory *shared.History
+	testWorkflowHistory *apiv1.History
 	testTimestamp       time.Time
 }
 
@@ -55,7 +54,7 @@ func (s *workflowShadowerSuite) SetupTest() {
 	s.Assertions = require.New(s.T())
 
 	s.controller = gomock.NewController(s.T())
-	s.mockService = workflowservicetest.NewMockClient(s.controller)
+	s.mockService = api.NewMockInterface(s.controller)
 
 	var err error
 	s.testShadower, err = NewWorkflowShadower(s.mockService, "testDomain", ShadowOptions{}, ReplayOptions{}, nil)
@@ -251,13 +250,13 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {
 		ExpirationInterval: expirationTime,
 	}
 
-	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.ScanWorkflowExecutionsResponse{
 		Executions:    newTestWorkflowExecutions(totalWorkflows),
 		NextPageToken: nil,
 	}, nil).Times(1)
-	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(...interface{}) (*shared.GetWorkflowExecutionHistoryResponse, error) {
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(func(...interface{}) (*apiv1.GetWorkflowExecutionHistoryResponse, error) {
 		s.testShadower.clock.(*clock.Mock).Add(timePerWorkflow)
-		return &shared.GetWorkflowExecutionHistoryResponse{
+		return &apiv1.GetWorkflowExecutionHistoryResponse{
 			History: s.testWorkflowHistory,
 		}, nil
 	}).Times(int(expirationTime/timePerWorkflow) + 1)
@@ -272,11 +271,11 @@ func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_MaxShadowingCount(
 		ShadowCount: maxShadowCount,
 	}
 
-	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.ScanWorkflowExecutionsResponse{
 		Executions:    newTestWorkflowExecutions(maxShadowCount * 2),
 		NextPageToken: []byte{1, 2, 3},
 	}, nil).Times(1)
-	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.GetWorkflowExecutionHistoryResponse{
 		History: s.testWorkflowHistory,
 	}, nil).Times(maxShadowCount)
 
@@ -289,7 +288,7 @@ func (s *workflowShadowerSuite) TestShadowWorker_NormalMode() {
 	totalWorkflows := len(workflowExecutions) * numScan
 
 	for i := 0; i != numScan; i++ {
-		scanResp := &shared.ListWorkflowExecutionsResponse{
+		scanResp := &apiv1.ScanWorkflowExecutionsResponse{
 			Executions:    workflowExecutions,
 			NextPageToken: []byte{1, 2, 3},
 		}
@@ -299,7 +298,7 @@ func (s *workflowShadowerSuite) TestShadowWorker_NormalMode() {
 		s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(scanResp, nil).Times(1)
 	}
 
-	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.GetWorkflowExecutionHistoryResponse{
 		History: s.testWorkflowHistory,
 	}, nil).Times(totalWorkflows)
 
@@ -317,13 +316,13 @@ func (s *workflowShadowerSuite) TestShadowWorker_ContinuousMode() {
 	}
 
 	for i := 0; i != numScan; i++ {
-		scanResp := &shared.ListWorkflowExecutionsResponse{
+		scanResp := &apiv1.ScanWorkflowExecutionsResponse{
 			Executions: workflowExecutions,
 		}
 		s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(scanResp, nil).Times(1)
 	}
 
-	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.GetWorkflowExecutionHistoryResponse{
 		History: s.testWorkflowHistory,
 	}, nil).Times(totalWorkflows)
 
@@ -350,14 +349,14 @@ func (s *workflowShadowerSuite) TestShadowWorker_ContinuousMode() {
 
 func (s *workflowShadowerSuite) TestShadowWorker_ReplayFailed() {
 	successfullyReplayed := 5
-	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.ScanWorkflowExecutionsResponse{
 		Executions:    newTestWorkflowExecutions(successfullyReplayed * 2),
 		NextPageToken: []byte{1, 2, 3},
 	}, nil).Times(1)
-	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.GetWorkflowExecutionHistoryResponse{
 		History: s.testWorkflowHistory,
 	}, nil).Times(successfullyReplayed)
-	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.GetWorkflowExecutionHistoryResponse{
 		History: getTestReplayWorkflowMismatchHistory(),
 	}, nil).Times(1)
 
@@ -368,18 +367,18 @@ func (s *workflowShadowerSuite) TestShadowWorker_ExpectedReplayError() {
 	testCases := []struct {
 		msg                string
 		getHistoryErr      error
-		getHistoryResponse *shared.GetWorkflowExecutionHistoryResponse
+		getHistoryResponse *apiv1.GetWorkflowExecutionHistoryResponse
 	}{
 		{
 			msg:           "only workflow started event", // for example cron workflow
 			getHistoryErr: nil,
-			getHistoryResponse: &shared.GetWorkflowExecutionHistoryResponse{
-				History: &shared.History{Events: []*shared.HistoryEvent{
-					createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-						WorkflowType: &shared.WorkflowType{Name: common.StringPtr("testWorkflow")},
-						TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
-						Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
-						CronSchedule: common.StringPtr("* * * * *"),
+			getHistoryResponse: &apiv1.GetWorkflowExecutionHistoryResponse{
+				History: &apiv1.History{Events: []*apiv1.HistoryEvent{
+					createTestEventWorkflowExecutionStarted(1, &apiv1.WorkflowExecutionStartedEventAttributes{
+						WorkflowType: &apiv1.WorkflowType{Name: "testWorkflow"},
+						TaskList:     &apiv1.TaskList{Name: "taskList"},
+						Input:        &apiv1.Payload{Data: testEncodeFunctionArgs(getDefaultDataConverter())},
+						CronSchedule: "* * * * *",
 					}),
 				},
 				},
@@ -387,19 +386,19 @@ func (s *workflowShadowerSuite) TestShadowWorker_ExpectedReplayError() {
 		},
 		{
 			msg:                "workflow not exist",
-			getHistoryErr:      &shared.EntityNotExistsError{Message: "Workflow passed retention date"},
+			getHistoryErr:      &api.EntityNotExistsError{Message: "Workflow passed retention date"},
 			getHistoryResponse: nil,
 		},
 		{
 			msg:                "corrupted workflow history", // for example cron workflow
-			getHistoryErr:      &shared.InternalServiceError{Message: "History events not continuous"},
+			getHistoryErr:      &api.InternalServiceError{Message: "History events not continuous"},
 			getHistoryResponse: nil,
 		},
 	}
 
 	for _, test := range testCases {
 		s.T().Run(test.msg, func(t *testing.T) {
-			s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
+			s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.ScanWorkflowExecutionsResponse{
 				Executions:    newTestWorkflowExecutions(1),
 				NextPageToken: nil,
 			}, nil).Times(1)
@@ -410,13 +409,13 @@ func (s *workflowShadowerSuite) TestShadowWorker_ExpectedReplayError() {
 	}
 }
 
-func newTestWorkflowExecutions(size int) []*shared.WorkflowExecutionInfo {
-	executions := make([]*shared.WorkflowExecutionInfo, size)
+func newTestWorkflowExecutions(size int) []*apiv1.WorkflowExecutionInfo {
+	executions := make([]*apiv1.WorkflowExecutionInfo, size)
 	for i := 0; i != size; i++ {
-		executions[i] = &shared.WorkflowExecutionInfo{
-			Execution: &shared.WorkflowExecution{
-				WorkflowId: common.StringPtr("workflowID"),
-				RunId:      common.StringPtr("runID"),
+		executions[i] = &apiv1.WorkflowExecutionInfo{
+			WorkflowExecution: &apiv1.WorkflowExecution{
+				WorkflowId: "workflowID",
+				RunId:      "runID",
 			},
 		}
 	}

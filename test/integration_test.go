@@ -34,9 +34,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/v2"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/client"
 	"go.uber.org/cadence/v2/interceptors"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/worker"
 	"go.uber.org/cadence/v2/workflow"
 	"go.uber.org/goleak"
@@ -96,11 +97,7 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 	ts.workflows = &Workflows{}
 	ts.Nil(waitForTCP(time.Minute, ts.config.ServiceAddr))
 	var err error
-	if ts.config.EnableGrpcAdapter {
-		ts.rpcClient, err = newGRPCAdapterClient(ts.config.ServiceName, ts.config.ServiceAddr)
-	} else {
-		ts.rpcClient, err = newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
-	}
+	ts.rpcClient, err = newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
 	ts.NoError(err)
 	ts.libClient = client.NewClient(ts.rpcClient.Interface, domainName,
 		&client.Options{
@@ -199,7 +196,7 @@ func (ts *IntegrationTestSuite) TestActivityRetryOnStartToCloseTimeout() {
 		"test-activity-retry-on-start2close-timeout",
 		ts.workflows.ActivityRetryOnTimeout,
 		&expected,
-		shared.TimeoutTypeStartToClose)
+		apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE)
 
 	ts.NoError(err)
 	ts.EqualValues(expected, ts.activities.invoked())
@@ -290,7 +287,7 @@ func (ts *IntegrationTestSuite) TestConsistentQuery() {
 		WorkflowID:            "test-consistent-query",
 		RunID:                 run.GetRunID(),
 		QueryType:             "consistent_query",
-		QueryConsistencyLevel: shared.QueryConsistencyLevelStrong.Ptr(),
+		QueryConsistencyLevel: apiv1.QueryConsistencyLevel_QUERY_CONSISTENCY_LEVEL_STRONG,
 	})
 	ts.Nil(err)
 	ts.NotNil(value)
@@ -393,7 +390,7 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	ts.NoError(err)
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
-	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
+	ts.NotNil(resp.WorkflowExecutionInfo.CloseTime)
 }
 
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
@@ -402,7 +399,7 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 	ts.NoError(err)
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
-	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() == 0)
+	ts.Nil(resp.WorkflowExecutionInfo.CloseTime)
 }
 
 func (ts *IntegrationTestSuite) TestActivityCancelUsingReplay() {
@@ -437,7 +434,7 @@ func (ts *IntegrationTestSuite) TestLargeQueryResultError() {
 	value, err := ts.libClient.QueryWorkflow(ctx, "test-large-query-error", run.GetRunID(), "large_query")
 	ts.Error(err)
 
-	queryErr, ok := err.(*shared.QueryFailedError)
+	queryErr, ok := err.(*api.QueryFailedError)
 	ts.True(ok)
 	ts.Equal("query result size (3000000) exceeds limit (2000000)", queryErr.Message)
 	ts.Nil(value)
@@ -459,12 +456,12 @@ func (ts *IntegrationTestSuite) registerDomain() {
 	defer cancel()
 	name := domainName
 	retention := int32(1)
-	err := client.Register(ctx, &shared.RegisterDomainRequest{
-		Name:                                   &name,
-		WorkflowExecutionRetentionPeriodInDays: &retention,
+	err := client.Register(ctx, &apiv1.RegisterDomainRequest{
+		Name:                             name,
+		WorkflowExecutionRetentionPeriod: api.DurationToProto(time.Duration(retention) * 24 * time.Hour),
 	})
 	if err != nil {
-		if _, ok := err.(*shared.DomainAlreadyExistsError); ok {
+		if _, ok := err.(*api.DomainAlreadyExistsError); ok {
 			return
 		}
 	}
@@ -475,7 +472,7 @@ func (ts *IntegrationTestSuite) registerDomain() {
 	err = ts.executeWorkflow("test-domain-exist", ts.workflows.SimplestWorkflow, &dummyReturn)
 	numOfRetry := 20
 	for err != nil && numOfRetry >= 0 {
-		if _, ok := err.(*shared.EntityNotExistsError); ok {
+		if _, ok := err.(*api.EntityNotExistsError); ok {
 			time.Sleep(domainCacheRefreshInterval)
 			err = ts.executeWorkflow("test-domain-exist", ts.workflows.SimplestWorkflow, &dummyReturn)
 		} else {
@@ -502,7 +499,7 @@ func (ts *IntegrationTestSuite) executeWorkflowWithOption(
 	}
 	err = run.Get(ctx, retValPtr)
 	if ts.config.Debug {
-		iter := ts.libClient.GetWorkflowHistory(ctx, options.ID, run.GetRunID(), false, shared.HistoryEventFilterTypeAllEvent)
+		iter := ts.libClient.GetWorkflowHistory(ctx, options.ID, run.GetRunID(), false, apiv1.EventFilterType_EVENT_FILTER_TYPE_ALL_EVENT)
 		for iter.HasNext() {
 			event, err1 := iter.Next()
 			if err1 != nil {

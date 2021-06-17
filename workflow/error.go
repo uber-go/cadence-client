@@ -21,7 +21,7 @@
 package workflow
 
 import (
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/internal"
 )
 
@@ -125,7 +125,7 @@ func NewContinueAsNewError(ctx Context, wfn interface{}, args ...interface{}) *C
 // Use NewHeartbeatTimeoutError to create heartbeat TimeoutError
 // WARNING: This function is public only to support unit testing of workflows.
 // It shouldn't be used by application level code.
-func NewTimeoutError(timeoutType shared.TimeoutType, details ...interface{}) *TimeoutError {
+func NewTimeoutError(timeoutType apiv1.TimeoutType, details ...interface{}) *TimeoutError {
 	return internal.NewTimeoutError(timeoutType, details...)
 }
 

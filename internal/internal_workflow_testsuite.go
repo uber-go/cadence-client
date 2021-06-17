@@ -36,9 +36,8 @@ import (
 	"github.com/robfig/cron"
 	"github.com/stretchr/testify/mock"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowservicetest"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/internal/common"
 	"go.uber.org/cadence/v2/internal/common/metrics"
 	"go.uber.org/yarpc"
@@ -118,7 +117,7 @@ type (
 		taskListSpecificActivities map[string]*taskListSpecificActivity
 
 		mock         *mock.Mock
-		service      workflowserviceclient.Interface
+		service      api.Interface
 		logger       *zap.Logger
 		metricsScope *metrics.TaggedScope
 		ctxProps     []ContextPropagator
@@ -128,7 +127,7 @@ type (
 
 		callbackChannel chan testCallbackHandle
 		testTimeout     time.Duration
-		header          *shared.Header
+		header          *apiv1.Header
 
 		counterID        int
 		activities       map[string]*testActivityHandle
@@ -280,9 +279,9 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *regist
 
 	// setup mock service
 	mockCtrl := gomock.NewController(&testReporter{logger: env.logger})
-	mockService := workflowservicetest.NewMockClient(mockCtrl)
+	mockService := api.NewMockInterface(mockCtrl)
 
-	mockHeartbeatFn := func(c context.Context, r *shared.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) error {
+	mockHeartbeatFn := func(c context.Context, r *apiv1.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) error {
 		activityID := string(r.TaskToken)
 		env.locker.Lock() // need lock as this is running in activity worker's goroutinue
 		activityHandle, ok := env.getActivityHandle(activityID)
@@ -290,13 +289,13 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *regist
 		if !ok {
 			env.logger.Debug("RecordActivityTaskHeartbeat: ActivityID not found, could be already completed or cancelled.",
 				zap.String(tagActivityID, activityID))
-			return &shared.EntityNotExistsError{}
+			return &api.EntityNotExistsError{}
 		}
-		activityHandle.heartbeatDetails = r.Details
+		activityHandle.heartbeatDetails = r.Details.GetData()
 		activityInfo := env.getActivityInfo(activityID, activityHandle.activityType)
 		env.postCallback(func() {
 			if env.onActivityHeartbeatListener != nil {
-				env.onActivityHeartbeatListener(activityInfo, newEncodedValues(r.Details, env.GetDataConverter()))
+				env.onActivityHeartbeatListener(activityInfo, newEncodedValues(r.Details.GetData(), env.GetDataConverter()))
 			}
 		}, false)
 
@@ -310,12 +309,12 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *regist
 		callOptions = append(callOptions, gomock.Any())
 	}
 	em := mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).
-		Return(&shared.RecordActivityTaskHeartbeatResponse{CancelRequested: common.BoolPtr(false)}, nil)
-	em.Do(func(ctx context.Context, r *shared.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) {
+		Return(&apiv1.RecordActivityTaskHeartbeatResponse{CancelRequested: false}, nil)
+	em.Do(func(ctx context.Context, r *apiv1.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) {
 		// TODO: The following will hit a data race in the gomock code where the Do() action is executed outside
 		// the lock and setting return value from inside the action is going to run into races.
 		// err := mockHeartbeatFn(ctx, r, opts)
-		// em.Return(&shared.RecordActivityTaskHeartbeatResponse{CancelRequested: common.BoolPtr(false)}, err)
+		// em.Return(&apiv1.RecordActivityTaskHeartbeatResponse{CancelRequested: false}, err)
 		mockHeartbeatFn(ctx, r, opts...)
 	}).AnyTimes()
 
@@ -388,18 +387,18 @@ func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(param
 	if workflowHandler, ok := env.runningWorkflows[params.workflowID]; ok {
 		// duplicate workflow ID
 		if !workflowHandler.handled {
-			return nil, &shared.WorkflowExecutionAlreadyStartedError{
-				Message: common.StringPtr("Workflow execution already started"),
+			return nil, &api.WorkflowExecutionAlreadyStartedError{
+				Message: "Workflow execution already started",
 			}
 		}
 		if params.workflowIDReusePolicy == WorkflowIDReusePolicyRejectDuplicate {
-			return nil, &shared.WorkflowExecutionAlreadyStartedError{
-				Message: common.StringPtr("Workflow execution already started"),
+			return nil, &api.WorkflowExecutionAlreadyStartedError{
+				Message: "Workflow execution already started",
 			}
 		}
 		if workflowHandler.err == nil && params.workflowIDReusePolicy == WorkflowIDReusePolicyAllowDuplicateFailedOnly {
-			return nil, &shared.WorkflowExecutionAlreadyStartedError{
-				Message: common.StringPtr("Workflow execution already started"),
+			return nil, &api.WorkflowExecutionAlreadyStartedError{
+				Message: "Workflow execution already started",
 			}
 		}
 	}
@@ -572,7 +571,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithOptions(
 		params,
 	)
 
-	task.HeartbeatDetails = env.heartbeatDetails
+	task.HeartbeatDetails = &apiv1.Payload{Data: env.heartbeatDetails}
 
 	// ensure activityFn is registered to defaultTestTaskList
 	taskHandler := env.newTestActivityTaskHandler(defaultTestTaskList, env.GetDataConverter())
@@ -580,7 +579,7 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithOptions(
 	if err != nil {
 		if err == context.DeadlineExceeded {
 			env.logger.Debug(fmt.Sprintf("Activity %v timed out", task.ActivityType.Name))
-			return nil, NewTimeoutError(shared.TimeoutTypeStartToClose, context.DeadlineExceeded.Error())
+			return nil, NewTimeoutError(apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE, context.DeadlineExceeded.Error())
 		}
 		topLine := fmt.Sprintf("activity for %s [panic]:", defaultTestTaskList)
 		st := getStackTraceRaw(topLine, 7, 0)
@@ -592,13 +591,13 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithOptions(
 	}
 
 	switch request := result.(type) {
-	case *shared.RespondActivityTaskCanceledRequest:
-		details := newEncodedValues(request.Details, env.GetDataConverter())
+	case *apiv1.RespondActivityTaskCanceledRequest:
+		details := newEncodedValues(request.GetDetails().GetData(), env.GetDataConverter())
 		return nil, NewCanceledError(details)
-	case *shared.RespondActivityTaskFailedRequest:
-		return nil, constructError(request.GetReason(), request.Details, env.GetDataConverter())
-	case *shared.RespondActivityTaskCompletedRequest:
-		return newEncodedValue(request.Result, env.GetDataConverter()), nil
+	case *apiv1.RespondActivityTaskFailedRequest:
+		return nil, constructError(request.GetFailure().GetReason(), request.GetFailure().GetDetails(), env.GetDataConverter())
+	case *apiv1.RespondActivityTaskCompletedRequest:
+		return newEncodedValue(request.GetResult().GetData(), env.GetDataConverter()), nil
 	default:
 		// will never happen
 		return nil, fmt.Errorf("unsupported respond type %T", result)
@@ -830,7 +829,7 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 
 	if err != nil {
 		switch err := err.(type) {
-		case *CanceledError, *ContinueAsNewError, *TimeoutError, *shared.WorkflowExecutionAlreadyStartedError:
+		case *CanceledError, *ContinueAsNewError, *TimeoutError, *api.WorkflowExecutionAlreadyStartedError:
 			env.testError = err
 		case *workflowPanicError:
 			env.testError = newPanicError(err.value, err.stackTrace)
@@ -912,10 +911,10 @@ func (h *testWorkflowHandle) rerun(asChild bool) bool {
 		if params.retryPolicy != nil && env.testError != nil {
 			errReason, _ := getErrorDetails(env.testError, env.GetDataConverter())
 			var expireTime time.Time
-			if params.retryPolicy.GetExpirationIntervalInSeconds() > 0 {
-				expireTime = params.scheduledTime.Add(time.Second * time.Duration(params.retryPolicy.GetExpirationIntervalInSeconds()))
+			if api.DurationFromProto(params.retryPolicy.ExpirationInterval) > 0 {
+				expireTime = params.scheduledTime.Add(api.DurationFromProto(params.retryPolicy.ExpirationInterval))
 			}
-			backoff := getRetryBackoffFromThriftRetryPolicy(params.retryPolicy, env.workflowInfo.Attempt, errReason, env.Now(), expireTime)
+			backoff := getRetryBackoffFromProtoRetryPolicy(params.retryPolicy, env.workflowInfo.Attempt, errReason, env.Now(), expireTime)
 			if backoff > 0 {
 				// remove the current child workflow from the pending child workflow map because
 				// the childWorkflowID will be the same for retry run.
@@ -1053,16 +1052,19 @@ func (env *testWorkflowEnvironmentImpl) ExecuteActivity(parameters executeActivi
 		defer func() {
 			panicErr := recover()
 			if result == nil && panicErr == nil {
-				reason := "activity called runtime.Goexit"
-				result = &shared.RespondActivityTaskFailedRequest{
-					Reason: &reason,
+				result = &apiv1.RespondActivityTaskFailedRequest{
+					Failure: &apiv1.Failure{
+						Reason: "activity called runtime.Goexit",
+					},
 				}
 			} else if panicErr != nil {
 				reason := errReasonPanic
 				details, _ := env.GetDataConverter().ToData(fmt.Sprintf("%v", panicErr))
-				result = &shared.RespondActivityTaskFailedRequest{
-					Reason:  &reason,
-					Details: details,
+				result = &apiv1.RespondActivityTaskFailedRequest{
+					Failure: &apiv1.Failure{
+						Reason: reason,
+						Details: details,
+					},
 				}
 			}
 			// post activity result to workflow dispatcher
@@ -1099,11 +1101,11 @@ func (env *testWorkflowEnvironmentImpl) makeUniqueID(id string) string {
 func (env *testWorkflowEnvironmentImpl) executeActivityWithRetryForTest(
 	taskHandler ActivityTaskHandler,
 	parameters executeActivityParams,
-	task *shared.PollForActivityTaskResponse,
+	task *apiv1.PollForActivityTaskResponse,
 ) (result interface{}) {
 	var expireTime time.Time
-	if parameters.RetryPolicy != nil && parameters.RetryPolicy.GetExpirationIntervalInSeconds() > 0 {
-		expireTime = env.Now().Add(time.Second * time.Duration(parameters.RetryPolicy.GetExpirationIntervalInSeconds()))
+	if parameters.RetryPolicy != nil && api.DurationFromProto(parameters.RetryPolicy.ExpirationInterval) > 0 {
+		expireTime = env.Now().Add(api.DurationFromProto(parameters.RetryPolicy.ExpirationInterval))
 	}
 
 	for {
@@ -1117,9 +1119,9 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithRetryForTest(
 		}
 
 		// check if a retry is needed
-		if request, ok := result.(*shared.RespondActivityTaskFailedRequest); ok && parameters.RetryPolicy != nil {
-			p := fromThriftRetryPolicy(parameters.RetryPolicy)
-			backoff := getRetryBackoffWithNowTime(p, task.GetAttempt(), *request.Reason, env.Now(), expireTime)
+		if request, ok := result.(*apiv1.RespondActivityTaskFailedRequest); ok && parameters.RetryPolicy != nil {
+			p := fromProtoRetryPolicy(parameters.RetryPolicy)
+			backoff := getRetryBackoffWithNowTime(p, task.GetAttempt(), request.Failure.Reason, env.Now(), expireTime)
 			if backoff > 0 {
 				// need a retry
 				waitCh := make(chan struct{})
@@ -1128,10 +1130,10 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithRetryForTest(
 				// is enqueued.
 				env.registerDelayedCallback(func() {
 					env.runningCount++
-					task.Attempt = common.Int32Ptr(task.GetAttempt() + 1)
+					task.Attempt = task.GetAttempt() + 1
 					activityID := string(task.TaskToken)
 					if ah, ok := env.getActivityHandle(activityID); ok {
-						task.HeartbeatDetails = ah.heartbeatDetails
+						task.HeartbeatDetails = &apiv1.Payload{Data: ah.heartbeatDetails}
 					}
 					close(waitCh)
 				}, backoff)
@@ -1149,23 +1151,23 @@ func (env *testWorkflowEnvironmentImpl) executeActivityWithRetryForTest(
 	return
 }
 
-func fromThriftRetryPolicy(p *shared.RetryPolicy) *RetryPolicy {
+func fromProtoRetryPolicy(p *apiv1.RetryPolicy) *RetryPolicy {
 	return &RetryPolicy{
-		InitialInterval:          time.Second * time.Duration(p.GetInitialIntervalInSeconds()),
+		InitialInterval:          api.DurationFromProto(p.InitialInterval),
 		BackoffCoefficient:       p.GetBackoffCoefficient(),
-		MaximumInterval:          time.Second * time.Duration(p.GetMaximumIntervalInSeconds()),
-		ExpirationInterval:       time.Second * time.Duration(p.GetExpirationIntervalInSeconds()),
+		MaximumInterval:          api.DurationFromProto(p.MaximumInterval),
+		ExpirationInterval:       api.DurationFromProto(p.ExpirationInterval),
 		MaximumAttempts:          p.GetMaximumAttempts(),
-		NonRetriableErrorReasons: p.NonRetriableErrorReasons,
+		NonRetriableErrorReasons: p.NonRetryableErrorReasons,
 	}
 }
 
-func getRetryBackoffFromThriftRetryPolicy(tp *shared.RetryPolicy, attempt int32, errReason string, now, expireTime time.Time) time.Duration {
+func getRetryBackoffFromProtoRetryPolicy(tp *apiv1.RetryPolicy, attempt int32, errReason string, now, expireTime time.Time) time.Duration {
 	if tp == nil {
 		return noRetryBackoff
 	}
 
-	p := fromThriftRetryPolicy(tp)
+	p := fromProtoRetryPolicy(tp)
 	return getRetryBackoffWithNowTime(p, attempt, errReason, now, expireTime)
 }
 
@@ -1254,19 +1256,19 @@ func (env *testWorkflowEnvironmentImpl) handleActivityResult(activityID string, 
 	var err error
 
 	switch request := result.(type) {
-	case *shared.RespondActivityTaskCanceledRequest:
-		details := newEncodedValues(request.Details, dataConverter)
+	case *apiv1.RespondActivityTaskCanceledRequest:
+		details := newEncodedValues(request.Details.GetData(), dataConverter)
 		err = NewCanceledError(details)
 		activityHandle.callback(nil, err)
-	case *shared.RespondActivityTaskFailedRequest:
-		err = constructError(*request.Reason, request.Details, dataConverter)
+	case *apiv1.RespondActivityTaskFailedRequest:
+		err = constructError(request.Failure.GetReason(), request.Failure.GetDetails(), dataConverter)
 		activityHandle.callback(nil, err)
-	case *shared.RespondActivityTaskCompletedRequest:
-		blob = request.Result
+	case *apiv1.RespondActivityTaskCompletedRequest:
+		blob = request.Result.GetData()
 		activityHandle.callback(blob, nil)
 	default:
 		if result == context.DeadlineExceeded {
-			err = NewTimeoutError(shared.TimeoutTypeStartToClose, context.DeadlineExceeded.Error())
+			err = NewTimeoutError(apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE, context.DeadlineExceeded.Error())
 			activityHandle.callback(nil, err)
 		} else {
 			panic(fmt.Sprintf("unsupported respond type %T", result))
@@ -1667,26 +1669,26 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 	return taskHandler
 }
 
-func newTestActivityTask(workflowID, runID, activityID, workflowTypeName, domainName string, params executeActivityParams) *shared.PollForActivityTaskResponse {
-	task := &shared.PollForActivityTaskResponse{
-		WorkflowExecution: &shared.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      common.StringPtr(runID),
+func newTestActivityTask(workflowID, runID, activityID, workflowTypeName, domainName string, params executeActivityParams) *apiv1.PollForActivityTaskResponse {
+	task := &apiv1.PollForActivityTaskResponse{
+		WorkflowExecution: &apiv1.WorkflowExecution{
+			WorkflowId: workflowID,
+			RunId:      runID,
 		},
-		ActivityId:                      common.StringPtr(activityID),
-		TaskToken:                       []byte(activityID), // use activityID as TaskToken so we can map TaskToken in heartbeat calls.
-		ActivityType:                    &shared.ActivityType{Name: common.StringPtr(params.ActivityType.Name)},
-		Input:                           params.Input,
-		ScheduledTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
-		ScheduleToCloseTimeoutSeconds:   common.Int32Ptr(params.ScheduleToCloseTimeoutSeconds),
-		ScheduledTimestampOfThisAttempt: common.Int64Ptr(time.Now().UnixNano()),
-		StartedTimestamp:                common.Int64Ptr(time.Now().UnixNano()),
-		StartToCloseTimeoutSeconds:      common.Int32Ptr(params.StartToCloseTimeoutSeconds),
-		HeartbeatTimeoutSeconds:         common.Int32Ptr(params.HeartbeatTimeoutSeconds),
-		WorkflowType: &shared.WorkflowType{
-			Name: common.StringPtr(workflowTypeName),
+		ActivityId:                 activityID,
+		TaskToken:                  []byte(activityID), // use activityID as TaskToken so we can map TaskToken in heartbeat calls.
+		ActivityType:               &apiv1.ActivityType{Name: params.ActivityType.Name},
+		Input:                      &apiv1.Payload{Data: params.Input},
+		ScheduledTime:              api.TimeToProto(time.Now()),
+		ScheduleToCloseTimeout:     api.SecondsToProto(params.ScheduleToCloseTimeoutSeconds),
+		ScheduledTimeOfThisAttempt: api.TimeToProto(time.Now()),
+		StartedTime:                api.TimeToProto(time.Now()),
+		StartToCloseTimeout:        api.SecondsToProto(params.StartToCloseTimeoutSeconds),
+		HeartbeatTimeout:           api.SecondsToProto(params.HeartbeatTimeoutSeconds),
+		WorkflowType: &apiv1.WorkflowType{
+			Name: workflowTypeName,
 		},
-		WorkflowDomain: common.StringPtr(domainName),
+		WorkflowDomain: domainName,
 		Header:         params.Header,
 	}
 	return task
@@ -2040,7 +2042,7 @@ func (env *testWorkflowEnvironmentImpl) signalWorkflowByID(workflowID, signalNam
 
 	if workflowHandle, ok := env.runningWorkflows[workflowID]; ok {
 		if workflowHandle.handled {
-			return &shared.WorkflowExecutionAlreadyCompletedError{Message: fmt.Sprintf("Workflow %v already completed", workflowID)}
+			return &api.WorkflowExecutionAlreadyCompletedError{Message: fmt.Sprintf("Workflow %v already completed", workflowID)}
 		}
 		workflowHandle.env.postCallback(func() {
 			workflowHandle.env.signalHandler(signalName, data)
@@ -2048,7 +2050,7 @@ func (env *testWorkflowEnvironmentImpl) signalWorkflowByID(workflowID, signalNam
 		return nil
 	}
 
-	return &shared.EntityNotExistsError{Message: fmt.Sprintf("Workflow %v not exists", workflowID)}
+	return &api.EntityNotExistsError{Message: fmt.Sprintf("Workflow %v not exists", workflowID)}
 }
 
 func (env *testWorkflowEnvironmentImpl) queryWorkflow(queryType string, args ...interface{}) (Value, error) {

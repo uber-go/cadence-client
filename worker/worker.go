@@ -25,10 +25,11 @@ package worker
 import (
 	"context"
 
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/activity"
 	"go.uber.org/cadence/v2/internal"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/workflow"
 	"go.uber.org/zap"
 )
@@ -143,7 +144,7 @@ type (
 		// ReplayWorkflowHistory executes a single decision task for the given json history file.
 		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
 		// The logger is an optional parameter. Defaults to the noop logger.
-		ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error
+		ReplayWorkflowHistory(logger *zap.Logger, history *apiv1.History) error
 
 		// ReplayWorkflowHistoryFromJSONFile executes a single decision task for the json history file downloaded from the cli.
 		// To download the history file: cadence workflow showid <workflow_id> -of <output_filename>
@@ -163,7 +164,7 @@ type (
 		// ReplayWorkflowExecution loads a workflow execution history from the Cadence service and executes a single decision task for it.
 		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
 		// The logger is the only optional parameter. Defaults to the noop logger.
-		ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.Interface, logger *zap.Logger, domain string, execution workflow.Execution) error
+		ReplayWorkflowExecution(ctx context.Context, service api.Interface, logger *zap.Logger, domain string, execution workflow.Execution) error
 	}
 
 	// WorkflowShadower retrieves and replays workflow history from Cadence service to determine if there's any nondeterministic changes in the workflow definition
@@ -223,14 +224,14 @@ const (
 )
 
 // New creates an instance of worker for managing workflow and activity executions.
-//    service  - thrift connection to the cadence server
+//    service  - API interface to the cadence server
 //    domain   - the name of the cadence domain
 //    taskList - is the task list name you use to identify your client worker, also
 //               identifies group of workflow and activity implementations that are
 //               hosted by a single worker process
 //    options  - configure any worker specific options like logger, metrics, identity
 func New(
-	service workflowserviceclient.Interface,
+	service cadence.Interface,
 	domain string,
 	taskList string,
 	options Options,
@@ -253,7 +254,7 @@ func NewWorkflowReplayerWithOptions(
 
 // NewWorkflowShadower creates a WorkflowShadower instance.
 func NewWorkflowShadower(
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	shadowOptions ShadowOptions,
 	replayOptions ReplayOptions,
@@ -272,7 +273,7 @@ func EnableVerboseLogging(enable bool) {
 // ReplayWorkflowHistory executes a single decision task for the given json history file.
 // Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.
-func ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
+func ReplayWorkflowHistory(logger *zap.Logger, history *apiv1.History) error {
 	return internal.ReplayWorkflowHistory(logger, history)
 }
 
@@ -298,7 +299,7 @@ func ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName s
 // ReplayWorkflowExecution loads a workflow execution history from the Cadence service and executes a single decision task for it.
 // Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is the only optional parameter. Defaults to the noop logger.
-func ReplayWorkflowExecution(ctx context.Context, service workflowserviceclient.Interface, logger *zap.Logger, domain string, execution workflow.Execution) error {
+func ReplayWorkflowExecution(ctx context.Context, service api.Interface, logger *zap.Logger, domain string, execution workflow.Execution) error {
 	return internal.ReplayWorkflowExecution(ctx, service, logger, domain, execution)
 }
 

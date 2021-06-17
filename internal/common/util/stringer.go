@@ -24,8 +24,9 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"strings"
 
-	s "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 )
 
 func anyToString(d interface{}) string {
@@ -44,6 +45,10 @@ func anyToString(d interface{}) string {
 			}
 			fieldValue := valueToString(f)
 			if len(fieldValue) == 0 {
+				continue
+			}
+			if strings.HasPrefix(t.Field(i).Name, "XXX_") {
+				// Skip generated gogo proto XXX_ fields
 				continue
 			}
 			if buf.Len() > 1 {
@@ -77,110 +82,25 @@ func valueToString(v reflect.Value) string {
 }
 
 // HistoryEventToString convert HistoryEvent to string
-func HistoryEventToString(e *s.HistoryEvent) string {
-	var data interface{}
-	switch e.GetEventType() {
-	case s.EventTypeWorkflowExecutionStarted:
-		data = e.WorkflowExecutionStartedEventAttributes
-
-	case s.EventTypeWorkflowExecutionCompleted:
-		data = e.WorkflowExecutionCompletedEventAttributes
-
-	case s.EventTypeWorkflowExecutionFailed:
-		data = e.WorkflowExecutionFailedEventAttributes
-
-	case s.EventTypeWorkflowExecutionTimedOut:
-		data = e.WorkflowExecutionTimedOutEventAttributes
-
-	case s.EventTypeDecisionTaskScheduled:
-		data = e.DecisionTaskScheduledEventAttributes
-
-	case s.EventTypeDecisionTaskStarted:
-		data = e.DecisionTaskStartedEventAttributes
-
-	case s.EventTypeDecisionTaskCompleted:
-		data = e.DecisionTaskCompletedEventAttributes
-
-	case s.EventTypeDecisionTaskTimedOut:
-		data = e.DecisionTaskTimedOutEventAttributes
-
-	case s.EventTypeActivityTaskScheduled:
-		data = e.ActivityTaskScheduledEventAttributes
-
-	case s.EventTypeActivityTaskStarted:
-		data = e.ActivityTaskStartedEventAttributes
-
-	case s.EventTypeActivityTaskCompleted:
-		data = e.ActivityTaskCompletedEventAttributes
-
-	case s.EventTypeActivityTaskFailed:
-		data = e.ActivityTaskFailedEventAttributes
-
-	case s.EventTypeActivityTaskTimedOut:
-		data = e.ActivityTaskTimedOutEventAttributes
-
-	case s.EventTypeActivityTaskCancelRequested:
-		data = e.ActivityTaskCancelRequestedEventAttributes
-
-	case s.EventTypeRequestCancelActivityTaskFailed:
-		data = e.RequestCancelActivityTaskFailedEventAttributes
-
-	case s.EventTypeActivityTaskCanceled:
-		data = e.ActivityTaskCanceledEventAttributes
-
-	case s.EventTypeTimerStarted:
-		data = e.TimerStartedEventAttributes
-
-	case s.EventTypeTimerFired:
-		data = e.TimerFiredEventAttributes
-
-	case s.EventTypeCancelTimerFailed:
-		data = e.CancelTimerFailedEventAttributes
-
-	case s.EventTypeTimerCanceled:
-		data = e.TimerCanceledEventAttributes
-
-	case s.EventTypeMarkerRecorded:
-		data = e.MarkerRecordedEventAttributes
-
-	case s.EventTypeWorkflowExecutionTerminated:
-		data = e.WorkflowExecutionTerminatedEventAttributes
-
-	default:
-		data = e
-	}
-
-	return e.GetEventType().String() + ": " + anyToString(data)
+func HistoryEventToString(e *apiv1.HistoryEvent) string {
+	return GetHistoryEventType(e) + ": " + anyToString(e.Attributes)
 }
 
 // DecisionToString convert Decision to string
-func DecisionToString(d *s.Decision) string {
-	var data interface{}
-	switch d.GetDecisionType() {
-	case s.DecisionTypeScheduleActivityTask:
-		data = d.ScheduleActivityTaskDecisionAttributes
+func DecisionToString(d *apiv1.Decision) string {
+	return GetDecisionType(d) + ": " + anyToString(d.GetAttributes())
+}
 
-	case s.DecisionTypeRequestCancelActivityTask:
-		data = d.RequestCancelActivityTaskDecisionAttributes
+func GetHistoryEventType(d *apiv1.HistoryEvent) string {
+	eventType := reflect.TypeOf(d.Attributes).Elem().Name()
+	eventType = strings.TrimPrefix(eventType, "HistoryEvent_")
+	eventType = strings.TrimSuffix(eventType, "EventAttributes")
+	return eventType
+}
 
-	case s.DecisionTypeStartTimer:
-		data = d.StartTimerDecisionAttributes
-
-	case s.DecisionTypeCancelTimer:
-		data = d.CancelTimerDecisionAttributes
-
-	case s.DecisionTypeCompleteWorkflowExecution:
-		data = d.CompleteWorkflowExecutionDecisionAttributes
-
-	case s.DecisionTypeFailWorkflowExecution:
-		data = d.FailWorkflowExecutionDecisionAttributes
-
-	case s.DecisionTypeRecordMarker:
-		data = d.RecordMarkerDecisionAttributes
-
-	default:
-		data = d
-	}
-
-	return d.GetDecisionType().String() + ": " + anyToString(data)
+func GetDecisionType(d *apiv1.Decision) string {
+	decisionType := reflect.TypeOf(d.Attributes).Elem().Name()
+	decisionType = strings.TrimPrefix(decisionType, "Decision_")
+	decisionType = strings.TrimSuffix(decisionType, "DecisionAttributes")
+	return decisionType
 }

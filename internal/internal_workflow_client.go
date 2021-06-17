@@ -29,17 +29,17 @@ import (
 	"reflect"
 	"time"
 
-	"go.uber.org/cadence/v2/internal/common/serializer"
-
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
 
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
-	s "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/internal/common"
 	"go.uber.org/cadence/v2/internal/common/backoff"
 	"go.uber.org/cadence/v2/internal/common/metrics"
+	"go.uber.org/cadence/v2/internal/common/serializer"
+	"go.uber.org/cadence/v2/internal/common/util"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -47,7 +47,7 @@ var _ Client = (*workflowClient)(nil)
 var _ DomainClient = (*domainClient)(nil)
 
 const (
-	defaultDecisionTaskTimeoutInSecs = 10
+	defaultDecisionTaskTimeout = 10 * time.Second
 	defaultGetHistoryTimeoutInSecs   = 25
 )
 
@@ -58,7 +58,7 @@ var (
 type (
 	// workflowClient is the client for starting a workflow execution.
 	workflowClient struct {
-		workflowService    workflowserviceclient.Interface
+		workflowService    api.Interface
 		domain             string
 		registry           *registry
 		metricsScope       *metrics.TaggedScope
@@ -71,7 +71,7 @@ type (
 
 	// domainClient is the client for managing domains.
 	domainClient struct {
-		workflowService workflowserviceclient.Interface
+		workflowService api.Interface
 		metricsScope    tally.Scope
 		identity        string
 		featureFlags    FeatureFlags
@@ -120,7 +120,7 @@ type (
 		//	- EntityNotExistsError
 		//	- BadRequestError
 		//	- InternalServiceError
-		Next() (*s.HistoryEvent, error)
+		Next() (*apiv1.HistoryEvent, error)
 	}
 
 	// historyEventIteratorImpl is the implementation of HistoryEventIterator
@@ -129,13 +129,13 @@ type (
 		initialized bool
 		// local cached history events and corresponding consuming index
 		nextEventIndex int
-		events         []*s.HistoryEvent
+		events         []*apiv1.HistoryEvent
 		// token to get next page of history events
 		nexttoken []byte
 		// err when getting next page of history events
 		err error
 		// func which use a next token to get next page of history events
-		paginate func(nexttoken []byte) (*s.GetWorkflowExecutionHistoryResponse, error)
+		paginate func(nexttoken []byte) (*apiv1.GetWorkflowExecutionHistoryResponse, error)
 	}
 )
 
@@ -162,17 +162,17 @@ func (wc *workflowClient) StartWorkflow(
 		return nil, errors.New("missing TaskList")
 	}
 
-	executionTimeout := common.Int32Ceil(options.ExecutionStartToCloseTimeout.Seconds())
+	executionTimeout := options.ExecutionStartToCloseTimeout
 	if executionTimeout <= 0 {
 		return nil, errors.New("missing or invalid ExecutionStartToCloseTimeout")
 	}
 
-	decisionTaskTimeout := common.Int32Ceil(options.DecisionTaskStartToCloseTimeout.Seconds())
+	decisionTaskTimeout := options.DecisionTaskStartToCloseTimeout
 	if decisionTaskTimeout < 0 {
 		return nil, errors.New("negative DecisionTaskStartToCloseTimeout provided")
 	}
 	if decisionTaskTimeout == 0 {
-		decisionTaskTimeout = defaultDecisionTaskTimeoutInSecs
+		decisionTaskTimeout = defaultDecisionTaskTimeout
 	}
 
 	// Validate type and its arguments.
@@ -191,8 +191,8 @@ func (wc *workflowClient) StartWorkflow(
 		return nil, err
 	}
 
-	delayStartSeconds := common.Int32Ceil(options.DelayStart.Seconds())
-	if delayStartSeconds < 0 {
+	delayStart := options.DelayStart
+	if delayStart < 0 {
 		return nil, errors.New("Invalid DelayStart option")
 	}
 
@@ -210,26 +210,26 @@ func (wc *workflowClient) StartWorkflow(
 	header := wc.getWorkflowHeader(ctx)
 
 	// run propagators to extract information about tracing and other stuff, store in headers field
-	startRequest := &s.StartWorkflowExecutionRequest{
-		Domain:                              common.StringPtr(wc.domain),
-		RequestId:                           common.StringPtr(uuid.New()),
-		WorkflowId:                          common.StringPtr(workflowID),
-		WorkflowType:                        workflowTypePtr(*workflowType),
-		TaskList:                            common.TaskListPtr(s.TaskList{Name: common.StringPtr(options.TaskList)}),
-		Input:                               input,
-		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionTimeout),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(decisionTaskTimeout),
-		Identity:                            common.StringPtr(wc.identity),
-		WorkflowIdReusePolicy:               options.WorkflowIDReusePolicy.toThriftPtr(),
-		RetryPolicy:                         convertRetryPolicy(options.RetryPolicy),
-		CronSchedule:                        common.StringPtr(options.CronSchedule),
-		Memo:                                memo,
-		SearchAttributes:                    searchAttr,
-		Header:                              header,
-		DelayStartSeconds:                   common.Int32Ptr(delayStartSeconds),
+	startRequest := &apiv1.StartWorkflowExecutionRequest{
+		Domain:                       wc.domain,
+		RequestId:                    uuid.New(),
+		WorkflowId:                   workflowID,
+		WorkflowType:                 &apiv1.WorkflowType{Name: workflowType.Name},
+		TaskList:                     &apiv1.TaskList{Name: options.TaskList},
+		Input:                        &apiv1.Payload{Data: input},
+		ExecutionStartToCloseTimeout: api.DurationToProto(executionTimeout),
+		TaskStartToCloseTimeout:      api.DurationToProto(decisionTaskTimeout),
+		Identity:                     wc.identity,
+		WorkflowIdReusePolicy:        options.WorkflowIDReusePolicy.toProto(),
+		RetryPolicy:                  convertRetryPolicy(options.RetryPolicy),
+		CronSchedule:                 options.CronSchedule,
+		Memo:                         memo,
+		SearchAttributes:             searchAttr,
+		Header:                       header,
+		DelayStart:                   api.DurationToProto(delayStart),
 	}
 
-	var response *s.StartWorkflowExecutionResponse
+	var response *apiv1.StartWorkflowExecutionResponse
 
 	// Start creating workflow request.
 	err = backoff.Retry(ctx,
@@ -239,7 +239,7 @@ func (wc *workflowClient) StartWorkflow(
 
 			var err1 error
 			response, err1 = wc.workflowService.StartWorkflowExecution(tchCtx, startRequest, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 
 	if err != nil {
@@ -274,8 +274,8 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 	var workflowID string
 	executionInfo, err := wc.StartWorkflow(ctx, options, workflow, args...)
 	if err != nil {
-		if alreadyStartedErr, ok := err.(*s.WorkflowExecutionAlreadyStartedError); ok {
-			runID = alreadyStartedErr.GetRunId()
+		if alreadyStartedErr, ok := err.(*api.WorkflowExecutionAlreadyStartedError); ok {
+			runID = alreadyStartedErr.RunID
 			// Assumption is that AlreadyStarted is never returned when options.ID is empty as UUID generated by
 			// StartWorkflow is not going to collide ever.
 			workflowID = options.ID
@@ -288,7 +288,7 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 	}
 
 	iterFn := func(fnCtx context.Context, fnRunID string) HistoryEventIterator {
-		return wc.GetWorkflowHistory(fnCtx, workflowID, fnRunID, true, s.HistoryEventFilterTypeCloseEvent)
+		return wc.GetWorkflowHistory(fnCtx, workflowID, fnRunID, true, apiv1.EventFilterType_EVENT_FILTER_TYPE_CLOSE_EVENT)
 	}
 
 	return &workflowRunImpl{
@@ -309,7 +309,7 @@ func (wc *workflowClient) ExecuteWorkflow(ctx context.Context, options StartWork
 func (wc *workflowClient) GetWorkflow(ctx context.Context, workflowID string, runID string) WorkflowRun {
 
 	iterFn := func(fnCtx context.Context, fnRunID string) HistoryEventIterator {
-		return wc.GetWorkflowHistory(fnCtx, workflowID, fnRunID, true, s.HistoryEventFilterTypeCloseEvent)
+		return wc.GetWorkflowHistory(fnCtx, workflowID, fnRunID, true, apiv1.EventFilterType_EVENT_FILTER_TYPE_CLOSE_EVENT)
 	}
 
 	return &workflowRunImpl{
@@ -349,17 +349,17 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 		return nil, errors.New("missing TaskList")
 	}
 
-	executionTimeout := common.Int32Ceil(options.ExecutionStartToCloseTimeout.Seconds())
+	executionTimeout := options.ExecutionStartToCloseTimeout
 	if executionTimeout <= 0 {
 		return nil, errors.New("missing or invalid ExecutionStartToCloseTimeout")
 	}
 
-	decisionTaskTimeout := common.Int32Ceil(options.DecisionTaskStartToCloseTimeout.Seconds())
+	decisionTaskTimeout := options.DecisionTaskStartToCloseTimeout
 	if decisionTaskTimeout < 0 {
 		return nil, errors.New("negative DecisionTaskStartToCloseTimeout provided")
 	}
 	if decisionTaskTimeout == 0 {
-		decisionTaskTimeout = defaultDecisionTaskTimeoutInSecs
+		decisionTaskTimeout = defaultDecisionTaskTimeout
 	}
 
 	// Validate type and its arguments.
@@ -378,8 +378,8 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 		return nil, err
 	}
 
-	delayStartSeconds := common.Int32Ceil(options.DelayStart.Seconds())
-	if delayStartSeconds < 0 {
+	delayStart := options.DelayStart
+	if delayStart < 0 {
 		return nil, errors.New("Invalid DelayStart option")
 	}
 
@@ -390,28 +390,30 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 	// get workflow headers from the context
 	header := wc.getWorkflowHeader(ctx)
 
-	signalWithStartRequest := &s.SignalWithStartWorkflowExecutionRequest{
-		Domain:                              common.StringPtr(wc.domain),
-		RequestId:                           common.StringPtr(uuid.New()),
-		WorkflowId:                          common.StringPtr(workflowID),
-		WorkflowType:                        workflowTypePtr(*workflowType),
-		TaskList:                            common.TaskListPtr(s.TaskList{Name: common.StringPtr(options.TaskList)}),
-		Input:                               input,
-		ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(executionTimeout),
-		TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(decisionTaskTimeout),
-		SignalName:                          common.StringPtr(signalName),
-		SignalInput:                         signalInput,
-		Identity:                            common.StringPtr(wc.identity),
-		RetryPolicy:                         convertRetryPolicy(options.RetryPolicy),
-		CronSchedule:                        common.StringPtr(options.CronSchedule),
-		Memo:                                memo,
-		SearchAttributes:                    searchAttr,
-		WorkflowIdReusePolicy:               options.WorkflowIDReusePolicy.toThriftPtr(),
-		Header:                              header,
-		DelayStartSeconds:                   common.Int32Ptr(delayStartSeconds),
+	signalWithStartRequest := &apiv1.SignalWithStartWorkflowExecutionRequest{
+		SignalName:   signalName,
+		SignalInput:  &apiv1.Payload{Data: signalInput},
+		StartRequest: &apiv1.StartWorkflowExecutionRequest{
+			Domain:                       wc.domain,
+			RequestId:                    uuid.New(),
+			WorkflowId:                   workflowID,
+			WorkflowType:                 &apiv1.WorkflowType{Name: workflowType.Name},
+			TaskList:                     &apiv1.TaskList{Name: options.TaskList},
+			Input:                        &apiv1.Payload{Data: input},
+			ExecutionStartToCloseTimeout: api.DurationToProto(executionTimeout),
+			TaskStartToCloseTimeout:      api.DurationToProto(decisionTaskTimeout),
+			Identity:                     wc.identity,
+			RetryPolicy:                  convertRetryPolicy(options.RetryPolicy),
+			CronSchedule:                 options.CronSchedule,
+			Memo:                         memo,
+			SearchAttributes:             searchAttr,
+			WorkflowIdReusePolicy:        options.WorkflowIDReusePolicy.toProto(),
+			Header:                       header,
+			DelayStart:                   api.DurationToProto(delayStart),
+		},
 	}
 
-	var response *s.StartWorkflowExecutionResponse
+	var response *apiv1.SignalWithStartWorkflowExecutionResponse
 
 	// Start creating workflow request.
 	err = backoff.Retry(ctx,
@@ -421,7 +423,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 
 			var err1 error
 			response, err1 = wc.workflowService.SignalWithStartWorkflowExecution(tchCtx, signalWithStartRequest, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 
 	if err != nil {
@@ -443,20 +445,21 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 // workflowID is required, other parameters are optional.
 // If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
 func (wc *workflowClient) CancelWorkflow(ctx context.Context, workflowID string, runID string) error {
-	request := &s.RequestCancelWorkflowExecutionRequest{
-		Domain: common.StringPtr(wc.domain),
-		WorkflowExecution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      getRunID(runID),
+	request := &apiv1.RequestCancelWorkflowExecutionRequest{
+		Domain: wc.domain,
+		WorkflowExecution: &apiv1.WorkflowExecution{
+			WorkflowId: workflowID,
+			RunId:      runID,
 		},
-		Identity: common.StringPtr(wc.identity),
+		Identity: wc.identity,
 	}
 
 	return backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
-			return wc.workflowService.RequestCancelWorkflowExecution(tchCtx, request, opt...)
+			_, err := wc.workflowService.RequestCancelWorkflowExecution(tchCtx, request, opt...)
+			return api.ConvertError(err)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 }
 
@@ -464,22 +467,23 @@ func (wc *workflowClient) CancelWorkflow(ctx context.Context, workflowID string,
 // workflowID is required, other parameters are optional.
 // If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
 func (wc *workflowClient) TerminateWorkflow(ctx context.Context, workflowID string, runID string, reason string, details []byte) error {
-	request := &s.TerminateWorkflowExecutionRequest{
-		Domain: common.StringPtr(wc.domain),
-		WorkflowExecution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      getRunID(runID),
+	request := &apiv1.TerminateWorkflowExecutionRequest{
+		Domain: wc.domain,
+		WorkflowExecution: &apiv1.WorkflowExecution{
+			WorkflowId: workflowID,
+			RunId:      runID,
 		},
-		Reason:   common.StringPtr(reason),
-		Details:  details,
-		Identity: common.StringPtr(wc.identity),
+		Reason:   reason,
+		Details:  &apiv1.Payload{Data: details},
+		Identity: wc.identity,
 	}
 
 	err := backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
-			return wc.workflowService.TerminateWorkflowExecution(tchCtx, request, opt...)
+			_, err := wc.workflowService.TerminateWorkflowExecution(tchCtx, request, opt...)
+			return api.ConvertError(err)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 
 	return err
@@ -491,24 +495,24 @@ func (wc *workflowClient) GetWorkflowHistory(
 	workflowID string,
 	runID string,
 	isLongPoll bool,
-	filterType s.HistoryEventFilterType,
+	filterType apiv1.EventFilterType,
 ) HistoryEventIterator {
 
 	domain := wc.domain
-	paginate := func(nextToken []byte) (*s.GetWorkflowExecutionHistoryResponse, error) {
-		request := &s.GetWorkflowExecutionHistoryRequest{
-			Domain: common.StringPtr(domain),
-			Execution: &s.WorkflowExecution{
-				WorkflowId: common.StringPtr(workflowID),
-				RunId:      getRunID(runID),
+	paginate := func(nextToken []byte) (*apiv1.GetWorkflowExecutionHistoryResponse, error) {
+		request := &apiv1.GetWorkflowExecutionHistoryRequest{
+			Domain: domain,
+			WorkflowExecution: &apiv1.WorkflowExecution{
+				WorkflowId: workflowID,
+				RunId:      runID,
 			},
-			WaitForNewEvent:        common.BoolPtr(isLongPoll),
-			HistoryEventFilterType: &filterType,
+			WaitForNewEvent:        isLongPoll,
+			HistoryEventFilterType: filterType,
 			NextPageToken:          nextToken,
-			SkipArchival:           common.BoolPtr(isLongPoll),
+			SkipArchival:           isLongPoll,
 		}
 
-		var response *s.GetWorkflowExecutionHistoryResponse
+		var response *apiv1.GetWorkflowExecutionHistoryResponse
 		var err error
 	Loop:
 		for {
@@ -522,6 +526,7 @@ func (wc *workflowClient) GetWorkflowHistory(
 					})
 					defer cancel()
 					response, err1 = wc.workflowService.GetWorkflowExecutionHistory(tchCtx, request, opt...)
+					err1 = api.ConvertError(err1)
 
 					if err1 != nil {
 						return err1
@@ -560,10 +565,10 @@ func (wc *workflowClient) GetWorkflowHistory(
 }
 
 func isEntityNonExistFromPassive(err error) bool {
-	if nonExistError, ok := err.(*s.EntityNotExistsError); ok {
-		return nonExistError.GetActiveCluster() != "" &&
-			nonExistError.GetCurrentCluster() != "" &&
-			nonExistError.GetActiveCluster() != nonExistError.GetCurrentCluster()
+	if nonExistError, ok := err.(*api.EntityNotExistsError); ok {
+		return nonExistError.ActiveCluster != "" &&
+			nonExistError.CurrentCluster != "" &&
+			nonExistError.ActiveCluster != nonExistError.CurrentCluster
 	}
 
 	return false
@@ -637,18 +642,18 @@ func (wc *workflowClient) RecordActivityHeartbeatByID(ctx context.Context,
 //  - BadRequestError
 //  - InternalServiceError
 //  - EntityNotExistError
-func (wc *workflowClient) ListClosedWorkflow(ctx context.Context, request *s.ListClosedWorkflowExecutionsRequest) (*s.ListClosedWorkflowExecutionsResponse, error) {
+func (wc *workflowClient) ListClosedWorkflow(ctx context.Context, request *apiv1.ListClosedWorkflowExecutionsRequest) (*apiv1.ListClosedWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
-		request.Domain = common.StringPtr(wc.domain)
+		request.Domain = wc.domain
 	}
-	var response *s.ListClosedWorkflowExecutionsResponse
+	var response *apiv1.ListClosedWorkflowExecutionsResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ListClosedWorkflowExecutions(tchCtx, request, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -661,18 +666,18 @@ func (wc *workflowClient) ListClosedWorkflow(ctx context.Context, request *s.Lis
 //  - BadRequestError
 //  - InternalServiceError
 //  - EntityNotExistError
-func (wc *workflowClient) ListOpenWorkflow(ctx context.Context, request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error) {
+func (wc *workflowClient) ListOpenWorkflow(ctx context.Context, request *apiv1.ListOpenWorkflowExecutionsRequest) (*apiv1.ListOpenWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
-		request.Domain = common.StringPtr(wc.domain)
+		request.Domain = wc.domain
 	}
-	var response *s.ListOpenWorkflowExecutionsResponse
+	var response *apiv1.ListOpenWorkflowExecutionsResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ListOpenWorkflowExecutions(tchCtx, request, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -681,18 +686,18 @@ func (wc *workflowClient) ListOpenWorkflow(ctx context.Context, request *s.ListO
 }
 
 // ListWorkflow implementation
-func (wc *workflowClient) ListWorkflow(ctx context.Context, request *s.ListWorkflowExecutionsRequest) (*s.ListWorkflowExecutionsResponse, error) {
+func (wc *workflowClient) ListWorkflow(ctx context.Context, request *apiv1.ListWorkflowExecutionsRequest) (*apiv1.ListWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
-		request.Domain = common.StringPtr(wc.domain)
+		request.Domain = wc.domain
 	}
-	var response *s.ListWorkflowExecutionsResponse
+	var response *apiv1.ListWorkflowExecutionsResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ListWorkflowExecutions(tchCtx, request, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -701,11 +706,11 @@ func (wc *workflowClient) ListWorkflow(ctx context.Context, request *s.ListWorkf
 }
 
 // ListArchivedWorkflow implementation
-func (wc *workflowClient) ListArchivedWorkflow(ctx context.Context, request *s.ListArchivedWorkflowExecutionsRequest) (*s.ListArchivedWorkflowExecutionsResponse, error) {
+func (wc *workflowClient) ListArchivedWorkflow(ctx context.Context, request *apiv1.ListArchivedWorkflowExecutionsRequest) (*apiv1.ListArchivedWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
-		request.Domain = common.StringPtr(wc.domain)
+		request.Domain = wc.domain
 	}
-	var response *s.ListArchivedWorkflowExecutionsResponse
+	var response *apiv1.ListArchivedWorkflowExecutionsResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
@@ -724,7 +729,7 @@ func (wc *workflowClient) ListArchivedWorkflow(ctx context.Context, request *s.L
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags, chanTimeout(timeout))
 			defer cancel()
 			response, err1 = wc.workflowService.ListArchivedWorkflowExecutions(tchCtx, request, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -733,18 +738,18 @@ func (wc *workflowClient) ListArchivedWorkflow(ctx context.Context, request *s.L
 }
 
 // ScanWorkflow implementation
-func (wc *workflowClient) ScanWorkflow(ctx context.Context, request *s.ListWorkflowExecutionsRequest) (*s.ListWorkflowExecutionsResponse, error) {
+func (wc *workflowClient) ScanWorkflow(ctx context.Context, request *apiv1.ScanWorkflowExecutionsRequest) (*apiv1.ScanWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
-		request.Domain = common.StringPtr(wc.domain)
+		request.Domain = wc.domain
 	}
-	var response *s.ListWorkflowExecutionsResponse
+	var response *apiv1.ScanWorkflowExecutionsResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ScanWorkflowExecutions(tchCtx, request, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -753,18 +758,18 @@ func (wc *workflowClient) ScanWorkflow(ctx context.Context, request *s.ListWorkf
 }
 
 // CountWorkflow implementation
-func (wc *workflowClient) CountWorkflow(ctx context.Context, request *s.CountWorkflowExecutionsRequest) (*s.CountWorkflowExecutionsResponse, error) {
+func (wc *workflowClient) CountWorkflow(ctx context.Context, request *apiv1.CountWorkflowExecutionsRequest) (*apiv1.CountWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
-		request.Domain = common.StringPtr(wc.domain)
+		request.Domain = wc.domain
 	}
-	var response *s.CountWorkflowExecutionsResponse
+	var response *apiv1.CountWorkflowExecutionsResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.CountWorkflowExecutions(tchCtx, request, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -773,18 +778,18 @@ func (wc *workflowClient) CountWorkflow(ctx context.Context, request *s.CountWor
 }
 
 // ResetWorkflow implementation
-func (wc *workflowClient) ResetWorkflow(ctx context.Context, request *s.ResetWorkflowExecutionRequest) (*s.ResetWorkflowExecutionResponse, error) {
+func (wc *workflowClient) ResetWorkflow(ctx context.Context, request *apiv1.ResetWorkflowExecutionRequest) (*apiv1.ResetWorkflowExecutionResponse, error) {
 	if len(request.GetDomain()) == 0 {
-		request.Domain = common.StringPtr(wc.domain)
+		request.Domain = wc.domain
 	}
-	var response *s.ResetWorkflowExecutionResponse
+	var response *apiv1.ResetWorkflowExecutionResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.ResetWorkflowExecution(tchCtx, request, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -793,15 +798,15 @@ func (wc *workflowClient) ResetWorkflow(ctx context.Context, request *s.ResetWor
 }
 
 // GetSearchAttributes implementation
-func (wc *workflowClient) GetSearchAttributes(ctx context.Context) (*s.GetSearchAttributesResponse, error) {
-	var response *s.GetSearchAttributesResponse
+func (wc *workflowClient) GetSearchAttributes(ctx context.Context) (*apiv1.GetSearchAttributesResponse, error) {
+	var response *apiv1.GetSearchAttributesResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
-			response, err1 = wc.workflowService.GetSearchAttributes(tchCtx, opt...)
-			return err1
+			response, err1 = wc.workflowService.GetSearchAttributes(tchCtx, &apiv1.GetSearchAttributesRequest{}, opt...)
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -814,22 +819,22 @@ func (wc *workflowClient) GetSearchAttributes(ctx context.Context) (*s.GetSearch
 //  - BadRequestError
 //  - InternalServiceError
 //  - EntityNotExistError
-func (wc *workflowClient) DescribeWorkflowExecution(ctx context.Context, workflowID, runID string) (*s.DescribeWorkflowExecutionResponse, error) {
-	request := &s.DescribeWorkflowExecutionRequest{
-		Domain: common.StringPtr(wc.domain),
-		Execution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr(workflowID),
-			RunId:      common.StringPtr(runID),
+func (wc *workflowClient) DescribeWorkflowExecution(ctx context.Context, workflowID, runID string) (*apiv1.DescribeWorkflowExecutionResponse, error) {
+	request := &apiv1.DescribeWorkflowExecutionRequest{
+		Domain: wc.domain,
+		WorkflowExecution: &apiv1.WorkflowExecution{
+			WorkflowId: workflowID,
+			RunId:      runID,
 		},
 	}
-	var response *s.DescribeWorkflowExecutionResponse
+	var response *apiv1.DescribeWorkflowExecutionResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			var err1 error
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			response, err1 = wc.workflowService.DescribeWorkflowExecution(tchCtx, request, opt...)
-			return err1
+			return api.ConvertError(err1)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -884,12 +889,12 @@ type QueryWorkflowWithOptionsRequest struct {
 	// QueryRejectCondition is an optional field used to reject queries based on workflow state.
 	// QueryRejectConditionNotOpen will reject queries to workflows which are not open
 	// QueryRejectConditionNotCompletedCleanly will reject queries to workflows which completed in any state other than completed (e.g. terminated, canceled timeout etc...)
-	QueryRejectCondition *s.QueryRejectCondition
+	QueryRejectCondition apiv1.QueryRejectCondition
 
 	// QueryConsistencyLevel is an optional field used to control the consistency level.
 	// QueryConsistencyLevelEventual means that query will eventually reflect up to date state of a workflow.
 	// QueryConsistencyLevelStrong means that query will reflect a workflow state of having applied all events which came before the query.
-	QueryConsistencyLevel *s.QueryConsistencyLevel
+	QueryConsistencyLevel apiv1.QueryConsistencyLevel
 }
 
 // QueryWorkflowWithOptionsResponse is the response to QueryWorkflowWithOptions
@@ -899,7 +904,7 @@ type QueryWorkflowWithOptionsResponse struct {
 	QueryResult Value
 
 	// QueryRejected contains information about the query rejection.
-	QueryRejected *s.QueryRejected
+	QueryRejected *apiv1.QueryRejected
 }
 
 // QueryWorkflowWithOptions queries a given workflow execution and returns the query result synchronously.
@@ -917,28 +922,28 @@ func (wc *workflowClient) QueryWorkflowWithOptions(ctx context.Context, request 
 			return nil, err
 		}
 	}
-	req := &s.QueryWorkflowRequest{
-		Domain: common.StringPtr(wc.domain),
-		Execution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr(request.WorkflowID),
-			RunId:      getRunID(request.RunID),
+	req := &apiv1.QueryWorkflowRequest{
+		Domain: wc.domain,
+		WorkflowExecution: &apiv1.WorkflowExecution{
+			WorkflowId: request.WorkflowID,
+			RunId:      request.RunID,
 		},
-		Query: &s.WorkflowQuery{
-			QueryType: common.StringPtr(request.QueryType),
-			QueryArgs: input,
+		Query: &apiv1.WorkflowQuery{
+			QueryType: request.QueryType,
+			QueryArgs: &apiv1.Payload{Data: input},
 		},
 		QueryRejectCondition:  request.QueryRejectCondition,
 		QueryConsistencyLevel: request.QueryConsistencyLevel,
 	}
 
-	var resp *s.QueryWorkflowResponse
+	var resp *apiv1.QueryWorkflowResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContextForQuery(ctx, wc.featureFlags)
 			defer cancel()
 			var err error
 			resp, err = wc.workflowService.QueryWorkflow(tchCtx, req, opt...)
-			return err
+			return api.ConvertError(err)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -952,7 +957,7 @@ func (wc *workflowClient) QueryWorkflowWithOptions(ctx context.Context, request 
 	}
 	return &QueryWorkflowWithOptionsResponse{
 		QueryRejected: nil,
-		QueryResult:   newEncodedValue(resp.QueryResult, wc.dataConverter),
+		QueryResult:   newEncodedValue(resp.QueryResult.GetData(), wc.dataConverter),
 	}, nil
 }
 
@@ -964,21 +969,21 @@ func (wc *workflowClient) QueryWorkflowWithOptions(ctx context.Context, request 
 //  - BadRequestError
 //  - InternalServiceError
 //  - EntityNotExistError
-func (wc *workflowClient) DescribeTaskList(ctx context.Context, tasklist string, tasklistType s.TaskListType) (*s.DescribeTaskListResponse, error) {
-	request := &s.DescribeTaskListRequest{
-		Domain:       common.StringPtr(wc.domain),
-		TaskList:     &s.TaskList{Name: common.StringPtr(tasklist)},
-		TaskListType: &tasklistType,
+func (wc *workflowClient) DescribeTaskList(ctx context.Context, tasklist string, tasklistType apiv1.TaskListType) (*apiv1.DescribeTaskListResponse, error) {
+	request := &apiv1.DescribeTaskListRequest{
+		Domain:       wc.domain,
+		TaskList:     &apiv1.TaskList{Name: tasklist},
+		TaskListType: tasklistType,
 	}
 
-	var resp *s.DescribeTaskListResponse
+	var resp *apiv1.DescribeTaskListResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
 			defer cancel()
 			var err error
 			resp, err = wc.workflowService.DescribeTaskList(tchCtx, request, opt...)
-			return err
+			return api.ConvertError(err)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -987,9 +992,9 @@ func (wc *workflowClient) DescribeTaskList(ctx context.Context, tasklist string,
 	return resp, nil
 }
 
-func (wc *workflowClient) getWorkflowHeader(ctx context.Context) *s.Header {
-	header := &s.Header{
-		Fields: make(map[string][]byte),
+func (wc *workflowClient) getWorkflowHeader(ctx context.Context) *apiv1.Header {
+	header := &apiv1.Header{
+		Fields: make(map[string]*apiv1.Payload),
 	}
 	writer := NewHeaderWriter(header)
 	for _, ctxProp := range wc.contextPropagators {
@@ -1003,12 +1008,13 @@ func (wc *workflowClient) getWorkflowHeader(ctx context.Context) *s.Header {
 //	- DomainAlreadyExistsError
 //	- BadRequestError
 //	- InternalServiceError
-func (dc *domainClient) Register(ctx context.Context, request *s.RegisterDomainRequest) error {
+func (dc *domainClient) Register(ctx context.Context, request *apiv1.RegisterDomainRequest) error {
 	return backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx, dc.featureFlags)
 			defer cancel()
-			return dc.workflowService.RegisterDomain(tchCtx, request, opt...)
+			_, err := dc.workflowService.RegisterDomain(tchCtx, request, opt...)
+			return api.ConvertError(err)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 }
 
@@ -1020,19 +1026,19 @@ func (dc *domainClient) Register(ctx context.Context, request *s.RegisterDomainR
 //	- EntityNotExistsError
 //	- BadRequestError
 //	- InternalServiceError
-func (dc *domainClient) Describe(ctx context.Context, name string) (*s.DescribeDomainResponse, error) {
-	request := &s.DescribeDomainRequest{
-		Name: common.StringPtr(name),
+func (dc *domainClient) Describe(ctx context.Context, name string) (*apiv1.DescribeDomainResponse, error) {
+	request := &apiv1.DescribeDomainRequest{
+		DescribeBy: &apiv1.DescribeDomainRequest_Name{Name: name},
 	}
 
-	var response *s.DescribeDomainResponse
+	var response *apiv1.DescribeDomainResponse
 	err := backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx, dc.featureFlags)
 			defer cancel()
 			var err error
 			response, err = dc.workflowService.DescribeDomain(tchCtx, request, opt...)
-			return err
+			return api.ConvertError(err)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	if err != nil {
 		return nil, err
@@ -1045,13 +1051,13 @@ func (dc *domainClient) Describe(ctx context.Context, name string) (*s.DescribeD
 //	- EntityNotExistsError
 //	- BadRequestError
 //	- InternalServiceError
-func (dc *domainClient) Update(ctx context.Context, request *s.UpdateDomainRequest) error {
+func (dc *domainClient) Update(ctx context.Context, request *apiv1.UpdateDomainRequest) error {
 	return backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx, dc.featureFlags)
 			defer cancel()
 			_, err := dc.workflowService.UpdateDomain(tchCtx, request, opt...)
-			return err
+			return api.ConvertError(err)
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 }
 
@@ -1089,7 +1095,7 @@ func (iter *historyEventIteratorImpl) HasNext() bool {
 	return false
 }
 
-func (iter *historyEventIteratorImpl) Next() (*s.HistoryEvent, error) {
+func (iter *historyEventIteratorImpl) Next() (*apiv1.HistoryEvent, error) {
 	// if caller call the Next() when iteration is over, just return nil, nil
 	if !iter.HasNext() {
 		panic("HistoryEventIterator Next() called without checking HasNext()")
@@ -1129,9 +1135,9 @@ func (workflowRun *workflowRunImpl) Get(ctx context.Context, valuePtr interface{
 		return err
 	}
 
-	switch closeEvent.GetEventType() {
-	case s.EventTypeWorkflowExecutionCompleted:
-		attributes := closeEvent.WorkflowExecutionCompletedEventAttributes
+	switch attr := closeEvent.Attributes.(type){
+	case *apiv1.HistoryEvent_WorkflowExecutionCompletedEventAttributes:
+		attributes := attr.WorkflowExecutionCompletedEventAttributes
 		if valuePtr == nil || attributes.Result == nil {
 			return nil
 		}
@@ -1139,57 +1145,57 @@ func (workflowRun *workflowRunImpl) Get(ctx context.Context, valuePtr interface{
 		if rf.Type().Kind() != reflect.Ptr {
 			return errors.New("value parameter is not a pointer")
 		}
-		err = deSerializeFunctionResult(workflowRun.workflowFn, attributes.Result, valuePtr, workflowRun.dataConverter, workflowRun.registry)
-	case s.EventTypeWorkflowExecutionFailed:
-		attributes := closeEvent.WorkflowExecutionFailedEventAttributes
-		err = constructError(attributes.GetReason(), attributes.Details, workflowRun.dataConverter)
-	case s.EventTypeWorkflowExecutionCanceled:
-		attributes := closeEvent.WorkflowExecutionCanceledEventAttributes
-		details := newEncodedValues(attributes.Details, workflowRun.dataConverter)
+		err = deSerializeFunctionResult(workflowRun.workflowFn, attributes.Result.GetData(), valuePtr, workflowRun.dataConverter, workflowRun.registry)
+	case *apiv1.HistoryEvent_WorkflowExecutionFailedEventAttributes:
+		attributes := attr.WorkflowExecutionFailedEventAttributes
+		err = constructError(attributes.Failure.GetReason(), attributes.Failure.GetDetails(), workflowRun.dataConverter)
+	case *apiv1.HistoryEvent_WorkflowExecutionCanceledEventAttributes:
+		attributes := attr.WorkflowExecutionCanceledEventAttributes
+		details := newEncodedValues(attributes.Details.GetData(), workflowRun.dataConverter)
 		err = NewCanceledError(details)
-	case s.EventTypeWorkflowExecutionTerminated:
+	case *apiv1.HistoryEvent_WorkflowExecutionTerminatedEventAttributes:
 		err = newTerminatedError()
-	case s.EventTypeWorkflowExecutionTimedOut:
-		attributes := closeEvent.WorkflowExecutionTimedOutEventAttributes
+	case *apiv1.HistoryEvent_WorkflowExecutionTimedOutEventAttributes:
+		attributes := attr.WorkflowExecutionTimedOutEventAttributes
 		err = NewTimeoutError(attributes.GetTimeoutType())
-	case s.EventTypeWorkflowExecutionContinuedAsNew:
-		attributes := closeEvent.WorkflowExecutionContinuedAsNewEventAttributes
+	case *apiv1.HistoryEvent_WorkflowExecutionContinuedAsNewEventAttributes:
+		attributes := attr.WorkflowExecutionContinuedAsNewEventAttributes
 		workflowRun.currentRunID = attributes.GetNewExecutionRunId()
 		return workflowRun.Get(ctx, valuePtr)
 	default:
-		err = fmt.Errorf("Unexpected event type %s when handling workflow execution result", closeEvent.GetEventType())
+		err = fmt.Errorf("Unexpected event type %s when handling workflow execution result", util.GetHistoryEventType(closeEvent))
 	}
 	return err
 }
 
-func getWorkflowMemo(input map[string]interface{}, dc DataConverter) (*s.Memo, error) {
+func getWorkflowMemo(input map[string]interface{}, dc DataConverter) (*apiv1.Memo, error) {
 	if input == nil {
 		return nil, nil
 	}
 
-	memo := make(map[string][]byte)
+	memo := make(map[string]*apiv1.Payload)
 	for k, v := range input {
 		memoBytes, err := encodeArg(dc, v)
 		if err != nil {
 			return nil, fmt.Errorf("encode workflow memo error: %v", err.Error())
 		}
-		memo[k] = memoBytes
+		memo[k] = &apiv1.Payload{Data: memoBytes}
 	}
-	return &s.Memo{Fields: memo}, nil
+	return &apiv1.Memo{Fields: memo}, nil
 }
 
-func serializeSearchAttributes(input map[string]interface{}) (*s.SearchAttributes, error) {
+func serializeSearchAttributes(input map[string]interface{}) (*apiv1.SearchAttributes, error) {
 	if input == nil {
 		return nil, nil
 	}
 
-	attr := make(map[string][]byte)
+	attr := make(map[string]*apiv1.Payload)
 	for k, v := range input {
 		attrBytes, err := json.Marshal(v)
 		if err != nil {
 			return nil, fmt.Errorf("encode search attribute [%s] error: %v", k, err)
 		}
-		attr[k] = attrBytes
+		attr[k] = &apiv1.Payload{Data: attrBytes}
 	}
-	return &s.SearchAttributes{IndexedFields: attr}, nil
+	return &apiv1.SearchAttributes{IndexedFields: attr}, nil
 }

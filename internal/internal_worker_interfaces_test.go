@@ -30,8 +30,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowservicetest"
-	m "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/zap"
 )
 
@@ -53,7 +53,7 @@ type (
 	InterfacesTestSuite struct {
 		suite.Suite
 		mockCtrl *gomock.Controller
-		service  *workflowservicetest.MockClient
+		service *api.MockInterface
 	}
 )
 
@@ -167,7 +167,7 @@ func TestInterfacesTestSuite(t *testing.T) {
 
 func (s *InterfacesTestSuite) SetupTest() {
 	s.mockCtrl = gomock.NewController(s.T())
-	s.service = workflowservicetest.NewMockClient(s.mockCtrl)
+	s.service = api.NewMockInterface(s.mockCtrl)
 }
 
 func (s *InterfacesTestSuite) TearDownTest() {
@@ -186,21 +186,21 @@ func (s *InterfacesTestSuite) TestInterface() {
 		Tracer:                       opentracing.NoopTracer{},
 	}
 
-	domainStatus := m.DomainStatusRegistered
-	domainDesc := &m.DescribeDomainResponse{
-		DomainInfo: &m.DomainInfo{
-			Name:   &domain,
-			Status: &domainStatus,
+	domainStatus := apiv1.DomainStatus_DOMAIN_STATUS_REGISTERED
+	domainDesc := &apiv1.DescribeDomainResponse{
+		Domain: &apiv1.Domain{
+			Name:   domain,
+			Status: domainStatus,
 		},
 	}
 
 	// mocks
 	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions...).Return(domainDesc, nil).AnyTimes()
-	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForActivityTaskResponse{}, nil).AnyTimes()
-	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil).AnyTimes()
-	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, nil).AnyTimes()
+	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.PollForActivityTaskResponse{}, nil).AnyTimes()
+	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil).AnyTimes()
+	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.PollForDecisionTaskResponse{}, nil).AnyTimes()
 	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil).AnyTimes()
-	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(&m.StartWorkflowExecutionResponse{}, nil).AnyTimes()
+	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(&apiv1.StartWorkflowExecutionResponse{}, nil).AnyTimes()
 
 	registry := newRegistry()
 	// Launch worker.

@@ -26,7 +26,7 @@ import (
 	"context"
 	"time"
 
-	s "go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/internal/common/backoff"
 )
 
@@ -64,15 +64,15 @@ func createDynamicServiceRetryPolicy(ctx context.Context) backoff.RetryPolicy {
 func isServiceTransientError(err error) bool {
 	// Retrying by default so it covers all transport errors.
 	switch err.(type) {
-	case *s.BadRequestError,
-		*s.EntityNotExistsError,
-		*s.WorkflowExecutionAlreadyStartedError,
-		*s.WorkflowExecutionAlreadyCompletedError,
-		*s.DomainAlreadyExistsError,
-		*s.QueryFailedError,
-		*s.DomainNotActiveError,
-		*s.CancellationAlreadyRequestedError,
-		*s.ClientVersionNotSupportedError:
+	case *api.BadRequestError,
+		*api.EntityNotExistsError,
+		*api.WorkflowExecutionAlreadyStartedError,
+		*api.WorkflowExecutionAlreadyCompletedError,
+		*api.DomainAlreadyExistsError,
+		*api.QueryFailedError,
+		*api.DomainNotActiveError,
+		*api.CancellationAlreadyRequestedError,
+		*api.ClientVersionNotSupportedError:
 		return false
 	}
 

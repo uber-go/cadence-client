@@ -29,7 +29,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/zap"
 )
 
@@ -45,7 +45,7 @@ type (
 		logger   *zap.Logger
 		scope    tally.Scope
 		ctxProps []ContextPropagator
-		header   *shared.Header
+		header   *apiv1.Header
 	}
 
 	// TestWorkflowEnvironment is the environment that you use to test workflow
@@ -126,7 +126,7 @@ func (s *WorkflowTestSuite) SetContextPropagators(ctxProps []ContextPropagator) 
 
 // SetHeader sets the headers for this WorkflowTestSuite. If you don't set header, test suite will not pass headers to
 // the workflow
-func (s *WorkflowTestSuite) SetHeader(header *shared.Header) {
+func (s *WorkflowTestSuite) SetHeader(header *apiv1.Header) {
 	s.header = header
 }
 
@@ -247,7 +247,7 @@ func (t *TestWorkflowEnvironment) OnActivity(activity interface{}, args ...inter
 
 // ErrMockStartChildWorkflowFailed is special error used to indicate the mocked child workflow should fail to start.
 // This error is also exposed as public as testsuite.ErrMockStartChildWorkflowFailed
-var ErrMockStartChildWorkflowFailed = fmt.Errorf("start child workflow failed: %v", shared.ChildWorkflowExecutionFailedCauseWorkflowAlreadyRunning)
+var ErrMockStartChildWorkflowFailed = fmt.Errorf("start child workflow failed: %v", apiv1.ChildWorkflowExecutionFailedCause_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_RUNNING)
 
 // OnWorkflow setup a mock call for workflow. Parameter workflow must be workflow function (func) or workflow name (string).
 // You must call Return() with appropriate parameters on the returned *MockCallWrapper instance. The supplied parameters to

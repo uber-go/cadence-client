@@ -29,8 +29,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/v2/.gen/go/shared"
-	"go.uber.org/cadence/v2/internal/common"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/zap"
 )
 
@@ -76,8 +75,8 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full() {
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full_ResultMisMatch() {
 	fullHistory := getTestReplayWorkflowFullHistory()
 	completedEvent := fullHistory.Events[len(fullHistory.Events)-1]
-	s.Equal(shared.EventTypeWorkflowExecutionCompleted, completedEvent.GetEventType())
-	completedEvent.WorkflowExecutionCompletedEventAttributes.Result = []byte("some random result")
+	s.NotNil(completedEvent.GetWorkflowExecutionCompletedEventAttributes())
+	completedEvent.GetWorkflowExecutionCompletedEventAttributes().Result = &apiv1.Payload{Data: []byte("some random result")}
 
 	err := s.replayer.ReplayWorkflowHistory(s.logger, fullHistory)
 	s.Error(err)
@@ -86,7 +85,7 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full_ResultMisMatch() 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full_ContinueAsNew() {
 	fullHistory := getTestReplayWorkflowFullHistory()
 	completedEventIdx := len(fullHistory.Events) - 1
-	s.Equal(shared.EventTypeWorkflowExecutionCompleted, fullHistory.Events[completedEventIdx].GetEventType())
+	s.NotNil(fullHistory.Events[completedEventIdx].GetWorkflowExecutionCompletedEventAttributes())
 	fullHistory.Events[completedEventIdx] = createTestEventWorkflowExecutionContinuedAsNew(int64(completedEventIdx+1), nil)
 
 	err := s.replayer.ReplayWorkflowHistory(s.logger, fullHistory)
@@ -292,180 +291,180 @@ func (w localActivitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte
 	return []byte("Done"), nil
 }
 
-func getTestReplayWorkflowFullHistory() *shared.History {
-	return &shared.History{
-		Events: []*shared.HistoryEvent{
-			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v2/internal.testReplayWorkflow")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+func getTestReplayWorkflowFullHistory() *apiv1.History {
+	return &apiv1.History{
+		Events: []*apiv1.HistoryEvent{
+			createTestEventWorkflowExecutionStarted(1, &apiv1.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &apiv1.WorkflowType{Name: "go.uber.org/cadence/v2/internal.testReplayWorkflow"},
+				TaskList:     &apiv1.TaskList{Name: testTaskList},
+				Input:        &apiv1.Payload{Data: testEncodeFunctionArgs(getDefaultDataConverter())},
 			}),
-			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskScheduled(2, &apiv1.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
-			createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-			createTestEventActivityTaskScheduled(5, &shared.ActivityTaskScheduledEventAttributes{
-				ActivityId:   common.StringPtr("0"),
-				ActivityType: &shared.ActivityType{Name: common.StringPtr("testActivity")},
-				TaskList:     &shared.TaskList{Name: &testTaskList},
+			createTestEventDecisionTaskCompleted(4, &apiv1.DecisionTaskCompletedEventAttributes{}),
+			createTestEventActivityTaskScheduled(5, &apiv1.ActivityTaskScheduledEventAttributes{
+				ActivityId:   "0",
+				ActivityType: &apiv1.ActivityType{Name: "testActivity"},
+				TaskList:     &apiv1.TaskList{Name: testTaskList},
 			}),
-			createTestEventActivityTaskStarted(6, &shared.ActivityTaskStartedEventAttributes{
-				ScheduledEventId: common.Int64Ptr(5),
+			createTestEventActivityTaskStarted(6, &apiv1.ActivityTaskStartedEventAttributes{
+				ScheduledEventId: 5,
 			}),
-			createTestEventActivityTaskCompleted(7, &shared.ActivityTaskCompletedEventAttributes{
-				ScheduledEventId: common.Int64Ptr(5),
-				StartedEventId:   common.Int64Ptr(6),
+			createTestEventActivityTaskCompleted(7, &apiv1.ActivityTaskCompletedEventAttributes{
+				ScheduledEventId: 5,
+				StartedEventId:   6,
 			}),
-			createTestEventDecisionTaskScheduled(8, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskScheduled(8, &apiv1.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(9),
-			createTestEventDecisionTaskCompleted(10, &shared.DecisionTaskCompletedEventAttributes{
-				ScheduledEventId: common.Int64Ptr(8),
-				StartedEventId:   common.Int64Ptr(9),
+			createTestEventDecisionTaskCompleted(10, &apiv1.DecisionTaskCompletedEventAttributes{
+				ScheduledEventId: 8,
+				StartedEventId:   9,
 			}),
-			createTestEventWorkflowExecutionCompleted(11, &shared.WorkflowExecutionCompletedEventAttributes{
-				DecisionTaskCompletedEventId: common.Int64Ptr(10),
-			}),
-		},
-	}
-}
-
-func getTestReplayWorkflowPartialHistoryWithDecisionEvents() *shared.History {
-	return &shared.History{
-		Events: []*shared.HistoryEvent{
-			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v2/internal.testReplayWorkflow")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
-			}),
-			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
-			createTestEventDecisionTaskStarted(3),
-			createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-			createTestEventActivityTaskScheduled(5, &shared.ActivityTaskScheduledEventAttributes{
-				ActivityId:   common.StringPtr("0"),
-				ActivityType: &shared.ActivityType{Name: common.StringPtr("testActivity-fm")},
-				TaskList:     &shared.TaskList{Name: &testTaskList},
+			createTestEventWorkflowExecutionCompleted(11, &apiv1.WorkflowExecutionCompletedEventAttributes{
+				DecisionTaskCompletedEventId: 10,
 			}),
 		},
 	}
 }
 
-func getTestReplayWorkflowPartialHistoryNoDecisionEvents() *shared.History {
-	return &shared.History{
-		Events: []*shared.HistoryEvent{
-			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v2/internal.testReplayWorkflow")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+func getTestReplayWorkflowPartialHistoryWithDecisionEvents() *apiv1.History {
+	return &apiv1.History{
+		Events: []*apiv1.HistoryEvent{
+			createTestEventWorkflowExecutionStarted(1, &apiv1.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &apiv1.WorkflowType{Name: "go.uber.org/cadence/v2/internal.testReplayWorkflow"},
+				TaskList:     &apiv1.TaskList{Name: testTaskList},
+				Input:        &apiv1.Payload{Data: testEncodeFunctionArgs(getDefaultDataConverter())},
 			}),
-			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskScheduled(2, &apiv1.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
-			createTestEventDecisionTaskFailed(4, &shared.DecisionTaskFailedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
-			createTestEventDecisionTaskScheduled(5, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskCompleted(4, &apiv1.DecisionTaskCompletedEventAttributes{}),
+			createTestEventActivityTaskScheduled(5, &apiv1.ActivityTaskScheduledEventAttributes{
+				ActivityId:   "0",
+				ActivityType: &apiv1.ActivityType{Name: "testActivity-fm"},
+				TaskList:     &apiv1.TaskList{Name: testTaskList},
+			}),
+		},
+	}
+}
+
+func getTestReplayWorkflowPartialHistoryNoDecisionEvents() *apiv1.History {
+	return &apiv1.History{
+		Events: []*apiv1.HistoryEvent{
+			createTestEventWorkflowExecutionStarted(1, &apiv1.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &apiv1.WorkflowType{Name: "go.uber.org/cadence/v2/internal.testReplayWorkflow"},
+				TaskList:     &apiv1.TaskList{Name: testTaskList},
+				Input:        &apiv1.Payload{Data: testEncodeFunctionArgs(getDefaultDataConverter())},
+			}),
+			createTestEventDecisionTaskScheduled(2, &apiv1.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskStarted(3),
+			createTestEventDecisionTaskFailed(4, &apiv1.DecisionTaskFailedEventAttributes{ScheduledEventId: 2}),
+			createTestEventDecisionTaskScheduled(5, &apiv1.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(6),
 		},
 	}
 }
 
-func getTestReplayWorkflowMismatchHistory() *shared.History {
-	return &shared.History{
-		Events: []*shared.HistoryEvent{
-			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v2/internal.testReplayWorkflow")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+func getTestReplayWorkflowMismatchHistory() *apiv1.History {
+	return &apiv1.History{
+		Events: []*apiv1.HistoryEvent{
+			createTestEventWorkflowExecutionStarted(1, &apiv1.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &apiv1.WorkflowType{Name: "go.uber.org/cadence/v2/internal.testReplayWorkflow"},
+				TaskList:     &apiv1.TaskList{Name: "taskList"},
+				Input:        &apiv1.Payload{Data: testEncodeFunctionArgs(getDefaultDataConverter())},
 			}),
-			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskScheduled(2, &apiv1.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
-			createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
-			createTestEventActivityTaskScheduled(5, &shared.ActivityTaskScheduledEventAttributes{
-				ActivityId:   common.StringPtr("0"),
-				ActivityType: &shared.ActivityType{Name: common.StringPtr("unknownActivityType")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
+			createTestEventDecisionTaskCompleted(4, &apiv1.DecisionTaskCompletedEventAttributes{}),
+			createTestEventActivityTaskScheduled(5, &apiv1.ActivityTaskScheduledEventAttributes{
+				ActivityId:   "0",
+				ActivityType: &apiv1.ActivityType{Name: "unknownActivityType"},
+				TaskList:     &apiv1.TaskList{Name: "taskList"},
 			}),
 		},
 	}
 }
 
-func getTestReplayWorkflowLocalActivityHistory() *shared.History {
-	return &shared.History{
-		Events: []*shared.HistoryEvent{
-			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v2/internal.testReplayWorkflowLocalActivity")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+func getTestReplayWorkflowLocalActivityHistory() *apiv1.History {
+	return &apiv1.History{
+		Events: []*apiv1.HistoryEvent{
+			createTestEventWorkflowExecutionStarted(1, &apiv1.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &apiv1.WorkflowType{Name: "go.uber.org/cadence/v2/internal.testReplayWorkflowLocalActivity"},
+				TaskList:     &apiv1.TaskList{Name: testTaskList},
+				Input:        &apiv1.Payload{Data: testEncodeFunctionArgs(getDefaultDataConverter())},
 			}),
-			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskScheduled(2, &apiv1.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
-			createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
+			createTestEventDecisionTaskCompleted(4, &apiv1.DecisionTaskCompletedEventAttributes{}),
 
-			createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
-				MarkerName:                   common.StringPtr(localActivityMarkerName),
-				Details:                      createLocalActivityMarkerDataForTest("0", "go.uber.org/cadence/v2/internal.testActivity"),
-				DecisionTaskCompletedEventId: common.Int64Ptr(4),
+			createTestEventLocalActivity(5, &apiv1.MarkerRecordedEventAttributes{
+				MarkerName:                   localActivityMarkerName,
+				Details:                      &apiv1.Payload{Data: createLocalActivityMarkerDataForTest("0", "go.uber.org/cadence/v2/internal.testActivity")},
+				DecisionTaskCompletedEventId: 4,
 			}),
 
-			createTestEventWorkflowExecutionCompleted(6, &shared.WorkflowExecutionCompletedEventAttributes{
-				DecisionTaskCompletedEventId: common.Int64Ptr(4),
+			createTestEventWorkflowExecutionCompleted(6, &apiv1.WorkflowExecutionCompletedEventAttributes{
+				DecisionTaskCompletedEventId: 4,
 			}),
 		},
 	}
 }
 
-func getTestReplayWorkflowLocalActivityResultMismatchHistory() *shared.History {
-	return &shared.History{
-		Events: []*shared.HistoryEvent{
-			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v2/internal.testReplayWorkflowLocalActivity")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+func getTestReplayWorkflowLocalActivityResultMismatchHistory() *apiv1.History {
+	return &apiv1.History{
+		Events: []*apiv1.HistoryEvent{
+			createTestEventWorkflowExecutionStarted(1, &apiv1.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &apiv1.WorkflowType{Name: "go.uber.org/cadence/v2/internal.testReplayWorkflowLocalActivity"},
+				TaskList:     &apiv1.TaskList{Name: testTaskList},
+				Input:        &apiv1.Payload{Data: testEncodeFunctionArgs(getDefaultDataConverter())},
 			}),
-			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskScheduled(2, &apiv1.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
-			createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
+			createTestEventDecisionTaskCompleted(4, &apiv1.DecisionTaskCompletedEventAttributes{}),
 
-			createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
-				MarkerName:                   common.StringPtr(localActivityMarkerName),
-				Details:                      createLocalActivityMarkerDataForTest("0", ""),
-				DecisionTaskCompletedEventId: common.Int64Ptr(4),
+			createTestEventLocalActivity(5, &apiv1.MarkerRecordedEventAttributes{
+				MarkerName:                   localActivityMarkerName,
+				Details:                      &apiv1.Payload{Data: createLocalActivityMarkerDataForTest("0", "")},
+				DecisionTaskCompletedEventId: 4,
 			}),
 
-			createTestEventWorkflowExecutionCompleted(6, &shared.WorkflowExecutionCompletedEventAttributes{
-				Result:                       []byte("some-incorrect-result"),
-				DecisionTaskCompletedEventId: common.Int64Ptr(4),
+			createTestEventWorkflowExecutionCompleted(6, &apiv1.WorkflowExecutionCompletedEventAttributes{
+				Result:                       &apiv1.Payload{Data: []byte("some-incorrect-result")},
+				DecisionTaskCompletedEventId: 4,
 			}),
 		},
 	}
 }
 
-func getTestReplayWorkflowLocalActivityTypeMismatchHistory() *shared.History {
-	return &shared.History{
-		Events: []*shared.HistoryEvent{
-			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
-				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v2/internal.testReplayWorkflowLocalActivity")},
-				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+func getTestReplayWorkflowLocalActivityTypeMismatchHistory() *apiv1.History {
+	return &apiv1.History{
+		Events: []*apiv1.HistoryEvent{
+			createTestEventWorkflowExecutionStarted(1, &apiv1.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &apiv1.WorkflowType{Name: "go.uber.org/cadence/v2/internal.testReplayWorkflowLocalActivity"},
+				TaskList:     &apiv1.TaskList{Name: testTaskList},
+				Input:        &apiv1.Payload{Data: testEncodeFunctionArgs(getDefaultDataConverter())},
 			}),
-			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
+			createTestEventDecisionTaskScheduled(2, &apiv1.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
-			createTestEventDecisionTaskCompleted(4, &shared.DecisionTaskCompletedEventAttributes{}),
+			createTestEventDecisionTaskCompleted(4, &apiv1.DecisionTaskCompletedEventAttributes{}),
 
-			createTestEventLocalActivity(5, &shared.MarkerRecordedEventAttributes{
-				MarkerName:                   common.StringPtr(localActivityMarkerName),
-				Details:                      createLocalActivityMarkerDataForTest("0", "different-activity-type"),
-				DecisionTaskCompletedEventId: common.Int64Ptr(4),
+			createTestEventLocalActivity(5, &apiv1.MarkerRecordedEventAttributes{
+				MarkerName:                   localActivityMarkerName,
+				Details:                      &apiv1.Payload{Data: createLocalActivityMarkerDataForTest("0", "different-activity-type")},
+				DecisionTaskCompletedEventId: 4,
 			}),
 
-			createTestEventWorkflowExecutionCompleted(6, &shared.WorkflowExecutionCompletedEventAttributes{
-				DecisionTaskCompletedEventId: common.Int64Ptr(4),
+			createTestEventWorkflowExecutionCompleted(6, &apiv1.WorkflowExecutionCompletedEventAttributes{
+				DecisionTaskCompletedEventId: 4,
 			}),
 		},
 	}
 }
 
-func getTestReplayWorkflowContextPropagatorHistory() *shared.History {
+func getTestReplayWorkflowContextPropagatorHistory() *apiv1.History {
 	history := getTestReplayWorkflowFullHistory()
-	history.Events[0].WorkflowExecutionStartedEventAttributes.WorkflowType.Name = common.StringPtr("go.uber.org/cadence/v2/internal.testReplayWorkflowContextPropagator")
-	history.Events[0].WorkflowExecutionStartedEventAttributes.Header = &shared.Header{
-		Fields: map[string][]byte{testHeader: []byte("testValue")},
+	history.Events[0].GetWorkflowExecutionStartedEventAttributes().WorkflowType.Name = "go.uber.org/cadence/v2/internal.testReplayWorkflowContextPropagator"
+	history.Events[0].GetWorkflowExecutionStartedEventAttributes().Header = &apiv1.Header{
+		Fields: map[string]*apiv1.Payload{testHeader: {Data:[]byte("testValue")}},
 	}
 	return history
 }

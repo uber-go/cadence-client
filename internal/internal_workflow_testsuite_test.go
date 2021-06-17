@@ -33,8 +33,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/v2/.gen/go/shared"
-	"go.uber.org/cadence/v2/internal/common"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/zap"
 )
 
@@ -56,8 +56,8 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 	s.localActivityOptions = LocalActivityOptions{
 		ScheduleToCloseTimeout: time.Second * 3,
 	}
-	s.header = &shared.Header{
-		Fields: map[string][]byte{"test": []byte("test-data")},
+	s.header = &apiv1.Header{
+		Fields: map[string]*apiv1.Payload{"test": {Data: []byte("test-data")}},
 	}
 	s.ctxProps = []ContextPropagator{NewStringMapPropagator([]string{"test"})}
 }
@@ -387,9 +387,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithHeaderContext() {
 		return "", errors.New("value not found from ctx")
 	}
 
-	s.SetHeader(&shared.Header{
-		Fields: map[string][]byte{
-			testHeader: []byte("test-data"),
+	s.SetHeader(&apiv1.Header{
+		Fields: map[string]*apiv1.Payload{
+			testHeader: {Data: []byte("test-data")},
 		},
 	})
 
@@ -1245,7 +1245,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_GetVersion() {
 		changeVersionsBytes, ok := wfInfo.SearchAttributes.IndexedFields[CadenceChangeVersion]
 		s.True(ok)
 		var changeVersions []string
-		err = json.Unmarshal(changeVersionsBytes, &changeVersions)
+		err = json.Unmarshal(changeVersionsBytes.GetData(), &changeVersions)
 		s.NoError(err)
 		s.Equal(1, len(changeVersions))
 		s.Equal("test_change_id-2", changeVersions[0])
@@ -1305,7 +1305,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockGetVersion() {
 		changeVersionsBytes, ok := wfInfo.SearchAttributes.IndexedFields[CadenceChangeVersion]
 		s.True(ok)
 		var changeVersions []string
-		err = json.Unmarshal(changeVersionsBytes, &changeVersions)
+		err = json.Unmarshal(changeVersionsBytes.GetData(), &changeVersions)
 		s.NoError(err)
 		s.Equal(2, len(changeVersions))
 		s.Equal("change_2-2", changeVersions[0])
@@ -1371,7 +1371,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockUpsertSearchAttributes() {
 		s.NotNil(wfInfo.SearchAttributes)
 		valBytes := wfInfo.SearchAttributes.IndexedFields["CustomIntField"]
 		var result int
-		NewValue(valBytes).Get(&result)
+		NewValue(valBytes.GetData()).Get(&result)
 		s.Equal(1, result)
 
 		return nil
@@ -1429,34 +1429,34 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockUpsertSearchAttributes_OnError() {
 
 func (s *WorkflowTestSuiteUnitTest) Test_ActivityWithThriftTypes() {
 	actualValues := []string{}
-	retVal := &shared.WorkflowExecution{WorkflowId: common.StringPtr("retwID2"), RunId: common.StringPtr("retrID2")}
+	retVal := &apiv1.WorkflowExecution{WorkflowId: "retwID2", RunId: "retrID2"}
 
 	// Passing one argument
-	activitySingleFn := func(ctx context.Context, wf *shared.WorkflowExecution) (*shared.WorkflowExecution, error) {
+	activitySingleFn := func(ctx context.Context, wf *apiv1.WorkflowExecution) (*apiv1.WorkflowExecution, error) {
 		actualValues = append(actualValues, wf.GetWorkflowId())
 		actualValues = append(actualValues, wf.GetRunId())
 		return retVal, nil
 	}
 
-	input := &shared.WorkflowExecution{WorkflowId: common.StringPtr("wID1"), RunId: common.StringPtr("rID1")}
+	input := &apiv1.WorkflowExecution{WorkflowId: "wID1", RunId: "rID1"}
 	env := s.NewTestActivityEnvironment()
 	env.RegisterActivity(activitySingleFn)
 	blob, err := env.ExecuteActivity(activitySingleFn, input)
 	s.NoError(err)
-	var ret *shared.WorkflowExecution
+	var ret *apiv1.WorkflowExecution
 	blob.Get(&ret)
 	s.Equal(retVal, ret)
 
 	// Passing more than one argument
-	activityDoubleArgFn := func(ctx context.Context, wf *shared.WorkflowExecution, t *shared.WorkflowType) (*shared.WorkflowExecution, error) {
+	activityDoubleArgFn := func(ctx context.Context, wf *apiv1.WorkflowExecution, t *apiv1.WorkflowType) (*apiv1.WorkflowExecution, error) {
 		actualValues = append(actualValues, wf.GetWorkflowId())
 		actualValues = append(actualValues, wf.GetRunId())
 		actualValues = append(actualValues, t.GetName())
 		return retVal, nil
 	}
 
-	input = &shared.WorkflowExecution{WorkflowId: common.StringPtr("wID2"), RunId: common.StringPtr("rID3")}
-	wt := &shared.WorkflowType{Name: common.StringPtr("wType")}
+	input = &apiv1.WorkflowExecution{WorkflowId: "wID2", RunId: "rID3"}
+	wt := &apiv1.WorkflowType{Name: "wType"}
 	env = s.NewTestActivityEnvironment()
 	env.RegisterActivity(activityDoubleArgFn)
 	blob, err = env.ExecuteActivity(activityDoubleArgFn, input, wt)
@@ -1610,9 +1610,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowHeaderContext() {
 	}
 
 	s.SetContextPropagators([]ContextPropagator{NewStringMapPropagator([]string{testHeader})})
-	s.SetHeader(&shared.Header{
-		Fields: map[string][]byte{
-			testHeader: []byte("test-data"),
+	s.SetHeader(&apiv1.Header{
+		Fields: map[string]*apiv1.Payload{
+			testHeader: {Data: []byte("test-data")},
 		},
 	})
 
@@ -1654,9 +1654,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowContextPropagation() {
 	}
 
 	s.SetContextPropagators([]ContextPropagator{NewStringMapPropagator([]string{testHeader})})
-	s.SetHeader(&shared.Header{
-		Fields: map[string][]byte{
-			testHeader: []byte("test-data"),
+	s.SetHeader(&apiv1.Header{
+		Fields: map[string]*apiv1.Payload{
+			testHeader: {Data: []byte("test-data")},
 		},
 	})
 
@@ -2763,9 +2763,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockChildWorkflowAlreadyRunning() {
 		err := ExecuteChildWorkflow(ctx, childWorkflowFn).Get(ctx, nil)
 		s.Error(err)
 
-		alreadySytartedErr, ok := err.(*shared.WorkflowExecutionAlreadyStartedError)
+		alreadySytartedErr, ok := err.(*api.WorkflowExecutionAlreadyStartedError)
 		s.True(ok)
-		s.Equal(runID, *alreadySytartedErr.RunId)
+		s.Equal(runID, alreadySytartedErr.RunID)
 
 		return nil
 	}
@@ -2775,8 +2775,8 @@ func (s *WorkflowTestSuiteUnitTest) Test_MockChildWorkflowAlreadyRunning() {
 	RegisterWorkflow(workflowFn)
 
 	env.OnWorkflow(childWorkflowFn, mock.Anything).
-		Return(&shared.WorkflowExecutionAlreadyStartedError{
-			RunId: &runID,
+		Return(&api.WorkflowExecutionAlreadyStartedError{
+			RunID: runID,
 		})
 
 	env.ExecuteWorkflow(workflowFn)
@@ -2799,7 +2799,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowAlreadyRunning() {
 
 		err = f2.Get(ctx1, &result2)
 		s.Error(err)
-		_, ok := err.(*shared.WorkflowExecutionAlreadyStartedError)
+		_, ok := err.(*api.WorkflowExecutionAlreadyStartedError)
 		s.True(ok)
 
 		return result1 + " " + result2, nil
@@ -2999,7 +2999,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityTimeoutWithDetails() {
 	count := 0
 	timeoutFn := func() error {
 		count++
-		return NewTimeoutError(shared.TimeoutTypeStartToClose, testErrorDetails1)
+		return NewTimeoutError(apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE, testErrorDetails1)
 	}
 
 	timeoutWf := func(ctx Context) error {
@@ -3027,7 +3027,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityTimeoutWithDetails() {
 	s.Error(err)
 	timeoutErr, ok := err.(*TimeoutError)
 	s.True(ok)
-	s.Equal(shared.TimeoutTypeStartToClose, timeoutErr.TimeoutType())
+	s.Equal(apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE, timeoutErr.TimeoutType())
 	s.True(timeoutErr.HasDetails())
 	var details string
 	err = timeoutErr.Details(&details)
@@ -3042,7 +3042,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityTimeoutWithDetails() {
 	s.Error(err)
 	timeoutErr, ok = err.(*TimeoutError)
 	s.True(ok)
-	s.Equal(shared.TimeoutTypeStartToClose, timeoutErr.TimeoutType())
+	s.Equal(apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE, timeoutErr.TimeoutType())
 	s.True(timeoutErr.HasDetails())
 	err = timeoutErr.Details(&details)
 	s.NoError(err)
@@ -3073,7 +3073,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ActivityDeadlineExceeded() {
 	s.Error(err)
 	timeoutErr, ok := err.(*TimeoutError)
 	s.True(ok)
-	s.Equal(shared.TimeoutTypeStartToClose, timeoutErr.TimeoutType())
+	s.Equal(apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE, timeoutErr.TimeoutType())
 	s.True(timeoutErr.HasDetails())
 	var details string
 	err = timeoutErr.Details(&details)

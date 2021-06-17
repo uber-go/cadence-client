@@ -27,7 +27,7 @@ import (
 	"reflect"
 	"strings"
 
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 )
 
 /*
@@ -99,7 +99,7 @@ type (
 
 	// TimeoutError returned when activity or child workflow timed out.
 	TimeoutError struct {
-		timeoutType shared.TimeoutType
+		timeoutType apiv1.TimeoutType
 		details     Values
 	}
 
@@ -176,7 +176,7 @@ func NewCustomError(reason string, details ...interface{}) *CustomError {
 
 // NewTimeoutError creates TimeoutError instance.
 // Use NewHeartbeatTimeoutError to create heartbeat TimeoutError
-func NewTimeoutError(timeoutType shared.TimeoutType, details ...interface{}) *TimeoutError {
+func NewTimeoutError(timeoutType apiv1.TimeoutType, details ...interface{}) *TimeoutError {
 	if len(details) == 1 {
 		if d, ok := details[0].(*EncodedValues); ok {
 			return &TimeoutError{timeoutType: timeoutType, details: d}
@@ -187,7 +187,7 @@ func NewTimeoutError(timeoutType shared.TimeoutType, details ...interface{}) *Ti
 
 // NewHeartbeatTimeoutError creates TimeoutError instance
 func NewHeartbeatTimeoutError(details ...interface{}) *TimeoutError {
-	return NewTimeoutError(shared.TimeoutTypeHeartbeat, details...)
+	return NewTimeoutError(apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT, details...)
 }
 
 // NewCanceledError creates CanceledError instance
@@ -282,7 +282,7 @@ func (e *TimeoutError) Error() string {
 }
 
 // TimeoutType return timeout type of this error
-func (e *TimeoutError) TimeoutType() shared.TimeoutType {
+func (e *TimeoutError) TimeoutType() apiv1.TimeoutType {
 	return e.timeoutType
 }
 

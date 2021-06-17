@@ -28,7 +28,8 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -302,7 +303,7 @@ type ServiceInvoker interface {
 // Use this method to unit test activity implementations that use context extractor methodshared.
 func WithActivityTask(
 	ctx context.Context,
-	task *shared.PollForActivityTaskResponse,
+	task *apiv1.PollForActivityTaskResponse,
 	taskList string,
 	invoker ServiceInvoker,
 	logger *zap.Logger,
@@ -313,11 +314,11 @@ func WithActivityTask(
 	tracer opentracing.Tracer,
 ) context.Context {
 	var deadline time.Time
-	scheduled := time.Unix(0, task.GetScheduledTimestampOfThisAttempt())
-	started := time.Unix(0, task.GetStartedTimestamp())
-	scheduleToCloseTimeout := time.Duration(task.GetScheduleToCloseTimeoutSeconds()) * time.Second
-	startToCloseTimeout := time.Duration(task.GetStartToCloseTimeoutSeconds()) * time.Second
-	heartbeatTimeout := time.Duration(task.GetHeartbeatTimeoutSeconds()) * time.Second
+	scheduled := api.TimeFromProto(task.ScheduledTimeOfThisAttempt)
+	started := api.TimeFromProto(task.StartedTime)
+	scheduleToCloseTimeout := api.DurationFromProto(task.ScheduleToCloseTimeout)
+	startToCloseTimeout := api.DurationFromProto(task.StartToCloseTimeout)
+	heartbeatTimeout := api.DurationFromProto(task.HeartbeatTimeout)
 	scheduleToCloseDeadline := scheduled.Add(scheduleToCloseTimeout)
 	startToCloseDeadline := started.Add(startToCloseTimeout)
 	// Minimum of the two deadlines.
@@ -328,21 +329,21 @@ func WithActivityTask(
 	}
 
 	logger = logger.With(
-		zapcore.Field{Key: tagActivityID, Type: zapcore.StringType, String: *task.ActivityId},
-		zapcore.Field{Key: tagActivityType, Type: zapcore.StringType, String: *task.ActivityType.Name},
-		zapcore.Field{Key: tagWorkflowType, Type: zapcore.StringType, String: *task.WorkflowType.Name},
-		zapcore.Field{Key: tagWorkflowID, Type: zapcore.StringType, String: *task.WorkflowExecution.WorkflowId},
-		zapcore.Field{Key: tagRunID, Type: zapcore.StringType, String: *task.WorkflowExecution.RunId},
+		zapcore.Field{Key: tagActivityID, Type: zapcore.StringType, String: task.ActivityId},
+		zapcore.Field{Key: tagActivityType, Type: zapcore.StringType, String: task.ActivityType.Name},
+		zapcore.Field{Key: tagWorkflowType, Type: zapcore.StringType, String: task.WorkflowType.Name},
+		zapcore.Field{Key: tagWorkflowID, Type: zapcore.StringType, String: task.WorkflowExecution.WorkflowId},
+		zapcore.Field{Key: tagRunID, Type: zapcore.StringType, String: task.WorkflowExecution.RunId},
 	)
 
 	return context.WithValue(ctx, activityEnvContextKey, &activityEnvironment{
 		taskToken:      task.TaskToken,
 		serviceInvoker: invoker,
-		activityType:   ActivityType{Name: *task.ActivityType.Name},
-		activityID:     *task.ActivityId,
+		activityType:   ActivityType{Name: task.ActivityType.Name},
+		activityID:     task.ActivityId,
 		workflowExecution: WorkflowExecution{
-			RunID: *task.WorkflowExecution.RunId,
-			ID:    *task.WorkflowExecution.WorkflowId},
+			RunID: task.WorkflowExecution.RunId,
+			ID:    task.WorkflowExecution.WorkflowId},
 		logger:             logger,
 		metricsScope:       scope,
 		deadline:           deadline,
@@ -352,11 +353,11 @@ func WithActivityTask(
 		taskList:           taskList,
 		dataConverter:      dataConverter,
 		attempt:            task.GetAttempt(),
-		heartbeatDetails:   task.HeartbeatDetails,
+		heartbeatDetails:   task.HeartbeatDetails.GetData(),
 		workflowType: &WorkflowType{
-			Name: *task.WorkflowType.Name,
+			Name: task.WorkflowType.Name,
 		},
-		workflowDomain:     *task.WorkflowDomain,
+		workflowDomain:     task.WorkflowDomain,
 		workerStopChannel:  workerStopChannel,
 		contextPropagators: contextPropagators,
 		tracer:             tracer,

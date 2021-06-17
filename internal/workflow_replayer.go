@@ -29,14 +29,15 @@ import (
 	"io/ioutil"
 	"math"
 
+	"github.com/gogo/protobuf/types"
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/v2/.gen/go/shared"
-	"go.uber.org/cadence/v2/internal/common"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
+	"go.uber.org/cadence/v2/internal/api/thrift"
 	"go.uber.org/cadence/v2/internal/common/backoff"
 	"go.uber.org/cadence/v2/internal/common/serializer"
 	"go.uber.org/zap"
@@ -122,14 +123,14 @@ func (r *WorkflowReplayer) RegisterWorkflowWithOptions(w interface{}, options Re
 // ReplayWorkflowHistory executes a single decision task for the given history.
 // Use for testing backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.
-func (r *WorkflowReplayer) ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
+func (r *WorkflowReplayer) ReplayWorkflowHistory(logger *zap.Logger, history *apiv1.History) error {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
 	testReporter := logger.Sugar()
 	controller := gomock.NewController(testReporter)
-	service := workflowservicetest.NewMockClient(controller)
+	service := api.NewMockInterface(controller)
 
 	return r.replayWorkflowHistory(logger, service, replayDomainName, nil, history, nil)
 }
@@ -158,7 +159,7 @@ func (r *WorkflowReplayer) ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.
 
 	testReporter := logger.Sugar()
 	controller := gomock.NewController(testReporter)
-	service := workflowservicetest.NewMockClient(controller)
+	service := api.NewMockInterface(controller)
 
 	return r.replayWorkflowHistory(logger, service, replayDomainName, nil, history, nil)
 }
@@ -167,21 +168,20 @@ func (r *WorkflowReplayer) ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.
 // The logger is an optional parameter. Defaults to the noop logger.
 func (r *WorkflowReplayer) ReplayWorkflowExecution(
 	ctx context.Context,
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	logger *zap.Logger,
 	domain string,
 	execution WorkflowExecution,
 ) error {
-	sharedExecution := &shared.WorkflowExecution{
-		RunId:      common.StringPtr(execution.RunID),
-		WorkflowId: common.StringPtr(execution.ID),
-	}
-	request := &shared.GetWorkflowExecutionHistoryRequest{
-		Domain:    common.StringPtr(domain),
-		Execution: sharedExecution,
+	request := &apiv1.GetWorkflowExecutionHistoryRequest{
+		Domain:    domain,
+		WorkflowExecution: &apiv1.WorkflowExecution{
+			RunId:      execution.RunID,
+			WorkflowId: execution.ID,
+		},
 	}
 
-	var hResponse *shared.GetWorkflowExecutionHistoryResponse
+	var hResponse *apiv1.GetWorkflowExecutionHistoryResponse
 	if err := backoff.Retry(ctx,
 		func() error {
 			tchCtx, cancel, opt := newChannelContext(ctx, r.options.FeatureFlags)
@@ -190,11 +190,11 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 			hResponse, err = service.GetWorkflowExecutionHistory(tchCtx, request, opt...)
 			cancel()
 
-			return err
+			return api.ConvertError(err)
 		},
 		createDynamicServiceRetryPolicy(ctx),
 		func(err error) bool {
-			if _, ok := err.(*shared.InternalServiceError); ok {
+			if _, ok := err.(*api.InternalServiceError); ok {
 				// treat InternalServiceError as non-retryable, as the workflow history may be corrupted
 				return false
 			}
@@ -205,7 +205,7 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 	}
 
 	if hResponse.RawHistory != nil {
-		history, err := serializer.DeserializeBlobDataToHistoryEvents(hResponse.RawHistory, shared.HistoryEventFilterTypeAllEvent)
+		history, err := serializer.DeserializeBlobDataToHistoryEvents(hResponse.RawHistory, apiv1.EventFilterType_EVENT_FILTER_TYPE_ALL_EVENT)
 		if err != nil {
 			return err
 		}
@@ -218,10 +218,10 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 
 func (r *WorkflowReplayer) replayWorkflowHistory(
 	logger *zap.Logger,
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	execution *WorkflowExecution,
-	history *shared.History,
+	history *apiv1.History,
 	nextPageToken []byte,
 ) error {
 	events := history.Events
@@ -232,36 +232,33 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		return errReplayHistoryTooShort
 	}
 	first := events[0]
-	if first.GetEventType() != shared.EventTypeWorkflowExecutionStarted {
+	attr := first.GetWorkflowExecutionStartedEventAttributes()
+	if attr == nil {
 		return errReplayInvalidFirstEvent
 	}
 	last := events[len(events)-1]
 
-	attr := first.WorkflowExecutionStartedEventAttributes
-	if attr == nil {
-		return errReplayCorruptedStartedEvent
-	}
 	workflowType := attr.WorkflowType
 	if execution == nil {
 		execution = &WorkflowExecution{
 			ID:    replayWorkflowID,
 			RunID: uuid.NewRandom().String(),
 		}
-		if first.WorkflowExecutionStartedEventAttributes.GetOriginalExecutionRunId() != "" {
-			execution.RunID = first.WorkflowExecutionStartedEventAttributes.GetOriginalExecutionRunId()
+		if attr.GetOriginalExecutionRunId() != "" {
+			execution.RunID = attr.GetOriginalExecutionRunId()
 		}
 	}
 
-	task := &shared.PollForDecisionTaskResponse{
-		Attempt:      common.Int64Ptr(int64(attr.GetAttempt())),
+	task := &apiv1.PollForDecisionTaskResponse{
+		Attempt:      int64(attr.GetAttempt()),
 		TaskToken:    []byte(replayTaskToken),
 		WorkflowType: workflowType,
-		WorkflowExecution: &shared.WorkflowExecution{
-			WorkflowId: common.StringPtr(execution.ID),
-			RunId:      common.StringPtr(execution.RunID),
+		WorkflowExecution: &apiv1.WorkflowExecution{
+			WorkflowId: execution.ID,
+			RunId:      execution.RunID,
 		},
 		History:                history,
-		PreviousStartedEventId: common.Int64Ptr(replayPreviousStartedEventID),
+		PreviousStartedEventId: &types.Int64Value{Value: replayPreviousStartedEventID},
 		NextPageToken:          nextPageToken,
 	}
 	if logger == nil {
@@ -294,7 +291,7 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		return err
 	}
 
-	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted && last.GetEventType() != shared.EventTypeWorkflowExecutionContinuedAsNew {
+	if last.GetWorkflowExecutionCompletedEventAttributes() == nil && last.GetWorkflowExecutionContinuedAsNewEventAttributes() == nil {
 		return nil
 	}
 
@@ -303,27 +300,27 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 	// entire history before starting the replay as otherwise we can't get the last event here.
 	// compare workflow results
 	if resp != nil {
-		completeReq, ok := resp.(*shared.RespondDecisionTaskCompletedRequest)
+		completeReq, ok := resp.(*apiv1.RespondDecisionTaskCompletedRequest)
 		if ok {
 			for _, d := range completeReq.Decisions {
-				if d.GetDecisionType() == shared.DecisionTypeContinueAsNewWorkflowExecution &&
-					last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
-					inputA := d.ContinueAsNewWorkflowExecutionDecisionAttributes.Input
-					inputB := last.WorkflowExecutionContinuedAsNewEventAttributes.Input
+				if d.GetContinueAsNewWorkflowExecutionDecisionAttributes() != nil &&
+					last.GetWorkflowExecutionContinuedAsNewEventAttributes() != nil {
+					inputA := d.GetContinueAsNewWorkflowExecutionDecisionAttributes().Input.GetData()
+					inputB := last.GetWorkflowExecutionContinuedAsNewEventAttributes().Input.GetData()
 					if bytes.Compare(inputA, inputB) == 0 {
 						return nil
 					}
 				}
-				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution &&
-					last.GetEventType() == shared.EventTypeWorkflowExecutionCompleted {
-					resultA := last.WorkflowExecutionCompletedEventAttributes.Result
-					resultB := d.CompleteWorkflowExecutionDecisionAttributes.Result
+				if d.GetCompleteWorkflowExecutionDecisionAttributes() != nil &&
+					last.GetWorkflowExecutionCompletedEventAttributes() != nil {
+					resultA := last.GetWorkflowExecutionCompletedEventAttributes().Result.GetData()
+					resultB := d.GetCompleteWorkflowExecutionDecisionAttributes().Result.GetData()
 					if bytes.Compare(resultA, resultB) == 0 {
 						return nil
 					}
 				}
-				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution &&
-					last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
+				if d.GetCompleteWorkflowExecutionDecisionAttributes() != nil &&
+					last.GetWorkflowExecutionContinuedAsNewEventAttributes() != nil {
 					// for cron and retry workflow, decision will be completed workflow and
 					// and server side will convert it to a continue as new event.
 					// there's nothing to compare here
@@ -335,25 +332,35 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 	return fmt.Errorf("replay workflow doesn't return the same result as the last event, resp: %v, last: %v", resp, last)
 }
 
-func extractHistoryFromFile(jsonfileName string, lastEventID int64) (*shared.History, error) {
+func extractHistoryFromFile(jsonfileName string, lastEventID int64) (*apiv1.History, error) {
 	raw, err := ioutil.ReadFile(jsonfileName)
 	if err != nil {
 		return nil, err
 	}
 
-	var deserializedEvents []*shared.HistoryEvent
+	var deserializedEvents []*apiv1.HistoryEvent
 	err = json.Unmarshal(raw, &deserializedEvents)
-
 	if err != nil {
 		return nil, err
 	}
 
+	// Fallback to Thrift encoding
+	if len(deserializedEvents) > 0 && deserializedEvents[0].EventId == 0 {
+		var thriftEvents []*shared.HistoryEvent
+		err = json.Unmarshal(raw, &thriftEvents)
+		if err != nil {
+			return nil, err
+		}
+
+		deserializedEvents = thrift.ToHistoryEvents(thriftEvents)
+	}
+
 	if lastEventID <= 0 {
-		return &shared.History{Events: deserializedEvents}, nil
+		return &apiv1.History{Events: deserializedEvents}, nil
 	}
 
 	// Caller is potentially asking for subset of history instead of all history events
-	var events []*shared.HistoryEvent
+	var events []*apiv1.HistoryEvent
 	for _, event := range deserializedEvents {
 		events = append(events, event)
 		if event.GetEventId() == lastEventID {
@@ -362,7 +369,7 @@ func extractHistoryFromFile(jsonfileName string, lastEventID int64) (*shared.His
 		}
 	}
 
-	return &shared.History{Events: events}, nil
+	return &apiv1.History{Events: events}, nil
 }
 
 func augmentReplayOptions(

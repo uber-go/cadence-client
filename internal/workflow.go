@@ -29,7 +29,8 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
-	s "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/internal/common"
 	"go.uber.org/cadence/v2/internal/common/backoff"
 	"go.uber.org/zap"
@@ -714,9 +715,9 @@ func (wc *workflowEnvironmentInterceptor) ExecuteChildWorkflow(ctx Context, chil
 	return result
 }
 
-func getWorkflowHeader(ctx Context, ctxProps []ContextPropagator) *s.Header {
-	header := &s.Header{
-		Fields: make(map[string][]byte),
+func getWorkflowHeader(ctx Context, ctxProps []ContextPropagator) *apiv1.Header {
+	header := &apiv1.Header{
+		Fields: make(map[string]*apiv1.Payload),
 	}
 	writer := NewHeaderWriter(header)
 	for _, ctxProp := range ctxProps {
@@ -739,10 +740,10 @@ type WorkflowInfo struct {
 	ContinuedExecutionRunID             *string
 	ParentWorkflowDomain                *string
 	ParentWorkflowExecution             *WorkflowExecution
-	Memo                                *s.Memo             // Value can be decoded using data converter (DefaultDataConverter, or custom one if set).
-	SearchAttributes                    *s.SearchAttributes // Value can be decoded using DefaultDataConverter.
+	Memo                                *apiv1.Memo             // Value can be decoded using data converter (DefaultDataConverter, or custom one if set).
+	SearchAttributes                    *apiv1.SearchAttributes // Value can be decoded using DefaultDataConverter.
 	BinaryChecksum                      *string
-	RetryPolicy                         *s.RetryPolicy
+	RetryPolicy                         *apiv1.RetryPolicy
 }
 
 // GetBinaryChecksum returns the binary checksum(identifier) of this worker
@@ -1453,20 +1454,20 @@ func WithRetryPolicy(ctx Context, retryPolicy RetryPolicy) Context {
 	return ctx1
 }
 
-func convertRetryPolicy(retryPolicy *RetryPolicy) *s.RetryPolicy {
+func convertRetryPolicy(retryPolicy *RetryPolicy) *apiv1.RetryPolicy {
 	if retryPolicy == nil {
 		return nil
 	}
 	if retryPolicy.BackoffCoefficient == 0 {
 		retryPolicy.BackoffCoefficient = backoff.DefaultBackoffCoefficient
 	}
-	thriftRetryPolicy := s.RetryPolicy{
-		InitialIntervalInSeconds:    common.Int32Ptr(common.Int32Ceil(retryPolicy.InitialInterval.Seconds())),
-		MaximumIntervalInSeconds:    common.Int32Ptr(common.Int32Ceil(retryPolicy.MaximumInterval.Seconds())),
-		BackoffCoefficient:          &retryPolicy.BackoffCoefficient,
-		MaximumAttempts:             &retryPolicy.MaximumAttempts,
-		NonRetriableErrorReasons:    retryPolicy.NonRetriableErrorReasons,
-		ExpirationIntervalInSeconds: common.Int32Ptr(common.Int32Ceil(retryPolicy.ExpirationInterval.Seconds())),
+	return &apiv1.RetryPolicy{
+		InitialInterval:             api.DurationToProto(retryPolicy.InitialInterval),
+		MaximumInterval:             api.DurationToProto(retryPolicy.MaximumInterval),
+		BackoffCoefficient:          retryPolicy.BackoffCoefficient,
+		MaximumAttempts:             retryPolicy.MaximumAttempts,
+		NonRetryableErrorReasons:    retryPolicy.NonRetriableErrorReasons,
+		ExpirationInterval:          api.DurationToProto(retryPolicy.ExpirationInterval),
 	}
-	return &thriftRetryPolicy
 }
+

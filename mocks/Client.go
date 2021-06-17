@@ -28,8 +28,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	"go.uber.org/cadence/v2/.gen/go/shared"
-	s "go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/client"
 	"go.uber.org/cadence/v2/encoded"
 	"go.uber.org/cadence/v2/internal"
@@ -84,20 +83,20 @@ func (_m *Client) CompleteActivityByID(ctx context.Context, domain string, workf
 }
 
 // CountWorkflow provides a mock function with given fields: ctx, request
-func (_m *Client) CountWorkflow(ctx context.Context, request *shared.CountWorkflowExecutionsRequest) (*shared.CountWorkflowExecutionsResponse, error) {
+func (_m *Client) CountWorkflow(ctx context.Context, request *apiv1.CountWorkflowExecutionsRequest) (*apiv1.CountWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	var r0 *shared.CountWorkflowExecutionsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.CountWorkflowExecutionsRequest) *shared.CountWorkflowExecutionsResponse); ok {
+	var r0 *apiv1.CountWorkflowExecutionsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.CountWorkflowExecutionsRequest) *apiv1.CountWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*shared.CountWorkflowExecutionsResponse)
+			r0 = ret.Get(0).(*apiv1.CountWorkflowExecutionsResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *shared.CountWorkflowExecutionsRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.CountWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)
@@ -107,20 +106,20 @@ func (_m *Client) CountWorkflow(ctx context.Context, request *shared.CountWorkfl
 }
 
 // DescribeTaskList provides a mock function with given fields: ctx, tasklist, tasklistType
-func (_m *Client) DescribeTaskList(ctx context.Context, tasklist string, tasklistType shared.TaskListType) (*shared.DescribeTaskListResponse, error) {
+func (_m *Client) DescribeTaskList(ctx context.Context, tasklist string, tasklistType apiv1.TaskListType) (*apiv1.DescribeTaskListResponse, error) {
 	ret := _m.Called(ctx, tasklist, tasklistType)
 
-	var r0 *shared.DescribeTaskListResponse
-	if rf, ok := ret.Get(0).(func(context.Context, string, shared.TaskListType) *shared.DescribeTaskListResponse); ok {
+	var r0 *apiv1.DescribeTaskListResponse
+	if rf, ok := ret.Get(0).(func(context.Context, string, apiv1.TaskListType) *apiv1.DescribeTaskListResponse); ok {
 		r0 = rf(ctx, tasklist, tasklistType)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*shared.DescribeTaskListResponse)
+			r0 = ret.Get(0).(*apiv1.DescribeTaskListResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, string, shared.TaskListType) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, apiv1.TaskListType) error); ok {
 		r1 = rf(ctx, tasklist, tasklistType)
 	} else {
 		r1 = ret.Error(1)
@@ -130,15 +129,15 @@ func (_m *Client) DescribeTaskList(ctx context.Context, tasklist string, tasklis
 }
 
 // DescribeWorkflowExecution provides a mock function with given fields: ctx, workflowID, runID
-func (_m *Client) DescribeWorkflowExecution(ctx context.Context, workflowID string, runID string) (*shared.DescribeWorkflowExecutionResponse, error) {
+func (_m *Client) DescribeWorkflowExecution(ctx context.Context, workflowID string, runID string) (*apiv1.DescribeWorkflowExecutionResponse, error) {
 	ret := _m.Called(ctx, workflowID, runID)
 
-	var r0 *shared.DescribeWorkflowExecutionResponse
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *shared.DescribeWorkflowExecutionResponse); ok {
+	var r0 *apiv1.DescribeWorkflowExecutionResponse
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *apiv1.DescribeWorkflowExecutionResponse); ok {
 		r0 = rf(ctx, workflowID, runID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*shared.DescribeWorkflowExecutionResponse)
+			r0 = ret.Get(0).(*apiv1.DescribeWorkflowExecutionResponse)
 		}
 	}
 
@@ -179,15 +178,15 @@ func (_m *Client) ExecuteWorkflow(ctx context.Context, options client.StartWorkf
 }
 
 // GetSearchAttributes provides a mock function with given fields: ctx
-func (_m *Client) GetSearchAttributes(ctx context.Context) (*shared.GetSearchAttributesResponse, error) {
+func (_m *Client) GetSearchAttributes(ctx context.Context) (*apiv1.GetSearchAttributesResponse, error) {
 	ret := _m.Called(ctx)
 
-	var r0 *shared.GetSearchAttributesResponse
-	if rf, ok := ret.Get(0).(func(context.Context) *shared.GetSearchAttributesResponse); ok {
+	var r0 *apiv1.GetSearchAttributesResponse
+	if rf, ok := ret.Get(0).(func(context.Context) *apiv1.GetSearchAttributesResponse); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*shared.GetSearchAttributesResponse)
+			r0 = ret.Get(0).(*apiv1.GetSearchAttributesResponse)
 		}
 	}
 
@@ -218,11 +217,11 @@ func (_m *Client) GetWorkflow(ctx context.Context, workflowID string, runID stri
 }
 
 // GetWorkflowHistory provides a mock function with given fields: ctx, workflowID, runID, isLongPoll, filterType
-func (_m *Client) GetWorkflowHistory(ctx context.Context, workflowID string, runID string, isLongPoll bool, filterType shared.HistoryEventFilterType) client.HistoryEventIterator {
+func (_m *Client) GetWorkflowHistory(ctx context.Context, workflowID string, runID string, isLongPoll bool, filterType apiv1.EventFilterType) client.HistoryEventIterator {
 	ret := _m.Called(ctx, workflowID, runID, isLongPoll, filterType)
 
 	var r0 internal.HistoryEventIterator
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool, shared.HistoryEventFilterType) internal.HistoryEventIterator); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool, apiv1.EventFilterType) internal.HistoryEventIterator); ok {
 		r0 = rf(ctx, workflowID, runID, isLongPoll, filterType)
 	} else {
 		if ret.Get(0) != nil {
@@ -234,20 +233,20 @@ func (_m *Client) GetWorkflowHistory(ctx context.Context, workflowID string, run
 }
 
 // ListClosedWorkflow provides a mock function with given fields: ctx, request
-func (_m *Client) ListClosedWorkflow(ctx context.Context, request *shared.ListClosedWorkflowExecutionsRequest) (*shared.ListClosedWorkflowExecutionsResponse, error) {
+func (_m *Client) ListClosedWorkflow(ctx context.Context, request *apiv1.ListClosedWorkflowExecutionsRequest) (*apiv1.ListClosedWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	var r0 *shared.ListClosedWorkflowExecutionsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListClosedWorkflowExecutionsRequest) *shared.ListClosedWorkflowExecutionsResponse); ok {
+	var r0 *apiv1.ListClosedWorkflowExecutionsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.ListClosedWorkflowExecutionsRequest) *apiv1.ListClosedWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*shared.ListClosedWorkflowExecutionsResponse)
+			r0 = ret.Get(0).(*apiv1.ListClosedWorkflowExecutionsResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListClosedWorkflowExecutionsRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.ListClosedWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)
@@ -257,20 +256,20 @@ func (_m *Client) ListClosedWorkflow(ctx context.Context, request *shared.ListCl
 }
 
 // ListOpenWorkflow provides a mock function with given fields: ctx, request
-func (_m *Client) ListOpenWorkflow(ctx context.Context, request *shared.ListOpenWorkflowExecutionsRequest) (*shared.ListOpenWorkflowExecutionsResponse, error) {
+func (_m *Client) ListOpenWorkflow(ctx context.Context, request *apiv1.ListOpenWorkflowExecutionsRequest) (*apiv1.ListOpenWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	var r0 *shared.ListOpenWorkflowExecutionsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListOpenWorkflowExecutionsRequest) *shared.ListOpenWorkflowExecutionsResponse); ok {
+	var r0 *apiv1.ListOpenWorkflowExecutionsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.ListOpenWorkflowExecutionsRequest) *apiv1.ListOpenWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*shared.ListOpenWorkflowExecutionsResponse)
+			r0 = ret.Get(0).(*apiv1.ListOpenWorkflowExecutionsResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListOpenWorkflowExecutionsRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.ListOpenWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)
@@ -280,20 +279,20 @@ func (_m *Client) ListOpenWorkflow(ctx context.Context, request *shared.ListOpen
 }
 
 // ListWorkflow provides a mock function with given fields: ctx, request
-func (_m *Client) ListWorkflow(ctx context.Context, request *shared.ListWorkflowExecutionsRequest) (*shared.ListWorkflowExecutionsResponse, error) {
+func (_m *Client) ListWorkflow(ctx context.Context, request *apiv1.ListWorkflowExecutionsRequest) (*apiv1.ListWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	var r0 *shared.ListWorkflowExecutionsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListWorkflowExecutionsRequest) *shared.ListWorkflowExecutionsResponse); ok {
+	var r0 *apiv1.ListWorkflowExecutionsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.ListWorkflowExecutionsRequest) *apiv1.ListWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*shared.ListWorkflowExecutionsResponse)
+			r0 = ret.Get(0).(*apiv1.ListWorkflowExecutionsResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListWorkflowExecutionsRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.ListWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)
@@ -303,20 +302,20 @@ func (_m *Client) ListWorkflow(ctx context.Context, request *shared.ListWorkflow
 }
 
 // ListArchivedWorkflow provides a mock function with given fields: ctx, request
-func (_m *Client) ListArchivedWorkflow(ctx context.Context, request *shared.ListArchivedWorkflowExecutionsRequest) (*shared.ListArchivedWorkflowExecutionsResponse, error) {
+func (_m *Client) ListArchivedWorkflow(ctx context.Context, request *apiv1.ListArchivedWorkflowExecutionsRequest) (*apiv1.ListArchivedWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	var r0 *shared.ListArchivedWorkflowExecutionsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListArchivedWorkflowExecutionsRequest) *shared.ListArchivedWorkflowExecutionsResponse); ok {
+	var r0 *apiv1.ListArchivedWorkflowExecutionsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.ListArchivedWorkflowExecutionsRequest) *apiv1.ListArchivedWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*shared.ListArchivedWorkflowExecutionsResponse)
+			r0 = ret.Get(0).(*apiv1.ListArchivedWorkflowExecutionsResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListArchivedWorkflowExecutionsRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.ListArchivedWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)
@@ -376,22 +375,22 @@ func (_m *Client) QueryWorkflowWithOptions(ctx context.Context, request *client.
 	return r0, r1
 }
 
-func (_m *Client) ResetWorkflow(ctx context.Context, request *s.ResetWorkflowExecutionRequest) (*s.ResetWorkflowExecutionResponse, error){
+func (_m *Client) ResetWorkflow(ctx context.Context, request *apiv1.ResetWorkflowExecutionRequest) (*apiv1.ResetWorkflowExecutionResponse, error){
 	var _ca []interface{}
 	_ca = append(_ca, ctx, request)
 	ret := _m.Called(_ca...)
 
-	var r0 *s.ResetWorkflowExecutionResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *s.ResetWorkflowExecutionRequest) *s.ResetWorkflowExecutionResponse); ok {
+	var r0 *apiv1.ResetWorkflowExecutionResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.ResetWorkflowExecutionRequest) *apiv1.ResetWorkflowExecutionResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*s.ResetWorkflowExecutionResponse)
+			r0 = ret.Get(0).(*apiv1.ResetWorkflowExecutionResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *s.ResetWorkflowExecutionRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.ResetWorkflowExecutionRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)
@@ -435,20 +434,20 @@ func (_m *Client) RecordActivityHeartbeatByID(ctx context.Context, domain string
 }
 
 // ScanWorkflow provides a mock function with given fields: ctx, request
-func (_m *Client) ScanWorkflow(ctx context.Context, request *shared.ListWorkflowExecutionsRequest) (*shared.ListWorkflowExecutionsResponse, error) {
+func (_m *Client) ScanWorkflow(ctx context.Context, request *apiv1.ScanWorkflowExecutionsRequest) (*apiv1.ScanWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	var r0 *shared.ListWorkflowExecutionsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListWorkflowExecutionsRequest) *shared.ListWorkflowExecutionsResponse); ok {
+	var r0 *apiv1.ScanWorkflowExecutionsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.ScanWorkflowExecutionsRequest) *apiv1.ScanWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*shared.ListWorkflowExecutionsResponse)
+			r0 = ret.Get(0).(*apiv1.ScanWorkflowExecutionsResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListWorkflowExecutionsRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *apiv1.ScanWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)

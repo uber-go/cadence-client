@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"go.uber.org/cadence/v2"
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/cadence/v2/client"
 	"go.uber.org/cadence/v2/internal"
 	"go.uber.org/cadence/v2/worker"
@@ -97,12 +97,12 @@ func (w *Workflows) ActivityRetryOptionsChange(ctx workflow.Context) ([]string, 
 	return []string{"fail", "fail"}, nil
 }
 
-func (w *Workflows) ActivityRetryOnTimeout(ctx workflow.Context, timeoutType shared.TimeoutType) ([]string, error) {
+func (w *Workflows) ActivityRetryOnTimeout(ctx workflow.Context, timeoutType apiv1.TimeoutType) ([]string, error) {
 	opts := w.defaultActivityOptionsWithRetry()
 	switch timeoutType {
-	case shared.TimeoutTypeScheduleToClose:
+	case apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_CLOSE:
 		opts.ScheduleToCloseTimeout = time.Second
-	case shared.TimeoutTypeStartToClose:
+	case apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE:
 		opts.StartToCloseTimeout = time.Second
 	}
 
@@ -153,7 +153,7 @@ func (w *Workflows) ActivityRetryOnHBTimeout(ctx workflow.Context) ([]string, er
 		return nil, fmt.Errorf("activity failed with unexpected error: %v", err)
 	}
 
-	if terr.TimeoutType() != shared.TimeoutTypeHeartbeat {
+	if terr.TimeoutType() != apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT {
 		return nil, fmt.Errorf("activity failed due to unexpected timeout %v", terr.TimeoutType())
 	}
 
@@ -216,11 +216,11 @@ func (w *Workflows) ContinueAsNewWithOptions(ctx workflow.Context, count int, ta
 		return "", errors.New("memo or search attributes are not carried over")
 	}
 	var memoVal, searchAttrVal string
-	err := client.NewValue(info.Memo.Fields["memoKey"]).Get(&memoVal)
+	err := client.NewValue(info.Memo.Fields["memoKey"].GetData()).Get(&memoVal)
 	if err != nil {
 		return "", errors.New("error when get memo value")
 	}
-	err = client.NewValue(info.SearchAttributes.IndexedFields["CustomKeywordField"]).Get(&searchAttrVal)
+	err = client.NewValue(info.SearchAttributes.IndexedFields["CustomKeywordField"].GetData()).Get(&searchAttrVal)
 	if err != nil {
 		return "", errors.New("error when get search attributes value")
 	}
@@ -501,11 +501,11 @@ func (w *Workflows) child(ctx workflow.Context, arg string, mustFail bool) (stri
 func (w *Workflows) childForMemoAndSearchAttr(ctx workflow.Context) (result string, err error) {
 	info := workflow.GetInfo(ctx)
 	var memo, searchAttr string
-	err = client.NewValue(info.Memo.Fields["memoKey"]).Get(&memo)
+	err = client.NewValue(info.Memo.Fields["memoKey"].GetData()).Get(&memo)
 	if err != nil {
 		return
 	}
-	err = client.NewValue(info.SearchAttributes.IndexedFields["CustomKeywordField"]).Get(&searchAttr)
+	err = client.NewValue(info.SearchAttributes.IndexedFields["CustomKeywordField"].GetData()).Get(&searchAttr)
 	if err != nil {
 		return
 	}

@@ -25,8 +25,6 @@ import (
 	"math"
 	"strings"
 	"time"
-
-	"go.uber.org/cadence/v2/.gen/go/shared"
 )
 
 type (
@@ -41,21 +39,19 @@ const (
 	WorkflowStatusClosed WorkflowStatus = "CLOSED"
 	// WorkflowStatusALL is the WorkflowStatus for all workflows
 	WorkflowStatusALL WorkflowStatus = "ALL"
-)
 
-var (
 	// WorkflowStatusCompleted is the WorkflowStatus for completed workflow
-	WorkflowStatusCompleted = WorkflowStatus(shared.WorkflowExecutionCloseStatusCompleted.String())
+	WorkflowStatusCompleted WorkflowStatus = "COMPLETED"
 	// WorkflowStatusFailed is the WorkflowStatus for failed workflows
-	WorkflowStatusFailed = WorkflowStatus(shared.WorkflowExecutionCloseStatusFailed.String())
+	WorkflowStatusFailed WorkflowStatus = "FAILED"
 	// WorkflowStatusCanceled is the WorkflowStatus for canceled workflows
-	WorkflowStatusCanceled = WorkflowStatus(shared.WorkflowExecutionCloseStatusCanceled.String())
+	WorkflowStatusCanceled WorkflowStatus = "CANCELED"
 	// WorkflowStatusTerminated is the WorkflowStatus for terminated workflows
-	WorkflowStatusTerminated = WorkflowStatus(shared.WorkflowExecutionCloseStatusTerminated.String())
+	WorkflowStatusTerminated WorkflowStatus = "TERMINATED"
 	// WorkflowStatusContinuedAsNew is the WorkflowStatus for continuedAsNew workflows
-	WorkflowStatusContinuedAsNew = WorkflowStatus(shared.WorkflowExecutionCloseStatusContinuedAsNew.String())
+	WorkflowStatusContinuedAsNew WorkflowStatus = "CONTINUED_AS_NEW"
 	// WorkflowStatusTimedOut is the WorkflowStatus for timedout workflows
-	WorkflowStatusTimedOut = WorkflowStatus(shared.WorkflowExecutionCloseStatusTimedOut.String())
+	WorkflowStatusTimedOut WorkflowStatus = "TIMED_OUT"
 )
 
 const (

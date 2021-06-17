@@ -31,8 +31,8 @@ import (
 	"time"
 
 	"github.com/facebookgo/clock"
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/v2/.gen/go/shadower"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/internal/common"
 	"go.uber.org/cadence/v2/internal/common/util"
 	"go.uber.org/zap"
@@ -118,7 +118,7 @@ type (
 	// WorkflowShadower retrieves and replays workflow history from Cadence service
 	// to determine if there's any nondeterministic changes in the workflow definition
 	WorkflowShadower struct {
-		service       workflowserviceclient.Interface
+		service       api.Interface
 		domain        string
 		shadowOptions ShadowOptions
 		logger        *zap.Logger
@@ -148,7 +148,7 @@ const (
 // NewWorkflowShadower creates an instance of the WorkflowShadower for testing
 // The logger is an optional parameter. Defaults to noop logger if not provided and will override the logger in WorkerOptions
 func NewWorkflowShadower(
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	domain string,
 	shadowOptions ShadowOptions,
 	replayOptions ReplayOptions,

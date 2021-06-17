@@ -26,8 +26,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/cadence/v2/.gen/go/shared"
-	"go.uber.org/cadence/v2/internal/common"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/zap"
 )
 
@@ -99,7 +98,7 @@ func Test_ActivityNotRegistered(t *testing.T) {
 }
 
 func Test_TimeoutError(t *testing.T) {
-	timeoutErr := NewTimeoutError(shared.TimeoutTypeScheduleToStart)
+	timeoutErr := NewTimeoutError(apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_START)
 	require.False(t, timeoutErr.HasDetails())
 	var data string
 	require.Equal(t, ErrNoData, timeoutErr.Details(&data))
@@ -111,12 +110,12 @@ func Test_TimeoutError(t *testing.T) {
 }
 
 func Test_TimeoutError_WithDetails(t *testing.T) {
-	testTimeoutErrorDetails(t, shared.TimeoutTypeHeartbeat)
-	testTimeoutErrorDetails(t, shared.TimeoutTypeScheduleToClose)
-	testTimeoutErrorDetails(t, shared.TimeoutTypeStartToClose)
+	testTimeoutErrorDetails(t, apiv1.TimeoutType_TIMEOUT_TYPE_HEARTBEAT)
+	testTimeoutErrorDetails(t, apiv1.TimeoutType_TIMEOUT_TYPE_SCHEDULE_TO_CLOSE)
+	testTimeoutErrorDetails(t, apiv1.TimeoutType_TIMEOUT_TYPE_START_TO_CLOSE)
 }
 
-func testTimeoutErrorDetails(t *testing.T, timeoutType shared.TimeoutType) {
+func testTimeoutErrorDetails(t *testing.T, timeoutType apiv1.TimeoutType) {
 	context := &workflowEnvironmentImpl{
 		decisionsHelper: newDecisionsHelper(),
 		dataConverter:   getDefaultDataConverter(),
@@ -126,7 +125,7 @@ func testTimeoutErrorDetails(t *testing.T, timeoutType shared.TimeoutType) {
 	activityID := "activityID"
 	context.decisionsHelper.scheduledEventIDToActivityID[5] = activityID
 	di := h.newActivityDecisionStateMachine(
-		&shared.ScheduleActivityTaskDecisionAttributes{ActivityId: common.StringPtr(activityID)})
+		&apiv1.ScheduleActivityTaskDecisionAttributes{ActivityId: activityID})
 	di.state = decisionStateInitiated
 	di.setData(&scheduledActivity{
 		callback: func(r []byte, e error) {
@@ -135,11 +134,11 @@ func testTimeoutErrorDetails(t *testing.T, timeoutType shared.TimeoutType) {
 	})
 	context.decisionsHelper.addDecision(di)
 	encodedDetails1, _ := context.dataConverter.ToData(testErrorDetails1)
-	event := createTestEventActivityTaskTimedOut(7, &shared.ActivityTaskTimedOutEventAttributes{
-		Details:          encodedDetails1,
-		ScheduledEventId: common.Int64Ptr(5),
-		StartedEventId:   common.Int64Ptr(6),
-		TimeoutType:      &timeoutType,
+	event := createTestEventActivityTaskTimedOut(7, &apiv1.ActivityTaskTimedOutEventAttributes{
+		Details:          &apiv1.Payload{Data: encodedDetails1},
+		ScheduledEventId: 5,
+		StartedEventId:   6,
+		TimeoutType:      timeoutType,
 	})
 	weh := &workflowExecutionEventHandlerImpl{context, nil}
 	weh.handleActivityTaskTimedOut(event)
@@ -438,7 +437,7 @@ func Test_SignalExternalWorkflowExecutionFailedError(t *testing.T) {
 	signalID := "signalID"
 	context.decisionsHelper.scheduledEventIDToSignalID[initiatedEventID] = signalID
 	di := h.newSignalExternalWorkflowStateMachine(
-		&shared.SignalExternalWorkflowExecutionDecisionAttributes{},
+		&apiv1.SignalExternalWorkflowExecutionDecisionAttributes{},
 		signalID,
 	)
 	di.state = decisionStateInitiated
@@ -449,9 +448,9 @@ func Test_SignalExternalWorkflowExecutionFailedError(t *testing.T) {
 	})
 	context.decisionsHelper.addDecision(di)
 	weh := &workflowExecutionEventHandlerImpl{context, nil}
-	event := createTestEventSignalExternalWorkflowExecutionFailed(1, &shared.SignalExternalWorkflowExecutionFailedEventAttributes{
-		InitiatedEventId: common.Int64Ptr(initiatedEventID),
-		Cause:            shared.SignalExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution.Ptr(),
+	event := createTestEventSignalExternalWorkflowExecutionFailed(1, &apiv1.SignalExternalWorkflowExecutionFailedEventAttributes{
+		InitiatedEventId: initiatedEventID,
+		Cause:            apiv1.SignalExternalWorkflowExecutionFailedCause_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNKNOWN_EXTERNAL_WORKFLOW_EXECUTION,
 	})
 	require.NoError(t, weh.handleSignalExternalWorkflowExecutionFailed(event))
 	_, ok := actualErr.(*UnknownExternalWorkflowExecutionError)
@@ -467,8 +466,8 @@ func Test_ContinueAsNewError(t *testing.T) {
 		return NewContinueAsNewError(ctx, continueAsNewWfName, a1, a2)
 	}
 
-	header := &shared.Header{
-		Fields: map[string][]byte{"test": []byte("test-data")},
+	header := &apiv1.Header{
+		Fields: map[string]*apiv1.Payload{"test": {Data: []byte("test-data")}},
 	}
 
 	s := &WorkflowTestSuite{

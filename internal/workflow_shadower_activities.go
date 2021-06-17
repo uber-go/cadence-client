@@ -26,9 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/v2/.gen/go/shadower"
 	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
+	"go.uber.org/cadence/v2/internal/api"
 	"go.uber.org/cadence/v2/internal/common"
 	"go.uber.org/cadence/v2/internal/common/backoff"
 	"go.uber.org/cadence/v2/internal/common/metrics"
@@ -58,13 +59,13 @@ func scanWorkflowActivity(
 	params shadower.ScanWorkflowActivityParams,
 ) (shadower.ScanWorkflowActivityResult, error) {
 	logger := GetActivityLogger(ctx)
-	service := ctx.Value(serviceClientContextKey).(workflowserviceclient.Interface)
+	service := ctx.Value(serviceClientContextKey).(api.Interface)
 
 	scanResult, err := scanWorkflowExecutionsHelper(ctx, service, params, logger)
 	switch err.(type) {
-	case *shared.EntityNotExistsError:
+	case *api.EntityNotExistsError:
 		err = NewCustomError(shadower.ErrReasonDomainNotExists, err.Error())
-	case *shared.BadRequestError:
+	case *api.BadRequestError:
 		err = NewCustomError(shadower.ErrReasonInvalidQuery, err.Error())
 	}
 	return scanResult, err
@@ -72,7 +73,7 @@ func scanWorkflowActivity(
 
 func scanWorkflowExecutionsHelper(
 	ctx context.Context,
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	params shadower.ScanWorkflowActivityParams,
 	logger *zap.Logger,
 ) (shadower.ScanWorkflowActivityResult, error) {
@@ -83,16 +84,16 @@ func scanWorkflowExecutionsHelper(
 		completionTime = now.Add(time.Duration(ratioToCompleteScanWorkflow * float32(activityTimeout)))
 	}
 
-	request := &shared.ListWorkflowExecutionsRequest{
-		Domain:        params.Domain,
-		Query:         params.WorkflowQuery,
+	request := &apiv1.ScanWorkflowExecutionsRequest{
+		Domain:        params.GetDomain(),
+		Query:         params.GetWorkflowQuery(),
 		NextPageToken: params.NextPageToken,
-		PageSize:      params.PageSize,
+		PageSize:      params.GetPageSize(),
 	}
 
 	result := shadower.ScanWorkflowActivityResult{}
 	for {
-		var resp *shared.ListWorkflowExecutionsResponse
+		var resp *apiv1.ScanWorkflowExecutionsResponse
 		if err := backoff.Retry(ctx,
 			func() error {
 				tchCtx, cancel, opt := newChannelContext(ctx, FeatureFlags{})
@@ -101,7 +102,7 @@ func scanWorkflowExecutionsHelper(
 				resp, err = service.ScanWorkflowExecutions(tchCtx, request, opt...)
 				cancel()
 
-				return err
+				return api.ConvertError(err)
 			},
 			createDynamicServiceRetryPolicy(ctx),
 			isServiceTransientError,
@@ -116,7 +117,10 @@ func scanWorkflowExecutionsHelper(
 
 		for _, execution := range resp.Executions {
 			if shouldReplay(params.GetSamplingRate()) {
-				result.Executions = append(result.Executions, execution.Execution)
+				result.Executions = append(result.Executions, &shared.WorkflowExecution{
+					WorkflowId: &execution.WorkflowExecution.WorkflowId,
+					RunId: &execution.WorkflowExecution.RunId,
+				})
 			}
 		}
 
@@ -148,7 +152,7 @@ func replayWorkflowActivity(
 ) (shadower.ReplayWorkflowActivityResult, error) {
 	logger := GetActivityLogger(ctx)
 	scope := tagScope(GetActivityMetricsScope(ctx), tagDomain, params.GetDomain(), tagTaskList, GetActivityInfo(ctx).TaskList)
-	service := ctx.Value(serviceClientContextKey).(workflowserviceclient.Interface)
+	service := ctx.Value(serviceClientContextKey).(api.Interface)
 	replayer := ctx.Value(workflowReplayerContextKey).(*WorkflowReplayer)
 
 	var progress replayWorkflowActivityProgress
@@ -203,7 +207,7 @@ func replayWorkflowActivity(
 func replayWorkflowExecutionHelper(
 	ctx context.Context,
 	replayer *WorkflowReplayer,
-	service workflowserviceclient.Interface,
+	service api.Interface,
 	logger *zap.Logger,
 	domain string,
 	execution WorkflowExecution,

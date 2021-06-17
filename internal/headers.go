@@ -23,7 +23,7 @@ package internal
 import (
 	"context"
 
-	"go.uber.org/cadence/v2/.gen/go/shared"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 )
 
 // HeaderWriter is an interface to write information to cadence headers
@@ -55,7 +55,7 @@ type ContextPropagator interface {
 }
 
 type headerReader struct {
-	header *shared.Header
+	header *apiv1.Header
 }
 
 func (hr *headerReader) ForEachKey(handler func(string, []byte) error) error {
@@ -63,7 +63,7 @@ func (hr *headerReader) ForEachKey(handler func(string, []byte) error) error {
 		return nil
 	}
 	for key, value := range hr.header.Fields {
-		if err := handler(key, value); err != nil {
+		if err := handler(key, value.GetData()); err != nil {
 			return err
 		}
 	}
@@ -71,25 +71,25 @@ func (hr *headerReader) ForEachKey(handler func(string, []byte) error) error {
 }
 
 // NewHeaderReader returns a header reader interface
-func NewHeaderReader(header *shared.Header) HeaderReader {
+func NewHeaderReader(header *apiv1.Header) HeaderReader {
 	return &headerReader{header}
 }
 
 type headerWriter struct {
-	header *shared.Header
+	header *apiv1.Header
 }
 
 func (hw *headerWriter) Set(key string, value []byte) {
 	if hw.header == nil {
 		return
 	}
-	hw.header.Fields[key] = value
+	hw.header.Fields[key] = &apiv1.Payload{Data: value}
 }
 
 // NewHeaderWriter returns a header writer interface
-func NewHeaderWriter(header *shared.Header) HeaderWriter {
+func NewHeaderWriter(header *apiv1.Header) HeaderWriter {
 	if header != nil && header.Fields == nil {
-		header.Fields = make(map[string][]byte)
+		header.Fields = make(map[string]*apiv1.Payload)
 	}
 	return &headerWriter{header}
 }

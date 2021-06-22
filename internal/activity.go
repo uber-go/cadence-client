@@ -294,7 +294,8 @@ type ServiceInvoker interface {
 	// without detail.
 	BackgroundHeartbeat() error
 	Close(flushBufferedHeartbeat bool)
-	GetClient(domain string, options *ClientOptions) Client
+
+	SignalWorkflow(ctx context.Context, domain, workflowID, runID, signalName string, signalInput []byte) error
 }
 
 // WithActivityTask adds activity specific information into context.

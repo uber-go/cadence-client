@@ -335,6 +335,7 @@ type (
 		DataConverter      DataConverter
 		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
+		FeatureFlags       FeatureFlags
 	}
 
 	// StartWorkflowOptions configuration parameters for starting a workflow execution.
@@ -502,6 +503,15 @@ const (
 	WorkflowIDReusePolicyTerminateIfRunning
 )
 
+func getFeatureFlags(options *ClientOptions) FeatureFlags {
+	if options != nil {
+		return FeatureFlags{
+			WorkflowExecutionAlreadyCompletedErrorEnabled: options.FeatureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled,
+		}
+	}
+	return FeatureFlags{}
+}
+
 // NewClient creates an instance of a workflow client
 func NewClient(service workflowserviceclient.Interface, domain string, options *ClientOptions) Client {
 	var identity string
@@ -532,6 +542,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	} else {
 		tracer = opentracing.NoopTracer{}
 	}
+
 	return &workflowClient{
 		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),
 		domain:             domain,
@@ -541,6 +552,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 		dataConverter:      dataConverter,
 		contextPropagators: contextPropagators,
 		tracer:             tracer,
+		featureFlags:       getFeatureFlags(options),
 	}
 }
 
@@ -557,10 +569,12 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 		metricScope = options.MetricsScope
 	}
 	metricScope = tagScope(metricScope, tagDomain, "domain-client", clientImplHeaderName, clientImplHeaderValue)
+
 	return &domainClient{
 		workflowService: metrics.NewWorkflowServiceWrapper(service, metricScope),
 		metricsScope:    metricScope,
 		identity:        identity,
+		featureFlags:    getFeatureFlags(options),
 	}
 }
 

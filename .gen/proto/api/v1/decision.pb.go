@@ -3809,10 +3809,7 @@ func (m *Decision) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -4271,10 +4268,7 @@ func (m *ScheduleActivityTaskDecisionAttributes) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -4393,10 +4387,7 @@ func (m *StartTimerDecisionAttributes) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -4483,10 +4474,7 @@ func (m *CompleteWorkflowExecutionDecisionAttributes) Unmarshal(dAtA []byte) err
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -4573,10 +4561,7 @@ func (m *FailWorkflowExecutionDecisionAttributes) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -4659,10 +4644,7 @@ func (m *RequestCancelActivityTaskDecisionAttributes) Unmarshal(dAtA []byte) err
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -4745,10 +4727,7 @@ func (m *CancelTimerDecisionAttributes) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -4835,10 +4814,7 @@ func (m *CancelWorkflowExecutionDecisionAttributes) Unmarshal(dAtA []byte) error
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -5011,10 +4987,7 @@ func (m *RequestCancelExternalWorkflowExecutionDecisionAttributes) Unmarshal(dAt
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -5169,10 +5142,7 @@ func (m *RecordMarkerDecisionAttributes) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -5706,10 +5676,7 @@ func (m *ContinueAsNewWorkflowExecutionDecisionAttributes) Unmarshal(dAtA []byte
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -6252,10 +6219,7 @@ func (m *StartChildWorkflowExecutionDecisionAttributes) Unmarshal(dAtA []byte) e
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -6496,10 +6460,7 @@ func (m *SignalExternalWorkflowExecutionDecisionAttributes) Unmarshal(dAtA []byt
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {
@@ -6586,10 +6547,7 @@ func (m *UpsertWorkflowSearchAttributesDecisionAttributes) Unmarshal(dAtA []byte
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthDecision
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthDecision
 			}
 			if (iNdEx + skippy) > l {

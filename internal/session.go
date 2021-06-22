@@ -540,9 +540,20 @@ func (env *sessionEnvironmentImpl) AddSessionToken() {
 
 func (env *sessionEnvironmentImpl) SignalCreationResponse(ctx context.Context, sessionID string) error {
 	activityEnv := getActivityEnv(ctx)
-	client := activityEnv.serviceInvoker.GetClient(activityEnv.workflowDomain, &ClientOptions{})
-	return client.SignalWorkflow(ctx, activityEnv.workflowExecution.ID, activityEnv.workflowExecution.RunID,
-		sessionID, env.getCreationResponse())
+
+	signalInput, err := encodeArg(getDefaultDataConverter(), env.getCreationResponse())
+	if err != nil {
+		return err
+	}
+
+	return activityEnv.serviceInvoker.SignalWorkflow(
+		ctx,
+		activityEnv.workflowDomain,
+		activityEnv.workflowExecution.ID,
+		activityEnv.workflowExecution.RunID,
+		sessionID,
+		signalInput,
+		)
 }
 
 func (env *sessionEnvironmentImpl) getCreationResponse() *sessionCreationResponse {

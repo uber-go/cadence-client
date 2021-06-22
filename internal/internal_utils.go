@@ -24,6 +24,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -54,6 +55,8 @@ const (
 	clientImplHeaderName  = "cadence-client-name"
 	clientImplHeaderValue = "uber-go"
 
+	clientFeatureFlagsHeaderName = "cadence-client-feature-flags"
+
 	// defaultRPCTimeout is the default tchannel rpc call timeout
 	defaultRPCTimeout = 10 * time.Second
 	//minRPCTimeout is minimum rpc call timeout allowed
@@ -64,14 +67,54 @@ const (
 	maxQueryRPCTimeout = 20 * time.Second
 )
 
+type (
+	FeatureFlags struct {
+		WorkflowExecutionAlreadyCompletedErrorEnabled bool
+	}
+)
+
 var (
 	// call header to cadence server
-	yarpcCallOptions = []yarpc.CallOption{
+	_yarpcCallOptions = []yarpc.CallOption{
 		yarpc.WithHeader(libraryVersionHeaderName, LibraryVersion),
 		yarpc.WithHeader(featureVersionHeaderName, FeatureVersion),
 		yarpc.WithHeader(clientImplHeaderName, clientImplHeaderValue),
 	}
 )
+
+func fromInternalFeatureFlags(featureFlags FeatureFlags) s.FeatureFlags {
+	// if we are using client-side-only flags in client.FeatureFlags;
+	// don't include them in shared.FeatureFlags and drop them here
+	return s.FeatureFlags{
+		WorkflowExecutionAlreadyCompletedErrorEnabled: common.BoolPtr(featureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled),
+	}
+}
+
+func toInternalFeatureFlags(featureFlags *s.FeatureFlags) FeatureFlags {
+	flags := FeatureFlags{}
+	if featureFlags != nil {
+		if featureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled != nil {
+			flags.WorkflowExecutionAlreadyCompletedErrorEnabled = *featureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled
+		}
+	}
+	return flags
+}
+
+func featureFlagsHeader(featureFlags FeatureFlags) string {
+	serialized := ""
+	buf, err := json.Marshal(fromInternalFeatureFlags(featureFlags))
+	if err == nil {
+		serialized = string(buf)
+	}
+	return serialized
+}
+
+func getYarpcCallOptions(featureFlags FeatureFlags) []yarpc.CallOption {
+	return append(
+		_yarpcCallOptions,
+		yarpc.WithHeader(clientFeatureFlagsHeaderName, featureFlagsHeader(featureFlags)),
+	)
+}
 
 // ContextBuilder stores all Channel-specific parameters that will
 // be stored inside of a context.
@@ -101,16 +144,29 @@ func chanTimeout(timeout time.Duration) func(builder *contextBuilder) {
 }
 
 // newChannelContext - Get a rpc channel context for query
-func newChannelContextForQuery(ctx context.Context, options ...func(builder *contextBuilder)) (context.Context, context.CancelFunc, []yarpc.CallOption) {
-	return newChannelContextHelper(ctx, true, options...)
+func newChannelContextForQuery(
+	ctx context.Context,
+	featureFlags FeatureFlags,
+	options ...func(builder *contextBuilder),
+) (context.Context, context.CancelFunc, []yarpc.CallOption) {
+	return newChannelContextHelper(ctx, true, featureFlags, options...)
 }
 
 // newChannelContext - Get a rpc channel context
-func newChannelContext(ctx context.Context, options ...func(builder *contextBuilder)) (context.Context, context.CancelFunc, []yarpc.CallOption) {
-	return newChannelContextHelper(ctx, false, options...)
+func newChannelContext(
+	ctx context.Context,
+	featureFlags FeatureFlags,
+	options ...func(builder *contextBuilder),
+) (context.Context, context.CancelFunc, []yarpc.CallOption) {
+	return newChannelContextHelper(ctx, false, featureFlags, options...)
 }
 
-func newChannelContextHelper(ctx context.Context, isQuery bool, options ...func(builder *contextBuilder)) (context.Context, context.CancelFunc, []yarpc.CallOption) {
+func newChannelContextHelper(
+	ctx context.Context,
+	isQuery bool,
+	featureFlags FeatureFlags,
+	options ...func(builder *contextBuilder),
+) (context.Context, context.CancelFunc, []yarpc.CallOption) {
 	rpcTimeout := defaultRPCTimeout
 	if ctx != nil {
 		// Set rpc timeout less than context timeout to allow for retries when call gets lost
@@ -136,7 +192,7 @@ func newChannelContextHelper(ctx context.Context, isQuery bool, options ...func(
 	}
 	ctx, cancelFn := builder.Build()
 
-	return ctx, cancelFn, yarpcCallOptions
+	return ctx, cancelFn, getYarpcCallOptions(featureFlags)
 }
 
 // GetWorkerIdentity gets a default identity for the worker.

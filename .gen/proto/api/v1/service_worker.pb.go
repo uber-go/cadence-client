@@ -4666,10 +4666,7 @@ func (m *PollForDecisionTaskRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -5245,7 +5242,7 @@ func (m *PollForDecisionTaskResponse) Unmarshal(dAtA []byte) error {
 					if err != nil {
 						return err
 					}
-					if skippy < 0 {
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
 						return ErrInvalidLengthServiceWorker
 					}
 					if (iNdEx + skippy) > postIndex {
@@ -5281,10 +5278,7 @@ func (m *PollForDecisionTaskResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -5689,7 +5683,7 @@ func (m *RespondDecisionTaskCompletedRequest) Unmarshal(dAtA []byte) error {
 					if err != nil {
 						return err
 					}
-					if skippy < 0 {
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
 						return ErrInvalidLengthServiceWorker
 					}
 					if (iNdEx + skippy) > postIndex {
@@ -5706,10 +5700,7 @@ func (m *RespondDecisionTaskCompletedRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -5908,7 +5899,7 @@ func (m *RespondDecisionTaskCompletedResponse) Unmarshal(dAtA []byte) error {
 					if err != nil {
 						return err
 					}
-					if skippy < 0 {
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
 						return ErrInvalidLengthServiceWorker
 					}
 					if (iNdEx + skippy) > postIndex {
@@ -5925,10 +5916,7 @@ func (m *RespondDecisionTaskCompletedResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -6132,10 +6120,7 @@ func (m *RespondDecisionTaskFailedRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -6186,10 +6171,7 @@ func (m *RespondDecisionTaskFailedResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -6376,10 +6358,7 @@ func (m *PollForActivityTaskRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -6979,10 +6958,7 @@ func (m *PollForActivityTaskResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -7135,10 +7111,7 @@ func (m *RespondActivityTaskCompletedRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -7189,10 +7162,7 @@ func (m *RespondActivityTaskCompletedResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -7411,10 +7381,7 @@ func (m *RespondActivityTaskCompletedByIDRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -7465,10 +7432,7 @@ func (m *RespondActivityTaskCompletedByIDResponse) Unmarshal(dAtA []byte) error 
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -7621,10 +7585,7 @@ func (m *RespondActivityTaskFailedRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -7675,10 +7636,7 @@ func (m *RespondActivityTaskFailedResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -7897,10 +7855,7 @@ func (m *RespondActivityTaskFailedByIDRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -7951,10 +7906,7 @@ func (m *RespondActivityTaskFailedByIDResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -8107,10 +8059,7 @@ func (m *RespondActivityTaskCanceledRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -8161,10 +8110,7 @@ func (m *RespondActivityTaskCanceledResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -8383,10 +8329,7 @@ func (m *RespondActivityTaskCanceledByIDRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -8437,10 +8380,7 @@ func (m *RespondActivityTaskCanceledByIDResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -8593,10 +8533,7 @@ func (m *RecordActivityTaskHeartbeatRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -8667,10 +8604,7 @@ func (m *RecordActivityTaskHeartbeatResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -8889,10 +8823,7 @@ func (m *RecordActivityTaskHeartbeatByIDRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -8963,10 +8894,7 @@ func (m *RecordActivityTaskHeartbeatByIDResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -9123,10 +9051,7 @@ func (m *RespondQueryTaskCompletedRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -9177,10 +9102,7 @@ func (m *RespondQueryTaskCompletedResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -9299,10 +9221,7 @@ func (m *ResetStickyTaskListRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {
@@ -9353,10 +9272,7 @@ func (m *ResetStickyTaskListResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceWorker
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceWorker
 			}
 			if (iNdEx + skippy) > l {

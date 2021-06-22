@@ -1265,7 +1265,9 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 		mockService,
 		func() {},
 		0,
-		make(chan struct{}))
+		make(chan struct{}),
+		featureFlags,
+	)
 
 	heartbeatErr := cadenceInvoker.BatchHeartbeat(nil)
 	t.NotNil(heartbeatErr)
@@ -1289,7 +1291,9 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveErro
 		mockService,
 		cancelHandler,
 		0,
-		make(chan struct{}))
+		make(chan struct{}),
+		featureFlags,
+	)
 
 	heartbeatErr := cadenceInvoker.BatchHeartbeat(nil)
 	t.NotNil(heartbeatErr)

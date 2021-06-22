@@ -221,6 +221,10 @@ type (
 		// Optional: Configures shadowing workflow
 		// default: please check the documentation for ShadowOptions for default options
 		ShadowOptions ShadowOptions
+
+		// Optional: Flags to turn on/off some server side options
+		// default: all the features in the struct are turned off
+		FeatureFlags FeatureFlags
 	}
 )
 

@@ -189,6 +189,9 @@ type (
 		Tracer opentracing.Tracer
 
 		WorkflowInterceptors []WorkflowInterceptorFactory
+
+		// flags to turn on/off some server side features
+		FeatureFlags FeatureFlags
 	}
 )
 
@@ -234,10 +237,15 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 // verifyDomainExist does a DescribeDomain operation on the specified domain with backoff/retry
 // It returns an error, if the server returns an EntityNotExist or BadRequest error
 // On any other transient error, this method will just return success
-func verifyDomainExist(client workflowserviceclient.Interface, domain string, logger *zap.Logger) error {
+func verifyDomainExist(
+	client workflowserviceclient.Interface,
+	domain string,
+	logger *zap.Logger,
+	featureFlags FeatureFlags,
+) error {
 	ctx := context.Background()
 	descDomainOp := func() error {
-		tchCtx, cancel, opt := newChannelContext(ctx)
+		tchCtx, cancel, opt := newChannelContext(ctx, featureFlags)
 		defer cancel()
 		_, err := client.DescribeDomain(tchCtx, &shared.DescribeDomainRequest{Name: &domain}, opt...)
 		if err != nil {
@@ -355,7 +363,7 @@ func newWorkflowTaskWorkerInternal(
 
 // Start the worker.
 func (ww *workflowWorker) Start() error {
-	err := verifyDomainExist(ww.workflowService, ww.domain, ww.worker.logger)
+	err := verifyDomainExist(ww.workflowService, ww.domain, ww.worker.logger, ww.executionParameters.FeatureFlags)
 	if err != nil {
 		return err
 	}
@@ -365,7 +373,7 @@ func (ww *workflowWorker) Start() error {
 }
 
 func (ww *workflowWorker) Run() error {
-	err := verifyDomainExist(ww.workflowService, ww.domain, ww.worker.logger)
+	err := verifyDomainExist(ww.workflowService, ww.domain, ww.worker.logger, ww.executionParameters.FeatureFlags)
 	if err != nil {
 		return err
 	}
@@ -517,7 +525,7 @@ func newActivityTaskWorker(
 
 // Start the worker.
 func (aw *activityWorker) Start() error {
-	err := verifyDomainExist(aw.workflowService, aw.domain, aw.worker.logger)
+	err := verifyDomainExist(aw.workflowService, aw.domain, aw.worker.logger, aw.executionParameters.FeatureFlags)
 	if err != nil {
 		return err
 	}
@@ -527,7 +535,7 @@ func (aw *activityWorker) Start() error {
 
 // Run the worker.
 func (aw *activityWorker) Run() error {
-	err := verifyDomainExist(aw.workflowService, aw.domain, aw.worker.logger)
+	err := verifyDomainExist(aw.workflowService, aw.domain, aw.worker.logger, aw.executionParameters.FeatureFlags)
 	if err != nil {
 		return err
 	}
@@ -1022,6 +1030,7 @@ func newAggregatedWorker(
 		ContextPropagators:                   wOptions.ContextPropagators,
 		Tracer:                               wOptions.Tracer,
 		WorkflowInterceptors:                 wOptions.WorkflowInterceptorChainFactories,
+		FeatureFlags:                         wOptions.FeatureFlags,
 	}
 
 	ensureRequiredParams(&workerParams)

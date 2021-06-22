@@ -46,6 +46,21 @@ steps:
           run: integ-test
           config: docker/buildkite/docker-compose.yml
 
+  - label: ":golang: integration-test-grpc-adapter"
+    agents:
+      queue: "workers"
+      docker: "*"
+    command: "make integ_test_grpc"
+    artifact_paths:
+      - ".build/coverage/*.out"
+    retry:
+      automatic:
+        limit: 1
+    plugins:
+      - docker-compose#v3.0.0:
+          run: integ-test-grpc
+          config: docker/buildkite/docker-compose.yml
+
   - wait
 
   - label: ":golang: code-coverage"

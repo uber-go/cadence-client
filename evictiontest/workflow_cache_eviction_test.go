@@ -87,7 +87,7 @@ func TestWorkersTestSuite(t *testing.T) {
 }
 
 // this is the mock for yarpcCallOptions, make sure length are the same
-var callOptions = []interface{}{gomock.Any(), gomock.Any(), gomock.Any()}
+var callOptions = []interface{}{gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()}
 
 func createTestEventWorkflowExecutionStarted(eventID int64, attr *m.WorkflowExecutionStartedEventAttributes) *m.HistoryEvent {
 	return &m.HistoryEvent{

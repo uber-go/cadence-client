@@ -2213,7 +2213,7 @@ func (m *RegisterDomainRequest) Unmarshal(dAtA []byte) error {
 					if err != nil {
 						return err
 					}
-					if skippy < 0 {
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
 						return ErrInvalidLengthServiceDomain
 					}
 					if (iNdEx + skippy) > postIndex {
@@ -2352,10 +2352,7 @@ func (m *RegisterDomainRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {
@@ -2406,10 +2403,7 @@ func (m *RegisterDomainResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {
@@ -2734,7 +2728,7 @@ func (m *UpdateDomainRequest) Unmarshal(dAtA []byte) error {
 					if err != nil {
 						return err
 					}
-					if skippy < 0 {
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
 						return ErrInvalidLengthServiceDomain
 					}
 					if (iNdEx + skippy) > postIndex {
@@ -3059,10 +3053,7 @@ func (m *UpdateDomainRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {
@@ -3149,10 +3140,7 @@ func (m *UpdateDomainResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {
@@ -3267,10 +3255,7 @@ func (m *DeprecateDomainRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {
@@ -3321,10 +3306,7 @@ func (m *DeprecateDomainResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {
@@ -3439,10 +3421,7 @@ func (m *DescribeDomainRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {
@@ -3529,10 +3508,7 @@ func (m *DescribeDomainResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {
@@ -3636,10 +3612,7 @@ func (m *ListDomainsRequest) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {
@@ -3758,10 +3731,7 @@ func (m *ListDomainsResponse) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthServiceDomain
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthServiceDomain
 			}
 			if (iNdEx + skippy) > l {

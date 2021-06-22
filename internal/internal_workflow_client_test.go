@@ -24,11 +24,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/v2/internal/common/serializer"
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"go.uber.org/cadence/v2/internal/common/serializer"
 
 	"go.uber.org/cadence/v2/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/v2/.gen/go/shared"
@@ -339,7 +340,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Success() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(createResponse, nil).Times(1)
 
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType := shared.EventTypeWorkflowExecutionCompleted
@@ -359,7 +360,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Success() {
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, callOptions...).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -384,7 +385,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_RawHistory_Success() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(createResponse, nil).Times(1)
 
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType := shared.EventTypeWorkflowExecutionCompleted
@@ -407,7 +408,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_RawHistory_Success() {
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, callOptions...).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -434,7 +435,7 @@ func (s *workflowRunSuite) TestExecuteWorkflowWorkflowExecutionAlreadyStartedErr
 		Message:        common.StringPtr("Already Started"),
 		StartRequestId: common.StringPtr(uuid.NewRandom().String()),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).
 		Return(nil, alreadyStartedErr).Times(1)
 
 	eventType := shared.EventTypeWorkflowExecutionCompleted
@@ -453,9 +454,9 @@ func (s *workflowRunSuite) TestExecuteWorkflowWorkflowExecutionAlreadyStartedErr
 		},
 		NextPageToken: nil,
 	}
-	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).
 		Return(getResponse, nil).Times(1)
-	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
+	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}, opt4 interface{}) {
 		workflowID := getRequest.Execution.WorkflowId
 		s.NotNil(workflowID)
 		s.NotEmpty(*workflowID)
@@ -486,7 +487,7 @@ func (s *workflowRunSuite) TestExecuteWorkflowWorkflowExecutionAlreadyStartedErr
 		Message:        common.StringPtr("Already Started"),
 		StartRequestId: common.StringPtr(uuid.NewRandom().String()),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).
 		Return(nil, alreadyStartedErr).Times(1)
 
 	eventType := shared.EventTypeWorkflowExecutionCompleted
@@ -509,9 +510,9 @@ func (s *workflowRunSuite) TestExecuteWorkflowWorkflowExecutionAlreadyStartedErr
 		},
 		NextPageToken: nil,
 	}
-	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).
 		Return(getResponse, nil).Times(1)
-	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
+	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}, opt4 interface{}) {
 		workflowID := getRequest.Execution.WorkflowId
 		s.NotNil(workflowID)
 		s.NotEmpty(*workflowID)
@@ -542,7 +543,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoIdInOptions() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(createResponse, nil).Times(1)
 
 	eventType := shared.EventTypeWorkflowExecutionCompleted
 	workflowResult := time.Hour * 59
@@ -561,8 +562,8 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoIdInOptions() {
 		NextPageToken: nil,
 	}
 	var wid *string
-	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
-	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
+	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(getResponse, nil).Times(1)
+	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}, opt4 interface{}) {
 		wid = getRequest.Execution.WorkflowId
 		s.NotNil(wid)
 		s.NotEmpty(*wid)
@@ -592,7 +593,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoIdInOptions_RawHistory() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(createResponse, nil).Times(1)
 
 	eventType := shared.EventTypeWorkflowExecutionCompleted
 	workflowResult := time.Hour * 59
@@ -614,8 +615,8 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoIdInOptions_RawHistory() {
 		NextPageToken: nil,
 	}
 	var wid *string
-	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
-	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}) {
+	getHistory := s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(getResponse, nil).Times(1)
+	getHistory.Do(func(ctx interface{}, getRequest *shared.GetWorkflowExecutionHistoryRequest, opt1 interface{}, opt2 interface{}, opt3 interface{}, opt4 interface{}) {
 		wid = getRequest.Execution.WorkflowId
 		s.NotNil(wid)
 		s.NotEmpty(*wid)
@@ -643,7 +644,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Cancelled() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(createResponse, nil).Times(1)
 
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType := shared.EventTypeWorkflowExecutionCanceled
@@ -663,7 +664,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Cancelled() {
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, callOptions...).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -690,7 +691,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Failed() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(createResponse, nil).Times(1)
 
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType := shared.EventTypeWorkflowExecutionFailed
@@ -713,7 +714,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Failed() {
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, callOptions...).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -738,7 +739,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Terminated() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(createResponse, nil).Times(1)
 
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType := shared.EventTypeWorkflowExecutionTerminated
@@ -754,7 +755,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_Terminated() {
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, callOptions...).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -779,7 +780,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_TimedOut() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(createResponse, nil).Times(1)
 
 	filterType := shared.HistoryEventFilterTypeCloseEvent
 	eventType := shared.EventTypeWorkflowExecutionTimedOut
@@ -798,7 +799,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_TimedOut() {
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, callOptions...).Return(getResponse, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -826,7 +827,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_ContinueAsNew() {
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
-	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(createResponse, nil).Times(1)
 
 	newRunID := "some other random run ID"
 	filterType := shared.HistoryEventFilterTypeCloseEvent
@@ -845,7 +846,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_ContinueAsNew() {
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest1, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse1, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest1, callOptions...).Return(getResponse1, nil).Times(1)
 
 	workflowResult := time.Hour * 59
 	encodedResult, _ := encodeArg(getDefaultDataConverter(), workflowResult)
@@ -865,7 +866,7 @@ func (s *workflowRunSuite) TestExecuteWorkflow_NoDup_ContinueAsNew() {
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest2, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse2, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest2, callOptions...).Return(getResponse2, nil).Times(1)
 
 	workflowRun, err := s.workflowClient.ExecuteWorkflow(
 		context.Background(),
@@ -905,7 +906,7 @@ func (s *workflowRunSuite) TestGetWorkflow() {
 		},
 		NextPageToken: nil,
 	}
-	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, gomock.Any(), gomock.Any(), gomock.Any()).Return(getResponse, nil).Times(1)
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), getRequest, callOptions...).Return(getResponse, nil).Times(1)
 
 	workflowID := workflowID
 	runID := runID

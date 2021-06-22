@@ -22,13 +22,13 @@
 package main
 
 import (
-	_ "go.uber.org/cadence/v1"
-	_ "go.uber.org/cadence/v1/activity"
-	_ "go.uber.org/cadence/v1/client"
-	_ "go.uber.org/cadence/v1/encoded"
-	_ "go.uber.org/cadence/v1/testsuite"
-	_ "go.uber.org/cadence/v1/worker"
-	_ "go.uber.org/cadence/v1/workflow"
+	_ "go.uber.org/cadence/v2"
+	_ "go.uber.org/cadence/v2/activity"
+	_ "go.uber.org/cadence/v2/client"
+	_ "go.uber.org/cadence/v2/encoded"
+	_ "go.uber.org/cadence/v2/testsuite"
+	_ "go.uber.org/cadence/v2/worker"
+	_ "go.uber.org/cadence/v2/workflow"
 )
 
 func main() {

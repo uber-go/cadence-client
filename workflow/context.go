@@ -21,7 +21,7 @@
 package workflow
 
 import (
-	"go.uber.org/cadence/v1/internal"
+	"go.uber.org/cadence/v2/internal"
 )
 
 // Context is a clone of context.Context with Done() returning Channel instead

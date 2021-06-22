@@ -27,12 +27,12 @@ import (
 	"math/rand"
 	"time"
 
-	"go.uber.org/cadence/v1"
-	"go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/client"
-	"go.uber.org/cadence/v1/internal"
-	"go.uber.org/cadence/v1/worker"
-	"go.uber.org/cadence/v1/workflow"
+	"go.uber.org/cadence/v2"
+	"go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/client"
+	"go.uber.org/cadence/v2/internal"
+	"go.uber.org/cadence/v2/worker"
+	"go.uber.org/cadence/v2/workflow"
 )
 
 const (

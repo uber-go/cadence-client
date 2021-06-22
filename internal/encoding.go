@@ -28,7 +28,7 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"go.uber.org/cadence/v1/internal/common"
+	"go.uber.org/cadence/v2/internal/common"
 )
 
 // encoding is capable of encoding and decoding objects

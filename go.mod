@@ -1,4 +1,4 @@
-module go.uber.org/cadence/v1
+module go.uber.org/cadence/v2
 
 go 1.13
 

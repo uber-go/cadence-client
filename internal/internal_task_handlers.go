@@ -36,13 +36,13 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
-	"go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
-	s "go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/internal/common"
-	"go.uber.org/cadence/v1/internal/common/backoff"
-	"go.uber.org/cadence/v1/internal/common/cache"
-	"go.uber.org/cadence/v1/internal/common/metrics"
-	"go.uber.org/cadence/v1/internal/common/util"
+	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
+	s "go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/internal/common/backoff"
+	"go.uber.org/cadence/v2/internal/common/cache"
+	"go.uber.org/cadence/v2/internal/common/metrics"
+	"go.uber.org/cadence/v2/internal/common/util"
 	"go.uber.org/zap"
 )
 

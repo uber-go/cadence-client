@@ -7,7 +7,7 @@
     "taskId":22037765,
     "workflowExecutionStartedEventAttributes":{
       "workflowType":{
-        "name":"go.uber.org/cadence/v1/test/replaytests.Workflow"
+        "name":"go.uber.org/cadence/v2/test/replaytests.Workflow"
       },
       "taskList":{
         "name":"helloWorldGroup"

@@ -24,20 +24,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/v1/internal/common/serializer"
+	"go.uber.org/cadence/v2/internal/common/serializer"
 	"log"
 	"os"
 	"testing"
 	"time"
 
-	"go.uber.org/cadence/v1/.gen/go/cadence/workflowservicetest"
-	"go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/internal/common"
+	"go.uber.org/cadence/v2/.gen/go/cadence/workflowservicetest"
+	"go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/internal/common"
 
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/v1/internal/common/metrics"
+	"go.uber.org/cadence/v2/internal/common/metrics"
 )
 
 const (

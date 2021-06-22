@@ -20,9 +20,9 @@
 
 package api
 
-import apiv1 "go.uber.org/cadence/v1/.gen/proto/api/v1"
+import apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package go.uber.org/cadence/v1/internal/api
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package go.uber.org/cadence/v2/internal/api
 
 type Interface interface {
 	apiv1.DomainAPIYARPCClient

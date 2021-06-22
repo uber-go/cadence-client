@@ -24,8 +24,8 @@ import (
 	"context"
 	"time"
 
-	"go.uber.org/cadence/v1/activity"
-	"go.uber.org/cadence/v1/workflow"
+	"go.uber.org/cadence/v2/activity"
+	"go.uber.org/cadence/v2/workflow"
 	"go.uber.org/zap"
 )
 

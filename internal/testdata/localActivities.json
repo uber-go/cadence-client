@@ -7,7 +7,7 @@
         "taskId": 1049501,
         "workflowExecutionStartedEventAttributes": {
             "workflowType": {
-                "name": "go.uber.org/cadence/v1/internal.localActivitiesCallingOptionsWorkflow.Execute"
+                "name": "go.uber.org/cadence/v2/internal.localActivitiesCallingOptionsWorkflow.Execute"
             },
             "taskList": {
                 "name": "tl-1"

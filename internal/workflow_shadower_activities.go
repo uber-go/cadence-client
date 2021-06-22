@@ -26,12 +26,12 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/v1/.gen/go/shadower"
-	"go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/internal/common"
-	"go.uber.org/cadence/v1/internal/common/backoff"
-	"go.uber.org/cadence/v1/internal/common/metrics"
+	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
+	"go.uber.org/cadence/v2/.gen/go/shadower"
+	"go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/internal/common/backoff"
+	"go.uber.org/cadence/v2/internal/common/metrics"
 	"go.uber.org/zap"
 )
 

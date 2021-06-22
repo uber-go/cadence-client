@@ -25,8 +25,8 @@ package workflowserviceserver
 
 import (
 	context "context"
-	cadence "go.uber.org/cadence/v1/.gen/go/cadence"
-	shared "go.uber.org/cadence/v1/.gen/go/shared"
+	cadence "go.uber.org/cadence/v2/.gen/go/cadence"
+	shared "go.uber.org/cadence/v2/.gen/go/shared"
 	wire "go.uber.org/thriftrw/wire"
 	transport "go.uber.org/yarpc/api/transport"
 	thrift "go.uber.org/yarpc/encoding/thrift"

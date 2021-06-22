@@ -23,9 +23,9 @@ package internal
 import (
 	"container/list"
 	"fmt"
-	s "go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/internal/common"
-	"go.uber.org/cadence/v1/internal/common/util"
+	s "go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/internal/common/util"
 )
 
 type (

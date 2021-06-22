@@ -6,7 +6,7 @@ default: test
 OS = $(shell uname -s)
 ARCH = $(shell uname -m)
 
-IMPORT_ROOT := go.uber.org/cadence/v1
+IMPORT_ROOT := go.uber.org/cadence/v2
 THRIFT_GENDIR := .gen/go
 THRIFTRW_SRC := idls/thrift/cadence.thrift idls/thrift/shadower.thrift
 # one or more thriftrw-generated file(s), to create / depend on generated code

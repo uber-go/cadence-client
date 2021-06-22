@@ -24,7 +24,7 @@ package workflow
 import (
 	"time"
 
-	"go.uber.org/cadence/v1/internal"
+	"go.uber.org/cadence/v2/internal"
 )
 
 type (

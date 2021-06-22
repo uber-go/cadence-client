@@ -38,11 +38,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
-	"go.uber.org/cadence/v1/.gen/go/cadence/workflowservicetest"
-	m "go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/internal"
-	"go.uber.org/cadence/v1/internal/common"
-	"go.uber.org/cadence/v1/worker"
+	"go.uber.org/cadence/v2/.gen/go/cadence/workflowservicetest"
+	m "go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/internal"
+	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/worker"
 	"go.uber.org/yarpc"
 	"golang.org/x/net/context"
 )
@@ -130,7 +130,7 @@ func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
 		ret := &m.PollForDecisionTaskResponse{
 			TaskToken:              make([]byte, 5),
 			WorkflowExecution:      &m.WorkflowExecution{WorkflowId: workflowID, RunId: runID},
-			WorkflowType:           &m.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v1/evictiontest.testReplayWorkflow")},
+			WorkflowType:           &m.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/v2/evictiontest.testReplayWorkflow")},
 			History:                &m.History{Events: testEvents},
 			PreviousStartedEventId: common.Int64Ptr(5)}
 		return ret, nil

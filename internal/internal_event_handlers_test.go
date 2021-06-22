@@ -26,7 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	s "go.uber.org/cadence/v1/.gen/go/shared"
+	s "go.uber.org/cadence/v2/.gen/go/shared"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"

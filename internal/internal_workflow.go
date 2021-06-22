@@ -35,11 +35,11 @@ import (
 
 	"github.com/robfig/cron"
 	"go.uber.org/atomic"
-	"go.uber.org/cadence/v1/.gen/go/shared"
-	s "go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/internal/common"
-	"go.uber.org/cadence/v1/internal/common/metrics"
-	"go.uber.org/cadence/v1/internal/common/util"
+	"go.uber.org/cadence/v2/.gen/go/shared"
+	s "go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/internal/common/metrics"
+	"go.uber.org/cadence/v2/internal/common/util"
 	"go.uber.org/zap"
 )
 

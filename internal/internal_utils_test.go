@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	s "go.uber.org/cadence/v1/.gen/go/shared"
+	s "go.uber.org/cadence/v2/.gen/go/shared"
 )
 
 func TestChannelBuilderOptions(t *testing.T) {

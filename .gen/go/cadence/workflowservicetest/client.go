@@ -26,8 +26,8 @@ package workflowservicetest
 import (
 	context "context"
 	gomock "github.com/golang/mock/gomock"
-	workflowserviceclient "go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
-	shared "go.uber.org/cadence/v1/.gen/go/shared"
+	workflowserviceclient "go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
+	shared "go.uber.org/cadence/v2/.gen/go/shared"
 	yarpc "go.uber.org/yarpc"
 )
 

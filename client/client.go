@@ -26,11 +26,11 @@ package client
 import (
 	"context"
 
-	"go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
-	s "go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/encoded"
-	"go.uber.org/cadence/v1/internal"
-	"go.uber.org/cadence/v1/workflow"
+	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
+	s "go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/encoded"
+	"go.uber.org/cadence/v2/internal"
+	"go.uber.org/cadence/v2/workflow"
 )
 
 const (

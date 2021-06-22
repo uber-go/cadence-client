@@ -27,7 +27,7 @@ import (
 	"reflect"
 	"strings"
 
-	"go.uber.org/cadence/v1/.gen/go/shared"
+	"go.uber.org/cadence/v2/.gen/go/shared"
 )
 
 /*

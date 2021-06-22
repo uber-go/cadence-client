@@ -35,7 +35,7 @@ string parameter, appends a word to it and then returns the result.
 	import (
 		"context"
 
-		"go.uber.org/cadence/v1/activity"
+		"go.uber.org/cadence/v2/activity"
 		"go.uber.org/zap"
 	)
 

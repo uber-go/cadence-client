@@ -31,10 +31,10 @@ import (
 	"time"
 
 	"github.com/facebookgo/clock"
-	"go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/v1/.gen/go/shadower"
-	"go.uber.org/cadence/v1/internal/common"
-	"go.uber.org/cadence/v1/internal/common/util"
+	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
+	"go.uber.org/cadence/v2/.gen/go/shadower"
+	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/internal/common/util"
 	"go.uber.org/zap"
 )
 

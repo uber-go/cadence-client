@@ -40,7 +40,7 @@ func TestWorkflowRegistration(t *testing.T) {
 		{
 			msg:               "register workflow function",
 			register:          func(r *registry) { r.RegisterWorkflow(testWorkflowFunction) },
-			workflowType:      "go.uber.org/cadence/v1/internal.testWorkflowFunction",
+			workflowType:      "go.uber.org/cadence/v2/internal.testWorkflowFunction",
 			resolveByFunction: testWorkflowFunction,
 		},
 		{
@@ -63,8 +63,8 @@ func TestWorkflowRegistration(t *testing.T) {
 		{
 			msg:               "register workflow struct function (backwards compatible)",
 			register:          func(r *registry) { r.RegisterWorkflow(w.Method) },
-			workflowType:      "go.uber.org/cadence/v1/internal.(*testWorkflowStruct).Method",
-			altWorkflowType:   "go.uber.org/cadence/v1/internal.(*testWorkflowStruct).Method-fm",
+			workflowType:      "go.uber.org/cadence/v2/internal.(*testWorkflowStruct).Method",
+			altWorkflowType:   "go.uber.org/cadence/v2/internal.(*testWorkflowStruct).Method-fm",
 			resolveByFunction: w.Method,
 		},
 		{
@@ -81,7 +81,7 @@ func TestWorkflowRegistration(t *testing.T) {
 				r.RegisterWorkflow(testWorkflowFunction)
 				r.RegisterWorkflowWithOptions(testWorkflowFunction, RegisterWorkflowOptions{DisableAlreadyRegisteredCheck: true})
 			},
-			workflowType:      "go.uber.org/cadence/v1/internal.testWorkflowFunction",
+			workflowType:      "go.uber.org/cadence/v2/internal.testWorkflowFunction",
 			resolveByFunction: testWorkflowFunction,
 		},
 		{
@@ -144,7 +144,7 @@ func TestActivityRegistration(t *testing.T) {
 		{
 			msg:               "register activity function",
 			register:          func(r *registry) { r.RegisterActivity(testActivityFunction) },
-			activityType:      "go.uber.org/cadence/v1/internal.testActivityFunction",
+			activityType:      "go.uber.org/cadence/v2/internal.testActivityFunction",
 			resolveByFunction: testActivityFunction,
 		},
 		{
@@ -167,8 +167,8 @@ func TestActivityRegistration(t *testing.T) {
 		{
 			msg:               "register activity struct",
 			register:          func(r *registry) { r.RegisterActivity(&testActivityStruct{}) },
-			activityType:      "go.uber.org/cadence/v1/internal.(*testActivityStruct).Method",
-			altActivityType:   "go.uber.org/cadence/v1/internal.(*testActivityStruct).Method-fm",
+			activityType:      "go.uber.org/cadence/v2/internal.(*testActivityStruct).Method",
+			altActivityType:   "go.uber.org/cadence/v2/internal.(*testActivityStruct).Method-fm",
 			resolveByFunction: (&testActivityStruct{}).Method,
 		},
 		{
@@ -203,7 +203,7 @@ func TestActivityRegistration(t *testing.T) {
 				r.RegisterActivity(&testActivityStruct{})
 				r.RegisterActivityWithOptions(&testActivityStruct{}, RegisterActivityOptions{DisableAlreadyRegisteredCheck: true})
 			},
-			activityType:      "go.uber.org/cadence/v1/internal.(*testActivityStruct).Method",
+			activityType:      "go.uber.org/cadence/v2/internal.(*testActivityStruct).Method",
 			resolveByFunction: (&testActivityStruct{}).Method,
 		},
 		{

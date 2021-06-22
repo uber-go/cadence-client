@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"strings"
 
-	apiv1 "go.uber.org/cadence/v1/.gen/proto/api/v1"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	"go.uber.org/yarpc/encoding/protobuf"
 	"go.uber.org/yarpc/yarpcerrors"
 )

@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/cadence/v1/worker"
+	"go.uber.org/cadence/v2/worker"
 	"go.uber.org/zap/zaptest"
 )
 

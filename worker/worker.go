@@ -25,11 +25,11 @@ package worker
 import (
 	"context"
 
-	"go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
-	"go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/activity"
-	"go.uber.org/cadence/v1/internal"
-	"go.uber.org/cadence/v1/workflow"
+	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
+	"go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/activity"
+	"go.uber.org/cadence/v2/internal"
+	"go.uber.org/cadence/v2/workflow"
 	"go.uber.org/zap"
 )
 

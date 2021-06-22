@@ -21,7 +21,7 @@
 package mocks
 
 import (
-	"go.uber.org/cadence/v1/client"
+	"go.uber.org/cadence/v2/client"
 )
 
 // make sure mocks are in sync with interfaces

@@ -29,7 +29,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	apiv1 "go.uber.org/cadence/v1/.gen/proto/api/v1"
+	apiv1 "go.uber.org/cadence/v2/.gen/proto/api/v1"
 	yarpc "go.uber.org/yarpc"
 )
 

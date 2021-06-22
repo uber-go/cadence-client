@@ -28,7 +28,7 @@ import (
 	base64 "encoding/base64"
 	json "encoding/json"
 	fmt "fmt"
-	shared "go.uber.org/cadence/v1/.gen/go/shared"
+	shared "go.uber.org/cadence/v2/.gen/go/shared"
 	multierr "go.uber.org/multierr"
 	thriftreflect "go.uber.org/thriftrw/thriftreflect"
 	wire "go.uber.org/thriftrw/wire"
@@ -2157,7 +2157,7 @@ func (v *WorkflowResult) IsSetFailed() bool {
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "shadower",
-	Package:  "go.uber.org/cadence/v1/.gen/go/shadower",
+	Package:  "go.uber.org/cadence/v2/.gen/go/shadower",
 	FilePath: "shadower.thrift",
 	SHA1:     "f29a425548641e51e02ec1978279c1e37b9df792",
 	Includes: []*thriftreflect.ThriftModule{

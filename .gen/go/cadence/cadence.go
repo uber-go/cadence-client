@@ -26,7 +26,7 @@ package cadence
 import (
 	errors "errors"
 	fmt "fmt"
-	shared "go.uber.org/cadence/v1/.gen/go/shared"
+	shared "go.uber.org/cadence/v2/.gen/go/shared"
 	multierr "go.uber.org/multierr"
 	thriftreflect "go.uber.org/thriftrw/thriftreflect"
 	wire "go.uber.org/thriftrw/wire"
@@ -37,7 +37,7 @@ import (
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "cadence",
-	Package:  "go.uber.org/cadence/v1/.gen/go/cadence",
+	Package:  "go.uber.org/cadence/v2/.gen/go/cadence",
 	FilePath: "cadence.thrift",
 	SHA1:     "9bc839885f29c2460af53bf639994d20e53521a0",
 	Includes: []*thriftreflect.ThriftModule{

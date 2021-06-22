@@ -23,8 +23,8 @@ package internal
 import (
 	"reflect"
 
-	"go.uber.org/cadence/v1/internal/common"
-	"go.uber.org/cadence/v1/internal/common/util"
+	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/internal/common/util"
 )
 
 type (

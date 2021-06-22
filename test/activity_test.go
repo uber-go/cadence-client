@@ -28,9 +28,9 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/cadence/v1"
-	"go.uber.org/cadence/v1/activity"
-	"go.uber.org/cadence/v1/worker"
+	"go.uber.org/cadence/v2"
+	"go.uber.org/cadence/v2/activity"
+	"go.uber.org/cadence/v2/worker"
 )
 
 type Activities struct {

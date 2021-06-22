@@ -29,9 +29,9 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
-	s "go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/internal/common"
-	"go.uber.org/cadence/v1/internal/common/backoff"
+	s "go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/internal/common/backoff"
 	"go.uber.org/zap"
 )
 

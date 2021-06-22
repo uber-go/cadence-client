@@ -32,12 +32,12 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/v1/.gen/go/cadence/workflowserviceclient"
-	s "go.uber.org/cadence/v1/.gen/go/shared"
-	"go.uber.org/cadence/v1/internal/common"
-	"go.uber.org/cadence/v1/internal/common/backoff"
-	"go.uber.org/cadence/v1/internal/common/metrics"
-	"go.uber.org/cadence/v1/internal/common/serializer"
+	"go.uber.org/cadence/v2/.gen/go/cadence/workflowserviceclient"
+	s "go.uber.org/cadence/v2/.gen/go/shared"
+	"go.uber.org/cadence/v2/internal/common"
+	"go.uber.org/cadence/v2/internal/common/backoff"
+	"go.uber.org/cadence/v2/internal/common/metrics"
+	"go.uber.org/cadence/v2/internal/common/serializer"
 	"go.uber.org/zap"
 )
 

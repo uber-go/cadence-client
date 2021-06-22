@@ -688,7 +688,7 @@ func TestPanic(t *testing.T) {
 	require.EqualValues(t, "simulated failure", err.Error())
 	panicError, ok := err.(*workflowPanicError)
 	require.True(t, ok)
-	require.Contains(t, panicError.StackTrace(), "cadence/v1/internal.TestPanic")
+	require.Contains(t, panicError.StackTrace(), "cadence/v2/internal.TestPanic")
 }
 
 func TestAwait(t *testing.T) {

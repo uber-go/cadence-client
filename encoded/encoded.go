@@ -21,7 +21,7 @@
 // Package encoded contains wrappers that are used for binary payloads deserialization.
 package encoded
 
-import "go.uber.org/cadence/v1/internal"
+import "go.uber.org/cadence/v2/internal"
 
 type (
 

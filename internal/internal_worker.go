@@ -820,7 +820,7 @@ func (aw *aggregatedWorker) Start() error {
 		return fmt.Errorf("failed to get executable checksum: %v", err)
 	}
 
-	if !isInterfaceNil(aw.workflowWorker) {
+	if aw.workflowWorker != nil {
 		if len(aw.registry.getRegisteredWorkflowTypes()) == 0 {
 			aw.logger.Info(
 				"Worker has no workflows registered, so workflow worker will not be started.",
@@ -832,7 +832,7 @@ func (aw *aggregatedWorker) Start() error {
 		}
 		aw.logger.Info("Started Workflow Worker")
 	}
-	if !isInterfaceNil(aw.activityWorker) {
+	if aw.activityWorker != nil {
 		if len(aw.registry.getRegisteredActivities()) == 0 {
 			aw.logger.Info(
 				"Worker has no activities registered, so activity worker will not be started.",
@@ -840,15 +840,15 @@ func (aw *aggregatedWorker) Start() error {
 		} else {
 			if err := aw.activityWorker.Start(); err != nil {
 				// stop workflow worker.
-				if !isInterfaceNil(aw.workflowWorker) {
+				if aw.workflowWorker != nil {
 					aw.workflowWorker.Stop()
 				}
 				return err
 			}
-			if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+			if aw.locallyDispatchedActivityWorker != nil {
 				if err := aw.locallyDispatchedActivityWorker.Start(); err != nil {
 					// stop workflow worker.
-					if !isInterfaceNil(aw.workflowWorker) {
+					if aw.workflowWorker != nil {
 						aw.workflowWorker.Stop()
 					}
 					aw.activityWorker.Stop()
@@ -859,16 +859,16 @@ func (aw *aggregatedWorker) Start() error {
 		}
 	}
 
-	if !isInterfaceNil(aw.sessionWorker) {
+	if aw.sessionWorker != nil {
 		if err := aw.sessionWorker.Start(); err != nil {
 			// stop workflow worker and activity worker.
-			if !isInterfaceNil(aw.workflowWorker) {
+			if aw.workflowWorker != nil {
 				aw.workflowWorker.Stop()
 			}
-			if !isInterfaceNil(aw.activityWorker) {
+			if aw.activityWorker != nil {
 				aw.activityWorker.Stop()
 			}
-			if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+			if aw.locallyDispatchedActivityWorker != nil {
 				aw.locallyDispatchedActivityWorker.Stop()
 			}
 			return err
@@ -876,18 +876,18 @@ func (aw *aggregatedWorker) Start() error {
 		aw.logger.Info("Started Session Worker")
 	}
 
-	if !isInterfaceNil(aw.shadowWorker) {
+	if aw.shadowWorker != nil {
 		if err := aw.shadowWorker.Start(); err != nil {
-			if !isInterfaceNil(aw.workflowWorker) {
+			if aw.workflowWorker != nil {
 				aw.workflowWorker.Stop()
 			}
-			if !isInterfaceNil(aw.activityWorker) {
+			if aw.activityWorker != nil {
 				aw.activityWorker.Stop()
 			}
-			if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+			if aw.locallyDispatchedActivityWorker != nil {
 				aw.locallyDispatchedActivityWorker.Stop()
 			}
-			if !isInterfaceNil(aw.sessionWorker) {
+			if aw.sessionWorker != nil {
 				aw.sessionWorker.Stop()
 			}
 			return err
@@ -971,19 +971,19 @@ func (aw *aggregatedWorker) Run() error {
 }
 
 func (aw *aggregatedWorker) Stop() {
-	if !isInterfaceNil(aw.workflowWorker) {
+	if aw.workflowWorker != nil {
 		aw.workflowWorker.Stop()
 	}
-	if !isInterfaceNil(aw.activityWorker) {
+	if aw.activityWorker != nil {
 		aw.activityWorker.Stop()
 	}
-	if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+	if aw.locallyDispatchedActivityWorker != nil {
 		aw.locallyDispatchedActivityWorker.Stop()
 	}
-	if !isInterfaceNil(aw.sessionWorker) {
+	if aw.sessionWorker != nil {
 		aw.sessionWorker.Stop()
 	}
-	if !isInterfaceNil(aw.shadowWorker) {
+	if aw.shadowWorker != nil {
 		aw.shadowWorker.Stop()
 	}
 	aw.logger.Info("Stopped Worker")
@@ -1229,10 +1229,6 @@ func getWorkflowFunctionName(r *registry, i interface{}) string {
 		result = alias
 	}
 	return result
-}
-
-func isInterfaceNil(i interface{}) bool {
-	return i == nil || reflect.ValueOf(i).IsNil()
 }
 
 func getReadOnlyChannel(c chan struct{}) <-chan struct{} {

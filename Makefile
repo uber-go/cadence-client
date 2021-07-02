@@ -19,6 +19,7 @@ BUILD := .build
 BINS := .bins
 
 INTEG_TEST_ROOT := ./test
+V2_ROOT := ./v2
 COVER_ROOT := $(BUILD)/coverage
 UT_COVER_FILE := $(COVER_ROOT)/unit_test_cover.out
 INTEG_STICKY_OFF_COVER_FILE := $(COVER_ROOT)/integ_test_sticky_off_cover.out
@@ -33,7 +34,7 @@ ALL_SRC := $(THRIFTRW_OUT) $(shell \
 	-e .build/ \
 )
 
-UT_DIRS := $(filter-out $(INTEG_TEST_ROOT)%, $(sort $(dir $(filter %_test.go,$(ALL_SRC)))))
+UT_DIRS := $(filter-out $(INTEG_TEST_ROOT)% $(V2_ROOT)%, $(sort $(dir $(filter %_test.go,$(ALL_SRC)))))
 
 # Files that needs to run lint.  excludes testify mocks and the thrift sentinel.
 LINT_SRC := $(filter-out ./mock% ./tools.go $(THRIFTRW_OUT),$(ALL_SRC))

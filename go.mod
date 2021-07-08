@@ -3,7 +3,7 @@ module go.uber.org/cadence
 go 1.13
 
 require (
-	github.com/apache/thrift v0.13.0
+	github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.4.4
@@ -21,13 +21,10 @@ require (
 	go.uber.org/goleak v1.0.0
 	go.uber.org/multierr v1.6.0
 	go.uber.org/thriftrw v1.25.0
-	go.uber.org/yarpc v1.53.2
+	go.uber.org/yarpc v1.55.0
 	go.uber.org/zap v1.13.0
 	golang.org/x/lint v0.0.0-20200130185559-910be7a94367
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	honnef.co/go/tools v0.0.1-2019.2.3
 )
-
-// yarpc brings up new thrift version, which is not compatible with current codebase
-replace github.com/apache/thrift => github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7

@@ -134,11 +134,13 @@ bins: thriftc $(ALL_SRC) $(BUILD)/copyright lint $(BUILD)/dummy
 unit_test: $(BUILD)/dummy
 	@mkdir -p $(COVER_ROOT)
 	@echo "mode: atomic" > $(UT_COVER_FILE)
-	@for dir in $(UT_DIRS); do \
+	@failed=0; \
+	for dir in $(UT_DIRS); do \
 		mkdir -p $(COVER_ROOT)/"$$dir"; \
-		go test "$$dir" $(TEST_ARG) -coverprofile=$(COVER_ROOT)/"$$dir"/cover.out || exit 1; \
+		go test "$$dir" $(TEST_ARG) -coverprofile=$(COVER_ROOT)/"$$dir"/cover.out || failed=1; \
 		cat $(COVER_ROOT)/"$$dir"/cover.out | grep -v "mode: atomic" >> $(UT_COVER_FILE); \
-	done;
+	done; \
+	exit $$failed
 
 integ_test_sticky_off: $(BUILD)/dummy
 	@mkdir -p $(COVER_ROOT)

@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2021 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,28 +18,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package internal
+package compatibility
 
-// below are the metadata which will be embedded as part
-// of headers in every rpc call made by this client to
-// cadence server.
+import (
+	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	apiv1 "go.uber.org/cadence/.gen/proto/api/v1"
+	internal "go.uber.org/cadence/internal/compatibility"
+)
 
-// Update to the metadata below is typically done
-// by the cadence team as part of a major feature or
-// behavior change
-
-// LibraryVersion is a semver that represents
-// the version of this cadence client library.
-// This represents API changes visible to Cadence
-// client side library consumers, i.e. developers
-// that are writing workflows. So every time we change API
-// that can affect them we have to change this number.
-// Format: MAJOR.MINOR.PATCH
-const LibraryVersion = "0.18.0"
-
-// FeatureVersion is a semver that represents the
-// feature set of this cadence client library support.
-// This can be used for client capability check, on
-// Cadence server, for backward compatibility
-// Format: MAJOR.MINOR.PATCH
-const FeatureVersion = "1.7.0"
+// NewThrift2ProtoAdapter creates an adapter for mapping calls from Thrift to Protobuf types.
+// This is intended to be used as compatibility layer for older client version to be able to
+// communicate with newer cadence server using GRPC.
+func NewThrift2ProtoAdapter(
+	domain apiv1.DomainAPIYARPCClient,
+	workflow apiv1.WorkflowAPIYARPCClient,
+	worker apiv1.WorkerAPIYARPCClient,
+	visibility apiv1.VisibilityAPIYARPCClient,
+) workflowserviceclient.Interface {
+	return internal.NewThrift2ProtoAdapter(domain, workflow, worker, visibility)
+}

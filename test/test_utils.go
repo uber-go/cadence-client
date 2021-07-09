@@ -28,19 +28,23 @@ import (
 	"strings"
 
 	"go.uber.org/yarpc"
+	"go.uber.org/yarpc/transport/grpc"
 	"go.uber.org/yarpc/transport/tchannel"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	apiv1 "go.uber.org/cadence/.gen/proto/api/v1"
+	"go.uber.org/cadence/compatibility"
 	"go.uber.org/cadence/workflow"
 )
 
 type (
 	// Config contains the integration test configuration
 	Config struct {
-		ServiceAddr string
-		ServiceName string
-		IsStickyOff bool
-		Debug       bool
+		ServiceAddr       string
+		ServiceName       string
+		IsStickyOff       bool
+		EnableGrpcAdapter bool
+		Debug             bool
 	}
 
 	// context.WithValue need this type instead of basic type string to avoid lint error
@@ -49,9 +53,10 @@ type (
 
 func newConfig() Config {
 	cfg := Config{
-		ServiceName: "cadence-frontend",
-		ServiceAddr: "127.0.0.1:7933",
-		IsStickyOff: true,
+		ServiceName:       "cadence-frontend",
+		ServiceAddr:       "127.0.0.1:7933",
+		EnableGrpcAdapter: false,
+		IsStickyOff:       true,
 	}
 	if name := getEnvServiceName(); name != "" {
 		cfg.ServiceName = name
@@ -61,6 +66,9 @@ func newConfig() Config {
 	}
 	if so := getEnvStickyOff(); so != "" {
 		cfg.IsStickyOff = so == "true"
+	}
+	if grpc := getEnableGrpcAdapter(); grpc != "" {
+		cfg.EnableGrpcAdapter = grpc == "true"
 	}
 	if debug := getDebug(); debug != "" {
 		cfg.Debug = debug == "true"
@@ -78,6 +86,10 @@ func getEnvServiceAddr() string {
 
 func getEnvStickyOff() string {
 	return strings.ToLower(strings.TrimSpace(os.Getenv("STICKY_OFF")))
+}
+
+func getEnableGrpcAdapter() string {
+	return strings.ToLower(strings.TrimSpace(os.Getenv("ENABLE_GRPC_ADAPTER")))
 }
 
 func getDebug() string {
@@ -115,6 +127,32 @@ func newRPCClient(
 	}
 	client := workflowserviceclient.New(dispatcher.ClientConfig(serviceName))
 	return &rpcClient{Interface: client, dispatcher: dispatcher}, nil
+}
+
+// newRPCClient builds and returns a new rpc client that is able to
+// make calls to the localhost cadence-server container via grpc adapter
+func newGRPCAdapterClient(
+	serviceName string, serviceAddr string) (*rpcClient, error) {
+	transport := grpc.NewTransport()
+	outbound := transport.NewSingleOutbound(serviceAddr)
+	dispatcher := yarpc.NewDispatcher(yarpc.Config{
+		Name: "integration-test",
+		Outbounds: yarpc.Outbounds{
+			serviceName: {
+				Unary: outbound,
+			},
+		},
+	})
+	if err := dispatcher.Start(); err != nil {
+		return nil, err
+	}
+	clientConfig := dispatcher.ClientConfig(serviceName)
+	adapter := compatibility.NewThrift2ProtoAdapter(
+		apiv1.NewDomainAPIYARPCClient(clientConfig),
+		apiv1.NewWorkflowAPIYARPCClient(clientConfig),
+		apiv1.NewWorkerAPIYARPCClient(clientConfig),
+		apiv1.NewVisibilityAPIYARPCClient(clientConfig))
+	return &rpcClient{Interface: adapter, dispatcher: dispatcher}, nil
 }
 
 // stringMapPropagator propagates the list of keys across a workflow,

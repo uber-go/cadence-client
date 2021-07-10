@@ -23,7 +23,7 @@ services:
           - statsd
 
   cadence:
-    image: ubercadence/server:master-auto-setup
+    image: ubercadence/server:v0.21.3-auto-setup
     ports:
       - "7933:7933"
       - "7833:7833"

@@ -1551,7 +1551,7 @@ func (t *TaskHandlersTestSuite) TestRegression_QueriesDoNotLeakGoroutines() {
 	newLeaks := goleak.Find()
 	t.Error(newLeaks, "expected at least one leaking goroutine")
 	t.Equal(countLeaks(oneCachedLeak), countLeaks(newLeaks),
-		"expected the query to leak no new goroutines.  before query:\n%v\n\nafter query:%v", oneCachedLeak, newLeaks)
+		"expected the query to leak no new goroutines.  before query:\n%v\n\nafter query:\n%v", oneCachedLeak, newLeaks)
 }
 
 func Test_NonDeterministicCheck(t *testing.T) {

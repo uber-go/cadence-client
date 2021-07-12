@@ -475,35 +475,24 @@ func (w *workflowExecutionContextImpl) Lock() {
 	w.mutex.Lock()
 }
 
-func (w *workflowExecutionContextImpl) Unlock(isInCache bool, err error) {
+func (w *workflowExecutionContextImpl) Unlock(err error) {
 	cleared := false
+	cached := getWorkflowCache().Exist(w.workflowInfo.WorkflowExecution.RunID)
 	if err != nil || w.err != nil || w.isWorkflowCompleted || (w.wth.disableStickyExecution && !w.hasPendingLocalActivityWork()) {
 		// TODO: in case of closed, it assumes the close decision always succeed. need server side change to return
-		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
+		// error to indicate the close failure case. This should be rare case. For now, always remove the cache, and
 		// if the close decision failed, the next decision will have to rebuild the state.
-		if getWorkflowCache().Exist(w.workflowInfo.WorkflowExecution.RunID) {
+		if cached {
+			// also clears state asynchronously via cache eviction
 			removeWorkflowContext(w.workflowInfo.WorkflowExecution.RunID)
 		} else {
-			// sticky is disabled, manually clear the workflow state.
-			if isInCache {
-				// sanity check, afaict this never happens.  but log/metric to collect evidence if it does.
-				// if it occurs it's almost certainly a logic bug (leads to double-clearing), though possibly not a damaging one.
-				// we should able to remove this after running for a while in canary / prod, our collection of users trigger quite a few edge cases.
-				w.wth.logger.DPanic("Workflow state should not have been cleared, it should be handled by cache eviction",
-					zap.String(tagWorkflowType, w.workflowInfo.WorkflowType.Name),
-					zap.String(tagWorkflowID, w.workflowInfo.WorkflowExecution.ID),
-					zap.String(tagRunID, w.workflowInfo.WorkflowExecution.RunID),
-					zap.Stack(tagPanicStack))
-				// temporary, remove after running in production for a while
-				w.wth.metricsScope.Counter("bug-clear-state")
-			}
 			w.clearState()
-			cleared = true
 		}
+		cleared = true
 	}
-	// !isInCache is the main scenario being caught here, but double-clearing is undesirable.
-	// it *might* be harmless to double-clear, but it's certainly irrational, and risks future problems.
-	if !isInCache && !cleared {
+	// there are a variety of reasons a workflow may not have been put into the cache.
+	// all of them mean we need to clear the state at this point, or any running goroutines will be orphaned.
+	if !cleared && !cached {
 		w.clearState()
 	}
 
@@ -667,7 +656,7 @@ func (wth *workflowTaskHandlerImpl) createWorkflowContext(task *s.PollForDecisio
 func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	task *s.PollForDecisionTaskResponse,
 	historyIterator HistoryIterator,
-) (workflowContext *workflowExecutionContextImpl, isInCache bool, err error) {
+) (workflowContext *workflowExecutionContextImpl, err error) {
 	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
 	defer func() {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
@@ -685,7 +674,6 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	if task.Query == nil || (task.Query != nil && !isFullHistory) {
 		workflowContext = getWorkflowContext(runID)
 	}
-	isInCache = workflowContext != nil
 
 	if workflowContext != nil {
 		workflowContext.Lock()
@@ -715,15 +703,13 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 
 		if !wth.disableStickyExecution && task.Query == nil {
 			workflowContext, _ = putWorkflowContext(runID, workflowContext)
-			// was false, but putWorkflowContext added it
-			isInCache = true
 		}
 		workflowContext.Lock()
 	}
 
 	err = workflowContext.resetStateIfDestroyed(task, historyIterator)
 	if err != nil {
-		workflowContext.Unlock(isInCache, err)
+		workflowContext.Unlock(err)
 	}
 
 	return
@@ -784,13 +770,13 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 			zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 	})
 
-	workflowContext, isInCache, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
+	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() {
-		workflowContext.Unlock(isInCache, errRet)
+		workflowContext.Unlock(errRet)
 	}()
 
 	var response interface{}

@@ -129,6 +129,9 @@ type (
 		// When none of the added condition is met:
 		// 		if there is no Default(added by AddDefault) and , then it will block the current goroutine
 		// 		if Default(added by AddDefault) is used, when Default callback will be executed without blocking
+		// When more than one of added conditions are met, only one of them will be invoked.
+		// Usually it's recommended to use a for loop to drain all of them, and use AddDefault to break out the
+		// loop properly(e.g. not missing any received data in channels)
 		Select(ctx Context)
 	}
 

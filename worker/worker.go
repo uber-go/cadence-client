@@ -173,6 +173,12 @@ type (
 		Run() error
 	}
 
+	AuthorizationProvider interface {
+	// GetAuthToken provides the OAuth authorization token
+	// It's called before every request to Cadence server, and sets the token in the request header.
+	GetAuthToken() []byte
+	}
+
 	// Options is used to configure a worker instance.
 	Options = internal.WorkerOptions
 

@@ -25,7 +25,6 @@ import (
 	"context"
 	"fmt"
 	"go.uber.org/cadence/internal/common/auth"
-	"go.uber.org/cadence/worker"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -338,7 +337,7 @@ type (
 		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
 		FeatureFlags       FeatureFlags
-		Authorization 	   worker.AuthorizationProvider
+		Authorization 	   auth.AuthorizationProvider
 	}
 
 	// StartWorkflowOptions configuration parameters for starting a workflow execution.

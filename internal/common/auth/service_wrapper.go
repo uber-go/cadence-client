@@ -24,7 +24,6 @@ import (
     "context"
     "go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
     "go.uber.org/cadence/.gen/go/shared"
-    "go.uber.org/cadence/worker"
     "go.uber.org/yarpc"
 )
 
@@ -34,11 +33,26 @@ const (
 
 type workflowServiceAuthWrapper struct {
     service workflowserviceclient.Interface
-    authProvider worker.AuthorizationProvider
+    authProvider AuthorizationProvider
+}
+
+type AuthorizationProvider interface {
+    // GetAuthToken provides the OAuth authorization token
+    // It's called before every request to Cadence server, and sets the token in the request header.
+    GetAuthToken() []byte
+}
+
+type JWTClaims struct {
+    Sub    string
+    Name   string
+    Groups string // separated by space
+    Admin  bool
+    Iat    int64
+    TTL    int64
 }
 
 // NewWorkflowServiceWrapper creates
-func NewWorkflowServiceWrapper(service workflowserviceclient.Interface, authorizationProvider worker.AuthorizationProvider) workflowserviceclient.Interface {
+func NewWorkflowServiceWrapper(service workflowserviceclient.Interface, authorizationProvider AuthorizationProvider) workflowserviceclient.Interface {
     return &workflowServiceAuthWrapper{
         service: service,
         authProvider: authorizationProvider,

@@ -195,15 +195,6 @@ type (
 		// flags to turn on/off some server side features
 		FeatureFlags FeatureFlags
 	}
-
-	JWTClaims struct {
-		Sub    string
-		Name   string
-		Groups string // separated by space
-		Admin  bool
-		Iat    int64
-		TTL    int64
-	}
 )
 
 // newWorkflowWorker returns an instance of the workflow worker.
@@ -1052,7 +1043,7 @@ func newAggregatedWorker(
 		zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: workerParams.Identity},
 	)
 	logger := workerParams.Logger
-	if options.Authorization != nil{
+	if options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, workerParams.MetricsScope)
@@ -1316,7 +1307,7 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 
 // JwtAuthorizationProvider defines the logic to create a JWT
 func JwtAuthorizationProvider(privateKey []byte) ([]byte, error) {
-	claims := JWTClaims{
+	claims := auth.JWTClaims{
 		Admin: true,
 		Iat:   time.Now().Unix(),
 		TTL:   60 * 10,

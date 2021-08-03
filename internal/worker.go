@@ -23,7 +23,7 @@ package internal
 
 import (
 	"context"
-	"go.uber.org/cadence/worker"
+	"go.uber.org/cadence/internal/common/auth"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -229,7 +229,7 @@ type (
 
 		// Optional: Authorization interface to get the Auth Token
 		// default: empty token
-		Authorization worker.AuthorizationProvider
+		Authorization auth.AuthorizationProvider
 	}
 )
 

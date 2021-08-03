@@ -328,3 +328,8 @@ func SetStickyWorkflowCacheSize(cacheSize int) {
 func SetBinaryChecksum(checksum string) {
 	internal.SetBinaryChecksum(checksum)
 }
+
+// NewJwtAuthorizationProvider creates a JwtAuthorizationProvider instance.
+func NewJwtAuthorizationProvider(privateKey []byte) ([]byte, error) {
+	return internal.JwtAuthorizationProvider(privateKey)
+}

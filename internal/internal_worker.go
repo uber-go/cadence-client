@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cristalhq/jwt/v3"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
@@ -193,6 +194,15 @@ type (
 
 		// flags to turn on/off some server side features
 		FeatureFlags FeatureFlags
+	}
+
+	JWTClaims struct {
+		Sub    string
+		Name   string
+		Groups string // separated by space
+		Admin  bool
+		Iat    int64
+		TTL    int64
 	}
 )
 
@@ -1302,4 +1312,28 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 		}
 	}
 	return nil
+}
+
+// JwtAuthorizationProvider defines the logic to create a JWT
+func JwtAuthorizationProvider(privateKey []byte) ([]byte, error) {
+	claims := JWTClaims{
+		Admin: true,
+		Iat:   time.Now().Unix(),
+		TTL:   60 * 10,
+	}
+	key, err := util.LoadRSAPrivateKey(privateKey)
+	if err != nil {
+		return nil, err
+	}
+	signer, err := jwt.NewSignerRS(jwt.RS256, key)
+	if err != nil {
+		return nil, err
+	}
+	builder := jwt.NewBuilder(signer)
+	token, err := builder.Build(claims)
+	if token == nil {
+		return nil, err
+	}
+
+	return token.Raw(), nil
 }

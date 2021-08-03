@@ -24,6 +24,8 @@ package internal
 import (
 	"context"
 	"fmt"
+	"go.uber.org/cadence/internal/common/auth"
+	"go.uber.org/cadence/worker"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -336,6 +338,7 @@ type (
 		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
 		FeatureFlags       FeatureFlags
+		Authorization 	   worker.AuthorizationProvider
 	}
 
 	// StartWorkflowOptions configuration parameters for starting a workflow execution.
@@ -542,9 +545,12 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	} else {
 		tracer = opentracing.NoopTracer{}
 	}
-
+	if options.Authorization != nil{
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
+	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &workflowClient{
-		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),
+		workflowService:    service,
 		domain:             domain,
 		registry:           newRegistry(),
 		metricsScope:       metrics.NewTaggedScope(metricScope),
@@ -569,9 +575,12 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 		metricScope = options.MetricsScope
 	}
 	metricScope = tagScope(metricScope, tagDomain, "domain-client", clientImplHeaderName, clientImplHeaderValue)
-
+	if options.Authorization != nil{
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
+	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &domainClient{
-		workflowService: metrics.NewWorkflowServiceWrapper(service, metricScope),
+		workflowService: service,
 		metricsScope:    metricScope,
 		identity:        identity,
 		featureFlags:    getFeatureFlags(options),

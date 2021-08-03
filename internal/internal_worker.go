@@ -29,6 +29,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/common/auth"
 	"io"
 	"os"
 	"reflect"
@@ -1041,6 +1042,9 @@ func newAggregatedWorker(
 		zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: workerParams.Identity},
 	)
 	logger := workerParams.Logger
+	if options.Authorization != nil{
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
 	service = metrics.NewWorkflowServiceWrapper(service, workerParams.MetricsScope)
 
 	processTestTags(&wOptions, &workerParams)

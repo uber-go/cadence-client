@@ -23,6 +23,7 @@ package internal
 
 import (
 	"context"
+	"go.uber.org/cadence/worker"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -225,6 +226,10 @@ type (
 		// Optional: Flags to turn on/off some server side options
 		// default: all the features in the struct are turned off
 		FeatureFlags FeatureFlags
+
+		// Optional: Authorization interface to get the Auth Token
+		// default: empty token
+		Authorization worker.AuthorizationProvider
 	}
 )
 

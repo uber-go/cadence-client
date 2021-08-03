@@ -29,7 +29,7 @@ import (
 )
 
 const (
-    jwtHeaderName = "cadence-client-jwt"
+    jwtHeaderName = "cadence-authorization"
 )
 
 type workflowServiceAuthWrapper struct {
@@ -56,151 +56,225 @@ func (w *workflowServiceAuthWrapper) DeprecateDomain(ctx context.Context, reques
     return err
 }
 
-func (w workflowServiceAuthWrapper) CountWorkflowExecutions(ctx context.Context, CountRequest *shared.CountWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.CountWorkflowExecutionsResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) ListDomains(ctx context.Context, request *shared.ListDomainsRequest, opts ...yarpc.CallOption) (*shared.ListDomainsResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.ListDomains(ctx, request, opts...)
+    
+    return result, err
 }
 
-
-func (w workflowServiceAuthWrapper) DescribeDomain(ctx context.Context, DescribeRequest *shared.DescribeDomainRequest, opts ...yarpc.CallOption) (*shared.DescribeDomainResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) DescribeDomain(ctx context.Context, request *shared.DescribeDomainRequest, opts ...yarpc.CallOption) (*shared.DescribeDomainResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.DescribeDomain(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) DescribeTaskList(ctx context.Context, Request *shared.DescribeTaskListRequest, opts ...yarpc.CallOption) (*shared.DescribeTaskListResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) DescribeWorkflowExecution(ctx context.Context, request *shared.DescribeWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.DescribeWorkflowExecutionResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.DescribeWorkflowExecution(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) DescribeWorkflowExecution(ctx context.Context, DescribeRequest *shared.DescribeWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.DescribeWorkflowExecutionResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) GetWorkflowExecutionHistory(ctx context.Context, request *shared.GetWorkflowExecutionHistoryRequest, opts ...yarpc.CallOption) (*shared.GetWorkflowExecutionHistoryResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.GetWorkflowExecutionHistory(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) GetClusterInfo(ctx context.Context, opts ...yarpc.CallOption) (*shared.ClusterInfo, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) ListClosedWorkflowExecutions(ctx context.Context, request *shared.ListClosedWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListClosedWorkflowExecutionsResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.ListClosedWorkflowExecutions(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) GetSearchAttributes(ctx context.Context, opts ...yarpc.CallOption) (*shared.GetSearchAttributesResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) ListOpenWorkflowExecutions(ctx context.Context, request *shared.ListOpenWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListOpenWorkflowExecutionsResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.ListOpenWorkflowExecutions(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) GetWorkflowExecutionHistory(ctx context.Context, GetRequest *shared.GetWorkflowExecutionHistoryRequest, opts ...yarpc.CallOption) (*shared.GetWorkflowExecutionHistoryResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) ListWorkflowExecutions(ctx context.Context, request *shared.ListWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListWorkflowExecutionsResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.ListWorkflowExecutions(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) ListArchivedWorkflowExecutions(ctx context.Context, ListRequest *shared.ListArchivedWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListArchivedWorkflowExecutionsResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) ListArchivedWorkflowExecutions(ctx context.Context, request *shared.ListArchivedWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListArchivedWorkflowExecutionsResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.ListArchivedWorkflowExecutions(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) ListClosedWorkflowExecutions(ctx context.Context, ListRequest *shared.ListClosedWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListClosedWorkflowExecutionsResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) ScanWorkflowExecutions(ctx context.Context, request *shared.ListWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListWorkflowExecutionsResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.ScanWorkflowExecutions(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) ListDomains(ctx context.Context, ListRequest *shared.ListDomainsRequest, opts ...yarpc.CallOption) (*shared.ListDomainsResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) CountWorkflowExecutions(ctx context.Context, request *shared.CountWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.CountWorkflowExecutionsResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.CountWorkflowExecutions(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) ListOpenWorkflowExecutions(ctx context.Context, ListRequest *shared.ListOpenWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListOpenWorkflowExecutionsResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) PollForActivityTask(ctx context.Context, request *shared.PollForActivityTaskRequest, opts ...yarpc.CallOption) (*shared.PollForActivityTaskResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.PollForActivityTask(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) ListTaskListPartitions(ctx context.Context, Request *shared.ListTaskListPartitionsRequest, opts ...yarpc.CallOption) (*shared.ListTaskListPartitionsResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) PollForDecisionTask(ctx context.Context, request *shared.PollForDecisionTaskRequest, opts ...yarpc.CallOption) (*shared.PollForDecisionTaskResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.PollForDecisionTask(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) ListWorkflowExecutions(ctx context.Context, ListRequest *shared.ListWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListWorkflowExecutionsResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RecordActivityTaskHeartbeat(ctx context.Context, request *shared.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) (*shared.RecordActivityTaskHeartbeatResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.RecordActivityTaskHeartbeat(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) PollForActivityTask(ctx context.Context, PollRequest *shared.PollForActivityTaskRequest, opts ...yarpc.CallOption) (*shared.PollForActivityTaskResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RecordActivityTaskHeartbeatByID(ctx context.Context, request *shared.RecordActivityTaskHeartbeatByIDRequest, opts ...yarpc.CallOption) (*shared.RecordActivityTaskHeartbeatResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.RecordActivityTaskHeartbeatByID(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) PollForDecisionTask(ctx context.Context, PollRequest *shared.PollForDecisionTaskRequest, opts ...yarpc.CallOption) (*shared.PollForDecisionTaskResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RegisterDomain(ctx context.Context, request *shared.RegisterDomainRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RegisterDomain(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) QueryWorkflow(ctx context.Context, QueryRequest *shared.QueryWorkflowRequest, opts ...yarpc.CallOption) (*shared.QueryWorkflowResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RequestCancelWorkflowExecution(ctx context.Context, request *shared.RequestCancelWorkflowExecutionRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RequestCancelWorkflowExecution(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) RecordActivityTaskHeartbeat(ctx context.Context, HeartbeatRequest *shared.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) (*shared.RecordActivityTaskHeartbeatResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RespondActivityTaskCanceled(ctx context.Context, request *shared.RespondActivityTaskCanceledRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RespondActivityTaskCanceled(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) RecordActivityTaskHeartbeatByID(ctx context.Context, HeartbeatRequest *shared.RecordActivityTaskHeartbeatByIDRequest, opts ...yarpc.CallOption) (*shared.RecordActivityTaskHeartbeatResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RespondActivityTaskCompleted(ctx context.Context, request *shared.RespondActivityTaskCompletedRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RespondActivityTaskCompleted(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) RegisterDomain(ctx context.Context, RegisterRequest *shared.RegisterDomainRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RespondActivityTaskFailed(ctx context.Context, request *shared.RespondActivityTaskFailedRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RespondActivityTaskFailed(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) RequestCancelWorkflowExecution(ctx context.Context, CancelRequest *shared.RequestCancelWorkflowExecutionRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RespondActivityTaskCanceledByID(ctx context.Context, request *shared.RespondActivityTaskCanceledByIDRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RespondActivityTaskCanceledByID(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) ResetStickyTaskList(ctx context.Context, ResetRequest *shared.ResetStickyTaskListRequest, opts ...yarpc.CallOption) (*shared.ResetStickyTaskListResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RespondActivityTaskCompletedByID(ctx context.Context, request *shared.RespondActivityTaskCompletedByIDRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RespondActivityTaskCompletedByID(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) ResetWorkflowExecution(ctx context.Context, ResetRequest *shared.ResetWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.ResetWorkflowExecutionResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RespondActivityTaskFailedByID(ctx context.Context, request *shared.RespondActivityTaskFailedByIDRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RespondActivityTaskFailedByID(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) RespondActivityTaskCanceled(ctx context.Context, CanceledRequest *shared.RespondActivityTaskCanceledRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RespondDecisionTaskCompleted(ctx context.Context, request *shared.RespondDecisionTaskCompletedRequest, opts ...yarpc.CallOption) (*shared.RespondDecisionTaskCompletedResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    response, err := w.service.RespondDecisionTaskCompleted(ctx, request, opts...)
+    return response, err
 }
 
-func (w workflowServiceAuthWrapper) RespondActivityTaskCanceledByID(ctx context.Context, CanceledRequest *shared.RespondActivityTaskCanceledByIDRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RespondDecisionTaskFailed(ctx context.Context, request *shared.RespondDecisionTaskFailedRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RespondDecisionTaskFailed(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) RespondActivityTaskCompleted(ctx context.Context, CompleteRequest *shared.RespondActivityTaskCompletedRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) SignalWorkflowExecution(ctx context.Context, request *shared.SignalWorkflowExecutionRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.SignalWorkflowExecution(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) RespondActivityTaskCompletedByID(ctx context.Context, CompleteRequest *shared.RespondActivityTaskCompletedByIDRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) SignalWithStartWorkflowExecution(ctx context.Context, request *shared.SignalWithStartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.SignalWithStartWorkflowExecution(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) RespondActivityTaskFailed(ctx context.Context, FailRequest *shared.RespondActivityTaskFailedRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) StartWorkflowExecution(ctx context.Context, request *shared.StartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.StartWorkflowExecution(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) RespondActivityTaskFailedByID(ctx context.Context, FailRequest *shared.RespondActivityTaskFailedByIDRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) TerminateWorkflowExecution(ctx context.Context, request *shared.TerminateWorkflowExecutionRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.TerminateWorkflowExecution(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) RespondDecisionTaskCompleted(ctx context.Context, CompleteRequest *shared.RespondDecisionTaskCompletedRequest, opts ...yarpc.CallOption) (*shared.RespondDecisionTaskCompletedResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) ResetWorkflowExecution(ctx context.Context, request *shared.ResetWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.ResetWorkflowExecutionResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.ResetWorkflowExecution(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) RespondDecisionTaskFailed(ctx context.Context, FailedRequest *shared.RespondDecisionTaskFailedRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) UpdateDomain(ctx context.Context, request *shared.UpdateDomainRequest, opts ...yarpc.CallOption) (*shared.UpdateDomainResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.UpdateDomain(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) RespondQueryTaskCompleted(ctx context.Context, CompleteRequest *shared.RespondQueryTaskCompletedRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) QueryWorkflow(ctx context.Context, request *shared.QueryWorkflowRequest, opts ...yarpc.CallOption) (*shared.QueryWorkflowResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.QueryWorkflow(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) ScanWorkflowExecutions(ctx context.Context, ListRequest *shared.ListWorkflowExecutionsRequest, opts ...yarpc.CallOption) (*shared.ListWorkflowExecutionsResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) ResetStickyTaskList(ctx context.Context, request *shared.ResetStickyTaskListRequest, opts ...yarpc.CallOption) (*shared.ResetStickyTaskListResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.ResetStickyTaskList(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) SignalWithStartWorkflowExecution(ctx context.Context, SignalWithStartRequest *shared.SignalWithStartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) DescribeTaskList(ctx context.Context, request *shared.DescribeTaskListRequest, opts ...yarpc.CallOption) (*shared.DescribeTaskListResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.DescribeTaskList(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) SignalWorkflowExecution(ctx context.Context, SignalRequest *shared.SignalWorkflowExecutionRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) RespondQueryTaskCompleted(ctx context.Context, request *shared.RespondQueryTaskCompletedRequest, opts ...yarpc.CallOption) error {
+    opts = append(opts, w.getYarpcJWTHeader())
+    err := w.service.RespondQueryTaskCompleted(ctx, request, opts...)
+    return err
 }
 
-func (w workflowServiceAuthWrapper) StartWorkflowExecution(ctx context.Context, StartRequest *shared.StartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) GetSearchAttributes(ctx context.Context, opts ...yarpc.CallOption) (*shared.GetSearchAttributesResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.GetSearchAttributes(ctx, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) TerminateWorkflowExecution(ctx context.Context, TerminateRequest *shared.TerminateWorkflowExecutionRequest, opts ...yarpc.CallOption) error {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) ListTaskListPartitions(ctx context.Context, request *shared.ListTaskListPartitionsRequest, opts ...yarpc.CallOption) (*shared.ListTaskListPartitionsResponse, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.ListTaskListPartitions(ctx, request, opts...)
+    return result, err
 }
 
-func (w workflowServiceAuthWrapper) UpdateDomain(ctx context.Context, UpdateRequest *shared.UpdateDomainRequest, opts ...yarpc.CallOption) (*shared.UpdateDomainResponse, error) {
-    panic("implement me")
+func (w *workflowServiceAuthWrapper) GetClusterInfo(ctx context.Context, opts ...yarpc.CallOption) (*shared.ClusterInfo, error) {
+    opts = append(opts, w.getYarpcJWTHeader())
+    result, err := w.service.GetClusterInfo(ctx, opts...)
+    return result, err
 }

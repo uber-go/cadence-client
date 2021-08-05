@@ -24,6 +24,7 @@ package worker
 
 import (
 	"context"
+	"go.uber.org/cadence/internal/common/auth"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -324,6 +325,6 @@ func SetBinaryChecksum(checksum string) {
 }
 
 // NewJwtAuthorizationProvider creates a JwtAuthorizationProvider instance.
-func NewJwtAuthorizationProvider(privateKey []byte) ([]byte, error) {
-	return internal.JwtAuthorizationProvider(privateKey)
+func NewJwtAuthorizationProvider(privateKey []byte) auth.AuthorizationProvider {
+	return internal.NewJwtAuthorizationProvider(privateKey)
 }

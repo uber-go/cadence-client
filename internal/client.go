@@ -24,13 +24,13 @@ package internal
 import (
 	"context"
 	"fmt"
-	"go.uber.org/cadence/internal/common/auth"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
 )

@@ -39,7 +39,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cristalhq/jwt/v3"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
@@ -1047,7 +1046,6 @@ func newAggregatedWorker(
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, workerParams.MetricsScope)
-
 	processTestTags(&wOptions, &workerParams)
 
 	// worker specific registry
@@ -1303,28 +1301,4 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 		}
 	}
 	return nil
-}
-
-// JwtAuthorizationProvider defines the logic to create a JWT
-func JwtAuthorizationProvider(privateKey []byte) ([]byte, error) {
-	claims := auth.JWTClaims{
-		Admin: true,
-		Iat:   time.Now().Unix(),
-		TTL:   60 * 10,
-	}
-	key, err := util.LoadRSAPrivateKey(privateKey)
-	if err != nil {
-		return nil, err
-	}
-	signer, err := jwt.NewSignerRS(jwt.RS256, key)
-	if err != nil {
-		return nil, err
-	}
-	builder := jwt.NewBuilder(signer)
-	token, err := builder.Build(claims)
-	if token == nil {
-		return nil, err
-	}
-
-	return token.Raw(), nil
 }

@@ -228,7 +228,7 @@ type (
 		FeatureFlags FeatureFlags
 
 		// Optional: Authorization interface to get the Auth Token
-		// default: empty token
+		// default: No provider
 		Authorization auth.AuthorizationProvider
 	}
 )

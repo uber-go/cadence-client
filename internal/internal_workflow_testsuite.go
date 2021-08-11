@@ -818,6 +818,7 @@ func (env *testWorkflowEnvironmentImpl) Complete(result []byte, err error) {
 		env.logger.Debug("Workflow already completed.")
 		return
 	}
+	env.workflowDef.Close()
 	if _, ok := err.(*CanceledError); ok && env.workflowCancelHandler != nil {
 		env.workflowCancelHandler()
 	}

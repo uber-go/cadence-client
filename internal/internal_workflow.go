@@ -538,6 +538,7 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 	env := getWorkflowEnvironment(ctx)
 	panicErr := dispatcher.ExecuteUntilAllBlocked()
 	if panicErr != nil {
+		dispatcher.Close()
 		env.Complete(nil, panicErr)
 		return
 	}
@@ -554,6 +555,7 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 		env.GetMetricsScope().Counter(metrics.UnhandledSignalsCounter).Inc(1)
 	}
 
+	dispatcher.Close()
 	env.Complete(rp.workflowResult, rp.error)
 }
 

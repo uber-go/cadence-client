@@ -727,6 +727,7 @@ func getWorkflowHeader(ctx Context, ctxProps []ContextPropagator) *s.Header {
 // WorkflowInfo information about currently executing workflow
 type WorkflowInfo struct {
 	WorkflowExecution                   WorkflowExecution
+	OriginalRunId                       string //This is the runID when the WorkflowExecutionStarted event is written
 	WorkflowType                        WorkflowType
 	TaskListName                        string
 	ExecutionStartToCloseTimeoutSeconds int32

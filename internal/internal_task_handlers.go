@@ -616,6 +616,7 @@ func (wth *workflowTaskHandlerImpl) createWorkflowContext(task *s.PollForDecisio
 			ID:    workflowID,
 			RunID: runID,
 		},
+		OriginalRunId:                       attributes.GetOriginalExecutionRunId(),
 		WorkflowType:                        flowWorkflowTypeFrom(*task.WorkflowType),
 		TaskListName:                        taskList.GetName(),
 		ExecutionStartToCloseTimeoutSeconds: attributes.GetExecutionStartToCloseTimeoutSeconds(),

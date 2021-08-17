@@ -29,6 +29,7 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/activity"
 	"go.uber.org/cadence/internal"
+	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
 )
@@ -321,4 +322,9 @@ func SetStickyWorkflowCacheSize(cacheSize int) {
 // On another hand, once the binary is marked as bad, the bad binary cannot poll decision and make any progress any more.
 func SetBinaryChecksum(checksum string) {
 	internal.SetBinaryChecksum(checksum)
+}
+
+// NewJwtAuthorizationProvider creates a JwtAuthorizationProvider instance.
+func NewJwtAuthorizationProvider(privateKey []byte) auth.AuthorizationProvider {
+	return internal.NewJwtAuthorizationProvider(privateKey)
 }

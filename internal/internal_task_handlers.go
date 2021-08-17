@@ -476,16 +476,24 @@ func (w *workflowExecutionContextImpl) Lock() {
 }
 
 func (w *workflowExecutionContextImpl) Unlock(err error) {
+	cleared := false
+	cached := getWorkflowCache().Exist(w.workflowInfo.WorkflowExecution.RunID)
 	if err != nil || w.err != nil || w.isWorkflowCompleted || (w.wth.disableStickyExecution && !w.hasPendingLocalActivityWork()) {
 		// TODO: in case of closed, it assumes the close decision always succeed. need server side change to return
-		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
+		// error to indicate the close failure case. This should be rare case. For now, always remove the cache, and
 		// if the close decision failed, the next decision will have to rebuild the state.
-		if getWorkflowCache().Exist(w.workflowInfo.WorkflowExecution.RunID) {
+		if cached {
+			// also clears state asynchronously via cache eviction
 			removeWorkflowContext(w.workflowInfo.WorkflowExecution.RunID)
 		} else {
-			// sticky is disabled, manually clear the workflow state.
 			w.clearState()
 		}
+		cleared = true
+	}
+	// there are a variety of reasons a workflow may not have been put into the cache.
+	// all of them mean we need to clear the state at this point, or any running goroutines will be orphaned.
+	if !cleared && !cached {
+		w.clearState()
 	}
 
 	w.mutex.Unlock()

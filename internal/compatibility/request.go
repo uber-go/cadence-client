@@ -494,50 +494,56 @@ func protoUpdateDomainRequest(t *shared.UpdateDomainRequest) *apiv1.UpdateDomain
 	}
 	fields := []string{}
 
-	if description := t.GetUpdatedInfo().Description; description != nil {
-		request.Description = *description
-		fields = append(fields, DomainUpdateDescriptionField)
+	if updatedInfo := t.GetUpdatedInfo(); updatedInfo != nil {
+		if updatedInfo.Description != nil {
+			request.Description = *updatedInfo.Description
+			fields = append(fields, DomainUpdateDescriptionField)
+		}
+		if updatedInfo.OwnerEmail != nil {
+			request.OwnerEmail = *updatedInfo.OwnerEmail
+			fields = append(fields, DomainUpdateOwnerEmailField)
+		}
+		if updatedInfo.Data != nil {
+			request.Data = updatedInfo.Data
+			fields = append(fields, DomainUpdateDataField)
+		}
 	}
-	if email := t.GetUpdatedInfo().OwnerEmail; email != nil {
-		request.OwnerEmail = *email
-		fields = append(fields, DomainUpdateOwnerEmailField)
+	if configuration := t.GetConfiguration(); configuration != nil {
+		if configuration.WorkflowExecutionRetentionPeriodInDays != nil {
+			request.WorkflowExecutionRetentionPeriod = daysToDuration(configuration.WorkflowExecutionRetentionPeriodInDays)
+			fields = append(fields, DomainUpdateRetentionPeriodField)
+		}
+		//if t.EmitMetric != nil {} - DEPRECATED
+		if configuration.BadBinaries != nil {
+			request.BadBinaries = protoBadBinaries(configuration.BadBinaries)
+			fields = append(fields, DomainUpdateBadBinariesField)
+		}
+		if configuration.HistoryArchivalStatus != nil {
+			request.HistoryArchivalStatus = protoArchivalStatus(configuration.HistoryArchivalStatus)
+			fields = append(fields, DomainUpdateHistoryArchivalStatusField)
+		}
+		if configuration.HistoryArchivalURI != nil {
+			request.HistoryArchivalUri = *configuration.HistoryArchivalURI
+			fields = append(fields, DomainUpdateHistoryArchivalURIField)
+		}
+		if configuration.VisibilityArchivalStatus != nil {
+			request.VisibilityArchivalStatus = protoArchivalStatus(configuration.VisibilityArchivalStatus)
+			fields = append(fields, DomainUpdateVisibilityArchivalStatusField)
+		}
+		if configuration.VisibilityArchivalURI != nil {
+			request.VisibilityArchivalUri = *configuration.VisibilityArchivalURI
+			fields = append(fields, DomainUpdateVisibilityArchivalURIField)
+		}
 	}
-	if data := t.GetUpdatedInfo().Data; data != nil {
-		request.Data = data
-		fields = append(fields, DomainUpdateDataField)
-	}
-	if retention := t.GetConfiguration().WorkflowExecutionRetentionPeriodInDays; retention != nil {
-		request.WorkflowExecutionRetentionPeriod = daysToDuration(retention)
-		fields = append(fields, DomainUpdateRetentionPeriodField)
-	}
-	//if t.EmitMetric != nil {} - DEPRECATED
-	if badBinaries := t.GetConfiguration().BadBinaries; badBinaries != nil {
-		request.BadBinaries = protoBadBinaries(badBinaries)
-		fields = append(fields, DomainUpdateBadBinariesField)
-	}
-	if historyArchivalStatus := t.GetConfiguration().HistoryArchivalStatus; historyArchivalStatus != nil {
-		request.HistoryArchivalStatus = protoArchivalStatus(historyArchivalStatus)
-		fields = append(fields, DomainUpdateHistoryArchivalStatusField)
-	}
-	if historyArchivalURI := t.GetConfiguration().HistoryArchivalURI; historyArchivalURI != nil {
-		request.HistoryArchivalUri = *historyArchivalURI
-		fields = append(fields, DomainUpdateHistoryArchivalURIField)
-	}
-	if visibilityArchivalStatus := t.GetConfiguration().VisibilityArchivalStatus; visibilityArchivalStatus != nil {
-		request.VisibilityArchivalStatus = protoArchivalStatus(visibilityArchivalStatus)
-		fields = append(fields, DomainUpdateVisibilityArchivalStatusField)
-	}
-	if visibilityArchivalURI := t.GetConfiguration().VisibilityArchivalURI; visibilityArchivalURI != nil {
-		request.VisibilityArchivalUri = *visibilityArchivalURI
-		fields = append(fields, DomainUpdateVisibilityArchivalURIField)
-	}
-	if activeClusterName := t.GetReplicationConfiguration().ActiveClusterName; activeClusterName != nil {
-		request.ActiveClusterName = *activeClusterName
-		fields = append(fields, DomainUpdateActiveClusterNameField)
-	}
-	if clusters := t.GetReplicationConfiguration().Clusters; clusters != nil {
-		request.Clusters = protoClusterReplicationConfigurationArray(clusters)
-		fields = append(fields, DomainUpdateClustersField)
+	if replicationConfiguration := t.GetReplicationConfiguration(); replicationConfiguration != nil {
+		if replicationConfiguration.ActiveClusterName != nil {
+			request.ActiveClusterName = *replicationConfiguration.ActiveClusterName
+			fields = append(fields, DomainUpdateActiveClusterNameField)
+		}
+		if replicationConfiguration.Clusters != nil {
+			request.Clusters = protoClusterReplicationConfigurationArray(replicationConfiguration.Clusters)
+			fields = append(fields, DomainUpdateClustersField)
+		}
 	}
 	if t.DeleteBadBinary != nil {
 		request.DeleteBadBinary = *t.DeleteBadBinary

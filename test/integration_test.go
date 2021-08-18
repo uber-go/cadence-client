@@ -49,6 +49,7 @@ type IntegrationTestSuite struct {
 	config       Config
 	rpcClient    *rpcClient
 	libClient    client.Client
+	domainClient client.DomainClient
 	activities   *Activities
 	workflows    *Workflows
 	worker       worker.Worker
@@ -106,6 +107,7 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 		&client.Options{
 			ContextPropagators: []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
 		})
+	ts.domainClient = client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ts.registerDomain()
 }
 
@@ -453,13 +455,28 @@ func (ts *IntegrationTestSuite) TestInspectLocalActivityInfo() {
 	ts.Nil(err)
 }
 
+func (ts *IntegrationTestSuite) TestDomainUpdate() {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	name := domainName
+	description := "test-description"
+	err := ts.domainClient.Update(ctx, &shared.UpdateDomainRequest{
+		Name:                     &name,
+		UpdatedInfo:              &shared.UpdateDomainInfo{Description: &description},
+	})
+	ts.NoError(err)
+
+	domain, err := ts.domainClient.Describe(ctx, name)
+	ts.NoError(err)
+	ts.Equal(description, *domain.DomainInfo.Description)
+}
+
 func (ts *IntegrationTestSuite) registerDomain() {
-	client := client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	name := domainName
 	retention := int32(1)
-	err := client.Register(ctx, &shared.RegisterDomainRequest{
+	err := ts.domainClient.Register(ctx, &shared.RegisterDomainRequest{
 		Name:                                   &name,
 		WorkflowExecutionRetentionPeriodInDays: &retention,
 	})

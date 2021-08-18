@@ -32,7 +32,7 @@ type JWTAuthProvider struct {
 }
 
 
-func NewJwtAuthorizationProvider(privateKey []byte) auth.AuthorizationProvider {
+func NewAdminJwtAuthorizationProvider(privateKey []byte) auth.AuthorizationProvider {
     return &JWTAuthProvider{
         PrivateKey: privateKey,
     }

@@ -327,7 +327,7 @@ func SetBinaryChecksum(checksum string) {
 	internal.SetBinaryChecksum(checksum)
 }
 
-// NewJwtAuthorizationProvider creates a JwtAuthorizationProvider instance.
-func NewJwtAuthorizationProvider(privateKey []byte) AuthorizationProvider {
-	return internal.NewJwtAuthorizationProvider(privateKey)
+// NewAdminJwtAuthorizationProvider creates a JwtAuthorizationProvider instance.
+func NewAdminJwtAuthorizationProvider(privateKey []byte) AuthorizationProvider {
+	return internal.NewAdminJwtAuthorizationProvider(privateKey)
 }

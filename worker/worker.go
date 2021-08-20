@@ -193,6 +193,9 @@ type (
 	// NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 	// mismatched history events (presumably arising from non-deterministic workflow definitions).
 	NonDeterministicWorkflowPolicy = internal.NonDeterministicWorkflowPolicy
+
+	// AuthorizationProvider is the interface that contains the method to get the auth token
+	AuthorizationProvider = auth.AuthorizationProvider
 )
 
 const (
@@ -324,7 +327,7 @@ func SetBinaryChecksum(checksum string) {
 	internal.SetBinaryChecksum(checksum)
 }
 
-// NewJwtAuthorizationProvider creates a JwtAuthorizationProvider instance.
-func NewJwtAuthorizationProvider(privateKey []byte) auth.AuthorizationProvider {
-	return internal.NewJwtAuthorizationProvider(privateKey)
+// NewAdminJwtAuthorizationProvider creates a JwtAuthorizationProvider instance.
+func NewAdminJwtAuthorizationProvider(privateKey []byte) AuthorizationProvider {
+	return internal.NewAdminJwtAuthorizationProvider(privateKey)
 }

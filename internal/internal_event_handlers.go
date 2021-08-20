@@ -551,11 +551,12 @@ func (wc *workflowEnvironmentImpl) Now() time.Time {
 }
 
 func (wc *workflowEnvironmentImpl) NewTimer(d time.Duration, callback resultHandler) *timerInfo {
-	if d < 0 {
-		callback(nil, fmt.Errorf("negative duration provided %v", d))
+	durationInSeconds := common.Int64Ceil(d.Seconds())
+	if durationInSeconds < 0 {
+		callback(nil, fmt.Errorf("negative duration provided %v", durationInSeconds))
 		return nil
 	}
-	if d == 0 {
+	if durationInSeconds == 0 {
 		callback(nil, nil)
 		return nil
 	}
@@ -563,14 +564,16 @@ func (wc *workflowEnvironmentImpl) NewTimer(d time.Duration, callback resultHand
 	timerID := wc.GenerateSequenceID()
 	startTimerAttr := &m.StartTimerDecisionAttributes{}
 	startTimerAttr.TimerId = common.StringPtr(timerID)
-	startTimerAttr.StartToFireTimeoutSeconds = common.Int64Ptr(common.Int64Ceil(d.Seconds()))
+	startTimerAttr.StartToFireTimeoutSeconds = common.Int64Ptr(durationInSeconds)
 
 	decision := wc.decisionsHelper.startTimer(startTimerAttr)
 	decision.setData(&scheduledTimer{callback: callback})
 
 	wc.logger.Debug("NewTimer",
 		zap.String(tagTimerID, startTimerAttr.GetTimerId()),
-		zap.Duration("Duration", d))
+		zap.Duration("Duration", d),
+		zap.Int64("DurationInSeconds", durationInSeconds),
+	)
 
 	return &timerInfo{timerID: timerID}
 }

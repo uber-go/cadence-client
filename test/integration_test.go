@@ -49,6 +49,7 @@ type IntegrationTestSuite struct {
 	config       Config
 	rpcClient    *rpcClient
 	libClient    client.Client
+	domainClient client.DomainClient
 	activities   *Activities
 	workflows    *Workflows
 	worker       worker.Worker
@@ -95,13 +96,18 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 	ts.activities = newActivities()
 	ts.workflows = &Workflows{}
 	ts.Nil(waitForTCP(time.Minute, ts.config.ServiceAddr))
-	rpcClient, err := newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
+	var err error
+	if ts.config.EnableGrpcAdapter {
+		ts.rpcClient, err = newGRPCAdapterClient(ts.config.ServiceName, ts.config.ServiceAddr)
+	} else {
+		ts.rpcClient, err = newRPCClient(ts.config.ServiceName, ts.config.ServiceAddr)
+	}
 	ts.NoError(err)
-	ts.rpcClient = rpcClient
 	ts.libClient = client.NewClient(ts.rpcClient.Interface, domainName,
 		&client.Options{
 			ContextPropagators: []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
 		})
+	ts.domainClient = client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ts.registerDomain()
 }
 
@@ -449,13 +455,28 @@ func (ts *IntegrationTestSuite) TestInspectLocalActivityInfo() {
 	ts.Nil(err)
 }
 
+func (ts *IntegrationTestSuite) TestDomainUpdate() {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	name := domainName
+	description := "test-description"
+	err := ts.domainClient.Update(ctx, &shared.UpdateDomainRequest{
+		Name:                     &name,
+		UpdatedInfo:              &shared.UpdateDomainInfo{Description: &description},
+	})
+	ts.NoError(err)
+
+	domain, err := ts.domainClient.Describe(ctx, name)
+	ts.NoError(err)
+	ts.Equal(description, *domain.DomainInfo.Description)
+}
+
 func (ts *IntegrationTestSuite) registerDomain() {
-	client := client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	name := domainName
 	retention := int32(1)
-	err := client.Register(ctx, &shared.RegisterDomainRequest{
+	err := ts.domainClient.Register(ctx, &shared.RegisterDomainRequest{
 		Name:                                   &name,
 		WorkflowExecutionRetentionPeriodInDays: &retention,
 	})

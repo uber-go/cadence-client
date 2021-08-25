@@ -95,7 +95,7 @@ func scanWorkflowExecutionsHelper(
 		var resp *shared.ListWorkflowExecutionsResponse
 		if err := backoff.Retry(ctx,
 			func() error {
-				tchCtx, cancel, opt := newChannelContext(ctx)
+				tchCtx, cancel, opt := newChannelContext(ctx, FeatureFlags{})
 
 				var err error
 				resp, err = service.ScanWorkflowExecutions(tchCtx, request, opt...)

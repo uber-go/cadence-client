@@ -29,6 +29,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/zap"
 )
 
@@ -221,6 +222,14 @@ type (
 		// Optional: Configures shadowing workflow
 		// default: please check the documentation for ShadowOptions for default options
 		ShadowOptions ShadowOptions
+
+		// Optional: Flags to turn on/off some server side options
+		// default: all the features in the struct are turned off
+		FeatureFlags FeatureFlags
+
+		// Optional: Authorization interface to get the Auth Token
+		// default: No provider
+		Authorization auth.AuthorizationProvider
 	}
 )
 

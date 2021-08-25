@@ -74,13 +74,64 @@ type (
 		Close()
 	}
 
-	// Selector must be used instead of native go select by workflow code.
+	// Selector must be used instead of native go select by workflow code for determinism.
 	// Use workflow.NewSelector(ctx) method to create a Selector instance.
+	// The interface is to simulate Golang's Select statement.
+	// For example, the logic of Golang code like below
+	// 	chA := make(chan int)
+	//	chB := make(chan int)
+	//	counter := 0
+	//	for {
+	//		select {
+	//		case i, ok := <- chA:
+	//			if ok{
+	//				counter += i
+	//			}
+	//		case i, ok := <- chB:
+	//			if ok{
+	//				counter += i
+	//			}
+	//		}
+	//	}
+	// should be written as
+	// 	s := workflow.NewSelector(ctx)
+	//	counter := 0
+	//	s.AddReceive(workflow.GetSignalChannel(ctx, "channelA"), func(c workflow.Channel, ok bool) {
+	//		if ok{
+	//			var i int
+	//			c.Receive(ctx, &i)
+	//			counter += i
+	//		}
+	//	})
+	//	s.AddReceive(workflow.GetSignalChannel(ctx, "channelB"), func(c workflow.Channel, ok bool) {
+	//		if ok{
+	//			var i int
+	//			c.Receive(ctx, &i)
+	//			counter += i
+	//		}
+	//	})
+	//
+	//	for {
+	//		s.Select(ctx)
+	//	}
 	Selector interface {
-		AddReceive(c Channel, f func(c Channel, more bool)) Selector
+		// AddReceive adds a ReceiveChannel to the selector. f is invoked when the channel has data or closed.
+		// ok == false indicates the channel is closed
+		AddReceive(c Channel, f func(c Channel, ok bool)) Selector
+		// AddSend adds a SendChannel to the selector. f is invoke when the channel is available to send
 		AddSend(c Channel, v interface{}, f func()) Selector
+		// AddFuture adds a Future to the selector f is invoked when future is ready
 		AddFuture(future Future, f func(f Future)) Selector
+		// AddDefault adds a default branch to the selector.
+		// f is invoked when non of the other conditions(ReceiveChannel, SendChannel and Future) is met for one call of Select
 		AddDefault(f func())
+		// Select waits for one of the added conditions to be met and invoke the callback as described above.
+		// When none of the added condition is met:
+		// 		if there is no Default(added by AddDefault) and , then it will block the current goroutine
+		// 		if Default(added by AddDefault) is used, when Default callback will be executed without blocking
+		// When more than one of added conditions are met, only one of them will be invoked.
+		// Usually it's recommended to use a for loop to drain all of them, and use AddDefault to break out the
+		// loop properly(e.g. not missing any received data in channels)
 		Select(ctx Context)
 	}
 

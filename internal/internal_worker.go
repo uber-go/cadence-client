@@ -43,6 +43,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/cadence/internal/common/util"
@@ -189,6 +190,9 @@ type (
 		Tracer opentracing.Tracer
 
 		WorkflowInterceptors []WorkflowInterceptorFactory
+
+		// flags to turn on/off some server side features
+		FeatureFlags FeatureFlags
 	}
 )
 
@@ -234,10 +238,15 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 // verifyDomainExist does a DescribeDomain operation on the specified domain with backoff/retry
 // It returns an error, if the server returns an EntityNotExist or BadRequest error
 // On any other transient error, this method will just return success
-func verifyDomainExist(client workflowserviceclient.Interface, domain string, logger *zap.Logger) error {
+func verifyDomainExist(
+	client workflowserviceclient.Interface,
+	domain string,
+	logger *zap.Logger,
+	featureFlags FeatureFlags,
+) error {
 	ctx := context.Background()
 	descDomainOp := func() error {
-		tchCtx, cancel, opt := newChannelContext(ctx)
+		tchCtx, cancel, opt := newChannelContext(ctx, featureFlags)
 		defer cancel()
 		_, err := client.DescribeDomain(tchCtx, &shared.DescribeDomainRequest{Name: &domain}, opt...)
 		if err != nil {
@@ -355,7 +364,7 @@ func newWorkflowTaskWorkerInternal(
 
 // Start the worker.
 func (ww *workflowWorker) Start() error {
-	err := verifyDomainExist(ww.workflowService, ww.domain, ww.worker.logger)
+	err := verifyDomainExist(ww.workflowService, ww.domain, ww.worker.logger, ww.executionParameters.FeatureFlags)
 	if err != nil {
 		return err
 	}
@@ -365,7 +374,7 @@ func (ww *workflowWorker) Start() error {
 }
 
 func (ww *workflowWorker) Run() error {
-	err := verifyDomainExist(ww.workflowService, ww.domain, ww.worker.logger)
+	err := verifyDomainExist(ww.workflowService, ww.domain, ww.worker.logger, ww.executionParameters.FeatureFlags)
 	if err != nil {
 		return err
 	}
@@ -517,7 +526,7 @@ func newActivityTaskWorker(
 
 // Start the worker.
 func (aw *activityWorker) Start() error {
-	err := verifyDomainExist(aw.workflowService, aw.domain, aw.worker.logger)
+	err := verifyDomainExist(aw.workflowService, aw.domain, aw.worker.logger, aw.executionParameters.FeatureFlags)
 	if err != nil {
 		return err
 	}
@@ -527,7 +536,7 @@ func (aw *activityWorker) Start() error {
 
 // Run the worker.
 func (aw *activityWorker) Run() error {
-	err := verifyDomainExist(aw.workflowService, aw.domain, aw.worker.logger)
+	err := verifyDomainExist(aw.workflowService, aw.domain, aw.worker.logger, aw.executionParameters.FeatureFlags)
 	if err != nil {
 		return err
 	}
@@ -812,7 +821,7 @@ func (aw *aggregatedWorker) Start() error {
 		return fmt.Errorf("failed to get executable checksum: %v", err)
 	}
 
-	if !isInterfaceNil(aw.workflowWorker) {
+	if aw.workflowWorker != nil {
 		if len(aw.registry.getRegisteredWorkflowTypes()) == 0 {
 			aw.logger.Info(
 				"Worker has no workflows registered, so workflow worker will not be started.",
@@ -824,7 +833,7 @@ func (aw *aggregatedWorker) Start() error {
 		}
 		aw.logger.Info("Started Workflow Worker")
 	}
-	if !isInterfaceNil(aw.activityWorker) {
+	if aw.activityWorker != nil {
 		if len(aw.registry.getRegisteredActivities()) == 0 {
 			aw.logger.Info(
 				"Worker has no activities registered, so activity worker will not be started.",
@@ -832,15 +841,15 @@ func (aw *aggregatedWorker) Start() error {
 		} else {
 			if err := aw.activityWorker.Start(); err != nil {
 				// stop workflow worker.
-				if !isInterfaceNil(aw.workflowWorker) {
+				if aw.workflowWorker != nil {
 					aw.workflowWorker.Stop()
 				}
 				return err
 			}
-			if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+			if aw.locallyDispatchedActivityWorker != nil {
 				if err := aw.locallyDispatchedActivityWorker.Start(); err != nil {
 					// stop workflow worker.
-					if !isInterfaceNil(aw.workflowWorker) {
+					if aw.workflowWorker != nil {
 						aw.workflowWorker.Stop()
 					}
 					aw.activityWorker.Stop()
@@ -851,16 +860,16 @@ func (aw *aggregatedWorker) Start() error {
 		}
 	}
 
-	if !isInterfaceNil(aw.sessionWorker) {
+	if aw.sessionWorker != nil {
 		if err := aw.sessionWorker.Start(); err != nil {
 			// stop workflow worker and activity worker.
-			if !isInterfaceNil(aw.workflowWorker) {
+			if aw.workflowWorker != nil {
 				aw.workflowWorker.Stop()
 			}
-			if !isInterfaceNil(aw.activityWorker) {
+			if aw.activityWorker != nil {
 				aw.activityWorker.Stop()
 			}
-			if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+			if aw.locallyDispatchedActivityWorker != nil {
 				aw.locallyDispatchedActivityWorker.Stop()
 			}
 			return err
@@ -868,18 +877,18 @@ func (aw *aggregatedWorker) Start() error {
 		aw.logger.Info("Started Session Worker")
 	}
 
-	if !isInterfaceNil(aw.shadowWorker) {
+	if aw.shadowWorker != nil {
 		if err := aw.shadowWorker.Start(); err != nil {
-			if !isInterfaceNil(aw.workflowWorker) {
+			if aw.workflowWorker != nil {
 				aw.workflowWorker.Stop()
 			}
-			if !isInterfaceNil(aw.activityWorker) {
+			if aw.activityWorker != nil {
 				aw.activityWorker.Stop()
 			}
-			if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+			if aw.locallyDispatchedActivityWorker != nil {
 				aw.locallyDispatchedActivityWorker.Stop()
 			}
-			if !isInterfaceNil(aw.sessionWorker) {
+			if aw.sessionWorker != nil {
 				aw.sessionWorker.Stop()
 			}
 			return err
@@ -963,19 +972,19 @@ func (aw *aggregatedWorker) Run() error {
 }
 
 func (aw *aggregatedWorker) Stop() {
-	if !isInterfaceNil(aw.workflowWorker) {
+	if aw.workflowWorker != nil {
 		aw.workflowWorker.Stop()
 	}
-	if !isInterfaceNil(aw.activityWorker) {
+	if aw.activityWorker != nil {
 		aw.activityWorker.Stop()
 	}
-	if !isInterfaceNil(aw.locallyDispatchedActivityWorker) {
+	if aw.locallyDispatchedActivityWorker != nil {
 		aw.locallyDispatchedActivityWorker.Stop()
 	}
-	if !isInterfaceNil(aw.sessionWorker) {
+	if aw.sessionWorker != nil {
 		aw.sessionWorker.Stop()
 	}
-	if !isInterfaceNil(aw.shadowWorker) {
+	if aw.shadowWorker != nil {
 		aw.shadowWorker.Stop()
 	}
 	aw.logger.Info("Stopped Worker")
@@ -1022,6 +1031,7 @@ func newAggregatedWorker(
 		ContextPropagators:                   wOptions.ContextPropagators,
 		Tracer:                               wOptions.Tracer,
 		WorkflowInterceptors:                 wOptions.WorkflowInterceptorChainFactories,
+		FeatureFlags:                         wOptions.FeatureFlags,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -1032,8 +1042,10 @@ func newAggregatedWorker(
 		zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: workerParams.Identity},
 	)
 	logger := workerParams.Logger
+	if options.Authorization != nil {
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
 	service = metrics.NewWorkflowServiceWrapper(service, workerParams.MetricsScope)
-
 	processTestTags(&wOptions, &workerParams)
 
 	// worker specific registry
@@ -1220,10 +1232,6 @@ func getWorkflowFunctionName(r *registry, i interface{}) string {
 		result = alias
 	}
 	return result
-}
-
-func isInterfaceNil(i interface{}) bool {
-	return i == nil || reflect.ValueOf(i).IsNil()
 }
 
 func getReadOnlyChannel(c chan struct{}) <-chan struct{} {

@@ -81,6 +81,10 @@ type ReplayOptions struct {
 	// Optional: Sets opentracing Tracer that is to be used to emit tracing information
 	// default: no tracer - opentracing.NoopTracer
 	Tracer opentracing.Tracer
+
+	// Optional: flags to turn on/off some features on server side
+	// default: all features under the struct is turned off
+	FeatureFlags FeatureFlags
 }
 
 // IsReplayDomain checks if the domainName is from replay
@@ -180,7 +184,7 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 	var hResponse *shared.GetWorkflowExecutionHistoryResponse
 	if err := backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, r.options.FeatureFlags)
 
 			var err error
 			hResponse, err = service.GetWorkflowExecutionHistory(tchCtx, request, opt...)
@@ -282,6 +286,7 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		service:        service,
 		metricsScope:   metricScope,
 		startedEventID: task.GetStartedEventId(),
+		featureFlags:   r.options.FeatureFlags,
 	}
 	taskHandler := newWorkflowTaskHandler(domain, workerParams, nil, r.registry)
 	resp, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task, historyIterator: iterator}, nil)

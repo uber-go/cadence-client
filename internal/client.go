@@ -30,6 +30,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap"
 )
@@ -335,6 +336,8 @@ type (
 		DataConverter      DataConverter
 		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
+		FeatureFlags       FeatureFlags
+		Authorization 	   auth.AuthorizationProvider
 	}
 
 	// StartWorkflowOptions configuration parameters for starting a workflow execution.
@@ -502,6 +505,15 @@ const (
 	WorkflowIDReusePolicyTerminateIfRunning
 )
 
+func getFeatureFlags(options *ClientOptions) FeatureFlags {
+	if options != nil {
+		return FeatureFlags{
+			WorkflowExecutionAlreadyCompletedErrorEnabled: options.FeatureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled,
+		}
+	}
+	return FeatureFlags{}
+}
+
 // NewClient creates an instance of a workflow client
 func NewClient(service workflowserviceclient.Interface, domain string, options *ClientOptions) Client {
 	var identity string
@@ -532,8 +544,12 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	} else {
 		tracer = opentracing.NoopTracer{}
 	}
+	if options != nil && options.Authorization != nil{
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
+	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &workflowClient{
-		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),
+		workflowService:    service,
 		domain:             domain,
 		registry:           newRegistry(),
 		metricsScope:       metrics.NewTaggedScope(metricScope),
@@ -541,6 +557,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 		dataConverter:      dataConverter,
 		contextPropagators: contextPropagators,
 		tracer:             tracer,
+		featureFlags:       getFeatureFlags(options),
 	}
 }
 
@@ -557,10 +574,15 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 		metricScope = options.MetricsScope
 	}
 	metricScope = tagScope(metricScope, tagDomain, "domain-client", clientImplHeaderName, clientImplHeaderValue)
+	if options != nil && options.Authorization != nil{
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
+	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &domainClient{
-		workflowService: metrics.NewWorkflowServiceWrapper(service, metricScope),
+		workflowService: service,
 		metricsScope:    metricScope,
 		identity:        identity,
+		featureFlags:    getFeatureFlags(options),
 	}
 }
 

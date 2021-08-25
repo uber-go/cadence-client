@@ -26,6 +26,7 @@ services:
     image: ubercadence/server:master-auto-setup
     ports:
       - "7933:7933"
+      - "7833:7833"
       - "7934:7934"
       - "7935:7935"
       - "7939:7939"
@@ -84,6 +85,29 @@ services:
       services-network:
         aliases:
           - integ-test-sticky-on
+
+  integ-test-grpc:
+    build:
+      context: ../../
+      dockerfile: ./docker/buildkite/Dockerfile
+    command:
+      - /bin/sh
+      - -e
+      - -c
+      - |
+        make integ_test_grpc
+    environment:
+      - "SERVICE_ADDR=cadence:7833"
+      - "ENABLE_GRPC_ADAPTER=true"
+      - "GO111MODULE=on"
+    depends_on:
+      - cadence
+    volumes:
+      - ../../:/go/src/go.uber.org/cadence
+    networks:
+      services-network:
+        aliases:
+          - integ-test-grpc
 
   unit-test:
     build:

@@ -144,6 +144,7 @@ type (
 		workerStopCh       <-chan struct{}
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
+		featureFlags       FeatureFlags
 	}
 
 	// history wrapper method to help information about events.
@@ -475,16 +476,24 @@ func (w *workflowExecutionContextImpl) Lock() {
 }
 
 func (w *workflowExecutionContextImpl) Unlock(err error) {
+	cleared := false
+	cached := getWorkflowCache().Exist(w.workflowInfo.WorkflowExecution.RunID)
 	if err != nil || w.err != nil || w.isWorkflowCompleted || (w.wth.disableStickyExecution && !w.hasPendingLocalActivityWork()) {
 		// TODO: in case of closed, it assumes the close decision always succeed. need server side change to return
-		// error to indicate the close failure case. This should be rear case. For now, always remove the cache, and
+		// error to indicate the close failure case. This should be rare case. For now, always remove the cache, and
 		// if the close decision failed, the next decision will have to rebuild the state.
-		if getWorkflowCache().Exist(w.workflowInfo.WorkflowExecution.RunID) {
+		if cached {
+			// also clears state asynchronously via cache eviction
 			removeWorkflowContext(w.workflowInfo.WorkflowExecution.RunID)
 		} else {
-			// sticky is disabled, manually clear the workflow state.
 			w.clearState()
 		}
+		cleared = true
+	}
+	// there are a variety of reasons a workflow may not have been put into the cache.
+	// all of them mean we need to clear the state at this point, or any running goroutines will be orphaned.
+	if !cleared && !cached {
+		w.clearState()
 	}
 
 	w.mutex.Unlock()
@@ -1659,6 +1668,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		workerStopCh:       params.WorkerStopChannel,
 		contextPropagators: params.ContextPropagators,
 		tracer:             params.Tracer,
+		featureFlags:       params.FeatureFlags,
 	}
 }
 
@@ -1674,6 +1684,7 @@ type cadenceInvoker struct {
 	lastDetailsReported   *[]byte     // Details that were reported in the last reporting interval.
 	closeCh               chan struct{}
 	workerStopChannel     <-chan struct{}
+	featureFlags          FeatureFlags
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
@@ -1778,7 +1789,7 @@ func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	err := recordActivityHeartbeat(ctx, i.service, i.identity, i.taskToken, details)
+	err := recordActivityHeartbeat(ctx, i.service, i.identity, i.taskToken, details, i.featureFlags)
 
 	switch err.(type) {
 	case *CanceledError:
@@ -1812,8 +1823,8 @@ func (i *cadenceInvoker) Close(flushBufferedHeartbeat bool) {
 	}
 }
 
-func (i *cadenceInvoker) GetClient(domain string, options *ClientOptions) Client {
-	return NewClient(i.service, domain, options)
+func (i *cadenceInvoker) SignalWorkflow(ctx context.Context, domain, workflowID, runID, signalName string, signalInput []byte) error {
+	return signalWorkflow(ctx, i.service, i.identity, domain, workflowID, runID, signalName, signalInput, i.featureFlags)
 }
 
 func newServiceInvoker(
@@ -1823,6 +1834,7 @@ func newServiceInvoker(
 	cancelHandler func(),
 	heartBeatTimeoutInSec int32,
 	workerStopChannel <-chan struct{},
+	featureFlags FeatureFlags,
 ) ServiceInvoker {
 	return &cadenceInvoker{
 		taskToken:             taskToken,
@@ -1832,6 +1844,7 @@ func newServiceInvoker(
 		heartBeatTimeoutInSec: heartBeatTimeoutInSec,
 		closeCh:               make(chan struct{}),
 		workerStopChannel:     workerStopChannel,
+		featureFlags:          featureFlags,
 	}
 }
 
@@ -1851,7 +1864,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	canCtx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
 
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh)
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh, ath.featureFlags)
 	defer func() {
 		_, activityCompleted := result.(*s.RespondActivityTaskCompletedRequest)
 		invoker.Close(!activityCompleted) // flush buffered heartbeat if activity was not successfully completed.
@@ -1968,12 +1981,42 @@ func createNewDecision(decisionType s.DecisionType) *s.Decision {
 		DecisionType: common.DecisionTypePtr(decisionType),
 	}
 }
+func signalWorkflow(
+	ctx context.Context,
+	service workflowserviceclient.Interface,
+	identity string,
+	domain string,
+	workflowID string,
+	runID string,
+	signalName string,
+	signalInput []byte,
+	featureFlags FeatureFlags,
+) error {
+	request := &s.SignalWorkflowExecutionRequest{
+		Domain: common.StringPtr(domain),
+		WorkflowExecution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      getRunID(runID),
+		},
+		SignalName: common.StringPtr(signalName),
+		Input:      signalInput,
+		Identity:   common.StringPtr(identity),
+	}
+
+	return backoff.Retry(ctx,
+		func() error {
+			tchCtx, cancel, opt := newChannelContext(ctx, featureFlags)
+			defer cancel()
+			return service.SignalWorkflowExecution(tchCtx, request, opt...)
+		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+}
 
 func recordActivityHeartbeat(
 	ctx context.Context,
 	service workflowserviceclient.Interface,
 	identity string,
 	taskToken, details []byte,
+	featureFlags FeatureFlags,
 ) error {
 	request := &s.RecordActivityTaskHeartbeatRequest{
 		TaskToken: taskToken,
@@ -1983,7 +2026,7 @@ func recordActivityHeartbeat(
 	var heartbeatResponse *s.RecordActivityTaskHeartbeatResponse
 	heartbeatErr := backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, featureFlags)
 			defer cancel()
 
 			var err error
@@ -2004,6 +2047,7 @@ func recordActivityHeartbeatByID(
 	identity string,
 	domain, workflowID, runID, activityID string,
 	details []byte,
+	featureFlags FeatureFlags,
 ) error {
 	request := &s.RecordActivityTaskHeartbeatByIDRequest{
 		Domain:     common.StringPtr(domain),
@@ -2016,7 +2060,7 @@ func recordActivityHeartbeatByID(
 	var heartbeatResponse *s.RecordActivityTaskHeartbeatResponse
 	heartbeatErr := backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx)
+			tchCtx, cancel, opt := newChannelContext(ctx, featureFlags)
 			defer cancel()
 
 			var err error

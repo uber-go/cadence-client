@@ -801,14 +801,22 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 func (wtp *workflowTaskPoller) toWorkflowTask(response *s.PollForDecisionTaskResponse) *workflowTask {
 	startEventID := response.GetStartedEventId()
 	nextEventID := response.GetNextEventId()
-	if nextEventID != 0 &&
-		startEventID != 0 &&
-		nextEventID-1 != startEventID {
-		wtp.logger.Warn("Invalid PollForDecisionTaskResponse, nextEventID doesn't match startedEventID",
-			zap.Int64("StartedEventID", startEventID),
-			zap.Int64("NextEventID", nextEventID),
-		)
-		wtp.metricsScope.Counter(metrics.DecisionPollInvalidCounter).Inc(1)
+	if nextEventID != 0 && startEventID != 0 {
+		// first case is for normal decision, the second is for transient decision
+		if nextEventID-1 != startEventID && nextEventID+1 != startEventID {
+			wtp.logger.Warn("Invalid PollForDecisionTaskResponse, nextEventID doesn't match startedEventID",
+				zap.Int64("StartedEventID", startEventID),
+				zap.Int64("NextEventID", nextEventID),
+			)
+			wtp.metricsScope.Counter(metrics.DecisionPollInvalidCounter).Inc(1)
+		} else {
+			// in transient decision case, set nextEventID to be one more than startEventID in case
+			// we can need to use the field to truncate history for decision task (check comments in newGetHistoryPageFunc)
+			// this is safe as
+			// - currently we are not using nextEventID for decision task
+			// - for query task, startEventID is not assigned, so we won't reach here.
+			nextEventID = startEventID + 1
+		}
 	}
 	historyIterator := &historyIteratorImpl{
 		nextPageToken:  response.NextPageToken,

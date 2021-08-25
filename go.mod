@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7
+	github.com/cristalhq/jwt/v3 v3.1.0
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.4.4

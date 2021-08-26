@@ -52,7 +52,7 @@ func (s *jwtAuthSuite) TearDownTest() {
 }
 
 func (s *jwtAuthSuite) TestCorrectTokenCreation() {
-    authorizer := NewJwtAuthorizationProvider(s.key)
+    authorizer := NewAdminJwtAuthorizationProvider(s.key)
     authToken, err := authorizer.GetAuthToken()
     s.NoError(err)
 
@@ -73,7 +73,7 @@ func (s *jwtAuthSuite) TestCorrectTokenCreation() {
 }
 
 func (s *jwtAuthSuite) TestIncorrectPrivateKeyForTokenCreation() {
-    authorizer := NewJwtAuthorizationProvider([]byte{})
+    authorizer := NewAdminJwtAuthorizationProvider([]byte{})
     _, err := authorizer.GetAuthToken()
     s.EqualError(err, "failed to parse PEM block containing the private key")
 }

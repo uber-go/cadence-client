@@ -43,6 +43,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/cadence/internal/common/util"
@@ -1041,8 +1042,10 @@ func newAggregatedWorker(
 		zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: workerParams.Identity},
 	)
 	logger := workerParams.Logger
+	if options.Authorization != nil {
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
 	service = metrics.NewWorkflowServiceWrapper(service, workerParams.MetricsScope)
-
 	processTestTags(&wOptions, &workerParams)
 
 	// worker specific registry

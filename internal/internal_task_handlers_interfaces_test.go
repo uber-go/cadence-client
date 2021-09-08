@@ -175,8 +175,7 @@ func (s *PollLayerInterfacesTestSuite) TestGetNextDecisions() {
 
 	eh := newHistory(workflowTask, nil)
 
-	info, err := eh.NextDecisionInfo()
-	events := info.decisionResultEvents
+	events, _, _, err := eh.NextDecisionEvents()
 
 	s.NoError(err)
 	s.Equal(3, len(events))

@@ -147,7 +147,7 @@ type (
 		featureFlags       FeatureFlags
 	}
 
-	// history wrapper to help reading decisions about history events.
+	// history wrapper method to help information about events.
 	history struct {
 		workflowTask   *workflowTask
 		eventsHandler  *workflowExecutionEventHandlerImpl
@@ -157,15 +157,6 @@ type (
 		lastEventID    int64 // last expected eventID, zero indicates read until end of stream
 		next           []*s.HistoryEvent
 		binaryChecksum *string
-		decisionCompletedEventID *int64
-	}
-
-	// historyDecisionInfo is a result of reading a block of history events that separated by decisions(decisionTaskStarted event)
-	historyDecisionInfo struct{
-		decisionResultEvents           []*s.HistoryEvent // the events that made by this decision(e.g. ActivityScheduled) until next DecisionTaskStarted
-		markerResultEvents []*s.HistoryEvent // a subset of decisionResultEvents to contain only markers
-		binaryChecksum *string // the checksum of binary that has made this decision(from decisionTaskCompleted event)
-		decisionTaskCompletedEventID *int64 // the eventID of decisionTaskCompleted event that has made this decision
 	}
 
 	decisionHeartbeatError struct {
@@ -264,31 +255,22 @@ func isDecisionEvent(eventType s.EventType) bool {
 	}
 }
 
-// NextDecisionInfo returns events that there processed as new by the next decision.
-func (eh *history) NextDecisionInfo() (info *historyDecisionInfo, err error) {
+// NextDecisionEvents returns events that there processed as new by the next decision.
+// TODO(maxim): Refactor to return a struct instead of multiple parameters
+func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent, binaryChecksum *string, err error) {
 	if eh.next == nil {
 		eh.next, _, err = eh.nextDecisionEvents()
 		if err != nil {
-			return &historyDecisionInfo{
-				binaryChecksum: eh.binaryChecksum,
-				decisionTaskCompletedEventID: eh.decisionCompletedEventID,
-			}, err
+			return result, markers, eh.binaryChecksum, err
 		}
 	}
 
-	result := eh.next
-	var markers []*s.HistoryEvent
-
+	result = eh.next
+	checksum := eh.binaryChecksum
 	if len(result) > 0 {
 		eh.next, markers, err = eh.nextDecisionEvents()
 	}
-	return &historyDecisionInfo{
-		decisionResultEvents: result,
-		markerResultEvents: markers,
-		binaryChecksum: eh.binaryChecksum,
-		decisionTaskCompletedEventID: eh.decisionCompletedEventID,
-	}, err
-
+	return result, markers, checksum, err
 }
 
 func (eh *history) HasNextDecisionEvents() bool {
@@ -365,7 +347,6 @@ OrderEvents:
 			}
 			if !isFailed {
 				eh.binaryChecksum = binaryChecksum
-				eh.decisionCompletedEventID = common.Int64Ptr(event.GetEventId()+1) //DecisionTaskCompleted is always the next of decisionTaskStarted
 				eh.currentIndex++
 				nextEvents = append(nextEvents, event)
 				break OrderEvents
@@ -865,8 +846,7 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	// Process events
 ProcessEvents:
 	for {
-		info, err := reorderedHistory.NextDecisionInfo()
-		reorderedEvents, markers, binaryChecksum := info.markerResultEvents, info.markerResultEvents, info.binaryChecksum
+		reorderedEvents, markers, binaryChecksum, err := reorderedHistory.NextDecisionEvents()
 		if err != nil {
 			return nil, err
 		}
@@ -879,8 +859,6 @@ ProcessEvents:
 		} else {
 			w.workflowInfo.BinaryChecksum = binaryChecksum
 		}
-		w.workflowInfo.DecisionCompletedEventID = info.decisionTaskCompletedEventID
-
 		// Markers are from the events that are produced from the current decision
 		for _, m := range markers {
 			if m.MarkerRecordedEventAttributes.GetMarkerName() != localActivityMarkerName {

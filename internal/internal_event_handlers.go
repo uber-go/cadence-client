@@ -814,6 +814,8 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		// Set replay clock.
 		weh.SetCurrentReplayTime(time.Unix(0, event.GetTimestamp()))
 		weh.workflowDefinition.OnDecisionTaskStarted()
+		// Set replay decisionStarted eventID
+		weh.workflowInfo.DecisionStartedEventID = event.GetEventId()
 
 	case m.EventTypeDecisionTaskTimedOut:
 		// No Operation

@@ -374,7 +374,11 @@ func (wc *workflowEnvironmentImpl) RegisterCancelHandler(handler func()) {
 func (wc *workflowEnvironmentImpl) ExecuteChildWorkflow(
 	params executeWorkflowParams, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error {
 	if params.workflowID == "" {
-		params.workflowID = wc.workflowInfo.WorkflowExecution.RunID + "_" + wc.GenerateSequenceID()
+		if wc.workflowInfo.OriginalRunId != ""{
+			params.workflowID = wc.workflowInfo.OriginalRunId + "_" + wc.GenerateSequenceID()	
+		}else{
+			params.workflowID = wc.workflowInfo.WorkflowExecution.RunID + "_" + wc.GenerateSequenceID()
+		}
 	}
 	memo, err := getWorkflowMemo(params.memo, wc.dataConverter)
 	if err != nil {
@@ -814,6 +818,8 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		// Set replay clock.
 		weh.SetCurrentReplayTime(time.Unix(0, event.GetTimestamp()))
 		weh.workflowDefinition.OnDecisionTaskStarted()
+		// Set replay decisionStarted eventID
+		weh.workflowInfo.DecisionStartedEventID = event.GetEventId()
 
 	case m.EventTypeDecisionTaskTimedOut:
 		// No Operation

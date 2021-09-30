@@ -32,6 +32,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
@@ -196,8 +197,12 @@ func newChannelContextHelper(
 }
 
 // GetWorkerIdentity gets a default identity for the worker.
+//
+// This contains a random UUID, generated each time it is called, to prevent identity collisions when workers share
+// other host/pid/etc information.  These alone are not guaranteed to be unique, especially when Docker is involved.
+// Take care to retrieve this only once per worker.
 func getWorkerIdentity(tasklistName string) string {
-	return fmt.Sprintf("%d@%s@%s", os.Getpid(), getHostName(), tasklistName)
+	return fmt.Sprintf("%d@%s@%s@%s", os.Getpid(), getHostName(), tasklistName, uuid.New())
 }
 
 func getHostName() string {

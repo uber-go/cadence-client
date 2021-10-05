@@ -50,22 +50,38 @@ type (
 	//
 	// Use workflow.NewChannel(ctx) to create an unbuffered Channel instance,
 	// workflow.NewBufferedChannel(ctx, size) to create a Channel which has a buffer,
-	// or workflow.GetSignalChannel(ctx, "name") to get a Channel that can contain encoded data sent from other systems.
-	//
-	// workflow.GetSignalChannel is named differently because you are not "creating" a new channel.  Signal channels
-	// are conceptually singletons that exist at all times, and they do not have to be "created" before a signal can be
-	// sent to a workflow.  The workflow will just have no way to know that the data exists until it inspects the
-	// appropriate signal channel.
+	// or workflow.GetSignalChannel(ctx, "name") to get a Channel that contains data sent to this workflow by a call to
+	// SignalWorkflow (e.g. on the Client, or similar methods like SignalExternalWorkflow or SignalChildWorkflow).
 	//
 	// Both NewChannel and NewBufferedChannel have "Named" constructors as well.
 	// These names will be visible in stack-trace queries, so they can help with debugging, but they do not otherwise
 	// impact behavior at all, and are not recorded anywhere (so you can change them without versioning your code).
+	//
+	// Also note that channels created by NewChannel and NewBufferedChannel do not do any serialization or
+	// deserialization - you will receive whatever value was sent, and non-(de)serializable values like function
+	// references and interfaces are fine, the same as using a normal Go channel.
+	//
+	// Signal channels, however, contain whatever bytes were sent to your workflow, and the values must be decoded into
+	// the output value.  By default, this means that Receive(ctx, &out) will use json.Unmarshal(data, &out), but this
+	// can be overridden at a worker level (worker.Options) or at a context level (workflow.WithDataConverter(ctx, dc)).
+	//
+	// You are able to send values to your own signal channels, and these values will behave the same as they do in
+	// normal channels (i.e. they will not be (de)serialized).  However, doing so is not generally recommended, as
+	// mixing the value types can increase the risk that you fail to read a value, causing values to be lost.  See
+	// Receive for more details about that behavior.
 	Channel interface {
 		// Receive blocks until it receives a value, and then assigns the received value to the provided pointer.
-		// It returns false when Channel is closed and all data has already been consumed from the channel, in the same
-		// way as Go channel reads work.
+		// It returns false when the Channel is closed and all data has already been consumed from the Channel, in the
+		// same way as Go channel reads work, but the assignment only occurs if there was a value in the Channel.
 		//
-		// This is equivalent to `v, more := <- aChannel`.
+		// This is technically equivalent to:
+		//  received, ok := <- aChannel:
+		//  if ok {
+		//  	*valuePtr = received
+		//  }
+		//
+		// But if your output values are zero values, this is equivalent to a normal channel read:
+		//  value, ok <- aChannel
 		//
 		// valuePtr must be assignable, and will be used to assign (for in-memory data in regular channels) or decode
 		// (for signal channels) the data in the channel.
@@ -83,28 +99,61 @@ type (
 		//   decoding will be attempted, so you can try it yourself.
 		// - for other channels, an interface{} pointer.  All values are interfaces, so this will never fail, and you
 		//   can inspect the type with reflection or type assertions.
-		Receive(ctx Context, valuePtr interface{}) (more bool)
+		Receive(ctx Context, valuePtr interface{}) (ok bool)
 
-		// ReceiveAsync tries to receive from Channel without blocking.
+		// ReceiveAsync tries to Receive from Channel without blocking.
 		// If there is data available from the Channel, it assigns the data to valuePtr and returns true.
 		// Otherwise, it returns false immediately.
 		//
-		// This is equivalent to:
+		// This is technically equivalent to:
 		//  select {
-		//  case v := <- aChannel: ok = true
-		//  default: ok = false
+		//  case received, ok := <- aChannel:
+		//  	if ok {
+		//  		*valuePtr = received
+		//  	}
+		//  default:
+		//  	// no value was read
+		//  	ok = false
+		//  }
+		//
+		// But if your output values are zero values, this is equivalent to a simpler form:
+		//  select {
+		//  case value, ok := <- aChannel:
+		//  default:
+		//  	// no value was read
+		//  	ok = false
 		//  }
 		//
 		// Decoding or assigning failures are handled like Receive.
 		ReceiveAsync(valuePtr interface{}) (ok bool)
 
 		// ReceiveAsyncWithMoreFlag is the same as ReceiveAsync, with an extra return to indicate if there could be
-		// more value from the Channel. more is false when Channel is closed.
+		// more values from the Channel in the future.
+		// `more` is false only when Channel is closed and the read failed (empty).
 		//
-		// This is equivalent to:
+		// This is technically equivalent to:
 		//  select {
-		//  case v, more := <- aChannel: ok = true
-		//  default: ok = false
+		//  case received, ok := <- aChannel:
+		//  	if ok {
+		//  		*valuePtr = received
+		//  	}
+		//  	more = ok
+		//  default:
+		//  	// no value was read
+		//  	ok = false
+		//  	// but the read would have blocked, so the channel is not closed
+		//  	more = true
+		//  }
+		//
+		// But if your output values are zero values, this is equivalent to a simpler form:
+		//  select {
+		//  case value, ok := <- aChannel:
+		//  	more = ok
+		//  default:
+		//  	// no value was read
+		//  	ok = false
+		//  	// but the read would have blocked, so the channel is not closed
+		//  	more = true
 		//  }
 		//
 		// Decoding or assigning failures are handled like Receive.
@@ -112,7 +161,7 @@ type (
 
 		// Send blocks until the data is sent.
 		//
-		// This is equivalent to `aChannel <- v`
+		// This is equivalent to `aChannel <- v`.
 		Send(ctx Context, v interface{})
 
 		// SendAsync will try to send without blocking.
@@ -137,20 +186,16 @@ type (
 	// The interface is intended to simulate Go's select statement, and any Go select can be fairly trivially rewritten
 	// for a Selector with effectively identical behavior.
 	//
-	// For example, normal Go code like below:
+	// For example, normal Go code like below (which will receive values forever, until idle for an hour):
 	//  chA := make(chan int)
 	//  chB := make(chan int)
 	//  counter := 0
 	//  for {
 	//  	select {
-	//  	case i, more := <- chA:
-	//  		if more {
-	//  			counter += i
-	//  		}
-	//  	case i, more := <- chB:
-	//  		if more {
-	//  			counter += i
-	//  		}
+	//  	case x := <- chA:
+	//  		counter += i
+	//  	case y := <- chB:
+	//  		counter += i
 	//  	case <- time.After(time.Hour):
 	//  		break
 	//  	}
@@ -163,18 +208,14 @@ type (
 	//  	timedout := false
 	//  	s := workflow.NewSelector(ctx)
 	//  	s.AddReceive(chA, func(c workflow.Channel, more bool) {
-	//  		if more {
-	//  			var i int
-	//  			c.Receive(ctx, &i)
-	//  			counter += i
-	//  		}
+	//  		var x int
+	//  		c.Receive(ctx, &x)
+	//  		counter += i
 	//  	})
 	//  	s.AddReceive(chB, func(c workflow.Channel, more bool) {
-	//  		if more {
-	//  			var i int
-	//  			c.Receive(ctx, &i)
-	//  			counter += i
-	//  		}
+	//  		var y int
+	//  		c.Receive(ctx, &y)
+	//  		counter += i
 	//  	})
 	//  	s.AddFuture(workflow.NewTimer(ctx, time.Hour), func(f workflow.Future) {
 	//  		timedout = true
@@ -195,17 +236,21 @@ type (
 	// Context used to construct the Selector, or the Context used to Select, will not (directly) unblock a Select call.
 	// Read Select for more details.
 	Selector interface {
-		// AddReceive waits to until a value can be received from a channel.
+		// AddReceive waits until a value can be received from a channel.
 		// f is invoked when the channel has data or is closed.
 		//
-		// This is equivalent to `case v, more := <- aChannel`, and `more` will only
-		// be false when the channel is both closed and no data was received.
+		// This is equivalent to `case v, ok := <- aChannel`, and `ok` will only be false when
+		// the channel is both closed and no data was received.
 		//
 		// When f is invoked, the data (or closed state) remains untouched in the channel, so
 		// you need to `c.Receive(ctx, &out)` (or `c.ReceiveAsync(&out)`) to remove and decode the value.
 		// Failure to do this is not an error - the value will simply remain in the channel until a future
 		// Receive retrieves it.
-		AddReceive(c Channel, f func(c Channel, more bool)) Selector
+		//
+		// The `ok` argument will match what a call to c.Receive would return (on a successful read), so it
+		// may be used to check for closed + empty channels without needing to try to read from the channel.
+		// See Channel.Receive for additional details about reading from channels.
+		AddReceive(c Channel, f func(c Channel, ok bool)) Selector
 		// AddSend waits to send a value to a channel.
 		// f is invoked when the value was successfully sent to the channel.
 		//
@@ -213,7 +258,7 @@ type (
 		//
 		// Unlike AddReceive, the value has already been sent on the channel when f is invoked.
 		AddSend(c Channel, v interface{}, f func()) Selector
-		// AddFuture invokes f after a Future is ready.
+		// AddFuture waits until a Future is ready, and then invokes f only once.
 		// If the Future is ready before Select is called, it is eligible to be invoked immediately.
 		//
 		// There is no direct equivalent in a native Go select statement.

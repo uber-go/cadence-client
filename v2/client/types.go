@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package v2
+package client
 
 import (
 	"time"
@@ -28,23 +28,6 @@ import (
 )
 
 type (
-	BadBinary struct {
-		Checksum string
-		Reason   string
-		Operator string
-		Created  time.Time
-	}
-
-	TaskListInfo struct {
-		Pollers []PollerInfo
-	}
-
-	PollerInfo struct {
-		LastAccess    time.Time
-		Identity      string
-		RatePerSecond *float64
-	}
-
 	DomainInfo struct {
 		ID          string
 		Name        string
@@ -54,12 +37,77 @@ type (
 		Data        map[string]string
 
 		WorkflowExecutionRetentionPeriod time.Duration
-		HistoryArchivalStatus            ArchivalStatus
-		HistoryArchivalURI               string
-		VisibilityArchivalStatus         ArchivalStatus
-		VisibilityArchivalURI            string
+
+		HistoryArchivalStatus    ArchivalStatus
+		HistoryArchivalURI       string
+		VisibilityArchivalStatus ArchivalStatus
+		VisibilityArchivalURI    string
+
+		BadBinaries []BadBinary
+
+		ActiveCluster string
+		Clusters      []string
 	}
 
+	BadBinary struct {
+		Checksum string
+		Reason   string
+		Operator string
+		Created  time.Time
+	}
+)
+
+type DomainStatus int
+
+const (
+	DomainStatusRegistered DomainStatus = iota
+	DomainStatusDeprecated
+	DomainStatusDeleted
+)
+
+type ArchivalStatus int
+
+const (
+	ArchivalStatusDisabled ArchivalStatus = iota
+	ArchivalStatusEnabled
+)
+
+type (
+	TaskListInfo struct {
+		Pollers []PollerInfo
+	}
+
+	PollerInfo struct {
+		LastAccess    time.Time
+		Identity      string
+		RatePerSecond *float64
+	}
+)
+
+type TaskListType int
+
+const (
+	TaskListTypeDecision TaskListType = iota
+	TaskListTypeActivity
+)
+
+type SearchAttribute struct {
+	Key  string
+	Type IndexedValueType
+}
+
+type IndexedValueType int
+
+const (
+	IndexedValueTypeString IndexedValueType = iota
+	IndexedValueTypeKeyword
+	IndexedValueTypeInt
+	IndexedValueTypeDouble
+	IndexedValueTypeBool
+	IndexedValueTypeDatetime
+)
+
+type (
 	WorkflowInfo struct {
 		WorkflowID       string
 		RunID            string
@@ -77,6 +125,14 @@ type (
 		AutoResetPoints  []ResetPointInfo
 		TaskList         string
 		IsCron           bool
+	}
+
+	ExtendedWorkflowInfo struct {
+		WorkflowInfo
+
+		PendingActivities []PendingActivityInfo
+		PendingChildren   []PendingChildWorkflowInfo
+		PendingDecision   *PendingDecisionInfo
 	}
 
 	PendingActivityInfo struct {
@@ -113,41 +169,14 @@ type (
 
 	ResetPointInfo struct {
 		BinaryChecksum           string
-		RunId                    string
+		RunID                    string
 		FirstDecisionCompletedId *int64
 		CreatedTime              *time.Time
 		ExpiringTime             *time.Time
 		Resettable               bool
 	}
 
-	SearchAttribute struct {
-		Key  string
-		Type IndexedValueType
-	}
-
 	RetryPolicy = internal.RetryPolicy
-)
-
-type DomainStatus int
-
-const (
-	DomainStatusRegistered DomainStatus = iota
-	DomainStatusDeprecated
-	DomainStatusDeleted
-)
-
-type ArchivalStatus int
-
-const (
-	ArchivalStatusDisabled ArchivalStatus = iota
-	ArchivalStatusEnabled
-)
-
-type TaskListType int
-
-const (
-	TaskListTypeDecision TaskListType = iota
-	TaskListTypeActivity
 )
 
 type QueryRejectCondition int
@@ -205,15 +234,4 @@ const (
 	ParentClosePolicyAbandon ParentClosePolicy = iota
 	ParentClosePolicyRequestCancel
 	ParentClosePolicyTerminate
-)
-
-type IndexedValueType int
-
-const (
-	IndexedValueTypeString IndexedValueType = iota
-	IndexedValueTypeKeyword
-	IndexedValueTypeInt
-	IndexedValueTypeDouble
-	IndexedValueTypeBool
-	IndexedValueTypeDatetime
 )

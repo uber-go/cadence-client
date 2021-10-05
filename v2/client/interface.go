@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"go.uber.org/cadence/encoded"
-	cadence "go.uber.org/cadence/v2"
 )
 
 type (
@@ -48,24 +47,16 @@ type (
 		Register(ctx context.Context, name string, replication DomainReplicationConfig, opts ...DomainRegisterOption) (Domain, error)
 
 		// List retrieves all domains that are registered within Cadence server.
-		List(ctx context.Context, page Page, opts ...DomainListOption) ([]ListedDomain, Page, error)
+		List(ctx context.Context, page Page, opts ...DomainListOption) ([]RichDomain, Page, error)
 
 		// Get selects a domain by a given name for further operations.
 		Get(name string) Domain
 	}
 
-	// ListedDomain is a domain that was retrieved via Domains.List function.
-	// It contains additional info for the domain.
-	ListedDomain interface {
+	// RichDomain is a domain that contains additional info.
+	RichDomain interface {
 		Domain
-		Info() cadence.DomainInfo
-	}
-
-	// DescribedDomain is a domain that was retrieved via Domain.Describe function.
-	// It contains additional info for the domain.
-	DescribedDomain interface {
-		Domain
-		Info() cadence.DomainInfo
+		Info() DomainInfo
 	}
 
 	// Domain is a Cadence way to group workflows of some application or owner.
@@ -74,33 +65,22 @@ type (
 		Name() string
 
 		// Describe returns information about the domain.
-		Describe(ctx context.Context, opts ...DomainDescribeOption) (DescribedDomain, error)
+		Describe(ctx context.Context, opts ...DomainDescribeOption) (DomainInfo, error)
 
 		// Update updates one or more domain fields. Use options to specify which fields to update.
 		Update(ctx context.Context, opts ...DomainUpdateOption) error
 
-		// Failover will failover the domain to another specified cluster.
+		// Failover will failover the domain to another given cluster.
 		Failover(ctx context.Context, cluster string, opts ...DomainFailoverOption) error
 
 		// Deprecate will deprecate the domain.
 		Deprecate(ctx context.Context, opts ...DomainDeprecateOption) error
 
-		// BadBinaries returns an interface for interacting with bad binaries.
-		BadBinaries() BadBinaries
-	}
+		// AddBadBinary will include new bad binary with the given checksum.
+		AddBadBinary(ctx context.Context, checksum string, reason string, opts ...DomainAddBadBinaryOption) error
 
-	// BadBinaries is an interface for interacting with bad binaries.
-	// A bad binary can be used to indicate a bad deployment, so that workers with it will
-	// stop making progress and workflows could be reset a state before the deployment.
-	BadBinaries interface {
-		// List returns a list of all bad binaries registered for the domain.
-		List(ctx context.Context, opts ...BadBinaryListOption) ([]cadence.BadBinary, error)
-
-		// Add will include new bad binary with the given checksum.
-		Add(ctx context.Context, checksum string, reason string, opts ...BadBinaryAddOption) error
-
-		// Delete will delete an existing bad binary by the given checksum.
-		Delete(ctx context.Context, checksum string, opts ...BadBinaryDeleteOption) error
+		// DeleteBadBinary will delete an existing bad binary by the given checksum.
+		DeleteBadBinary(ctx context.Context, checksum string, opts ...DomainDeleteBadBinaryOption) error
 	}
 
 	// Workflows is an interface for interacting with Cadence workflows for the selected domain.
@@ -113,7 +93,7 @@ type (
 		Count(ctx context.Context, query Query, opts ...WorkflowCountOption) (int64, error)
 
 		// List returns a list of workflow executions based on query.
-		List(ctx context.Context, query Query, page Page, opts ...WorkflowListOption) ([]ListedWorkflow, *Page, error)
+		List(ctx context.Context, query Query, page Page, opts ...WorkflowListOption) ([]RichWorkflow, *Page, error)
 
 		// Get will select a concrete workflow run by a given workflow and run ID for further operations.
 		Get(workflowID, runID string) Workflow
@@ -122,27 +102,13 @@ type (
 		GetCurrent(workflowID string) Workflow
 	}
 
-	// ListedWorkflow is a workflow retrieved via Workflows.List function.
-	// It contains additional info about the workflow that was included in the List API call.
-	ListedWorkflow interface {
+	// RichWorkflow is a workflow that contains additional info.
+	RichWorkflow interface {
 		Workflow
-		Info() cadence.WorkflowInfo
+		Info() WorkflowInfo
 	}
 
-	// DescribedWorkflow is a workflow retrieved via Workflow.Describe function.
-	// It contains additional info about the workflow.
-	DescribedWorkflow interface {
-		Workflow
-		Info() cadence.WorkflowInfo
-
-		// PendingActivities returns information about pending activities for the workflow (if any)
-		PendingActivities() []cadence.PendingActivityInfo
-		// PendingChildren returns information pending child workflows (if any)
-		PendingChildren() []cadence.PendingChildWorkflowInfo
-		// PendingDecision return information about pending decision
-		PendingDecision() *cadence.PendingDecisionInfo
-	}
-
+	// Workflow
 	Workflow interface {
 		// Domain returns Domain of this workflow
 		Domain() Domain
@@ -164,7 +130,7 @@ type (
 		Query(ctx context.Context, queryType string, args []interface{}, opts ...WorkflowQueryOption) (encoded.Value, error)
 
 		// Describe returns information about the workflow execution.
-		Describe(ctx context.Context, opts ...WorkflowDescribeOption) (DescribedWorkflow, error)
+		Describe(ctx context.Context, opts ...WorkflowDescribeOption) (ExtendedWorkflowInfo, error)
 
 		// Cancel cancels a workflow in execution.
 		// This is different from Terminate, as it would cancel workflow context giving opportunity for it to do the cleanup and exit gracefully.
@@ -218,22 +184,22 @@ type (
 	// TaskLists is an interface for interacting with task lists.
 	TaskLists interface {
 		// Get selects a task list by the given name and type.
-		Get(name string, taskListType cadence.TaskListType) TaskList
+		Get(name string, taskListType TaskListType) TaskList
 	}
 
 	// TaskList is a light-weight Cadence queue that is used to deliver tasks to Cadence worker.
 	TaskList interface {
 		// Describe returns information about the tasklist, right now this API returns the
 		// pollers which polled this tasklist in last few minutes.
-		Describe(ctx context.Context) (cadence.TaskListInfo, error)
+		Describe(ctx context.Context) (TaskListInfo, error)
 	}
 
 	// SearchAttributes is an interface for interacting with search attributes.
 	// The search attributes can be used in query of workflow List/Count APIs.
 	// Adding new search attributes requires cadence server to update dynamic config ValidSearchAttributes.
 	SearchAttributes interface {
-		// List returns valid search attributes keys and value types.
-		List(ctx context.Context) ([]cadence.SearchAttribute, error)
+		// List returns all valid search attributes keys and value types for the Cadence cluster.
+		List(ctx context.Context) ([]SearchAttribute, error)
 	}
 )
 
@@ -285,19 +251,14 @@ type (
 		domainDeprecateOption()
 	}
 
-	// BadBinaryListOption allows passing optional parameters when listing bad binaries
-	BadBinaryListOption interface {
-		badBinaryListOption()
+	// DomainAddBadBinaryOption allows passing optional parameters when adding bad binaries
+	DomainAddBadBinaryOption interface {
+		domainAddBadBinaryOption()
 	}
 
-	// BadBinaryAddOption allows passing optional parameters when adding bad binaries
-	BadBinaryAddOption interface {
-		badBinaryAddOption()
-	}
-
-	// BadBinaryDeleteOption allows passing optional parameters when deleting bad binaries
-	BadBinaryDeleteOption interface {
-		badBinaryDeleteOption()
+	// DomainDeleteBadBinaryOption allows passing optional parameters when deleting bad binaries
+	DomainDeleteBadBinaryOption interface {
+		domainDeleteBadBinaryOption()
 	}
 
 	// DomainOption can be used when registering or updating a domain
@@ -406,12 +367,12 @@ func SetDomainData(data map[string]string) DomainOption {
 }
 
 // SetHistoryArchival will set history archival parameters for the domain
-func SetHistoryArchival(status cadence.ArchivalStatus, uri string) DomainOption {
+func SetHistoryArchival(status ArchivalStatus, uri string) DomainOption {
 	panic("not implemented")
 }
 
 // SetVisibilityArchival will set visibility archival parameters for the domain
-func SetVisibilityArchival(status cadence.ArchivalStatus, uri string) DomainOption {
+func SetVisibilityArchival(status ArchivalStatus, uri string) DomainOption {
 	panic("not implemented")
 }
 
@@ -437,13 +398,13 @@ func WithDecisionTaskStartToCloseTimeout(timeout time.Duration) WorkflowStartOpt
 // WithWorkflowIDReusePolicy defines whether server allow reuse of workflow ID.
 // Can be useful for dedup logic if set to WorkflowIdReusePolicyRejectDuplicate.
 // Default: WorkflowIDReusePolicyAllowDuplicateFailedOnly
-func WithWorkflowIDReusePolicy(policy cadence.WorkflowIDReusePolicy) WorkflowStartOption {
+func WithWorkflowIDReusePolicy(policy WorkflowIDReusePolicy) WorkflowStartOption {
 	panic("not implemented")
 }
 
 // WithRetryPolicy sets the retry policy for the workflow.
 // If provided, in case of workflow failure server will start new workflow execution if needed based on the retry policy.
-func WithRetryPolicy(policy cadence.RetryPolicy) WorkflowStartOption {
+func WithRetryPolicy(policy RetryPolicy) WorkflowStartOption {
 	panic("not implemented")
 }
 
@@ -491,13 +452,13 @@ func WithStart(wfFunc interface{}, args []interface{}, taskList string, timeout 
 }
 
 // WithQueryRejectCondition sets the query behaviour based on workflow state.
-func WithQueryRejectCondition(condition cadence.QueryRejectCondition) WorkflowQueryOption {
+func WithQueryRejectCondition(condition QueryRejectCondition) WorkflowQueryOption {
 	panic("not implemented")
 }
 
 // WithQueryConsistencyLevel sets the consistency level on query.
 // Default: QueryConsistencyLevelEventual
-func WithQueryConsistencyLevel(level cadence.QueryConsistencyLevel) WorkflowQueryOption {
+func WithQueryConsistencyLevel(level QueryConsistencyLevel) WorkflowQueryOption {
 	panic("not implemented")
 }
 

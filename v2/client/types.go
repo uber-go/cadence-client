@@ -112,9 +112,9 @@ type (
 		WorkflowID       string
 		RunID            string
 		WorkflowType     string
+		Status           WorkflowStatus
 		StartTime        time.Time
 		CloseTime        *time.Time
-		CloseStatus      *WorkflowExecutionCloseStatus
 		HistoryLength    int64
 		ParentWorkflowID string
 		ParentRunID      string
@@ -202,15 +202,16 @@ const (
 	WorkflowIdReusePolicyTerminateIfRunning
 )
 
-type WorkflowExecutionCloseStatus int
+type WorkflowStatus int
 
 const (
-	WorkflowExecutionCloseStatusCompleted WorkflowExecutionCloseStatus = iota
-	WorkflowExecutionCloseStatusFailed
-	WorkflowExecutionCloseStatusCanceled
-	WorkflowExecutionCloseStatusTerminated
-	WorkflowExecutionCloseStatusContinuedAsNew
-	WorkflowExecutionCloseStatusTimedOut
+	WorkflowStatusOpen WorkflowStatus = iota
+	WorkflowStatusCompleted
+	WorkflowStatusFailed
+	WorkflowStatusCanceled
+	WorkflowStatusTerminated
+	WorkflowStatusContinuedAsNew
+	WorkflowStatusTimedOut
 )
 
 type PendingActivityState int

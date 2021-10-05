@@ -38,6 +38,9 @@ type (
 
 		// SearchAttributes returns an interface for interacting with cluster search attributes.
 		SearchAttributes() SearchAttributes
+
+		// QueryBuilder returns a query builder to contruct workflow queries
+		QueryBuilder() QueryBuilder
 	}
 
 	// Domains is an interface for interacting with Cadence domains.
@@ -512,5 +515,41 @@ func ResetToEventId(eventId int64) WorkflowResetPoint {
 	panic("not implemented")
 }
 
-type Query interface {
-}
+type (
+	// QueryBuilder allows building worklows queries
+	QueryBuilder interface {
+		// Raw accepts raw SQL query
+		Raw(sql string) Query
+
+		// WorkflowStart constructs query to match workflows on given workflow start time range.
+		// If passed time is nil, it is treated as an open ended interval.
+		WorkflowStart(from, to *time.Time) Query
+		// WorkflowClose constructs query to match workflows on given workflow close time range.
+		// If passed time is nil, it is treated as an open ended interval.
+		WorkflowClose(from, to *time.Time) Query
+		// WorkflowStatus constructs query to match workflows with status in the given collection.
+		WorkflowStatus(in ...WorkflowStatus) Query
+		// WorkflowType constructs query to match workflow with exact worfklow type.
+		WorkflowType(wfType string) Query
+		// SearchAttribute constructs query to match workflow on arbitraty search attribute.
+		SearchAttribute(key string, value interface{}) Query
+
+		// And combines two queries so that both of them has to match the workflow
+		And(a, b Query) Query
+		// Or combines two quries so that only one of them has to match the workflow
+		Or(a, b Query) Query
+		// Not inverts the given query to not match the workflow
+		Not(a Query) Query
+
+		// All combines many queries so that all of them has to match the workflow
+		All(clauses ...Query) Query
+		// Any combines many queries so that any of them has to match the workflow
+		Any(clauses ...Query) Query
+	}
+
+	// Query is a query constructed via QueryBuilder that can be used to query workflows.
+	Query interface{
+		// Validate can check whether constructed query is valid without issuing it to Cadence server.
+		Validate() error
+	}
+)

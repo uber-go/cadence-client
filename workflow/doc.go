@@ -192,13 +192,25 @@ For exact behavior, make sure to read the documentation on functions that you ar
 As an incomplete summary, these actions will all fail immediately, and the associated error returns (possibly within
 a Future) will be a workflow.CanceledError:
 
-  - workflow.ExecuteChildWorkflow (pending a bugfix, see #1234)
   - workflow.Await
   - workflow.Sleep
   - workflow.Timer
 
+Child workflows will:
+
+  - ExecuteChildWorkflow will synchronously fail with a CanceledError if canceled before it is called
+    (pending a bugfix: https://github.com/uber-go/cadence-client/pull/1138)
+  - be canceled if the child workflow is running
+  - wait to complete their future.Get until the child returns, and the future will contain the final result
+    (which may be anything that was returned, not necessarily a CanceledError)
+
 Activities have configurable cancellation behavior.  For workflow.ExecuteActivity and workflow.ExecuteLocalActivity,
-see the activity package's documentation for details.
+see the activity package's documentation for details.  In summary though:
+
+  - ExecuteActivity will synchronously fail with a CanceledError if canceled before it is called
+  - the activity's future.Get will by default return a CanceledError immediately when canceled,
+    unless activityoptions.WaitForCancellation is true
+  - the activity's context will be canceled at the next heartbeat event, or not at all if that does not occur
 
 And actions like this will be completely unaffected:
 

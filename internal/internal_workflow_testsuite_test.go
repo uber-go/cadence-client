@@ -3098,3 +3098,63 @@ func (s *WorkflowTestSuiteUnitTest) Test_AwaitWithTimeout() {
 	_ = env.GetWorkflowResult(&result)
 	s.False(result)
 }
+
+func (s *WorkflowTestSuiteUnitTest) Test_Regression_ExecuteChildWorkflowWithCanceledContext() {
+	// cancelTime of:
+	// - <0 == do not cancel
+	// - 0  == cancel synchronously
+	// - >0 == cancel after waiting that long
+	check := func(cancelTime time.Duration, expected string) {
+		env := s.NewTestWorkflowEnvironment()
+		env.Test(s.T())
+		env.RegisterWorkflowWithOptions(func(ctx Context) error {
+			return Sleep(ctx, time.Minute)
+		}, RegisterWorkflowOptions{Name: "child"})
+		env.RegisterWorkflowWithOptions(func(ctx Context) (string, error) {
+			ctx, cancel := WithCancel(ctx)
+			if cancelTime == 0 {
+				cancel()
+			} else if cancelTime > 0 {
+				Go(ctx, func(ctx Context) {
+					_ = Sleep(ctx, cancelTime)
+					cancel()
+				})
+			}
+
+			ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
+				ExecutionStartToCloseTimeout: 2 * time.Minute,
+				TaskStartToCloseTimeout:      2 * time.Minute,
+			})
+			err := ExecuteChildWorkflow(ctx, "child").Get(ctx, nil)
+
+			if err == nil {
+				return "no err", nil
+			} else if _, ok := err.(*CanceledError); ok {
+				return "canceled", nil
+			}
+			return "unknown: " + err.Error(), nil
+		}, RegisterWorkflowOptions{Name: "parent"})
+
+		env.ExecuteWorkflow("parent")
+		s.True(env.IsWorkflowCompleted())
+		s.NoError(env.GetWorkflowError())
+
+		var result string
+		s.NoError(env.GetWorkflowResult(&result))
+		s.Equal(expected, result)
+	}
+	s.Run("sanity check", func() {
+		// workflow should run the child successfully normally...
+		check(-1, "no err")
+	})
+	s.Run("canceled after child starts", func() {
+		// ... and cancel the child when the child is canceled...
+		check(30*time.Second, "canceled")
+	})
+	s.Run("canceled before child starts", func() {
+		// ... and should not start the child (i.e. be canceled) when canceled before it is started.
+		check(0, "no err") // but it does not!  this is a bug to fix.
+		// this should be:
+		// check(0, "canceled")
+	})
+}

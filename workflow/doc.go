@@ -189,15 +189,16 @@ documentation on functions that change their behavior with a canceled context; i
 behavior, its behavior does not change.
 For exact behavior, make sure to read the documentation on functions that you are calling.
 
-As an incomplete summary, these actions will all fail immediately (or when the activity completes, if WaitForCancellation
-is true), and the associated error returns (possibly within a Future) will be a workflow.CanceledError:
+As an incomplete summary, these actions will all fail immediately, and the associated error returns (possibly within
+a Future) will be a workflow.CanceledError:
 
-  - workflow.ExecuteActivity and workflow.ExecuteLocalActivity
-    (see Activity's documentation for more details on canceled activities)
-  - workflow.ExecuteChildWorkflow
+  - workflow.ExecuteChildWorkflow (pending a bugfix, see #1234)
   - workflow.Await
   - workflow.Sleep
   - workflow.Timer
+
+Activities have configurable cancellation behavior.  For workflow.ExecuteActivity and workflow.ExecuteLocalActivity,
+see the activity package's documentation for details.
 
 And actions like this will be completely unaffected:
 

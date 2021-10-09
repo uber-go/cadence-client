@@ -164,6 +164,9 @@ func (ts *IntegrationTestSuite) SetupTest() {
 
 func (ts *IntegrationTestSuite) TearDownTest() {
 	ts.worker.Stop()
+	// worker shutdown is not synchronous,
+	// give goroutines some time before starting the next so `ts.T().Fail` does not run between tests.
+	time.Sleep(time.Second)
 }
 
 func (ts *IntegrationTestSuite) TestBasic() {

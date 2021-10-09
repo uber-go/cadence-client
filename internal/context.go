@@ -318,6 +318,9 @@ func (c *cancelCtx) String() string {
 // cancel closes c.done, cancels each of c's children, and, if
 // removeFromParent is true, removes c from its parent's children.
 func (c *cancelCtx) cancel(removeFromParent bool, err error) {
+	if err == nil {
+		panic("context: internal error: missing cancel error")
+	}
 	c.mu.Lock()
 	if c.canceled {
 		c.mu.Unlock()
@@ -326,13 +329,6 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 		return
 	}
 	c.canceled = true
-
-	if err == nil {
-		panic("context: internal error: missing cancel error")
-	}
-	if c.err != nil {
-		return // already canceled
-	}
 	c.err = err
 	c.done.Close()
 	for child := range c.children {

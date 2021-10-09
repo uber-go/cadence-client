@@ -330,13 +330,15 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 	}
 	c.canceled = true
 	c.err = err
-	c.done.Close()
 	for child := range c.children {
 		// NOTE: acquiring the child's lock while holding parent's lock.
 		child.cancel(false, err)
 	}
 	c.children = nil
 	c.mu.Unlock()
+
+	// close synchronously calls callbacks which can and do access Err, so we cannot lock during Close
+	c.done.Close()
 
 	if removeFromParent {
 		removeChild(c.Context, c)

@@ -223,6 +223,7 @@ func propagateCancel(parent Context, child canceler) {
 		return // parent is never canceled
 	}
 	if p, ok := parentCancelCtx(parent); ok {
+		p.mu.Lock()
 		if p.err != nil {
 			// parent has already been canceled
 			child.cancel(false, p.err)
@@ -232,6 +233,7 @@ func propagateCancel(parent Context, child canceler) {
 			}
 			p.children[child] = true
 		}
+		p.mu.Unlock()
 	} else {
 		go func() {
 			s := NewSelector(parent)
@@ -269,9 +271,11 @@ func removeChild(parent Context, child canceler) {
 	if !ok {
 		return
 	}
+	p.mu.Lock()
 	if p.children != nil {
 		delete(p.children, child)
 	}
+	p.mu.Unlock()
 }
 
 // A canceler is a context type that can be canceled directly.  The
@@ -296,10 +300,14 @@ type cancelCtx struct {
 }
 
 func (c *cancelCtx) Done() Channel {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.done
 }
 
 func (c *cancelCtx) Err() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.err
 }
 
@@ -318,7 +326,6 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 		return
 	}
 	c.canceled = true
-	c.mu.Unlock()
 
 	if err == nil {
 		panic("context: internal error: missing cancel error")
@@ -333,6 +340,7 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 		child.cancel(false, err)
 	}
 	c.children = nil
+	c.mu.Unlock()
 
 	if removeFromParent {
 		removeChild(c.Context, c)

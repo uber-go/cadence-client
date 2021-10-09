@@ -60,3 +60,34 @@ func TestContext_RaceRegression(t *testing.T) {
 	env.ExecuteWorkflow(wf)
 	assert.NoError(t, env.GetWorkflowError())
 }
+
+func TestContext_RaceRegression_2(t *testing.T) {
+	/*
+		It's apparently also possible to race on adding children while propagating the cancel to children.
+	*/
+	s := WorkflowTestSuite{}
+	s.SetLogger(zaptest.NewLogger(t))
+	env := s.NewTestWorkflowEnvironment()
+	wf := func(ctx Context) error {
+		ctx, cancel := WithCancel(ctx)
+		racyCancel := func(ctx Context) {
+			defer cancel() // defer is necessary as Sleep will never return due to Goexit
+			defer func() {
+				_, ccancel := WithCancel(ctx)
+				cancel()
+				ccancel()
+			}()
+			_ = Sleep(ctx, time.Hour)
+		}
+		// start a handful to increase odds of a race being detected
+		for i := 0; i < 10; i++ {
+			Go(ctx, racyCancel)
+		}
+
+		_ = Sleep(ctx, time.Minute) // die early
+		return nil
+	}
+	env.RegisterWorkflow(wf)
+	env.ExecuteWorkflow(wf)
+	assert.NoError(t, env.GetWorkflowError())
+}

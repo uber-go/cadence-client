@@ -22,7 +22,6 @@ package internal
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -288,7 +287,6 @@ type cancelCtx struct {
 
 	done Channel // closed by the first cancel call.
 
-	mu       sync.Mutex
 	canceled bool
 
 	children map[canceler]bool // set to nil by the first cancel call
@@ -310,16 +308,12 @@ func (c *cancelCtx) String() string {
 // cancel closes c.done, cancels each of c's children, and, if
 // removeFromParent is true, removes c from its parent's children.
 func (c *cancelCtx) cancel(removeFromParent bool, err error) {
-	c.mu.Lock()
 	if c.canceled {
-		c.mu.Unlock()
 		// calling cancel from multiple go routines isn't safe
 		// avoid a data race by only allowing the first call
 		return
 	}
 	c.canceled = true
-	c.mu.Unlock()
-
 	if err == nil {
 		panic("context: internal error: missing cancel error")
 	}

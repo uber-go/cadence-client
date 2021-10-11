@@ -22,57 +22,57 @@
 package util
 
 import (
-    "crypto/rsa"
-    "crypto/x509"
-    "encoding/pem"
-    "fmt"
-    "strings"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
+	"strings"
 )
 
 type KeyType string
 
 const (
-    KeyTypePrivate KeyType = "private key"
+	KeyTypePrivate KeyType = "private key"
 
-    KeyTypePublic KeyType = "public key"
+	KeyTypePublic KeyType = "public key"
 )
 
 func loadRSAKey(keyString []byte, keyType KeyType) (interface{}, error) {
-    block, _ := pem.Decode(keyString)
-    if block == nil || strings.ToLower(block.Type) != strings.ToLower(string(keyType)) {
-        return nil, fmt.Errorf("failed to parse PEM block containing the %s", keyType)
-    }
+	block, _ := pem.Decode(keyString)
+	if block == nil || strings.ToLower(block.Type) != strings.ToLower(string(keyType)) {
+		return nil, fmt.Errorf("failed to parse PEM block containing the %s", keyType)
+	}
 
-    switch keyType {
-    case KeyTypePrivate:
-        key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-        if err != nil {
-            return nil, fmt.Errorf("failed to parse DER encoded %s: %s", keyType, err.Error())
-        }
-        return key, nil
-    case KeyTypePublic:
-        key, err := x509.ParsePKIXPublicKey(block.Bytes)
-        if err != nil {
-            return nil, fmt.Errorf("failed to parse DER encoded %s: %s", keyType, err.Error())
-        }
-        return key, nil
-    default:
-        return nil, fmt.Errorf("invalid Key Type")
-    }
+	switch keyType {
+	case KeyTypePrivate:
+		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse DER encoded %s: %s", keyType, err.Error())
+		}
+		return key, nil
+	case KeyTypePublic:
+		key, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse DER encoded %s: %s", keyType, err.Error())
+		}
+		return key, nil
+	default:
+		return nil, fmt.Errorf("invalid Key Type")
+	}
 }
 
 func LoadRSAPublicKey(key []byte) (*rsa.PublicKey, error) {
-    rsaKey, err := loadRSAKey(key, KeyTypePublic)
-    if err != nil {
-        return nil, err
-    }
-    return rsaKey.(*rsa.PublicKey), err
+	rsaKey, err := loadRSAKey(key, KeyTypePublic)
+	if err != nil {
+		return nil, err
+	}
+	return rsaKey.(*rsa.PublicKey), err
 }
 
 func LoadRSAPrivateKey(key []byte) (*rsa.PrivateKey, error) {
-    rsaKey, err := loadRSAKey(key, KeyTypePrivate)
-    if err != nil {
-        return nil, err
-    }
-    return rsaKey.(*rsa.PrivateKey), err
+	rsaKey, err := loadRSAKey(key, KeyTypePrivate)
+	if err != nil {
+		return nil, err
+	}
+	return rsaKey.(*rsa.PrivateKey), err
 }

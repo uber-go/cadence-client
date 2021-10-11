@@ -33,6 +33,7 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
+	"go.uber.org/zap/zaptest"
 )
 
 type shadowWorkerSuite struct {
@@ -67,6 +68,7 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
+			Logger:   zaptest.NewLogger(s.T()),
 		},
 		registry,
 	)
@@ -97,6 +99,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 		},
 		workerExecutionParameters{
 			TaskList: testTaskList,
+			Logger:   zaptest.NewLogger(s.T()),
 		},
 		newRegistry(),
 	)
@@ -115,6 +118,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
+			Logger:   zaptest.NewLogger(s.T()),
 		},
 		newRegistry(),
 	)
@@ -131,7 +135,9 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 		s.mockService,
 		testDomain,
 		ShadowOptions{},
-		workerExecutionParameters{},
+		workerExecutionParameters{
+			Logger: zaptest.NewLogger(s.T()),
+		},
 		newRegistry(),
 	)
 
@@ -153,6 +159,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
+			Logger:   zaptest.NewLogger(s.T()),
 		},
 		newRegistry(),
 	)
@@ -195,6 +202,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 		},
 		workerExecutionParameters{
 			TaskList: testTaskList,
+			Logger:   zaptest.NewLogger(s.T()),
 		},
 		newRegistry(),
 	)

@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Uber Technologies Inc.
+// Copyright (c) 2017-2021 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,41 +21,33 @@
 package internal
 
 import (
-	"github.com/cristalhq/jwt/v3"
-	"go.uber.org/cadence/internal/common/auth"
-	"go.uber.org/cadence/internal/common/util"
-	"time"
+	"testing"
+
+	"github.com/golang/mock/gomock"
+	"go.uber.org/zap/zaptest"
 )
 
-type JWTAuthProvider struct {
-	PrivateKey []byte
+// A collection of cross-test helpers.
+// When a function is not intended to be used outside a file / suite, consider an instance method or variable instead.
+
+// Creates a new workflow environment with the correct logger / testing.T configured.
+func newTestWorkflowEnv(t *testing.T) *TestWorkflowEnvironment {
+	s := WorkflowTestSuite{}
+	s.SetLogger(zaptest.NewLogger(t))
+	// tally is not set since metrics are not noisy by default, and the test-instance
+	// is largely useless without access to the instance for snapshots.
+	env := s.NewTestWorkflowEnvironment()
+	env.Test(t)
+	return env
 }
 
-func NewAdminJwtAuthorizationProvider(privateKey []byte) auth.AuthorizationProvider {
-	return &JWTAuthProvider{
-		PrivateKey: privateKey,
+// this is the mock for yarpcCallOptions, as gomock requires the num of arguments to be the same.
+// see getYarpcCallOptions for the default case.
+func callOptions() []interface{} {
+	return []interface{}{
+		gomock.Any(), // library version
+		gomock.Any(), // feature version
+		gomock.Any(), // client name
+		gomock.Any(), // feature flags
 	}
-}
-
-func (j *JWTAuthProvider) GetAuthToken() ([]byte, error) {
-	claims := auth.JWTClaims{
-		Admin: true,
-		Iat:   time.Now().Unix(),
-		TTL:   60 * 10,
-	}
-	key, err := util.LoadRSAPrivateKey(j.PrivateKey)
-	if err != nil {
-		return nil, err
-	}
-	signer, err := jwt.NewSignerRS(jwt.RS256, key)
-	if err != nil {
-		return nil, err
-	}
-	builder := jwt.NewBuilder(signer)
-	token, err := builder.Build(claims)
-	if token == nil {
-		return nil, err
-	}
-
-	return token.Raw(), nil
 }

@@ -374,9 +374,9 @@ func (wc *workflowEnvironmentImpl) RegisterCancelHandler(handler func()) {
 func (wc *workflowEnvironmentImpl) ExecuteChildWorkflow(
 	params executeWorkflowParams, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error {
 	if params.workflowID == "" {
-		if wc.workflowInfo.OriginalRunId != ""{
-			params.workflowID = wc.workflowInfo.OriginalRunId + "_" + wc.GenerateSequenceID()	
-		}else{
+		if wc.workflowInfo.OriginalRunId != "" {
+			params.workflowID = wc.workflowInfo.OriginalRunId + "_" + wc.GenerateSequenceID()
+		} else {
 			params.workflowID = wc.workflowInfo.WorkflowExecution.RunID + "_" + wc.GenerateSequenceID()
 		}
 	}

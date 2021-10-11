@@ -24,7 +24,6 @@ package internal
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"reflect"
 	"sync"
@@ -128,7 +127,7 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 	testEvents := []*shared.HistoryEvent{
 		createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 			TaskList: &shared.TaskList{Name: common.StringPtr(taskList)},
-			Input:    testEncodeFunctionArgs(params.DataConverter),
+			Input:    testEncodeFunctionArgs(s.T(), params.DataConverter),
 		}),
 		createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 		createTestEventDecisionTaskStarted(3),
@@ -177,24 +176,24 @@ func sampleWorkflowExecute(ctx Context, input []byte) (result []byte, err error)
 
 // test activity1
 func testActivityByteArgs(ctx context.Context, input []byte) ([]byte, error) {
-	fmt.Println("Executing Activity1")
+	GetActivityLogger(ctx).Info("Executing Activity1")
 	return nil, nil
 }
 
 // test testActivityMultipleArgs
-func testActivityMultipleArgs(context.Context, int, []string, bool) ([]byte, error) {
-	fmt.Println("Executing Activity2")
+func testActivityMultipleArgs(ctx context.Context, _ int, _ []string, _ bool) ([]byte, error) {
+	GetActivityLogger(ctx).Info("Executing Activity2")
 	return nil, nil
 }
 
 // test testActivityMultipleArgsWithStruct
-func testActivityMultipleArgsWithStruct(_ context.Context, i int, s testActivityArg) ([]byte, error) {
-	fmt.Printf("Executing testActivityMultipleArgsWithStruct: %d, %v\n", i, s)
+func testActivityMultipleArgsWithStruct(ctx context.Context, i int, s testActivityArg) ([]byte, error) {
+	GetActivityLogger(ctx).Sugar().Infof("Executing testActivityMultipleArgsWithStruct: %d, %v\n", i, s)
 	return nil, nil
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorker() {
-	worker := createWorkerWithThrottle(s.service, float64(500.0), nil, nil)
+	worker := createWorkerWithThrottle(s.T(), s.service, float64(500.0), nil, nil)
 	err := worker.Start()
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
@@ -202,7 +201,7 @@ func (s *internalWorkerTestSuite) TestCreateWorker() {
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorker_WithDataConverter() {
-	worker := createWorkerWithDataConverter(s.service)
+	worker := createWorkerWithDataConverter(s.T(), s.service)
 	err := worker.Start()
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
@@ -210,7 +209,7 @@ func (s *internalWorkerTestSuite) TestCreateWorker_WithDataConverter() {
 }
 
 func (s *internalWorkerTestSuite) TestCreateShadowWorker() {
-	worker := createShadowWorker(s.service, &ShadowOptions{})
+	worker := createShadowWorker(s.T(), s.service, &ShadowOptions{})
 	s.Nil(worker.workflowWorker)
 	s.Nil(worker.activityWorker)
 	s.Nil(worker.locallyDispatchedActivityWorker)
@@ -222,7 +221,7 @@ func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
 	mockCtrl := gomock.NewController(s.T())
 	service := workflowservicetest.NewMockClient(mockCtrl)
 
-	worker := createWorker(service)
+	worker := createWorker(s.T(), service)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -238,7 +237,7 @@ func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
 
 func (s *internalWorkerTestSuite) TestNoActivitiesOrWorkflows() {
 	t := s.T()
-	w := createWorker(s.service)
+	w := createWorker(s.T(), s.service)
 	w.registry = newRegistry()
 	assert.Empty(t, w.registry.getRegisteredActivities())
 	assert.Empty(t, w.registry.getRegisteredWorkflowTypes())
@@ -266,7 +265,7 @@ func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
 				// log
 			}).Times(2)
 
-		worker := createWorker(service)
+		worker := createWorker(s.T(), service)
 		if tc.isErrFatal {
 			err := worker.Start()
 			assert.Error(t, err, "worker.start() MUST fail when domain is invalid")
@@ -298,7 +297,7 @@ func (s *internalWorkerTestSuite) TestStartShadowWorkerFailWithInvalidOptions() 
 	}
 
 	for _, opt := range invalidOptions {
-		worker := createShadowWorker(s.service, opt)
+		worker := createShadowWorker(s.T(), s.service, opt)
 		err := worker.Start()
 		assert.Error(s.T(), err, "worker.Start() should fail given invalid shadow options")
 	}
@@ -325,19 +324,22 @@ func (m *mockPollForActivityTaskRequest) String() string {
 }
 
 func createWorker(
+	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(service, float64(0.0), nil, nil)
+	return createWorkerWithThrottle(t, service, float64(0.0), nil, nil)
 }
 
 func createShadowWorker(
+	t *testing.T,
 	service *workflowservicetest.MockClient,
 	shadowOptions *ShadowOptions,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(service, float64(0.0), nil, shadowOptions)
+	return createWorkerWithThrottle(t, service, float64(0.0), nil, shadowOptions)
 }
 
 func createWorkerWithThrottle(
+	t *testing.T,
 	service *workflowservicetest.MockClient,
 	activitiesPerSecond float64,
 	dc DataConverter,
@@ -375,6 +377,7 @@ func createWorkerWithThrottle(
 	workerOptions := WorkerOptions{}
 	workerOptions.WorkerActivitiesPerSecond = 20
 	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
+	workerOptions.Logger = zaptest.NewLogger(t)
 	if dc != nil {
 		workerOptions.DataConverter = dc
 	}
@@ -395,9 +398,10 @@ func createWorkerWithThrottle(
 }
 
 func createWorkerWithDataConverter(
+	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(service, float64(0.0), newTestDataConverter(), nil)
+	return createWorkerWithThrottle(t, service, float64(0.0), newTestDataConverter(), nil)
 }
 
 func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions) {
@@ -728,8 +732,7 @@ func TestVariousActivitySchedulingOption(t *testing.T) {
 }
 
 func testVariousActivitySchedulingOption(t *testing.T, wf interface{}) {
-	ts := &WorkflowTestSuite{}
-	env := ts.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	env.RegisterWorkflow(wf)
 	testInternalWorkerRegisterWithTestEnv(env)
 	env.ExecuteWorkflow(wf, []byte{1, 2})
@@ -738,8 +741,7 @@ func testVariousActivitySchedulingOption(t *testing.T, wf interface{}) {
 }
 
 func testVariousActivitySchedulingOptionWithDataConverter(t *testing.T, wf interface{}) {
-	ts := &WorkflowTestSuite{}
-	env := ts.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	env.SetWorkerOptions(WorkerOptions{DataConverter: newTestDataConverter()})
 	env.RegisterWorkflow(wf)
 	testInternalWorkerRegisterWithTestEnv(env)
@@ -806,7 +808,7 @@ func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataC
 		fn: func(arg1 int) (err error) {
 			return NewCustomError("testReason", "testStringDetails")
 		}}
-	_, e := a1.Execute(ctx, testEncodeFunctionArgs(dataConverter, 1))
+	_, e := a1.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, 1))
 	require.Error(t, e)
 	errWD := e.(*CustomError)
 	require.Equal(t, "testReason", errWD.Reason())
@@ -819,7 +821,7 @@ func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataC
 		fn: func(arg1 int) (err error) {
 			return NewCustomError("testReason", testErrorDetails{T: "testErrorStack"})
 		}}
-	_, e = a2.Execute(ctx, testEncodeFunctionArgs(dataConverter, 1))
+	_, e = a2.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, 1))
 	require.Error(t, e)
 	errWD = e.(*CustomError)
 	require.Equal(t, "testReason", errWD.Reason())
@@ -832,7 +834,7 @@ func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataC
 		fn: func(arg1 int) (result string, err error) {
 			return "testResult", NewCustomError("testReason", testErrorDetails{T: "testErrorStack3"})
 		}}
-	encResult, e := a3.Execute(ctx, testEncodeFunctionArgs(dataConverter, 1))
+	encResult, e := a3.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, 1))
 	var result string
 	err := dataConverter.FromData(encResult, &result)
 	require.NoError(t, err)
@@ -848,7 +850,7 @@ func testActivityErrorWithDetailsHelper(ctx context.Context, t *testing.T, dataC
 		fn: func(arg1 int) (result string, err error) {
 			return "testResult4", NewCustomError("testReason", "testMultipleString", testErrorDetails{T: "testErrorStack4"})
 		}}
-	encResult, e = a4.Execute(ctx, testEncodeFunctionArgs(dataConverter, 1))
+	encResult, e = a4.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, 1))
 	err = dataConverter.FromData(encResult, &result)
 	require.NoError(t, err)
 	require.Equal(t, "testResult4", result)
@@ -873,7 +875,7 @@ func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataCon
 		fn: func(arg1 int) (err error) {
 			return NewCanceledError("testCancelStringDetails")
 		}}
-	_, e := a1.Execute(ctx, testEncodeFunctionArgs(dataConverter, 1))
+	_, e := a1.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, 1))
 	require.Error(t, e)
 	errWD := e.(*CanceledError)
 	var strDetails string
@@ -885,7 +887,7 @@ func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataCon
 		fn: func(arg1 int) (err error) {
 			return NewCanceledError(testErrorDetails{T: "testCancelErrorStack"})
 		}}
-	_, e = a2.Execute(ctx, testEncodeFunctionArgs(dataConverter, 1))
+	_, e = a2.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, 1))
 	require.Error(t, e)
 	errWD = e.(*CanceledError)
 	var td testErrorDetails
@@ -897,7 +899,7 @@ func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataCon
 		fn: func(arg1 int) (result string, err error) {
 			return "testResult", NewCanceledError(testErrorDetails{T: "testErrorStack3"})
 		}}
-	encResult, e := a3.Execute(ctx, testEncodeFunctionArgs(dataConverter, 1))
+	encResult, e := a3.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, 1))
 	var r string
 	err := dataConverter.FromData(encResult, &r)
 	require.NoError(t, err)
@@ -912,7 +914,7 @@ func testActivityCancelledErrorHelper(ctx context.Context, t *testing.T, dataCon
 		fn: func(arg1 int) (result string, err error) {
 			return "testResult4", NewCanceledError("testMultipleString", testErrorDetails{T: "testErrorStack4"})
 		}}
-	encResult, e = a4.Execute(ctx, testEncodeFunctionArgs(dataConverter, 1))
+	encResult, e = a4.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, 1))
 	err = dataConverter.FromData(encResult, &r)
 	require.NoError(t, err)
 	require.Equal(t, "testResult4", r)
@@ -935,7 +937,7 @@ func testActivityExecutionVariousTypesHelper(ctx context.Context, t *testing.T, 
 		fn: func(ctx context.Context, arg1 string) (*testWorkflowResult, error) {
 			return &testWorkflowResult{V: 1}, nil
 		}}
-	encResult, e := a1.Execute(ctx, testEncodeFunctionArgs(dataConverter, "test"))
+	encResult, e := a1.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, "test"))
 	require.NoError(t, e)
 	var r *testWorkflowResult
 	err := dataConverter.FromData(encResult, &r)
@@ -946,7 +948,7 @@ func testActivityExecutionVariousTypesHelper(ctx context.Context, t *testing.T, 
 		fn: func(ctx context.Context, arg1 *testWorkflowResult) (*testWorkflowResult, error) {
 			return &testWorkflowResult{V: 2}, nil
 		}}
-	encResult, e = a2.Execute(ctx, testEncodeFunctionArgs(dataConverter, r))
+	encResult, e = a2.Execute(ctx, testEncodeFunctionArgs(t, dataConverter, r))
 	require.NoError(t, e)
 	err = dataConverter.FromData(encResult, &r)
 	require.NoError(t, err)
@@ -1146,10 +1148,10 @@ func _TestThriftEncoding(t *testing.T) {
 */
 
 // Encode function args
-func testEncodeFunctionArgs(dataConverter DataConverter, args ...interface{}) []byte {
+func testEncodeFunctionArgs(t *testing.T, dataConverter DataConverter, args ...interface{}) []byte {
 	input, err := encodeArgs(dataConverter, args)
 	if err != nil {
-		fmt.Println(err)
+		t.Error(err)
 		panic("Failed to encode arguments")
 	}
 	return input

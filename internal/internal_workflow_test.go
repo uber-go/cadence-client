@@ -32,7 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/internal/common/metrics"
-	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 type WorkflowUnitTest struct {
@@ -48,6 +48,9 @@ func (s *WorkflowUnitTest) SetupSuite() {
 		HeartbeatTimeout:       20 * time.Second,
 	}
 }
+func (s *WorkflowUnitTest) SetupTest() {
+	s.SetLogger(zaptest.NewLogger(s.T()))
+}
 
 func TestWorkflowUnitTest(t *testing.T) {
 	suite.Run(t, new(WorkflowUnitTest))
@@ -58,7 +61,7 @@ func worldWorkflow(ctx Context, input string) (result string, err error) {
 }
 
 func (s *WorkflowUnitTest) Test_WorldWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.ExecuteWorkflow(worldWorkflow, "Hello")
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -95,7 +98,7 @@ type key int
 const unitTestKey key = 1
 
 func (s *WorkflowUnitTest) Test_SingleActivityWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	ctx := context.WithValue(context.Background(), unitTestKey, s)
 	env.SetWorkerOptions(WorkerOptions{BackgroundActivityContext: ctx})
 	env.RegisterActivity(helloWorldAct)
@@ -165,7 +168,7 @@ func returnPanicWorkflow(ctx Context) (err error) {
 }
 
 func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.RegisterWorkflowWithOptions(splitJoinActivityWorkflow, RegisterWorkflowOptions{Name: "splitJoinActivityWorkflow"})
 	env.RegisterActivityWithOptions(testAct, RegisterActivityOptions{Name: "testActivityWithOptions"})
 	env.OnActivity(testAct, mock.Anything).Return(func(ctx context.Context) (string, error) {
@@ -199,9 +202,7 @@ func (s *WorkflowUnitTest) Test_SplitJoinActivityWorkflow() {
 }
 
 func TestWorkflowPanic(t *testing.T) {
-	ts := &WorkflowTestSuite{}
-	ts.SetLogger(zap.NewNop()) // this test simulate panic, use nop logger to avoid logging noise
-	env := ts.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	env.RegisterActivity(testAct)
 	env.ExecuteWorkflow(splitJoinActivityWorkflow, true)
 	require.True(t, env.IsWorkflowCompleted())
@@ -212,9 +213,7 @@ func TestWorkflowPanic(t *testing.T) {
 }
 
 func TestWorkflowReturnsPanic(t *testing.T) {
-	ts := &WorkflowTestSuite{}
-	ts.SetLogger(zap.NewNop()) // this test simulate panic, use nop logger to avoid logging noise
-	env := ts.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	env.ExecuteWorkflow(returnPanicWorkflow)
 	require.True(t, env.IsWorkflowCompleted())
 	require.NotNil(t, env.GetWorkflowError())
@@ -229,7 +228,7 @@ func testClockWorkflow(ctx Context) (time.Time, error) {
 }
 
 func (s *WorkflowUnitTest) Test_ClockWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.ExecuteWorkflow(testClockWorkflow)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -284,8 +283,7 @@ func (w *testTimerWorkflow) Execute(ctx Context, input []byte) (result []byte, e
 }
 
 func TestTimerWorkflow(t *testing.T) {
-	ts := &WorkflowTestSuite{}
-	env := ts.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	w := &testTimerWorkflow{t: t}
 	env.RegisterWorkflow(w.Execute)
 	env.ExecuteWorkflow(w.Execute, []byte{1, 2})
@@ -335,8 +333,7 @@ func (w *testActivityCancelWorkflow) Execute(ctx Context, input []byte) (result 
 }
 
 func TestActivityCancellation(t *testing.T) {
-	ts := &WorkflowTestSuite{}
-	env := ts.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	env.RegisterActivity(testAct)
 	w := &testActivityCancelWorkflow{t: t}
 	env.RegisterWorkflow(w.Execute)
@@ -394,7 +391,7 @@ func greetingsWorkflow(ctx Context) (result string, err error) {
 }
 
 func (s *WorkflowUnitTest) Test_ExternalExampleWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.RegisterActivity(getGreetingActivity)
 	env.RegisterActivity(getNameActivity)
 	env.RegisterActivity(sayGreetingActivity)
@@ -413,7 +410,7 @@ func continueAsNewWorkflowTest(ctx Context) error {
 }
 
 func (s *WorkflowUnitTest) Test_ContinueAsNewWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.ExecuteWorkflow(continueAsNewWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NotNil(env.GetWorkflowError())
@@ -432,7 +429,7 @@ func cancelWorkflowTest(ctx Context) (string, error) {
 }
 
 func (s *WorkflowUnitTest) Test_CancelWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
 	}, time.Hour)
@@ -469,7 +466,7 @@ func cancelWorkflowAfterActivityTest(ctx Context) ([]byte, error) {
 }
 
 func (s *WorkflowUnitTest) Test_CancelWorkflowAfterActivity() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
 	}, time.Hour)
@@ -540,7 +537,7 @@ func (s *WorkflowUnitTest) Test_SignalWorkflow() {
 		"Sig2Value7;",
 		"Sig3Value1;",
 	}
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 
 	// Setup signals.
 	for i := 0; i < 2; i++ {
@@ -651,6 +648,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_ShouldLogMetricsAndNotPa
 	scope, closer, reporter := metrics.NewTaggedMetricsScope()
 	s.SetMetricsScope(scope)
 	env := s.NewTestWorkflowEnvironment()
+	env.Test(s.T())
 
 	// Setup signals.
 	env.RegisterDelayedCallback(func() {
@@ -684,6 +682,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_OnSelectorRead_ShouldLog
 	scope, closer, reporter := metrics.NewTaggedMetricsScope()
 	s.SetMetricsScope(scope)
 	env := s.NewTestWorkflowEnvironment()
+	env.Test(s.T())
 
 	// Setup signals.
 	env.RegisterDelayedCallback(func() {
@@ -717,6 +716,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_ReceiveAsync_ShouldLogMe
 	scope, closer, reporter := metrics.NewTaggedMetricsScope()
 	s.SetMetricsScope(scope)
 	env := s.NewTestWorkflowEnvironment()
+	env.Test(s.T())
 
 	env.ExecuteWorkflow(receiveAsyncCorruptSignalWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
@@ -735,7 +735,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalWorkflow_ReceiveAsync_ShouldLogMe
 }
 
 func (s *WorkflowUnitTest) Test_CorruptedSignalOnClosedChannelWorkflow_ReceiveAsync_ShouldComplete() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 
 	env.ExecuteWorkflow(receiveAsyncCorruptSignalOnClosedChannelWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
@@ -747,7 +747,7 @@ func (s *WorkflowUnitTest) Test_CorruptedSignalOnClosedChannelWorkflow_ReceiveAs
 }
 
 func (s *WorkflowUnitTest) Test_CorruptedSignalOnClosedChannelWorkflow_Receive_ShouldComplete() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 
 	// Setup signals.
 	env.RegisterDelayedCallback(func() {
@@ -777,7 +777,7 @@ func closeChannelTest(ctx Context) error {
 }
 
 func (s *WorkflowUnitTest) Test_CloseChannelWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.ExecuteWorkflow(closeChannelTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -809,7 +809,7 @@ func closeChannelInSelectTest(ctx Context) error {
 }
 
 func (s *WorkflowUnitTest) Test_CloseChannelInSelectWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.ExecuteWorkflow(closeChannelInSelectTest)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -834,7 +834,7 @@ func bufferedChanWorkflowTest(ctx Context, bufferSize int) error {
 func (s *WorkflowUnitTest) Test_BufferedChanWorkflow() {
 	bufferSizeList := []int{1, 5}
 	for _, bufferSize := range bufferSizeList {
-		env := s.NewTestWorkflowEnvironment()
+		env := newTestWorkflowEnv(s.T())
 		env.ExecuteWorkflow(bufferedChanWorkflowTest, bufferSize)
 		s.True(env.IsWorkflowCompleted())
 		s.NoError(env.GetWorkflowError())
@@ -885,7 +885,8 @@ func bufferedChanWithSelectorWorkflowTest(ctx Context, bufferSize int) error {
 func (s *WorkflowUnitTest) Test_BufferedChanWithSelectorWorkflow() {
 	bufferSizeList := []int{1, 5}
 	for _, bufferSize := range bufferSizeList {
-		env := s.NewTestWorkflowEnvironment()
+		bufferSize := bufferSize
+		env := newTestWorkflowEnv(s.T())
 		env.ExecuteWorkflow(bufferedChanWithSelectorWorkflowTest, bufferSize)
 		s.True(env.IsWorkflowCompleted())
 		s.NoError(env.GetWorkflowError())
@@ -910,7 +911,7 @@ func activityOptionsWorkflow(ctx Context) (result string, err error) {
 // Test that activity options are correctly spawned with WithActivityOptions is called.
 // See https://github.com/uber-go/cadence-client/issues/372
 func (s *WorkflowUnitTest) Test_ActivityOptionsWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.ExecuteWorkflow(activityOptionsWorkflow)
 	s.True(env.IsWorkflowCompleted())
 	s.NoError(env.GetWorkflowError())
@@ -935,7 +936,7 @@ func getMemoTest(ctx Context) (result string, err error) {
 }
 
 func (s *WorkflowUnitTest) Test_MemoWorkflow() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	memo := map[string]interface{}{
 		memoTestKey: memoTestVal,
 	}
@@ -1114,7 +1115,7 @@ func waitGroupNegativeCounterPanicsWorkflowTest(ctx Context) (int, error) {
 }
 
 func (s *WorkflowUnitTest) Test_waitGroupNegativeCounterPanicsWorkflowTest() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.RegisterWorkflow(waitGroupNegativeCounterPanicsWorkflowTest)
 	env.ExecuteWorkflow(waitGroupNegativeCounterPanicsWorkflowTest)
 	s.True(env.IsWorkflowCompleted())
@@ -1125,7 +1126,7 @@ func (s *WorkflowUnitTest) Test_waitGroupNegativeCounterPanicsWorkflowTest() {
 }
 
 func (s *WorkflowUnitTest) Test_WaitGroupMultipleConcurrentWaitsPanicsWorkflowTest() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.RegisterWorkflow(waitGroupMultipleConcurrentWaitsPanicsWorkflowTest)
 	env.RegisterWorkflow(sleepWorkflow)
 	env.ExecuteWorkflow(waitGroupMultipleConcurrentWaitsPanicsWorkflowTest)
@@ -1137,7 +1138,7 @@ func (s *WorkflowUnitTest) Test_WaitGroupMultipleConcurrentWaitsPanicsWorkflowTe
 }
 
 func (s *WorkflowUnitTest) Test_WaitGroupMultipleWaitsWorkflowTest() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.RegisterWorkflow(waitGroupMultipleWaitsWorkflowTest)
 	env.RegisterWorkflow(sleepWorkflow)
 	env.ExecuteWorkflow(waitGroupMultipleWaitsWorkflowTest)
@@ -1150,7 +1151,7 @@ func (s *WorkflowUnitTest) Test_WaitGroupMultipleWaitsWorkflowTest() {
 }
 
 func (s *WorkflowUnitTest) Test_WaitGroupWaitForMWorkflowTest() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.RegisterWorkflow(waitGroupWaitForMWorkflowTest)
 	env.RegisterWorkflow(sleepWorkflow)
 
@@ -1166,7 +1167,7 @@ func (s *WorkflowUnitTest) Test_WaitGroupWaitForMWorkflowTest() {
 }
 
 func (s *WorkflowUnitTest) Test_WaitGroupWorkflowTest() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	env.RegisterWorkflow(waitGroupWorkflowTest)
 	env.RegisterWorkflow(sleepWorkflow)
 
@@ -1182,7 +1183,7 @@ func (s *WorkflowUnitTest) Test_WaitGroupWorkflowTest() {
 }
 
 func (s *WorkflowUnitTest) Test_StaleGoroutinesAreShutDown() {
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(s.T())
 	deferred := make(chan struct{})
 	after := make(chan struct{})
 	wf := func(ctx Context) error {
@@ -1207,14 +1208,18 @@ func (s *WorkflowUnitTest) Test_StaleGoroutinesAreShutDown() {
 	maxWait := time.NewTimer(time.Second)
 	defer maxWait.Stop()
 	select {
-	case <-deferred: s.T().Logf("deferred callback executed after %v", time.Now().Sub(started))
-	case <-maxWait.C: s.Fail("deferred func should have been called within 1 second")
+	case <-deferred:
+		s.T().Logf("deferred callback executed after %v", time.Now().Sub(started))
+	case <-maxWait.C:
+		s.Fail("deferred func should have been called within 1 second")
 	}
 	// if deferred code has run, this has already occurred-or-not.
 	// if it timed out waiting for the deferred code, it has waited long enough, and this is mostly a curiosity.
 	select {
-	case <-after: s.Fail("code after sleep should not have run")
-	default: s.T().Log("code after sleep correctly not executed")
+	case <-after:
+		s.Fail("code after sleep should not have run")
+	default:
+		s.T().Log("code after sleep correctly not executed")
 	}
 }
 

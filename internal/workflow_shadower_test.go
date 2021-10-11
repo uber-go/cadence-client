@@ -66,7 +66,7 @@ func (s *workflowShadowerSuite) SetupTest() {
 	// register test workflow
 	s.testShadower.RegisterWorkflow(testReplayWorkflow)
 
-	s.testWorkflowHistory = getTestReplayWorkflowFullHistory()
+	s.testWorkflowHistory = getTestReplayWorkflowFullHistory(s.T())
 
 	s.testTimestamp = time.Now()
 }
@@ -358,7 +358,7 @@ func (s *workflowShadowerSuite) TestShadowWorker_ReplayFailed() {
 		History: s.testWorkflowHistory,
 	}, nil).Times(successfullyReplayed)
 	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.GetWorkflowExecutionHistoryResponse{
-		History: getTestReplayWorkflowMismatchHistory(),
+		History: getTestReplayWorkflowMismatchHistory(s.T()),
 	}, nil).Times(1)
 
 	s.Error(s.testShadower.shadowWorker())
@@ -378,7 +378,7 @@ func (s *workflowShadowerSuite) TestShadowWorker_ExpectedReplayError() {
 					createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 						WorkflowType: &shared.WorkflowType{Name: common.StringPtr("testWorkflow")},
 						TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
-						Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+						Input:        testEncodeFunctionArgs(s.T(), getDefaultDataConverter()),
 						CronSchedule: common.StringPtr("* * * * *"),
 					}),
 				},

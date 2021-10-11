@@ -32,8 +32,7 @@ import (
 
 func TestSetMemoOnStart(t *testing.T) {
 	t.Parallel()
-	testSuite := &WorkflowTestSuite{}
-	env := testSuite.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 
 	memo := map[string]interface{}{
 		"key": make(chan int),
@@ -52,8 +51,7 @@ func TestSetMemoOnStart(t *testing.T) {
 
 func TestSetSearchAttributesOnStart(t *testing.T) {
 	t.Parallel()
-	testSuite := &WorkflowTestSuite{}
-	env := testSuite.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 
 	invalidSearchAttr := map[string]interface{}{
 		"key": make(chan int),
@@ -71,8 +69,7 @@ func TestSetSearchAttributesOnStart(t *testing.T) {
 
 func TestUnregisteredActivity(t *testing.T) {
 	t.Parallel()
-	testSuite := &WorkflowTestSuite{}
-	env := testSuite.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	workflow := func(ctx Context) error {
 		ctx = WithActivityOptions(ctx, ActivityOptions{
 			ScheduleToStartTimeout: time.Minute,
@@ -89,8 +86,7 @@ func TestUnregisteredActivity(t *testing.T) {
 }
 
 func TestNoExplicitRegistrationRequired(t *testing.T) {
-	testSuite := &WorkflowTestSuite{}
-	env := testSuite.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	activity := func(ctx context.Context, arg string) (string, error) { return arg + " World!", nil }
 	env.RegisterActivity(activity)
 	env.ExecuteWorkflow(func(ctx Context, arg1 string) (string, error) {
@@ -114,8 +110,7 @@ func TestNoExplicitRegistrationRequired(t *testing.T) {
 }
 
 func TestWorkflowReturnNil(t *testing.T) {
-	testSuite := &WorkflowTestSuite{}
-	env := testSuite.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 
 	var isExecuted bool
 	testWF := func(ctx Context) error {

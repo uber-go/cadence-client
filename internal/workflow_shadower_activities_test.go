@@ -60,11 +60,12 @@ func (s *workflowShadowerActivitiesSuite) SetupTest() {
 
 	s.controller = gomock.NewController(s.T())
 	s.mockService = workflowservicetest.NewMockClient(s.controller)
+	s.SetLogger(zaptest.NewLogger(s.T()))
 
 	s.env = s.NewTestActivityEnvironment()
 	s.testReplayer = NewWorkflowReplayer()
 	s.testReplayer.RegisterWorkflow(testReplayWorkflow)
-	s.testWorkflowHistory = getTestReplayWorkflowFullHistory()
+	s.testWorkflowHistory = getTestReplayWorkflowFullHistory(s.T())
 
 	activityContext := context.Background()
 	activityContext = context.WithValue(activityContext, serviceClientContextKey, s.mockService)
@@ -226,7 +227,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Ra
 	numSkipped := int32(0)
 	numExecutions := 100
 
-	mismatchWorkflowHistory := getTestReplayWorkflowMismatchHistory()
+	mismatchWorkflowHistory := getTestReplayWorkflowMismatchHistory(s.T())
 	for i := 0; i != numExecutions; i++ {
 		switch rand.Intn(3) {
 		case 0:
@@ -259,7 +260,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Ra
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_WorkflowNotRegistered() {
 	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.GetWorkflowExecutionHistoryResponse{
-		History: getTestReplayWorkflowLocalActivityHistory(), // this workflow type is not registered
+		History: getTestReplayWorkflowLocalActivityHistory(s.T()), // this workflow type is not registered
 	}, nil).Times(1)
 
 	params := newTestReplayWorkflowActivityParams(5)

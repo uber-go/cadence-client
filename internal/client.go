@@ -337,7 +337,7 @@ type (
 		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
 		FeatureFlags       FeatureFlags
-		Authorization 	   auth.AuthorizationProvider
+		Authorization      auth.AuthorizationProvider
 	}
 
 	// StartWorkflowOptions configuration parameters for starting a workflow execution.
@@ -544,7 +544,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	} else {
 		tracer = opentracing.NoopTracer{}
 	}
-	if options != nil && options.Authorization != nil{
+	if options != nil && options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
@@ -574,7 +574,7 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 		metricScope = options.MetricsScope
 	}
 	metricScope = tagScope(metricScope, tagDomain, "domain-client", clientImplHeaderName, clientImplHeaderValue)
-	if options != nil && options.Authorization != nil{
+	if options != nil && options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)

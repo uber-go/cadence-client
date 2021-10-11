@@ -42,6 +42,7 @@ import (
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/goleak"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 const (
@@ -115,11 +116,11 @@ func getWorkflowInfoWorkflowFunc(ctx Context, expectedLastCompletionResult strin
 
 // Test suite.
 func (t *TaskHandlersTestSuite) SetupTest() {
+	t.logger = zaptest.NewLogger(t.T())
 }
 
 func (t *TaskHandlersTestSuite) SetupSuite() {
-	logger, _ := zap.NewDevelopment()
-	t.logger = logger
+	t.logger = zaptest.NewLogger(t.T())
 	registerWorkflows(t.registry)
 }
 
@@ -1502,9 +1503,9 @@ func (t *TaskHandlersTestSuite) TestRegression_QueriesDoNotLeakGoroutines() {
 
 	taskList := "tl1"
 	params := workerExecutionParameters{
-		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		TaskList:               taskList,
+		Identity:               "test-id-1",
+		Logger:                 t.logger,
 		DisableStickyExecution: false,
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)

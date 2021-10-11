@@ -69,12 +69,12 @@ func (s *workflowReplayerSuite) SetupTest() {
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full() {
-	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowFullHistory())
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowFullHistory(s.T()))
 	s.NoError(err)
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full_ResultMisMatch() {
-	fullHistory := getTestReplayWorkflowFullHistory()
+	fullHistory := getTestReplayWorkflowFullHistory(s.T())
 	completedEvent := fullHistory.Events[len(fullHistory.Events)-1]
 	s.Equal(shared.EventTypeWorkflowExecutionCompleted, completedEvent.GetEventType())
 	completedEvent.WorkflowExecutionCompletedEventAttributes.Result = []byte("some random result")
@@ -84,7 +84,7 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full_ResultMisMatch() 
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full_ContinueAsNew() {
-	fullHistory := getTestReplayWorkflowFullHistory()
+	fullHistory := getTestReplayWorkflowFullHistory(s.T())
 	completedEventIdx := len(fullHistory.Events) - 1
 	s.Equal(shared.EventTypeWorkflowExecutionCompleted, fullHistory.Events[completedEventIdx].GetEventType())
 	fullHistory.Events[completedEventIdx] = createTestEventWorkflowExecutionContinuedAsNew(int64(completedEventIdx+1), nil)
@@ -94,32 +94,32 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Full_ContinueAsNew() {
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Partial_WithDecisionEvents() {
-	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowPartialHistoryWithDecisionEvents())
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowPartialHistoryWithDecisionEvents(s.T()))
 	s.NoError(err)
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Partial_NoDecisionEvents() {
-	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowPartialHistoryNoDecisionEvents())
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowPartialHistoryNoDecisionEvents(s.T()))
 	s.NoError(err)
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_LocalActivity() {
-	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowLocalActivityHistory())
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowLocalActivityHistory(s.T()))
 	s.NoError(err)
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_LocalActivity_Result_Mismatch() {
-	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowLocalActivityResultMismatchHistory())
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowLocalActivityResultMismatchHistory(s.T()))
 	s.Error(err)
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_LocalActivity_Activity_Type_Mismatch() {
-	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowLocalActivityTypeMismatchHistory())
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowLocalActivityTypeMismatchHistory(s.T()))
 	s.Error(err)
 }
 
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_ContextPropagator() {
-	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowContextPropagatorHistory())
+	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowContextPropagatorHistory(s.T()))
 	s.NoError(err)
 }
 
@@ -292,13 +292,13 @@ func (w localActivitiesCallingOptionsWorkflow) Execute(ctx Context, input []byte
 	return []byte("Done"), nil
 }
 
-func getTestReplayWorkflowFullHistory() *shared.History {
+func getTestReplayWorkflowFullHistory(t *testing.T) *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+				Input:        testEncodeFunctionArgs(t, getDefaultDataConverter()),
 			}),
 			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
@@ -328,13 +328,13 @@ func getTestReplayWorkflowFullHistory() *shared.History {
 	}
 }
 
-func getTestReplayWorkflowPartialHistoryWithDecisionEvents() *shared.History {
+func getTestReplayWorkflowPartialHistoryWithDecisionEvents(t *testing.T) *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+				Input:        testEncodeFunctionArgs(t, getDefaultDataConverter()),
 			}),
 			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
@@ -348,13 +348,13 @@ func getTestReplayWorkflowPartialHistoryWithDecisionEvents() *shared.History {
 	}
 }
 
-func getTestReplayWorkflowPartialHistoryNoDecisionEvents() *shared.History {
+func getTestReplayWorkflowPartialHistoryNoDecisionEvents(t *testing.T) *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+				Input:        testEncodeFunctionArgs(t, getDefaultDataConverter()),
 			}),
 			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
@@ -365,13 +365,13 @@ func getTestReplayWorkflowPartialHistoryNoDecisionEvents() *shared.History {
 	}
 }
 
-func getTestReplayWorkflowMismatchHistory() *shared.History {
+func getTestReplayWorkflowMismatchHistory(t *testing.T) *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflow")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr("taskList")},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+				Input:        testEncodeFunctionArgs(t, getDefaultDataConverter()),
 			}),
 			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
@@ -385,13 +385,13 @@ func getTestReplayWorkflowMismatchHistory() *shared.History {
 	}
 }
 
-func getTestReplayWorkflowLocalActivityHistory() *shared.History {
+func getTestReplayWorkflowLocalActivityHistory(t *testing.T) *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+				Input:        testEncodeFunctionArgs(t, getDefaultDataConverter()),
 			}),
 			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
@@ -410,13 +410,13 @@ func getTestReplayWorkflowLocalActivityHistory() *shared.History {
 	}
 }
 
-func getTestReplayWorkflowLocalActivityResultMismatchHistory() *shared.History {
+func getTestReplayWorkflowLocalActivityResultMismatchHistory(t *testing.T) *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+				Input:        testEncodeFunctionArgs(t, getDefaultDataConverter()),
 			}),
 			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
@@ -436,13 +436,13 @@ func getTestReplayWorkflowLocalActivityResultMismatchHistory() *shared.History {
 	}
 }
 
-func getTestReplayWorkflowLocalActivityTypeMismatchHistory() *shared.History {
+func getTestReplayWorkflowLocalActivityTypeMismatchHistory(t *testing.T) *shared.History {
 	return &shared.History{
 		Events: []*shared.HistoryEvent{
 			createTestEventWorkflowExecutionStarted(1, &shared.WorkflowExecutionStartedEventAttributes{
 				WorkflowType: &shared.WorkflowType{Name: common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowLocalActivity")},
 				TaskList:     &shared.TaskList{Name: common.StringPtr(testTaskList)},
-				Input:        testEncodeFunctionArgs(getDefaultDataConverter()),
+				Input:        testEncodeFunctionArgs(t, getDefaultDataConverter()),
 			}),
 			createTestEventDecisionTaskScheduled(2, &shared.DecisionTaskScheduledEventAttributes{}),
 			createTestEventDecisionTaskStarted(3),
@@ -461,8 +461,8 @@ func getTestReplayWorkflowLocalActivityTypeMismatchHistory() *shared.History {
 	}
 }
 
-func getTestReplayWorkflowContextPropagatorHistory() *shared.History {
-	history := getTestReplayWorkflowFullHistory()
+func getTestReplayWorkflowContextPropagatorHistory(t *testing.T) *shared.History {
+	history := getTestReplayWorkflowFullHistory(t)
 	history.Events[0].WorkflowExecutionStartedEventAttributes.WorkflowType.Name = common.StringPtr("go.uber.org/cadence/internal.testReplayWorkflowContextPropagator")
 	history.Events[0].WorkflowExecutionStartedEventAttributes.Header = &shared.Header{
 		Fields: map[string][]byte{testHeader: []byte("testValue")},

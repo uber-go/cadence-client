@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
-	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 const (
@@ -58,39 +58,48 @@ var (
 	testErrorDetails4 = testStruct2{"a string", 321, &[]string{"eat", "code"}}
 )
 
+// Creates a new workflow environment with the correct logger configured.
+func newTestActivityEnv(t *testing.T) *TestActivityEnvironment {
+	s := &WorkflowTestSuite{}
+	s.SetLogger(zaptest.NewLogger(t))
+	// same tally note
+	env := s.NewTestActivityEnvironment()
+	return env
+}
+
 func (tes *testErrorStruct) Error() string {
 	return tes.message
 }
 
 func Test_GenericError(t *testing.T) {
 	// test activity error
-	errorActivityFn := func() error {
-		return errors.New("error:foo")
-	}
-	s := &WorkflowTestSuite{}
-	env := s.NewTestActivityEnvironment()
-	env.RegisterActivity(errorActivityFn)
-	_, err := env.ExecuteActivity(errorActivityFn)
-	require.Error(t, err)
-	require.Equal(t, &GenericError{"error:foo"}, err)
-
+	t.Run("activities", func(t *testing.T) {
+		errorActivityFn := func() error {
+			return errors.New("error:foo")
+		}
+		env := newTestActivityEnv(t)
+		env.RegisterActivity(errorActivityFn)
+		_, err := env.ExecuteActivity(errorActivityFn)
+		require.Error(t, err)
+		require.Equal(t, &GenericError{"error:foo"}, err)
+	})
 	// test workflow error
-	errorWorkflowFn := func(ctx Context) error {
-		return errors.New("error:foo")
-	}
-	wfEnv := s.NewTestWorkflowEnvironment()
-	wfEnv.RegisterWorkflow(errorWorkflowFn)
-	wfEnv.ExecuteWorkflow(errorWorkflowFn)
-	err = wfEnv.GetWorkflowError()
-	require.Error(t, err)
-	require.Equal(t, &GenericError{"error:foo"}, err)
+	t.Run("workflows", func(t *testing.T) {
+		errorWorkflowFn := func(ctx Context) error {
+			return errors.New("error:foo")
+		}
+		env := newTestWorkflowEnv(t)
+		env.RegisterWorkflow(errorWorkflowFn)
+		env.ExecuteWorkflow(errorWorkflowFn)
+		err := env.GetWorkflowError()
+		require.Error(t, err)
+		require.Equal(t, &GenericError{"error:foo"}, err)
+	})
 }
 
 func Test_ActivityNotRegistered(t *testing.T) {
 	registeredActivityFn, unregisteredActivitFn := "RegisteredActivity", "UnregisteredActivityFn"
-	s := &WorkflowTestSuite{}
-	s.SetLogger(zap.NewNop())
-	env := s.NewTestActivityEnvironment()
+	env := newTestActivityEnv(t)
 	env.RegisterActivityWithOptions(func() error { return nil }, RegisterActivityOptions{Name: registeredActivityFn})
 	_, err := env.ExecuteActivity(unregisteredActivitFn)
 	require.Error(t, err)
@@ -172,8 +181,7 @@ func Test_CustomError(t *testing.T) {
 	errorActivityFn := func() error {
 		return err0
 	}
-	s := &WorkflowTestSuite{}
-	env := s.NewTestActivityEnvironment()
+	env := newTestActivityEnv(t)
 	env.RegisterActivity(errorActivityFn)
 	_, err := env.ExecuteActivity(errorActivityFn)
 	require.Error(t, err)
@@ -203,7 +211,7 @@ func Test_CustomError(t *testing.T) {
 	errorWorkflowFn := func(ctx Context) error {
 		return err0
 	}
-	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv := newTestWorkflowEnv(t)
 	wfEnv.RegisterWorkflow(errorWorkflowFn)
 	wfEnv.ExecuteWorkflow(errorWorkflowFn)
 	err = wfEnv.GetWorkflowError()
@@ -236,8 +244,7 @@ func Test_CustomError_Pointer(t *testing.T) {
 	errorActivityFn := func() error {
 		return err1
 	}
-	s := &WorkflowTestSuite{}
-	env := s.NewTestActivityEnvironment()
+	env := newTestActivityEnv(t)
 	env.RegisterActivity(errorActivityFn)
 	_, err = env.ExecuteActivity(errorActivityFn)
 	require.Error(t, err)
@@ -265,7 +272,7 @@ func Test_CustomError_Pointer(t *testing.T) {
 	errorWorkflowFn := func(ctx Context) error {
 		return err1
 	}
-	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv := newTestWorkflowEnv(t)
 	wfEnv.RegisterWorkflow(errorWorkflowFn)
 	wfEnv.ExecuteWorkflow(errorWorkflowFn)
 	err = wfEnv.GetWorkflowError()
@@ -280,7 +287,7 @@ func Test_CustomError_Pointer(t *testing.T) {
 	errorWorkflowFn2 := func(ctx Context) error {
 		return err2 // pointer in details
 	}
-	wfEnv = s.NewTestWorkflowEnvironment()
+	wfEnv = newTestWorkflowEnv(t)
 	wfEnv.RegisterWorkflow(errorWorkflowFn2)
 	wfEnv.ExecuteWorkflow(errorWorkflowFn2)
 	err = wfEnv.GetWorkflowError()
@@ -327,8 +334,7 @@ func Test_CanceledError(t *testing.T) {
 	errorActivityFn := func() error {
 		return err0
 	}
-	s := &WorkflowTestSuite{}
-	env := s.NewTestActivityEnvironment()
+	env := newTestActivityEnv(t)
 	env.RegisterActivity(errorActivityFn)
 	_, err := env.ExecuteActivity(errorActivityFn)
 	require.Error(t, err)
@@ -350,7 +356,7 @@ func Test_CanceledError(t *testing.T) {
 	errorWorkflowFn := func(ctx Context) error {
 		return err0
 	}
-	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv := newTestWorkflowEnv(t)
 	wfEnv.RegisterWorkflow(errorWorkflowFn)
 	wfEnv.ExecuteWorkflow(errorWorkflowFn)
 	err = wfEnv.GetWorkflowError()
@@ -475,7 +481,9 @@ func Test_ContinueAsNewError(t *testing.T) {
 		header:   header,
 		ctxProps: []ContextPropagator{NewStringMapPropagator([]string{"test"})},
 	}
+	s.SetLogger(zaptest.NewLogger(t))
 	wfEnv := s.NewTestWorkflowEnvironment()
+	wfEnv.Test(t)
 	wfEnv.RegisterWorkflowWithOptions(continueAsNewWorkflowFn, RegisterWorkflowOptions{
 		Name: continueAsNewWfName,
 	})

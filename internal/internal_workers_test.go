@@ -36,6 +36,7 @@ import (
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 // ActivityTaskHandler never returns response
@@ -122,8 +123,6 @@ func (s *WorkersTestSuite) TestActivityWorkerWithLocalActivityDispatch() {
 
 func (s *WorkersTestSuite) testActivityWorker(useLocallyDispatched bool) {
 	domain := "testDomain"
-	logger, _ := zap.NewDevelopment()
-
 	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, nil)
 	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptions()...).Return(&m.PollForActivityTaskResponse{}, nil).AnyTimes()
 	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).AnyTimes()
@@ -131,7 +130,7 @@ func (s *WorkersTestSuite) testActivityWorker(useLocallyDispatched bool) {
 	executionParameters := workerExecutionParameters{
 		TaskList:                     "testTaskList",
 		MaxConcurrentActivityPollers: 5,
-		Logger:                       logger,
+		Logger:                       zaptest.NewLogger(s.T()),
 	}
 	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler(), useLocallyDispatchedActivityPoller: useLocallyDispatched}
 	a := &greeterActivity{}
@@ -146,7 +145,6 @@ func (s *WorkersTestSuite) testActivityWorker(useLocallyDispatched bool) {
 
 func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	domain := "testDomain"
-	logger, _ := zap.NewDevelopment()
 
 	pats := &m.PollForActivityTaskResponse{
 		TaskToken: []byte("token"),
@@ -176,7 +174,7 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 		TaskList:                        "testTaskList",
 		MaxConcurrentActivityPollers:    5,
 		ConcurrentActivityExecutionSize: 2,
-		Logger:                          logger,
+		Logger:                          zaptest.NewLogger(s.T()),
 		UserContext:                     ctx,
 		UserContextCancel:               cancel,
 		WorkerStopTimeout:               time.Second * 2,
@@ -212,7 +210,7 @@ func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 	executionParameters := workerExecutionParameters{
 		TaskList:                     "testDecisionTaskList",
 		MaxConcurrentDecisionPollers: 5,
-		Logger:                       zap.NewNop(),
+		Logger:                       zaptest.NewLogger(s.T()),
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
@@ -336,7 +334,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 	}).Times(2)
 
 	options := WorkerOptions{
-		Logger:                zap.NewNop(),
+		Logger:                zaptest.NewLogger(s.T()),
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
 	}
@@ -508,7 +506,7 @@ func (s *WorkersTestSuite) TestQueryTask_WorkflowCacheEvicted() {
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions()...).Return(&m.PollForDecisionTaskResponse{}, &m.InternalServiceError{}).AnyTimes()
 
 	options := WorkerOptions{
-		Logger:                zap.NewNop(),
+		Logger:                zaptest.NewLogger(s.T()),
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
 		DataConverter:         dc,
@@ -634,7 +632,7 @@ func (s *WorkersTestSuite) TestMultipleLocalActivities() {
 	}).Times(1)
 
 	options := WorkerOptions{
-		Logger:                zap.NewNop(),
+		Logger:                zaptest.NewLogger(s.T()),
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
 	}
@@ -752,7 +750,7 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 	}).Times(1)
 
 	options := WorkerOptions{
-		Logger:   zap.NewNop(),
+		Logger:   zaptest.NewLogger(s.T()),
 		Identity: "test-worker-identity",
 	}
 	worker := newAggregatedWorker(s.service, domain, taskList, options)
@@ -819,7 +817,7 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 	}
 
 	options := WorkerOptions{
-		Logger:   zap.NewNop(),
+		Logger:   zaptest.NewLogger(s.T()),
 		Identity: "test-worker-identity",
 	}
 

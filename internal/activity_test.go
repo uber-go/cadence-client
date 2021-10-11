@@ -22,7 +22,6 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -54,17 +53,6 @@ func (s *activityTestSuite) TearDownTest() {
 	s.mockCtrl.Finish() // assert mock’s expectations
 }
 
-// this is the mock for yarpcCallOptions, as gomock requires the num of arguments to be the same.
-// see getYarpcCallOptions for the default case.
-func callOptions() []interface{} {
-	return []interface{}{
-		gomock.Any(), // library version
-		gomock.Any(), // feature version
-		gomock.Any(), // client name
-		gomock.Any(), // feature flags
-	}
-}
-
 func (s *activityTestSuite) TestActivityHeartbeat() {
 	ctx, cancel := context.WithCancel(context.Background())
 	invoker := newServiceInvoker([]byte("task-token"), "identity", s.service, cancel, 1, make(chan struct{}), FeatureFlags{})
@@ -86,7 +74,7 @@ func (s *activityTestSuite) TestActivityHeartbeat_InternalError() {
 	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).
 		Return(nil, &shared.InternalServiceError{}).
 		Do(func(ctx context.Context, request *shared.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) {
-			fmt.Println("MOCK RecordActivityTaskHeartbeat executed")
+			s.T().Log("MOCK RecordActivityTaskHeartbeat executed")
 		}).AnyTimes()
 
 	RecordActivityHeartbeat(ctx, "testDetails")

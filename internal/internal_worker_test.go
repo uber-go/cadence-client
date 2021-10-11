@@ -261,7 +261,7 @@ func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
 
 	for _, tc := range testCases {
 		service := workflowservicetest.NewMockClient(mockCtrl)
-		service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions...).Return(nil, tc.domainErr).Do(
+		service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, tc.domainErr).Do(
 			func(ctx context.Context, request *shared.DescribeDomainRequest, opts ...yarpc.CallOption) {
 				// log
 			}).Times(2)
@@ -352,7 +352,7 @@ func createWorkerWithThrottle(
 		},
 	}
 	// mocks
-	service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions...).Return(domainDesc, nil).Do(
+	service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(domainDesc, nil).Do(
 		func(ctx context.Context, request *shared.DescribeDomainRequest, opts ...yarpc.CallOption) {
 			// log
 		}).AnyTimes()
@@ -363,13 +363,13 @@ func createWorkerWithThrottle(
 		expectedActivitiesPerSecond = defaultTaskListActivitiesPerSecond
 	}
 	service.EXPECT().PollForActivityTask(
-		gomock.Any(), ofPollForActivityTaskRequest(expectedActivitiesPerSecond), callOptions...,
+		gomock.Any(), ofPollForActivityTaskRequest(expectedActivitiesPerSecond), callOptions()...,
 	).Return(activityTask, nil).AnyTimes()
-	service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil).AnyTimes()
+	service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).AnyTimes()
 
 	decisionTask := &shared.PollForDecisionTaskResponse{}
-	service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(decisionTask, nil).AnyTimes()
-	service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil).AnyTimes()
+	service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions()...).Return(decisionTask, nil).AnyTimes()
+	service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, nil).AnyTimes()
 
 	// Configure worker options.
 	workerOptions := WorkerOptions{}
@@ -406,15 +406,15 @@ func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions)
 	domain := "testDomain"
 	wfClient := NewClient(mockService, domain, opt)
 	var completedRequest, canceledRequest, failedRequest interface{}
-	mockService.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil).Do(
+	mockService.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).Do(
 		func(ctx context.Context, request *shared.RespondActivityTaskCompletedRequest, opts ...yarpc.CallOption) {
 			completedRequest = request
 		})
-	mockService.EXPECT().RespondActivityTaskCanceled(gomock.Any(), gomock.Any(), callOptions...).Return(nil).Do(
+	mockService.EXPECT().RespondActivityTaskCanceled(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).Do(
 		func(ctx context.Context, request *shared.RespondActivityTaskCanceledRequest, opts ...yarpc.CallOption) {
 			canceledRequest = request
 		})
-	mockService.EXPECT().RespondActivityTaskFailed(gomock.Any(), gomock.Any(), callOptions...).Return(nil).Do(
+	mockService.EXPECT().RespondActivityTaskFailed(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).Do(
 		func(ctx context.Context, request *shared.RespondActivityTaskFailedRequest, opts ...yarpc.CallOption) {
 			failedRequest = request
 		})
@@ -444,15 +444,15 @@ func (s *internalWorkerTestSuite) TestCompleteActivityById() {
 	domain := "testDomain"
 	wfClient := NewClient(mockService, domain, nil)
 	var completedRequest, canceledRequest, failedRequest interface{}
-	mockService.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), gomock.Any(), callOptions...).Return(nil).Do(
+	mockService.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).Do(
 		func(ctx context.Context, request *shared.RespondActivityTaskCompletedByIDRequest, opts ...yarpc.CallOption) {
 			completedRequest = request
 		})
-	mockService.EXPECT().RespondActivityTaskCanceledByID(gomock.Any(), gomock.Any(), callOptions...).Return(nil).Do(
+	mockService.EXPECT().RespondActivityTaskCanceledByID(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).Do(
 		func(ctx context.Context, request *shared.RespondActivityTaskCanceledByIDRequest, opts ...yarpc.CallOption) {
 			canceledRequest = request
 		})
-	mockService.EXPECT().RespondActivityTaskFailedByID(gomock.Any(), gomock.Any(), callOptions...).Return(nil).Do(
+	mockService.EXPECT().RespondActivityTaskFailedByID(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).Do(
 		func(ctx context.Context, request *shared.RespondActivityTaskFailedByIDRequest, opts ...yarpc.CallOption) {
 			failedRequest = request
 		})
@@ -477,7 +477,7 @@ func (s *internalWorkerTestSuite) TestRecordActivityHeartbeat() {
 	var heartbeatRequest *shared.RecordActivityTaskHeartbeatRequest
 	cancelRequested := false
 	heartbeatResponse := shared.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
-	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).Return(&heartbeatResponse, nil).
+	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).Return(&heartbeatResponse, nil).
 		Do(func(ctx context.Context, request *shared.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) {
 			heartbeatRequest = request
 		}).Times(2)
@@ -501,7 +501,7 @@ func (s *internalWorkerTestSuite) TestRecordActivityHeartbeat_WithDataConverter(
 	detail3 := 4
 	encodedDetail, err := dc.ToData(detail1, detail2, detail3)
 	require.Nil(t, err)
-	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).Return(&heartbeatResponse, nil).
+	s.service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).Return(&heartbeatResponse, nil).
 		Do(func(ctx context.Context, request *shared.RecordActivityTaskHeartbeatRequest, opts ...yarpc.CallOption) {
 			heartbeatRequest = request
 			require.Equal(t, encodedDetail, request.Details)
@@ -517,7 +517,7 @@ func (s *internalWorkerTestSuite) TestRecordActivityHeartbeatByID() {
 	var heartbeatRequest *shared.RecordActivityTaskHeartbeatByIDRequest
 	cancelRequested := false
 	heartbeatResponse := shared.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
-	s.service.EXPECT().RecordActivityTaskHeartbeatByID(gomock.Any(), gomock.Any(), callOptions...).Return(&heartbeatResponse, nil).
+	s.service.EXPECT().RecordActivityTaskHeartbeatByID(gomock.Any(), gomock.Any(), callOptions()...).Return(&heartbeatResponse, nil).
 		Do(func(ctx context.Context, request *shared.RecordActivityTaskHeartbeatByIDRequest, opts ...yarpc.CallOption) {
 			heartbeatRequest = request
 		}).Times(2)

@@ -107,7 +107,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
 		Name: common.StringPtr(testDomain),
-	}, callOptions...).Return(nil, &shared.EntityNotExistsError{}).Times(1)
+	}, callOptions()...).Return(nil, &shared.EntityNotExistsError{}).Times(1)
 
 	shadowWorker := newShadowWorker(
 		s.mockService,
@@ -125,7 +125,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() {
 	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
 		Name: common.StringPtr(testDomain),
-	}, callOptions...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
+	}, callOptions()...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
 
 	shadowWorker := newShadowWorker(
 		s.mockService,
@@ -141,11 +141,11 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
 		Name: common.StringPtr(testDomain),
-	}, callOptions...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
+	}, callOptions()...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
 	// first return a retryable error to check if retry policy is configured
-	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(nil, &shared.ServiceBusyError{}).Times(1)
+	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.ServiceBusyError{}).Times(1)
 	// then return a non-retryable error
-	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(nil, &shared.BadRequestError{}).Times(1)
+	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.BadRequestError{}).Times(1)
 
 	shadowWorker := newShadowWorker(
 		s.mockService,
@@ -172,11 +172,11 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 	var startRequest *shared.StartWorkflowExecutionRequest
 	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
 		Name: common.StringPtr(testDomain),
-	}, callOptions...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
+	}, callOptions()...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
 	s.mockService.EXPECT().DescribeDomain(gomock.Any(), &shared.DescribeDomainRequest{
 		Name: common.StringPtr(shadower.LocalDomainName),
-	}, callOptions...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
-	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(
+	}, callOptions()...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
+	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).DoAndReturn(
 		func(_ context.Context, request *shared.StartWorkflowExecutionRequest, _ ...yarpc.CallOption) (*shared.StartWorkflowExecutionResponse, error) {
 			startRequest = request
 			return nil, &shared.WorkflowExecutionAlreadyStartedError{}

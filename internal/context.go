@@ -227,10 +227,12 @@ func propagateCancel(parent Context, child canceler) {
 			// parent has already been canceled
 			child.cancel(false, p.err)
 		} else {
+			p.childrenLock.Lock()
 			if p.children == nil {
 				p.children = make(map[canceler]bool)
 			}
 			p.children[child] = true
+			p.childrenLock.Unlock()
 		}
 	} else {
 		go func() {
@@ -269,6 +271,9 @@ func removeChild(parent Context, child canceler) {
 	if !ok {
 		return
 	}
+
+	p.childrenLock.Lock()
+	defer p.childrenLock.Unlock()
 	if p.children != nil {
 		delete(p.children, child)
 	}
@@ -288,11 +293,12 @@ type cancelCtx struct {
 
 	done Channel // closed by the first cancel call.
 
-	mu       sync.Mutex
-	canceled bool
+	cancelLock sync.Mutex
+	canceled   bool
 
-	children map[canceler]bool // set to nil by the first cancel call
-	err      error             // set to non-nil by the first cancel call
+	childrenLock sync.Mutex
+	children     map[canceler]bool // set to nil by the first cancel call
+	err          error             // set to non-nil by the first cancel call
 }
 
 func (c *cancelCtx) Done() Channel {
@@ -307,18 +313,36 @@ func (c *cancelCtx) String() string {
 	return fmt.Sprintf("%v.WithCancel", c.Context)
 }
 
+func (c *cancelCtx) getChildren() []canceler {
+	c.childrenLock.Lock()
+	defer c.childrenLock.Unlock()
+
+	out := []canceler{}
+	for key := range c.children {
+		out = append(out, key)
+	}
+	return out
+}
+
+func (c *cancelCtx) isValidChild(child canceler) bool {
+	c.childrenLock.Lock()
+	defer c.childrenLock.Unlock()
+	_, ok := c.children[child]
+	return ok
+}
+
 // cancel closes c.done, cancels each of c's children, and, if
 // removeFromParent is true, removes c from its parent's children.
 func (c *cancelCtx) cancel(removeFromParent bool, err error) {
-	c.mu.Lock()
+	c.cancelLock.Lock()
 	if c.canceled {
-		c.mu.Unlock()
+		c.cancelLock.Unlock()
 		// calling cancel from multiple go routines isn't safe
 		// avoid a data race by only allowing the first call
 		return
 	}
 	c.canceled = true
-	c.mu.Unlock()
+	c.cancelLock.Unlock()
 
 	if err == nil {
 		panic("context: internal error: missing cancel error")
@@ -328,9 +352,13 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 	}
 	c.err = err
 	c.done.Close()
-	for child := range c.children {
-		// NOTE: acquiring the child's lock while holding parent's lock.
-		child.cancel(false, err)
+
+	children := c.getChildren()
+	for _, child := range children {
+		if c.isValidChild(child) {
+			// NOTE: acquiring the child's lock while holding parent's lock.
+			child.cancel(false, err)
+		}
 	}
 	c.children = nil
 

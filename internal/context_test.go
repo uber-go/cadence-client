@@ -28,6 +28,47 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// This test aims to check if we have a race when all the parents and children
+// decide to cancel at the same time.
+func TestChildParentCancelRace(t *testing.T) {
+	s := WorkflowTestSuite{}
+	s.SetLogger(zaptest.NewLogger(t))
+	env := s.NewTestWorkflowEnvironment()
+
+	wf := func(ctx Context) error {
+		parentCtx, parentCancel := WithCancel(ctx)
+		defer parentCancel()
+
+		type cancelerContext struct {
+			ctx      Context
+			canceler func()
+		}
+
+		children := []cancelerContext{}
+		numChildren := 100
+
+		for i := 0; i < numChildren; i++ {
+			c, canceler := WithCancel(parentCtx)
+			children = append(children, cancelerContext{
+				ctx:      c,
+				canceler: canceler,
+			})
+		}
+
+		for i := 0; i < numChildren; i++ {
+			go children[i].canceler()
+			if i == numChildren/2 {
+				go parentCancel()
+			}
+		}
+
+		return nil
+	}
+	env.RegisterWorkflow(wf)
+	env.ExecuteWorkflow(wf)
+	assert.NoError(t, env.GetWorkflowError())
+}
+
 func TestContext_RaceRegression(t *testing.T) {
 	/*
 		A race condition existed due to concurrently ending goroutines on shutdown (i.e. closing their chan without waiting

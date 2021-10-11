@@ -28,9 +28,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// This test aims to check if we have a race when all the parents and children
-// decide to cancel at the same time.
-func TestChildParentCancelRace(t *testing.T) {
+func TestContextChildParentCancelRace(t *testing.T) {
+	/*
+		Testing previous race happened while child and parent cancelling at the same time
+		While child is trying to remove itself from the parent, parent tries to iterate
+		its children and cancel them at the same time.
+	*/
 	s := WorkflowTestSuite{}
 	s.SetLogger(zaptest.NewLogger(t))
 	env := s.NewTestWorkflowEnvironment()
@@ -69,7 +72,7 @@ func TestChildParentCancelRace(t *testing.T) {
 	assert.NoError(t, env.GetWorkflowError())
 }
 
-func TestContext_RaceRegression(t *testing.T) {
+func TestContextConcurrentCancelRace(t *testing.T) {
 	/*
 		A race condition existed due to concurrently ending goroutines on shutdown (i.e. closing their chan without waiting
 		on them to finish shutdown), which executed... quite a lot of non-concurrency-safe code in a concurrent way.  All
@@ -84,6 +87,37 @@ func TestContext_RaceRegression(t *testing.T) {
 		ctx, cancel := WithCancel(ctx)
 		racyCancel := func(ctx Context) {
 			defer cancel() // defer is necessary as Sleep will never return due to Goexit
+			_ = Sleep(ctx, time.Hour)
+		}
+		// start a handful to increase odds of a race being detected
+		for i := 0; i < 10; i++ {
+			Go(ctx, racyCancel)
+		}
+
+		_ = Sleep(ctx, time.Minute) // die early
+		return nil
+	}
+	env.RegisterWorkflow(wf)
+	env.ExecuteWorkflow(wf)
+	assert.NoError(t, env.GetWorkflowError())
+}
+
+func TestContextAddChildCancelParentRace(t *testing.T) {
+	/*
+		It's apparently also possible to race on adding children while propagating the cancel to children.
+	*/
+	s := WorkflowTestSuite{}
+	s.SetLogger(zaptest.NewLogger(t))
+	env := s.NewTestWorkflowEnvironment()
+	wf := func(ctx Context) error {
+		ctx, cancel := WithCancel(ctx)
+		racyCancel := func(ctx Context) {
+			defer cancel() // defer is necessary as Sleep will never return due to Goexit
+			defer func() {
+				_, ccancel := WithCancel(ctx)
+				cancel()
+				ccancel()
+			}()
 			_ = Sleep(ctx, time.Hour)
 		}
 		// start a handful to increase odds of a race being detected

@@ -223,7 +223,9 @@ func propagateCancel(parent Context, child canceler) {
 		return // parent is never canceled
 	}
 	if p, ok := parentCancelCtx(parent); ok {
+		p.cancelLock.Lock()
 		if p.err != nil {
+			p.cancelLock.Unlock()
 			// parent has already been canceled
 			child.cancel(false, p.err)
 		} else {
@@ -233,6 +235,7 @@ func propagateCancel(parent Context, child canceler) {
 			}
 			p.children[child] = true
 			p.childrenLock.Unlock()
+			p.cancelLock.Unlock()
 		}
 	} else {
 		go func() {
@@ -342,7 +345,6 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 		return
 	}
 	c.canceled = true
-	c.cancelLock.Unlock()
 
 	if err == nil {
 		panic("context: internal error: missing cancel error")
@@ -351,6 +353,7 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 		return // already canceled
 	}
 	c.err = err
+	c.cancelLock.Unlock()
 	c.done.Close()
 
 	children := c.getChildren()

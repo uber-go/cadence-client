@@ -542,7 +542,6 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	} else {
 		tracer = opentracing.NoopTracer{}
 	}
-
 	return &workflowClient{
 		workflowService:    metrics.NewWorkflowServiceWrapper(service, metricScope),
 		domain:             domain,
@@ -569,7 +568,6 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 		metricScope = options.MetricsScope
 	}
 	metricScope = tagScope(metricScope, tagDomain, "domain-client", clientImplHeaderName, clientImplHeaderValue)
-
 	return &domainClient{
 		workflowService: metrics.NewWorkflowServiceWrapper(service, metricScope),
 		metricsScope:    metricScope,

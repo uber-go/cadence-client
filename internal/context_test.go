@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap/zaptest"
 )
 
 func TestContextChildParentCancelRace(t *testing.T) {
@@ -81,9 +80,7 @@ func TestContextConcurrentCancelRace(t *testing.T) {
 		In principle this must be safe to do - contexts are supposed to be concurrency-safe.  Even if ours are not actually
 		safe (for valid reasons), our execution model needs to ensure they *act* like it's safe.
 	*/
-	s := WorkflowTestSuite{}
-	s.SetLogger(zaptest.NewLogger(t))
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	wf := func(ctx Context) error {
 		ctx, cancel := WithCancel(ctx)
 		racyCancel := func(ctx Context) {

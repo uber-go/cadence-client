@@ -376,7 +376,7 @@ func (_m *Client) QueryWorkflowWithOptions(ctx context.Context, request *client.
 	return r0, r1
 }
 
-func (_m *Client) ResetWorkflow(ctx context.Context, request *s.ResetWorkflowExecutionRequest) (*s.ResetWorkflowExecutionResponse, error){
+func (_m *Client) ResetWorkflow(ctx context.Context, request *s.ResetWorkflowExecutionRequest) (*s.ResetWorkflowExecutionResponse, error) {
 	var _ca []interface{}
 	_ca = append(_ca, ctx, request)
 	ret := _m.Called(_ca...)

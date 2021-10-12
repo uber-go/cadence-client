@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Copyright (c) 2017-2021 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,15 +18,36 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:build tools
-// +build tools
-
-package cadence
+package internal
 
 import (
-	_ "github.com/kisielk/errcheck"
-	_ "go.uber.org/thriftrw"
-	_ "go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc"
-	_ "golang.org/x/lint/golint"
-	_ "honnef.co/go/tools/cmd/staticcheck"
+	"testing"
+
+	"github.com/golang/mock/gomock"
+	"go.uber.org/zap/zaptest"
 )
+
+// A collection of cross-test helpers.
+// When a function is not intended to be used outside a file / suite, consider an instance method or variable instead.
+
+// Creates a new workflow environment with the correct logger / testing.T configured.
+func newTestWorkflowEnv(t *testing.T) *TestWorkflowEnvironment {
+	s := WorkflowTestSuite{}
+	s.SetLogger(zaptest.NewLogger(t))
+	// tally is not set since metrics are not noisy by default, and the test-instance
+	// is largely useless without access to the instance for snapshots.
+	env := s.NewTestWorkflowEnvironment()
+	env.Test(t)
+	return env
+}
+
+// this is the mock for yarpcCallOptions, as gomock requires the num of arguments to be the same.
+// see getYarpcCallOptions for the default case.
+func callOptions() []interface{} {
+	return []interface{}{
+		gomock.Any(), // library version
+		gomock.Any(), // feature version
+		gomock.Any(), // client name
+		gomock.Any(), // feature flags
+	}
+}

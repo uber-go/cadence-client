@@ -50,14 +50,14 @@ type (
 		Register(ctx context.Context, name string, replication DomainReplicationConfig, opts ...DomainRegisterOption) (Domain, error)
 
 		// List retrieves all domains that are registered within Cadence server.
-		List(ctx context.Context, page Page, opts ...DomainListOption) ([]RichDomain, Page, error)
+		List(ctx context.Context, page Page, opts ...DomainListOption) ([]ListedDomain, Page, error)
 
 		// Get selects a domain by a given name for further operations.
 		Get(name string) Domain
 	}
 
-	// RichDomain is a domain that contains additional info.
-	RichDomain interface {
+	// ListedDomain is a domain that was retrieved via List call and contains additional info.
+	ListedDomain interface {
 		Domain
 		Info() DomainInfo
 	}
@@ -96,7 +96,7 @@ type (
 		Count(ctx context.Context, query Query, opts ...WorkflowCountOption) (int64, error)
 
 		// List returns a list of workflow executions based on query.
-		List(ctx context.Context, query Query, page Page, opts ...WorkflowListOption) ([]RichWorkflow, *Page, error)
+		List(ctx context.Context, query Query, page Page, opts ...WorkflowListOption) ([]ListedWorkflow, *Page, error)
 
 		// Get will select a concrete workflow run by a given workflow and run ID for further operations.
 		Get(workflowID, runID string) Workflow
@@ -105,8 +105,8 @@ type (
 		GetCurrent(workflowID string) Workflow
 	}
 
-	// RichWorkflow is a workflow that contains additional info.
-	RichWorkflow interface {
+	// ListedWorkflow is a workflow that was retrieved via List call and contains additional info.
+	ListedWorkflow interface {
 		Workflow
 		Info() WorkflowInfo
 	}
@@ -548,7 +548,7 @@ type (
 	}
 
 	// Query is a query constructed via QueryBuilder that can be used to query workflows.
-	Query interface{
+	Query interface {
 		// Validate can check whether constructed query is valid without issuing it to Cadence server.
 		Validate() error
 	}

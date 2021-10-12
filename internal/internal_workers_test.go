@@ -510,6 +510,15 @@ func (s *WorkersTestSuite) TestQueryTask_WorkflowCacheEvicted() {
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
 		DataConverter:         dc,
+		// set concurrent decision task execution to 1,
+		// otherwise query task may be polled and start execution
+		// before decision task put created workflowContext into the cache,
+		// resulting in a cache hit for query
+		// by setting concurrent execution size to 1, we ensure when polling
+		// query task, cache already contains the workflowContext for this workflow,
+		// and we can force clear the cache when polling the query task.
+		// See the mock function for the second PollForDecisionTask call above.
+		MaxConcurrentDecisionTaskExecutionSize: 1,
 	}
 	worker := newAggregatedWorker(s.service, domain, taskList, options)
 	worker.RegisterWorkflowWithOptions(

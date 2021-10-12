@@ -10,7 +10,7 @@ IMPORT_ROOT := go.uber.org/cadence
 THRIFT_GENDIR := .gen/go
 THRIFTRW_SRC := idls/thrift/cadence.thrift idls/thrift/shadower.thrift
 # one or more thriftrw-generated file(s), to create / depend on generated code
-THRIFTRW_OUT := $(THRIFT_GENDIR)/cadence/idl.go
+THRIFTRW_OUT := $(THRIFT_GENDIR)/cadence/cadence.go
 TEST_ARG ?= -v -race
 
 # general build-product folder, cleaned as part of `make clean`

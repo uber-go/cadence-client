@@ -42,6 +42,7 @@ import (
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/goleak"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 const (
@@ -115,11 +116,11 @@ func getWorkflowInfoWorkflowFunc(ctx Context, expectedLastCompletionResult strin
 
 // Test suite.
 func (t *TaskHandlersTestSuite) SetupTest() {
+	t.logger = zaptest.NewLogger(t.T())
 }
 
 func (t *TaskHandlersTestSuite) SetupSuite() {
-	logger, _ := zap.NewDevelopment()
-	t.logger = logger
+	t.logger = zaptest.NewLogger(t.T())
 	registerWorkflows(t.registry)
 }
 
@@ -1189,7 +1190,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NoError() {
 
 	cancelRequested := false
 	heartbeatResponse := s.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
-	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).Return(&heartbeatResponse, nil)
+	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).Return(&heartbeatResponse, nil)
 
 	cadenceInvoker := &cadenceInvoker{
 		identity:  "Test_Cadence_Invoker",
@@ -1228,8 +1229,8 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_Interleaved() {
 
 	cancelRequested := false
 	heartbeatResponse := s.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
-	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), newHeartbeatRequestMatcher([]byte("1")), callOptions...).Return(&heartbeatResponse, nil).Times(3)
-	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), newHeartbeatRequestMatcher([]byte("2")), callOptions...).Return(&heartbeatResponse, nil).Times(3)
+	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), newHeartbeatRequestMatcher([]byte("1")), callOptions()...).Return(&heartbeatResponse, nil).Times(3)
+	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), newHeartbeatRequestMatcher([]byte("2")), callOptions()...).Return(&heartbeatResponse, nil).Times(3)
 
 	cadenceInvoker := &cadenceInvoker{
 		identity:              "Test_Cadence_Invoker",
@@ -1264,7 +1265,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 	mockService := workflowservicetest.NewMockClient(mockCtrl)
 
 	entityNotExistsError := &s.EntityNotExistsError{}
-	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).Return(nil, entityNotExistsError)
+	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, entityNotExistsError)
 
 	cadenceInvoker := newServiceInvoker(
 		nil,
@@ -1273,7 +1274,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 		func() {},
 		0,
 		make(chan struct{}),
-		featureFlags,
+		FeatureFlags{},
 	)
 
 	heartbeatErr := cadenceInvoker.BatchHeartbeat(nil)
@@ -1287,7 +1288,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveErro
 	mockService := workflowservicetest.NewMockClient(mockCtrl)
 
 	domainNotActiveError := &s.DomainNotActiveError{}
-	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions...).Return(nil, domainNotActiveError)
+	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, domainNotActiveError)
 
 	called := false
 	cancelHandler := func() { called = true }
@@ -1299,7 +1300,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveErro
 		cancelHandler,
 		0,
 		make(chan struct{}),
-		featureFlags,
+		FeatureFlags{},
 	)
 
 	heartbeatErr := cadenceInvoker.BatchHeartbeat(nil)
@@ -1502,9 +1503,9 @@ func (t *TaskHandlersTestSuite) TestRegression_QueriesDoNotLeakGoroutines() {
 
 	taskList := "tl1"
 	params := workerExecutionParameters{
-		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		TaskList:               taskList,
+		Identity:               "test-id-1",
+		Logger:                 t.logger,
 		DisableStickyExecution: false,
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)

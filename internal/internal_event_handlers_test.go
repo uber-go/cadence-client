@@ -165,7 +165,7 @@ func Test_UpsertSearchAttributes(t *testing.T) {
 	t.Parallel()
 	env := &workflowEnvironmentImpl{
 		decisionsHelper: newDecisionsHelper(),
-		workflowInfo:    GetWorkflowInfo(createRootTestContext()),
+		workflowInfo:    GetWorkflowInfo(createRootTestContext(t)),
 	}
 	err := env.UpsertSearchAttributes(nil)
 	require.Error(t, err)

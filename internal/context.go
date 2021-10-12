@@ -327,13 +327,6 @@ func (c *cancelCtx) getChildren() []canceler {
 	return out
 }
 
-func (c *cancelCtx) isValidChild(child canceler) bool {
-	c.childrenLock.Lock()
-	defer c.childrenLock.Unlock()
-	_, ok := c.children[child]
-	return ok
-}
-
 // cancel closes c.done, cancels each of c's children, and, if
 // removeFromParent is true, removes c from its parent's children.
 func (c *cancelCtx) cancel(removeFromParent bool, err error) {
@@ -350,6 +343,7 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 		panic("context: internal error: missing cancel error")
 	}
 	if c.err != nil {
+		c.cancelLock.Unlock()
 		return // already canceled
 	}
 	c.err = err
@@ -358,12 +352,12 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 
 	children := c.getChildren()
 	for _, child := range children {
-		if c.isValidChild(child) {
-			// NOTE: acquiring the child's lock while holding parent's lock.
-			child.cancel(false, err)
-		}
+		// NOTE: acquiring the child's lock while holding parent's lock.
+		child.cancel(false, err)
 	}
+	c.childrenLock.Lock()
 	c.children = nil
+	c.childrenLock.Unlock()
 
 	if removeFromParent {
 		removeChild(c.Context, c)

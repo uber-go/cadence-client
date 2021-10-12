@@ -44,8 +44,21 @@ import (
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/worker"
 	"go.uber.org/yarpc"
+	"go.uber.org/zap/zaptest"
 	"golang.org/x/net/context"
 )
+
+// copied from internal/test_helpers_test.go
+// this is the mock for yarpcCallOptions, as gomock requires the num of arguments to be the same.
+// see getYarpcCallOptions for the default case.
+func callOptions() []interface{} {
+	return []interface{}{
+		gomock.Any(), // library version
+		gomock.Any(), // feature version
+		gomock.Any(), // client name
+		gomock.Any(), // feature flags
+	}
+}
 
 func testReplayWorkflow(ctx internal.Context) error {
 	ao := internal.ActivityOptions{
@@ -85,9 +98,6 @@ func TestWorkersTestSuite(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	suite.Run(t, new(CacheEvictionSuite))
 }
-
-// this is the mock for yarpcCallOptions, make sure length are the same
-var callOptions = []interface{}{gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()}
 
 func createTestEventWorkflowExecutionStarted(eventID int64, attr *m.WorkflowExecutionStartedEventAttributes) *m.HistoryEvent {
 	return &m.HistoryEvent{
@@ -149,25 +159,28 @@ func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
 	cacheSize := 5
 	internal.SetStickyWorkflowCacheSize(cacheSize)
 	// once for workflow worker because we disable activity worker
-	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil).Times(1)
+	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, nil).Times(1)
 	// feed our worker exactly *cacheSize* "legit" decision tasks
 	// these are handcrafted decision tasks that are not blatantly obviously mocks
 	// the goal is to trick our worker into thinking they are real so it
 	// actually goes along with processing these and puts their execution in the cache.
-	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(mockPollForDecisionTask).Times(cacheSize)
+	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions()...).DoAndReturn(mockPollForDecisionTask).Times(cacheSize)
 	// after *cacheSize* "legit" tasks are fed to our worker, start feeding our worker empty responses.
 	// these will get tossed away immediately after polled, but we still need them so gomock doesn't compain about unexpected calls.
 	// this is because our worker's poller doesn't stop, it keeps polling on the service client as long
 	// as Stop() is not called on the worker
-	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, nil).AnyTimes()
+	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions()...).Return(&m.PollForDecisionTaskResponse{}, nil).AnyTimes()
 	// this gets called after polled decision tasks are processed, any number of times doesn't matter
-	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(&m.RespondDecisionTaskCompletedResponse{}, nil).AnyTimes()
+	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(&m.RespondDecisionTaskCompletedResponse{}, nil).AnyTimes()
 	// this is the critical point of the test.
 	// ResetSticky should be called exactly once because our workflow cache evicts when full
 	// so if our worker puts *cacheSize* entries in the cache, it should evict exactly one
-	s.service.EXPECT().ResetStickyTaskList(gomock.Any(), gomock.Any(), callOptions...).DoAndReturn(mockResetStickyTaskList).Times(1)
+	s.service.EXPECT().ResetStickyTaskList(gomock.Any(), gomock.Any(), callOptions()...).DoAndReturn(mockResetStickyTaskList).Times(1)
 
-	workflowWorker := internal.NewWorker(s.service, "test-domain", "tasklist", worker.Options{DisableActivityWorker: true})
+	workflowWorker := internal.NewWorker(s.service, "test-domain", "tasklist", worker.Options{
+		DisableActivityWorker: true,
+		Logger:                zaptest.NewLogger(s.T()),
+	})
 	// this is an arbitrary workflow we use for this test
 	// NOTE: a simple helloworld that doesn't execute an activity
 	// won't work because the workflow will simply just complete

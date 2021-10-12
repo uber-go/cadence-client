@@ -40,7 +40,7 @@ import (
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/goleak"
-	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 type IntegrationTestSuite struct {
@@ -143,17 +143,15 @@ func (ts *IntegrationTestSuite) SetupTest() {
 	ts.seq++
 	ts.activities.clearInvoked()
 	ts.taskListName = fmt.Sprintf("tl-%v", ts.seq)
-	logger, err := zap.NewDevelopment()
-	ts.NoError(err)
 	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, worker.Options{
 		DisableStickyExecution: ts.config.IsStickyOff,
-		Logger:                 logger,
+		Logger:                 zaptest.NewLogger(ts.T()),
 		ContextPropagators:     []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
 	})
 	ts.tracer = newtracingInterceptorFactory()
 	options := worker.Options{
 		DisableStickyExecution:            ts.config.IsStickyOff,
-		Logger:                            logger,
+		Logger:                            zaptest.NewLogger(ts.T()),
 		WorkflowInterceptorChainFactories: []interceptors.WorkflowInterceptorFactory{ts.tracer},
 		ContextPropagators:                []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
 	}
@@ -408,11 +406,9 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 }
 
 func (ts *IntegrationTestSuite) TestActivityCancelUsingReplay() {
-	logger, err := zap.NewDevelopment()
-	ts.NoError(err)
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterWorkflowWithOptions(ts.workflows.ActivityCancelRepro, workflow.RegisterOptions{DisableAlreadyRegisteredCheck: true})
-	err = replayer.ReplayPartialWorkflowHistoryFromJSONFile(logger, "fixtures/activity.cancel.sm.repro.json", 12)
+	err := replayer.ReplayPartialWorkflowHistoryFromJSONFile(zaptest.NewLogger(ts.T()), "fixtures/activity.cancel.sm.repro.json", 12)
 	ts.NoError(err)
 }
 
@@ -461,8 +457,8 @@ func (ts *IntegrationTestSuite) TestDomainUpdate() {
 	name := domainName
 	description := "test-description"
 	err := ts.domainClient.Update(ctx, &shared.UpdateDomainRequest{
-		Name:                     &name,
-		UpdatedInfo:              &shared.UpdateDomainInfo{Description: &description},
+		Name:        &name,
+		UpdatedInfo: &shared.UpdateDomainInfo{Description: &description},
 	})
 	ts.NoError(err)
 
@@ -518,6 +514,7 @@ func (ts *IntegrationTestSuite) executeWorkflowWithOption(
 		return err
 	}
 	err = run.Get(ctx, retValPtr)
+	logger := zaptest.NewLogger(ts.T())
 	if ts.config.Debug {
 		iter := ts.libClient.GetWorkflowHistory(ctx, options.ID, run.GetRunID(), false, shared.HistoryEventFilterTypeAllEvent)
 		for iter.HasNext() {
@@ -525,7 +522,7 @@ func (ts *IntegrationTestSuite) executeWorkflowWithOption(
 			if err1 != nil {
 				break
 			}
-			fmt.Println(event.String())
+			logger.Info(event.String())
 		}
 	}
 	return err

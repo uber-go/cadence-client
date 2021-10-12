@@ -36,6 +36,7 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 type WorkflowTestSuiteUnitTest struct {
@@ -60,6 +61,10 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 		Fields: map[string][]byte{"test": []byte("test-data")},
 	}
 	s.ctxProps = []ContextPropagator{NewStringMapPropagator([]string{"test"})}
+}
+
+func (s *WorkflowTestSuiteUnitTest) SetupTest() {
+	s.SetLogger(zaptest.NewLogger(s.T()))
 }
 
 func TestUnitTestSuite(t *testing.T) {

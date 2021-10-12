@@ -32,7 +32,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	m "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 const (
@@ -175,14 +175,13 @@ func (s *InterfacesTestSuite) TearDownTest() {
 }
 
 func (s *InterfacesTestSuite) TestInterface() {
-	logger, _ := zap.NewDevelopment()
 	domain := "testDomain"
 	// Workflow execution parameters.
 	workflowExecutionParameters := workerExecutionParameters{
 		TaskList:                     "testTaskList",
 		MaxConcurrentActivityPollers: 4,
 		MaxConcurrentDecisionPollers: 4,
-		Logger:                       logger,
+		Logger:                       zaptest.NewLogger(s.T()),
 		Tracer:                       opentracing.NoopTracer{},
 	}
 
@@ -195,12 +194,12 @@ func (s *InterfacesTestSuite) TestInterface() {
 	}
 
 	// mocks
-	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions...).Return(domainDesc, nil).AnyTimes()
-	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForActivityTaskResponse{}, nil).AnyTimes()
-	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil).AnyTimes()
-	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions...).Return(&m.PollForDecisionTaskResponse{}, nil).AnyTimes()
-	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions...).Return(nil, nil).AnyTimes()
-	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions...).Return(&m.StartWorkflowExecutionResponse{}, nil).AnyTimes()
+	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(domainDesc, nil).AnyTimes()
+	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptions()...).Return(&m.PollForActivityTaskResponse{}, nil).AnyTimes()
+	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).AnyTimes()
+	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions()...).Return(&m.PollForDecisionTaskResponse{}, nil).AnyTimes()
+	s.service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, nil).AnyTimes()
+	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).Return(&m.StartWorkflowExecutionResponse{}, nil).AnyTimes()
 
 	registry := newRegistry()
 	// Launch worker.
@@ -213,7 +212,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 		TaskList:                     "testTaskList",
 		MaxConcurrentActivityPollers: 10,
 		MaxConcurrentDecisionPollers: 10,
-		Logger:                       logger,
+		Logger:                       zaptest.NewLogger(s.T()),
 		Tracer:                       opentracing.NoopTracer{},
 	}
 

@@ -553,7 +553,7 @@ func (env *sessionEnvironmentImpl) SignalCreationResponse(ctx context.Context, s
 		activityEnv.workflowExecution.RunID,
 		sessionID,
 		signalInput,
-		)
+	)
 }
 
 func (env *sessionEnvironmentImpl) getCreationResponse() *sessionCreationResponse {

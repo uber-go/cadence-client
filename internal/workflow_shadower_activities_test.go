@@ -60,11 +60,12 @@ func (s *workflowShadowerActivitiesSuite) SetupTest() {
 
 	s.controller = gomock.NewController(s.T())
 	s.mockService = workflowservicetest.NewMockClient(s.controller)
+	s.SetLogger(zaptest.NewLogger(s.T()))
 
 	s.env = s.NewTestActivityEnvironment()
 	s.testReplayer = NewWorkflowReplayer()
 	s.testReplayer.RegisterWorkflow(testReplayWorkflow)
-	s.testWorkflowHistory = getTestReplayWorkflowFullHistory()
+	s.testWorkflowHistory = getTestReplayWorkflowFullHistory(s.T())
 
 	activityContext := context.Background()
 	activityContext = context.WithValue(activityContext, serviceClientContextKey, s.mockService)
@@ -87,7 +88,7 @@ func (s *workflowShadowerActivitiesSuite) TearDownTest() {
 
 func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_Succeed() {
 	numExecutions := 1000
-	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.ListWorkflowExecutionsResponse{
 		Executions:    newTestWorkflowExecutions(numExecutions),
 		NextPageToken: []byte{1, 2, 3},
 	}, nil).Times(1)
@@ -110,7 +111,7 @@ func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_Succeed() {
 
 func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_MinResultSize() {
 	numExecutionsPerScan := 3
-	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.ListWorkflowExecutionsResponse{
 		Executions:    newTestWorkflowExecutions(numExecutionsPerScan),
 		NextPageToken: []byte{1, 2, 3},
 	}, nil).Times(int(math.Ceil(float64(minScanWorkflowResultSize) / float64(numExecutionsPerScan))))
@@ -132,7 +133,7 @@ func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_MinResultSize
 
 func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_CompletionTime() {
 	activityTimeoutSeconds := int32(1)
-	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.ListWorkflowExecutionsResponse{
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.ListWorkflowExecutionsResponse{
 		Executions:    newTestWorkflowExecutions(1),
 		NextPageToken: []byte{1, 2, 3},
 	}, nil).MaxTimes(int(time.Duration(activityTimeoutSeconds) * time.Second / scanWorkflowWaitPeriod))
@@ -160,7 +161,7 @@ func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_CompletionTim
 }
 
 func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_InvalidQuery() {
-	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions...).Return(nil, &shared.BadRequestError{
+	s.mockService.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.BadRequestError{
 		Message: "invalid query",
 	}).Times(1)
 
@@ -176,7 +177,7 @@ func (s *workflowShadowerActivitiesSuite) TestScanWorkflowActivity_InvalidQuery(
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_NoPreviousProgress() {
 	numExecutions := 10
-	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.GetWorkflowExecutionHistoryResponse{
 		History: s.testWorkflowHistory,
 	}, nil).Times(numExecutions)
 
@@ -204,7 +205,7 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Wi
 	s.env.SetHeartbeatDetails(progress)
 
 	numExecutions := 10
-	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.GetWorkflowExecutionHistoryResponse{
 		History: s.testWorkflowHistory,
 	}, nil).Times(numExecutions - progress.NextExecutionIdx)
 
@@ -226,20 +227,20 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Ra
 	numSkipped := int32(0)
 	numExecutions := 100
 
-	mismatchWorkflowHistory := getTestReplayWorkflowMismatchHistory()
+	mismatchWorkflowHistory := getTestReplayWorkflowMismatchHistory(s.T())
 	for i := 0; i != numExecutions; i++ {
 		switch rand.Intn(3) {
 		case 0:
 			numSucceed++
-			s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+			s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.GetWorkflowExecutionHistoryResponse{
 				History: s.testWorkflowHistory,
 			}, nil).Times(1)
 		case 1:
 			numSkipped++
-			s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(nil, &shared.EntityNotExistsError{}).Times(1)
+			s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.EntityNotExistsError{}).Times(1)
 		case 2:
 			numFailed++
-			s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+			s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.GetWorkflowExecutionHistoryResponse{
 				History: mismatchWorkflowHistory,
 			}, nil).Times(1)
 		}
@@ -258,8 +259,8 @@ func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_Ra
 }
 
 func (s *workflowShadowerActivitiesSuite) TestReplayWorkflowExecutionActivity_WorkflowNotRegistered() {
-	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions...).Return(&shared.GetWorkflowExecutionHistoryResponse{
-		History: getTestReplayWorkflowLocalActivityHistory(), // this workflow type is not registered
+	s.mockService.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), callOptions()...).Return(&shared.GetWorkflowExecutionHistoryResponse{
+		History: getTestReplayWorkflowLocalActivityHistory(s.T()), // this workflow type is not registered
 	}, nil).Times(1)
 
 	params := newTestReplayWorkflowActivityParams(5)

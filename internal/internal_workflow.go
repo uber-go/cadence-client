@@ -144,14 +144,15 @@ type (
 	unblockFunc func(status string, stackDepth int) (keepBlocked bool)
 
 	coroutineState struct {
-		name         string
-		dispatcher   *dispatcherImpl  // dispatcher this context belongs to
-		aboutToBlock chan bool        // used to notify dispatcher that coroutine that owns this context is about to block
-		unblock      chan unblockFunc // used to notify coroutine that it should continue executing.
-		keptBlocked  bool             // true indicates that coroutine didn't make any progress since the last yield unblocking
-		closed       bool             // indicates that owning coroutine has finished execution
-		blocked      atomic.Bool
-		panicError   *workflowPanicError // non nil if coroutine had unhandled panic
+		name              string
+		dispatcher        *dispatcherImpl  // dispatcher this context belongs to
+		aboutToBlock      chan bool        // used to notify dispatcher that coroutine that owns this context is about to block
+		unblock           chan unblockFunc // used to notify coroutine that it should continue executing.
+		keptBlocked       bool             // true indicates that coroutine didn't make any progress since the last yield unblocking
+		closed            bool             // indicates that owning coroutine has finished execution
+		completedShutdown chan struct{}    // closed after .closed is set to true, use to wait for shutdown
+		blocked           atomic.Bool
+		panicError        *workflowPanicError // non nil if coroutine had unhandled panic
 	}
 
 	dispatcherImpl struct {
@@ -596,7 +597,7 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 		hasResult = false
 		v, ok, m := c.receiveAsyncImpl(callback)
 
-		if !ok && !m { //channel closed and empty
+		if !ok && !m { // channel closed and empty
 			return m
 		}
 
@@ -606,7 +607,7 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 				state.unblocked()
 				return m
 			}
-			continue //corrupt signal. Drop and reset process
+			continue // corrupt signal. Drop and reset process
 		}
 		for {
 			if hasResult {
@@ -615,7 +616,7 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 					state.unblocked()
 					return more
 				}
-				break //Corrupt signal. Drop and reset process.
+				break // Corrupt signal. Drop and reset process.
 			}
 			state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
 		}
@@ -631,7 +632,7 @@ func (c *channelImpl) ReceiveAsync(valuePtr interface{}) (ok bool) {
 func (c *channelImpl) ReceiveAsyncWithMoreFlag(valuePtr interface{}) (ok bool, more bool) {
 	for {
 		v, ok, more := c.receiveAsyncImpl(nil)
-		if !ok && !more { //channel closed and empty
+		if !ok && !more { // channel closed and empty
 			return ok, more
 		}
 
@@ -774,7 +775,7 @@ func (c *channelImpl) Close() {
 // Takes a value and assigns that 'to' value. logs a metric if it is unable to deserialize
 func (c *channelImpl) assignValue(from interface{}, to interface{}) error {
 	err := decodeAndAssignValue(c.dataConverter, from, to)
-	//add to metrics
+	// add to metrics
 	if err != nil {
 		c.env.GetLogger().Error(fmt.Sprintf("Corrupt signal received on channel %s. Error deserializing", c.name), zap.Error(err))
 		c.env.GetMetricsScope().Counter(metrics.CorruptedSignalsCounter).Inc(1)
@@ -840,6 +841,7 @@ func (s *coroutineState) call() {
 
 func (s *coroutineState) close() {
 	s.closed = true
+	close(s.completedShutdown)
 	s.aboutToBlock <- true
 }
 
@@ -849,6 +851,8 @@ func (s *coroutineState) exit() {
 			runtime.Goexit()
 			return true
 		}
+		// wait for it
+		<-s.completedShutdown
 	}
 }
 
@@ -887,10 +891,11 @@ func (d *dispatcherImpl) newNamedCoroutine(ctx Context, name string, f func(ctx 
 
 func (d *dispatcherImpl) newState(name string) *coroutineState {
 	c := &coroutineState{
-		name:         name,
-		dispatcher:   d,
-		aboutToBlock: make(chan bool, 1),
-		unblock:      make(chan unblockFunc),
+		name:              name,
+		dispatcher:        d,
+		aboutToBlock:      make(chan bool, 1),
+		unblock:           make(chan unblockFunc),
+		completedShutdown: make(chan struct{}),
 	}
 	d.sequence++
 	d.coroutines = append(d.coroutines, c)

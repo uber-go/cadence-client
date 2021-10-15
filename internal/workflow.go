@@ -896,6 +896,14 @@ func (wc *workflowEnvironmentInterceptor) ExecuteChildWorkflow(ctx Context, chil
 		decodeFutureImpl: mainFuture.(*decodeFutureImpl),
 		executionFuture:  executionFuture.(*futureImpl),
 	}
+
+	// Starting with a canceled context should immediately fail, no need to even try.
+	if ctx.Err() != nil {
+		mainSettable.SetError(ctx.Err())
+		executionSettable.SetError(ctx.Err())
+		return result
+	}
+
 	workflowOptionsFromCtx := getWorkflowEnvOptions(ctx)
 	dc := workflowOptionsFromCtx.dataConverter
 	env := getWorkflowEnvironment(ctx)
@@ -928,6 +936,7 @@ func (wc *workflowEnvironmentInterceptor) ExecuteChildWorkflow(ctx Context, chil
 
 	ctxDone, cancellable := ctx.Done().(*channelImpl)
 	cancellationCallback := &receiveCallback{}
+	shouldCancelAsync := false
 	err = getWorkflowEnvironment(ctx).ExecuteChildWorkflow(params, func(r []byte, e error) {
 		mainSettable.Set(r, e)
 		if cancellable {
@@ -939,6 +948,11 @@ func (wc *workflowEnvironmentInterceptor) ExecuteChildWorkflow(ctx Context, chil
 			childWorkflowExecution = &r
 		}
 		executionSettable.Set(r, e)
+
+		// forward the delayed cancellation if necessary
+		if shouldCancelAsync && e == nil && !mainFuture.IsReady() {
+			getWorkflowEnvironment(ctx).RequestCancelChildWorkflow(*options.domain, childWorkflowExecution.ID)
+		}
 	})
 
 	if err != nil {
@@ -949,9 +963,19 @@ func (wc *workflowEnvironmentInterceptor) ExecuteChildWorkflow(ctx Context, chil
 
 	if cancellable {
 		cancellationCallback.fn = func(v interface{}, more bool) bool {
-			if ctx.Err() == ErrCanceled && childWorkflowExecution != nil && !mainFuture.IsReady() {
-				// child workflow started, and ctx cancelled
-				getWorkflowEnvironment(ctx).RequestCancelChildWorkflow(*options.domain, childWorkflowExecution.ID)
+			if ctx.Err() == ErrCanceled {
+				if childWorkflowExecution != nil && !mainFuture.IsReady() {
+					// child workflow started, and ctx cancelled.  forward cancel to the child.
+					getWorkflowEnvironment(ctx).RequestCancelChildWorkflow(*options.domain, childWorkflowExecution.ID)
+				} else if childWorkflowExecution == nil {
+					// decision to start the child has been made, but it has not yet started.
+
+					// TODO: ideal, but not strictly necessary for correctness:
+					// if it's in the same decision, revoke that cancel synchronously.
+
+					// if the decision has already gone through: wait for it to be started, and then cancel it.
+					shouldCancelAsync = true
+				}
 			}
 			return false
 		}

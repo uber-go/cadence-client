@@ -3158,8 +3158,6 @@ func (s *WorkflowTestSuiteUnitTest) Test_Regression_ExecuteChildWorkflowWithCanc
 	})
 	s.Run("canceled before child starts", func() {
 		// ... and should not start the child (i.e. be canceled) when canceled before it is started.
-		check(0, "no err") // but it does not!  this is a bug to fix.
-		// this should be:
-		// check(0, "canceled")
+		check(0, "canceled")
 	})
 }

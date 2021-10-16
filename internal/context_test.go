@@ -34,9 +34,7 @@ func TestContextChildParentCancelRace(t *testing.T) {
 		While child is trying to remove itself from the parent, parent tries to iterate
 		its children and cancel them at the same time.
 	*/
-	s := WorkflowTestSuite{}
-	s.SetLogger(zaptest.NewLogger(t))
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 
 	wf := func(ctx Context) error {
 		parentCtx, parentCancel := WithCancel(ctx)
@@ -106,9 +104,7 @@ func TestContextAddChildCancelParentRace(t *testing.T) {
 	/*
 		It's apparently also possible to race on adding children while propagating the cancel to children.
 	*/
-	s := WorkflowTestSuite{}
-	s.SetLogger(zaptest.NewLogger(t))
-	env := s.NewTestWorkflowEnvironment()
+	env := newTestWorkflowEnv(t)
 	wf := func(ctx Context) error {
 		ctx, cancel := WithCancel(ctx)
 		racyCancel := func(ctx Context) {

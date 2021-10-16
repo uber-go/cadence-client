@@ -25,7 +25,9 @@ package client
 
 import (
 	"context"
+	"errors"
 
+	"go.uber.org/cadence"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/encoded"
@@ -449,4 +451,55 @@ func NewValue(data []byte) encoded.Value {
 //   NewValues(data).Get(&result1, &result2)
 func NewValues(data []byte) encoded.Values {
 	return internal.NewValues(data)
+}
+
+// IsWorkflowError returns true if an error is a known returned-by-the-workflow error type, when it comes from
+// WorkflowRun from either Client.ExecuteWorkflow or Client.GetWorkflow.  If it returns false, the error comes from
+// some other source, e.g. RPC request failures or bad arguments.
+// Using it on errors from any other source is currently undefined.
+//
+// This checks for known types via errors.As, so it will check recursively if it encounters wrapped errors.
+// Note that this is different than the various `cadence.Is[Type]Error` checks, which do not unwrap.
+//
+// Currently the complete list of errors checked is:
+// *cadence.CustomError, *cadence.CanceledError, *workflow.ContinueAsNewError,
+// *workflow.GenericError, *workflow.TimeoutError, *workflow.TerminatedError,
+// *workflow.PanicError, *workflow.UnknownExternalWorkflowExecutionError
+//
+// See documentation for each error type for details.
+func IsWorkflowError(err error) bool {
+	var custom *cadence.CustomError
+	if errors.As(err, &custom) {
+		return true
+	}
+	var cancel *cadence.CanceledError
+	if errors.As(err, &cancel) {
+		return true
+	}
+
+	var generic *workflow.GenericError
+	if errors.As(err, &generic) {
+		return true
+	}
+	var timeout *workflow.TimeoutError
+	if errors.As(err, &timeout) {
+		return true
+	}
+	var terminate *workflow.TerminatedError
+	if errors.As(err, &terminate) {
+		return true
+	}
+	var panicked *workflow.PanicError
+	if errors.As(err, &panicked) {
+		return true
+	}
+	var can *workflow.ContinueAsNewError
+	if errors.As(err, &can) {
+		return true
+	}
+	var unknown *workflow.UnknownExternalWorkflowExecutionError
+	if errors.As(err, &unknown) {
+		return true
+	}
+	return false
 }

@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/cadence/worker"
+	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -40,4 +41,13 @@ func TestReplayWorkflowHistoryFromFile(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestReplayChildWorkflowBugBackport(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	replayer.RegisterWorkflowWithOptions(childWorkflow, workflow.RegisterOptions{Name: "child"})
+	replayer.RegisterWorkflowWithOptions(childWorkflowBug, workflow.RegisterOptions{Name: "parent"})
+
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "child_bug.json")
+	require.NoError(t, err)
 }

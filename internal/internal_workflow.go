@@ -183,6 +183,7 @@ type (
 		memo                                map[string]interface{}
 		searchAttributes                    map[string]interface{}
 		parentClosePolicy                   ParentClosePolicy
+		bugports                            Bugports
 	}
 
 	executeWorkflowParams struct {
@@ -596,7 +597,7 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 		hasResult = false
 		v, ok, m := c.receiveAsyncImpl(callback)
 
-		if !ok && !m { //channel closed and empty
+		if !ok && !m { // channel closed and empty
 			return m
 		}
 
@@ -606,7 +607,7 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 				state.unblocked()
 				return m
 			}
-			continue //corrupt signal. Drop and reset process
+			continue // corrupt signal. Drop and reset process
 		}
 		for {
 			if hasResult {
@@ -615,7 +616,7 @@ func (c *channelImpl) Receive(ctx Context, valuePtr interface{}) (more bool) {
 					state.unblocked()
 					return more
 				}
-				break //Corrupt signal. Drop and reset process.
+				break // Corrupt signal. Drop and reset process.
 			}
 			state.yield(fmt.Sprintf("blocked on %s.Receive", c.name))
 		}
@@ -631,7 +632,7 @@ func (c *channelImpl) ReceiveAsync(valuePtr interface{}) (ok bool) {
 func (c *channelImpl) ReceiveAsyncWithMoreFlag(valuePtr interface{}) (ok bool, more bool) {
 	for {
 		v, ok, more := c.receiveAsyncImpl(nil)
-		if !ok && !more { //channel closed and empty
+		if !ok && !more { // channel closed and empty
 			return ok, more
 		}
 
@@ -774,7 +775,7 @@ func (c *channelImpl) Close() {
 // Takes a value and assigns that 'to' value. logs a metric if it is unable to deserialize
 func (c *channelImpl) assignValue(from interface{}, to interface{}) error {
 	err := decodeAndAssignValue(c.dataConverter, from, to)
-	//add to metrics
+	// add to metrics
 	if err != nil {
 		c.env.GetLogger().Error(fmt.Sprintf("Corrupt signal received on channel %s. Error deserializing", c.name), zap.Error(err))
 		c.env.GetMetricsScope().Counter(metrics.CorruptedSignalsCounter).Inc(1)

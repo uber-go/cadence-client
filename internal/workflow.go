@@ -472,6 +472,65 @@ type (
 		// ParentClosePolicy - Optional policy to decide what to do for the child.
 		// Default is Terminate (if onboarded to this feature)
 		ParentClosePolicy ParentClosePolicy
+
+		// Bugports allows opt-in enabling of older, possibly buggy behavior, primarily intended to allow temporarily
+		// emulating old behavior until a fix is deployed.
+		//
+		// Bugports are always deprecated and may be removed in future versions.
+		// Generally speaking they will *likely* remain in place for one minor version, and then they may be removed to
+		// allow cleaning up the additional code complexity that they cause.
+		//
+		// deprecated
+		Bugports Bugports
+	}
+
+	// Bugports allows opt-in enabling of older, possibly buggy behavior, primarily intended to allow temporarily
+	// emulating old behavior until a fix is deployed.
+	// By default, bugs (especially rarely-occurring ones) are fixed and all users are opted into the new behavior.
+	// Back-ported buggy behavior *may* be available via these flags.
+	//
+	// Fields in here are NOT guaranteed to be stable.  They will almost certainly be removed in the next major
+	// release, and might be removed earlier if a need arises, e.g. if the historical behavior causes too much of an
+	// increase in code complexity.
+	//
+	// See each individual field for details.
+	//
+	// Bugports are always deprecated and may be removed in future versions.
+	// Generally speaking they will *likely* remain in place for one minor version, and then they may be removed to
+	// allow cleaning up the additional code complexity that they cause.
+	//
+	// deprecated
+	Bugports struct {
+		// StartChildWorkflowsOnCanceledContext allows emulating older, buggy behavior that existed prior to v0.18.4.
+		//
+		// Prior to the fix, child workflows would be started and keep running when their context was canceled in two
+		// situations:
+		// 1) when the context was canceled before ExecuteChildWorkflow is called, and
+		// 2) when the context was canceled after ExecuteChildWorkflow but before the child workflow was started.
+		//
+		// 1 is unfortunately easy to trigger, though many workflows will encounter an error earlier and not reach the
+		// child-workflow-executing code.  2 is expected to be very rare in practice.
+		//
+		// To permanently emulate old behavior, use a disconnected context when starting child workflows, and
+		// cancel it only after `childfuture.GetWorkflowExecution().Get(...)` returns.  This can be used when this flag
+		// is removed in the future.
+		//
+		// If you have currently-broken workflows and need to repair them, there are two primary options:
+		//
+		// 1: Check the BinaryChecksum value of your new deploy and/or of the decision that is currently failing
+		// workflows.  Then set this flag when replaying history on those not-fixed checksums.  Concretely, this means
+		// checking both `workflow.GetInfo(ctx).BinaryChecksum` (note that sufficiently old clients may not have
+		// recorded a value, and it may be nil) and `workflow.IsReplaying(ctx)`.
+		//
+		// 2: Reset broken workflows back to either before the buggy behavior was recorded, or before the fixed behavior
+		// was deployed.  A "bad binary" reset type can do the latter in bulk, see the CLI's
+		// `cadence workflow reset-batch --reset_type BadBinary --help` for details.  For the former, check the failing
+		// histories, identify the point at which the bug occurred, and reset to prior to that decision task.
+		//
+		// Added in 0.18.4, this may be removed in or after v0.19.0, so please migrate off of it ASAP.
+		//
+		// deprecated
+		StartChildWorkflowsOnCanceledContext bool
 	}
 )
 
@@ -896,15 +955,23 @@ func (wc *workflowEnvironmentInterceptor) ExecuteChildWorkflow(ctx Context, chil
 		decodeFutureImpl: mainFuture.(*decodeFutureImpl),
 		executionFuture:  executionFuture.(*futureImpl),
 	}
+	// clients prior to v0.18.4 would incorrectly start child workflows that were started with cancelled contexts,
+	// and did not react to cancellation between requested and started.
+	correctChildCancellation := true
+	workflowOptionsFromCtx := getWorkflowEnvOptions(ctx)
 
 	// Starting with a canceled context should immediately fail, no need to even try.
 	if ctx.Err() != nil {
-		mainSettable.SetError(ctx.Err())
-		executionSettable.SetError(ctx.Err())
-		return result
+		if workflowOptionsFromCtx.bugports.StartChildWorkflowsOnCanceledContext {
+			// backport the bug
+			correctChildCancellation = false
+		} else {
+			mainSettable.SetError(ctx.Err())
+			executionSettable.SetError(ctx.Err())
+			return result
+		}
 	}
 
-	workflowOptionsFromCtx := getWorkflowEnvOptions(ctx)
 	dc := workflowOptionsFromCtx.dataConverter
 	env := getWorkflowEnvironment(ctx)
 	wfType, input, err := getValidatedWorkflowFunction(childWorkflowType, args, dc, env.GetRegistry())
@@ -951,7 +1018,11 @@ func (wc *workflowEnvironmentInterceptor) ExecuteChildWorkflow(ctx Context, chil
 
 		// forward the delayed cancellation if necessary
 		if shouldCancelAsync && e == nil && !mainFuture.IsReady() {
-			getWorkflowEnvironment(ctx).RequestCancelChildWorkflow(*options.domain, childWorkflowExecution.ID)
+			if workflowOptionsFromCtx.bugports.StartChildWorkflowsOnCanceledContext {
+				// do nothing: buggy behavior did not forward the cancellation
+			} else {
+				getWorkflowEnvironment(ctx).RequestCancelChildWorkflow(*options.domain, childWorkflowExecution.ID)
+			}
 		}
 	})
 
@@ -967,7 +1038,7 @@ func (wc *workflowEnvironmentInterceptor) ExecuteChildWorkflow(ctx Context, chil
 				if childWorkflowExecution != nil && !mainFuture.IsReady() {
 					// child workflow started, and ctx cancelled.  forward cancel to the child.
 					getWorkflowEnvironment(ctx).RequestCancelChildWorkflow(*options.domain, childWorkflowExecution.ID)
-				} else if childWorkflowExecution == nil {
+				} else if childWorkflowExecution == nil && correctChildCancellation {
 					// decision to start the child has been made, but it has not yet started.
 
 					// TODO: ideal, but not strictly necessary for correctness:
@@ -1294,6 +1365,7 @@ func WithChildWorkflowOptions(ctx Context, cwo ChildWorkflowOptions) Context {
 	wfOptions.memo = cwo.Memo
 	wfOptions.searchAttributes = cwo.SearchAttributes
 	wfOptions.parentClosePolicy = cwo.ParentClosePolicy
+	wfOptions.bugports = cwo.Bugports
 
 	return ctx1
 }

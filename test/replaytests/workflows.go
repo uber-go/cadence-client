@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"go.uber.org/cadence/activity"
+	"go.uber.org/cadence/client"
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
 )
@@ -103,4 +104,28 @@ func helloworldActivity(ctx context.Context, name string) (string, error) {
 	logger := activity.GetLogger(ctx)
 	logger.Info("helloworld activity started")
 	return "Hello " + name + "!", nil
+}
+
+func childWorkflowBug(ctx workflow.Context) error {
+	ctx = workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+		ExecutionStartToCloseTimeout: 30 * time.Second,
+		TaskStartToCloseTimeout:      30 * time.Second,
+		WorkflowIDReusePolicy:        client.WorkflowIDReusePolicyTerminateIfRunning, // not relevant, just convenient
+		Bugports: workflow.Bugports{
+			// child_bug.json records a history against this workflow where the child workflow IS executed,
+			// despite the canceled context.
+			//
+			// this bug has been fixed, and this flag un-does the fix.
+			// if the flag is removed, just delete this test + that history.
+			StartChildWorkflowsOnCanceledContext: true,
+		},
+	})
+	ctx, cancel := workflow.WithCancel(ctx)
+	cancel()
+	return workflow.ExecuteChildWorkflow(ctx, "child").Get(ctx, nil)
+}
+
+func childWorkflow(ctx workflow.Context) error {
+	_ = workflow.Sleep(ctx, 10*time.Second)
+	return nil
 }

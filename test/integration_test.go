@@ -140,6 +140,7 @@ func (ts *IntegrationTestSuite) TearDownSuite() {
 }
 
 func (ts *IntegrationTestSuite) SetupTest() {
+	ts.Assertions = require.New(ts.T())
 	ts.seq++
 	ts.activities.clearInvoked()
 	ts.taskListName = fmt.Sprintf("tl-%v", ts.seq)
@@ -254,6 +255,7 @@ func (ts *IntegrationTestSuite) TestCancellation() {
 	ts.Error(err)
 	_, ok := err.(*cadence.CanceledError)
 	ts.True(ok)
+	ts.Truef(client.IsWorkflowError(err), "err from canceled workflows should be a workflow error: %#v", err)
 }
 
 func (ts *IntegrationTestSuite) TestStackTraceQuery() {
@@ -318,6 +320,7 @@ func (ts *IntegrationTestSuite) TestWorkflowIDReuseRejectDuplicate() {
 	gerr, ok := err.(*workflow.GenericError)
 	ts.True(ok)
 	ts.True(strings.Contains(gerr.Error(), "WorkflowExecutionAlreadyStartedError"))
+	ts.Truef(client.IsWorkflowError(err), "already-started child error should be a workflow error: %#v", err)
 }
 
 func (ts *IntegrationTestSuite) TestWorkflowIDReuseAllowDuplicateFailedOnly1() {
@@ -335,6 +338,7 @@ func (ts *IntegrationTestSuite) TestWorkflowIDReuseAllowDuplicateFailedOnly1() {
 	gerr, ok := err.(*workflow.GenericError)
 	ts.True(ok)
 	ts.True(strings.Contains(gerr.Error(), "WorkflowExecutionAlreadyStartedError"))
+	ts.Truef(client.IsWorkflowError(err), "already-started child error should be a workflow error: %#v", err)
 }
 
 func (ts *IntegrationTestSuite) TestWorkflowIDReuseAllowDuplicateFailedOnly2() {
@@ -367,15 +371,39 @@ func (ts *IntegrationTestSuite) TestWorkflowIDReuseAllowDuplicate() {
 	ts.Equal("HELLOWORLD", result)
 }
 
+func (ts *IntegrationTestSuite) TestWorkflowIDReuseErrorViaStartWorkflow() {
+	duplicatedWID := "test-workflowidreuse-duplicate-start-error"
+	// setup: run any workflow once to consume the ID
+	err := ts.executeWorkflow(
+		duplicatedWID,
+		ts.workflows.SimplestWorkflow,
+		nil,
+	)
+	ts.NoError(err, "basic workflow should succeed")
+
+	// a second attempt should fail
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	opts := ts.startWorkflowOptions(duplicatedWID)
+	opts.WorkflowIDReusePolicy = client.WorkflowIDReusePolicyRejectDuplicate
+	exec, err := ts.libClient.StartWorkflow(ctx, opts, ts.workflows.SimplestWorkflow)
+	ts.Nil(exec)
+	ts.Error(err)
+	ts.IsType(&shared.WorkflowExecutionAlreadyStartedError{}, err, "should be the known already-started error type")
+	ts.False(client.IsWorkflowError(err), "start-workflow rejected errors should not be workflow errors")
+}
+
 func (ts *IntegrationTestSuite) TestChildWFRetryOnError() {
 	err := ts.executeWorkflow("test-childwf-retry-on-error", ts.workflows.ChildWorkflowRetryOnError, nil)
 	ts.Error(err)
+	ts.Truef(client.IsWorkflowError(err), "child error should be a workflow error: %#v", err)
 	ts.EqualValues([]string{"toUpper", "toUpper", "toUpper"}, ts.activities.invoked())
 }
 
 func (ts *IntegrationTestSuite) TestChildWFRetryOnTimeout() {
 	err := ts.executeWorkflow("test-childwf-retry-on-timeout", ts.workflows.ChildWorkflowRetryOnTimeout, nil)
 	ts.Error(err)
+	ts.Truef(client.IsWorkflowError(err), "child-timeout error should be a workflow error: %#v", err)
 	ts.EqualValues([]string{"sleep", "sleep", "sleep"}, ts.activities.invoked())
 }
 
@@ -438,6 +466,7 @@ func (ts *IntegrationTestSuite) TestLargeQueryResultError() {
 	ts.Nil(err)
 	value, err := ts.libClient.QueryWorkflow(ctx, "test-large-query-error", run.GetRunID(), "large_query")
 	ts.Error(err)
+	ts.False(client.IsWorkflowError(err), "query errors should not be workflow errors, as they are request-related")
 
 	queryErr, ok := err.(*shared.QueryFailedError)
 	ts.True(ok)

@@ -199,7 +199,7 @@ a Future) will be a workflow.CanceledError:
 Child workflows will:
 
   - ExecuteChildWorkflow will synchronously fail with a CanceledError if canceled before it is called
-    (pending a bugfix: https://github.com/uber-go/cadence-client/pull/1138)
+    (in v0.18.4 and newer.  See https://github.com/uber-go/cadence-client/pull/1138 for details.)
   - be canceled if the child workflow is running
   - wait to complete their future.Get until the child returns, and the future will contain the final result
     (which may be anything that was returned, not necessarily a CanceledError)

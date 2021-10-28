@@ -66,7 +66,7 @@ The second string parameter is a custom activity-specific parameter that can be 
 on start. An activity can have one or more such parameters. All parameters to an activity function must be
 serializable, which essentially means that params can’t be channels, functions, variadic, or unsafe pointer.
 Exact details will depend on your DataConverter, but by default they must work with encoding/json.Marshal (and
-Unmarshal on the receiving side).
+Unmarshal on the receiving side, which has the same limitations plus generally cannot deserialize into an interface).
 
 This activity declares two return values: (string, error). The string return value is used to return the result of the
 activity, and can be retrieved in the workflow with this activity's Future.

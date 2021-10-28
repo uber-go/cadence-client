@@ -2788,7 +2788,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowAlreadyRunning() {
 		ctx1 := WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
 			WorkflowID:                   "Test_ChildWorkflowAlreadyRunning",
 			ExecutionStartToCloseTimeout: time.Minute,
-			//WorkflowIDReusePolicy:        WorkflowIDReusePolicyAllowDuplicate,
+			// WorkflowIDReusePolicy:        WorkflowIDReusePolicyAllowDuplicate,
 		})
 
 		var result1, result2 string
@@ -3104,7 +3104,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_Regression_ExecuteChildWorkflowWithCanc
 	// - <0 == do not cancel
 	// - 0  == cancel synchronously
 	// - >0 == cancel after waiting that long
-	check := func(cancelTime time.Duration, expected string) {
+	check := func(cancelTime time.Duration, bugport bool, expected string) {
 		env := s.NewTestWorkflowEnvironment()
 		env.Test(s.T())
 		env.RegisterWorkflowWithOptions(func(ctx Context) error {
@@ -3124,6 +3124,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_Regression_ExecuteChildWorkflowWithCanc
 			ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
 				ExecutionStartToCloseTimeout: 2 * time.Minute,
 				TaskStartToCloseTimeout:      2 * time.Minute,
+				Bugports: Bugports{
+					StartChildWorkflowsOnCanceledContext: bugport,
+				},
 			})
 			err := ExecuteChildWorkflow(ctx, "child").Get(ctx, nil)
 
@@ -3145,14 +3148,20 @@ func (s *WorkflowTestSuiteUnitTest) Test_Regression_ExecuteChildWorkflowWithCanc
 	}
 	s.Run("sanity check", func() {
 		// workflow should run the child successfully normally...
-		check(-1, "no err")
+		check(-1, false, "no err")
 	})
 	s.Run("canceled after child starts", func() {
 		// ... and cancel the child when the child is canceled...
-		check(30*time.Second, "canceled")
+		check(30*time.Second, false, "canceled")
 	})
 	s.Run("canceled before child starts", func() {
 		// ... and should not start the child (i.e. be canceled) when canceled before it is started.
-		check(0, "canceled")
+		check(0, false, "canceled")
+	})
+	s.Run("canceled before child starts with bugport enabled", func() {
+		// prior to v0.18.4, canceling before the child was started would still start the child,
+		// and it would continue running.
+		// the bugport provides this old behavior to ease migration, at least until we feel the need to remove it.
+		check(0, true, "no err")
 	})
 }

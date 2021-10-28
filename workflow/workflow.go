@@ -44,6 +44,10 @@ type (
 	// ChildWorkflowOptions stores all child workflow specific parameters that will be stored inside of a Context.
 	ChildWorkflowOptions = internal.ChildWorkflowOptions
 
+	// Bugports contains opt-in flags for backports of old, buggy behavior that has been fixed.
+	// See the internal docs for details.
+	Bugports = internal.Bugports
+
 	// RegisterOptions consists of options for registering a workflow
 	RegisterOptions = internal.RegisterWorkflowOptions
 

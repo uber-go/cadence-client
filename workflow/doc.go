@@ -139,8 +139,92 @@ Time related functions:
 
 Failing a Workflow
 
-To mark a workflow as failed all that needs to happen is for the workflow function to return an error via the err
-return value.
+To mark a workflow as failed, return an error from your workflow function via the err return value.
+Note that failed workflows do not record the non-error return's value: you cannot usefully return both a
+value and an error, only the error will be recorded.
+
+Ending a Workflow externally
+
+Inside a workflow, to end you must finish your function by returning a result or error.
+
+Externally, two tools exist to stop workflows from outside the workflow itself, by using the CLI or RPC client:
+cancellation and termination.  Termination is forceful, cancellation allows a workflow to exit gracefully.
+
+Workflows can also time out, based on their ExecutionStartToClose duration.  A timeout behaves the same as
+termination (it is a hard deadline on the workflow), but a different close status and final event will be reported.
+
+Terminating a Workflow
+
+Terminating is roughly equivalent to using `kill -9` on a process - the workflow will be ended immediately,
+and no further decisions will be made.  It cannot be prevented or delayed by the workflow, or by any configuration.
+Any in-progress decisions or activities will fail whenever they next communicate with Cadence's servers, i.e. when
+they complete or when they next heartbeat.
+
+Because termination does not allow for any further code to be run, this also means your workflow has no
+chance to clean up after itself (e.g. running a cleanup Activity to adjust a database record).
+If you need to run additional logic when your workflow, use cancellation instead.
+
+Canceling a Workflow
+
+Canceling marks a workflow as canceled (this is a one-time, one-way operation), and immediately wakes the workflow
+up to process the cancellation (schedules a new decision task).  When the workflow resumes after being canceled,
+the context that was passed into the workflow (and thus all derived contexts) will be canceled, which changes the
+behavior of many workflow.* functions.
+
+Canceled workflow.Context behavior
+
+A workflow's context can be canceled by either canceling the workflow, or calling the cancel-func returned from
+a worfklow.WithCancel(ctx) call.  Both behave identically.
+
+At any time, you can convert a canceled (or could-be-canceled) context into a non-canceled context by using
+workflow.NewDisconnectedContext.  The resulting context will ignore cancellation from the context it is derived from.
+Disconnected contexts like this can be created before or after a context has been canceled, and it does not matter
+how the cancellation occurred.
+Because this context will not be canceled, this can be useful for using context cancellation as a way to request that
+some behavior be shut down, while allowing you to run cleanup logic in activities or elsewhere.
+
+As a general guideline, doing anything with I/O with a canceled context (e.g. executing an activity, starting a
+child workflow, sleeping) will fail rather than cause external changes.  Detailed descriptions are available in
+documentation on functions that change their behavior with a canceled context; if it does not mention canceled-context
+behavior, its behavior does not change.
+For exact behavior, make sure to read the documentation on functions that you are calling.
+
+As an incomplete summary, these actions will all fail immediately, and the associated error returns (possibly within
+a Future) will be a workflow.CanceledError:
+
+  - workflow.Await
+  - workflow.Sleep
+  - workflow.Timer
+
+Child workflows will:
+
+  - ExecuteChildWorkflow will synchronously fail with a CanceledError if canceled before it is called
+    (in v0.18.4 and newer.  See https://github.com/uber-go/cadence-client/pull/1138 for details.)
+  - be canceled if the child workflow is running
+  - wait to complete their future.Get until the child returns, and the future will contain the final result
+    (which may be anything that was returned, not necessarily a CanceledError)
+
+Activities have configurable cancellation behavior.  For workflow.ExecuteActivity and workflow.ExecuteLocalActivity,
+see the activity package's documentation for details.  In summary though:
+
+  - ExecuteActivity will synchronously fail with a CanceledError if canceled before it is called
+  - the activity's future.Get will by default return a CanceledError immediately when canceled,
+    unless activityoptions.WaitForCancellation is true
+  - the activity's context will be canceled at the next heartbeat event, or not at all if that does not occur
+
+And actions like this will be completely unaffected:
+
+  - future.Get
+    (futures derived from the calls above may return a CanceledError, but this is not guaranteed for all futures)
+  - selector.Select
+    (Select is completely unaffected, similar to a native select statement.  if you wish to unblock when your
+    context is canceled, consider using an AddReceive with the context's Done() channel, as with a native select)
+  - channel.Send, channel.Receive, and channel.ReceiveAsync
+    (similar to native chan read/write operations, use a selector to wait for send/receive or some other action)
+  - workflow.Go
+    (the context argument in the callback is derived and may be canceled, but this does not stop the goroutine,
+    nor stop new ones from being started)
+  - workflow.GetVersion, workflow.GetLogger, workflow.GetMetricsScope, workflow.Now, many others
 
 Execute Activity
 
@@ -286,14 +370,14 @@ pattern, extra care needs to be taken to ensure the child workflow is started be
 Error Handling
 
 Activities and child workflows can fail. You could handle errors differently based on different error cases. If the
-activity returns an error as errors.New() or fmt.Errorf(), those errors will be converted to error.GenericError. If the
-activity returns an error as error.NewCustomError("err-reason", details), that error will be converted to
-*error.CustomError. There are other types of errors like error.TimeoutError, error.CanceledError and error.PanicError.
+activity returns an error as errors.New() or fmt.Errorf(), those errors will be converted to workflow.GenericError. If the
+activity returns an error as workflow.NewCustomError("err-reason", details), that error will be converted to
+*workflow.CustomError. There are other types of errors like workflow.TimeoutError, workflow.CanceledError and workflow.PanicError.
 So the error handling code would look like:
 
 	err := workflow.ExecuteActivity(ctx, YourActivityFunc).Get(ctx, nil)
 	switch err := err.(type) {
-	case *error.CustomError:
+	case *workflow.CustomError:
 		switch err.Reason() {
 		case "err-reason-a":
 			// handle error-reason-a
@@ -305,7 +389,7 @@ So the error handling code would look like:
 		default:
 			// handle all other error reasons
 		}
-	case *error.GenericError:
+	case *workflow.GenericError:
 		switch err.Error() {
 		case "err-msg-1":
 			// handle error with message "err-msg-1"
@@ -314,7 +398,7 @@ So the error handling code would look like:
 		default:
 			// handle all other generic errors
 		}
-	case *error.TimeoutError:
+	case *workflow.TimeoutError:
 		switch err.TimeoutType() {
 		case shared.TimeoutTypeScheduleToStart:
 			// handle ScheduleToStart timeout
@@ -324,9 +408,9 @@ So the error handling code would look like:
 			// handle heartbeat timeout
 		default:
 		}
-	case *error.PanicError:
-		 // handle panic error
-	case *error.CanceledError:
+	case *workflow.PanicError:
+		// handle panic error
+	case *workflow.CanceledError:
 		// handle canceled error
 	default:
 		// all other cases (ideally, this should not happen)
@@ -530,7 +614,7 @@ The code below implements the unit tests for the SimpleWorkflow sample.
 		s.True(s.env.IsWorkflowCompleted())
 
 		s.NotNil(s.env.GetWorkflowError())
-		_, ok := s.env.GetWorkflowError().(*error.GenericError)
+		_, ok := s.env.GetWorkflowError().(*workflow.GenericError)
 		s.True(ok)
 		s.Equal("SimpleActivityFailure", s.env.GetWorkflowError().Error())
 	}
@@ -591,7 +675,7 @@ Lets first take a look at a test that simulates a test failing via the "activity
 		s.True(s.env.IsWorkflowCompleted())
 
 		s.NotNil(s.env.GetWorkflowError())
-		_, ok := s.env.GetWorkflowError().(*error.GenericError)
+		_, ok := s.env.GetWorkflowError().(*workflow.GenericError)
 		s.True(ok)
 		s.Equal("SimpleActivityFailure", s.env.GetWorkflowError().Error())
 	}

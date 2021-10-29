@@ -152,6 +152,11 @@ func (a thrift2protoAdapter) RequestCancelWorkflowExecution(ctx context.Context,
 	return thrift.Error(err)
 }
 
+func (a thrift2protoAdapter) GetTaskListsByDomain(ctx context.Context, request *shared.GetTaskListsByDomainRequest, opts ...yarpc.CallOption) (*shared.GetTaskListsByDomainResponse, error) {
+	response, err := a.workflow.GetTaskListsByDomain(ctx, proto.GetTaskListsByDomainRequest(request), opts...)
+	return thrift.GetTaskListsByDomainResponse(response), thrift.Error(err)
+}
+
 func (a thrift2protoAdapter) ResetStickyTaskList(ctx context.Context, request *shared.ResetStickyTaskListRequest, opts ...yarpc.CallOption) (*shared.ResetStickyTaskListResponse, error) {
 	_, err := a.worker.ResetStickyTaskList(ctx, proto.ResetStickyTaskListRequest(request), opts...)
 	return &shared.ResetStickyTaskListResponse{}, thrift.Error(err)

@@ -176,6 +176,17 @@ var (
 	GetSearchAttributesResponse = apiv1.GetSearchAttributesResponse{
 		Keys: IndexedValueTypeMap,
 	}
+	GetTaskListsByDomainRequest = apiv1.GetTaskListsByDomainRequest{
+		Domain: DomainName,
+	}
+	GetTaskListsByDomainResponse = apiv1.GetTaskListsByDomainResponse{
+		ActivityTaskListMap: map[string]*apiv1.DescribeTaskListResponse{
+			"A": &DescribeTaskListResponse,
+		},
+		DecisionTaskListMap: map[string]*apiv1.DescribeTaskListResponse{
+			"B": &DescribeTaskListResponse,
+		},
+	}
 	PollForDecisionTaskRequest = apiv1.PollForDecisionTaskRequest{
 		Domain:         DomainName,
 		TaskList:       &TaskList,

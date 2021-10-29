@@ -233,6 +233,15 @@ func RequestCancelWorkflowExecutionRequest(t *shared.RequestCancelWorkflowExecut
 	}
 }
 
+func GetTaskListsByDomainRequest(t *shared.GetTaskListsByDomainRequest) *apiv1.GetTaskListsByDomainRequest {
+	if t == nil {
+		return nil
+	}
+	return &apiv1.GetTaskListsByDomainRequest{
+		Domain: t.GetDomainName(),
+	}
+}
+
 func ResetStickyTaskListRequest(t *shared.ResetStickyTaskListRequest) *apiv1.ResetStickyTaskListRequest {
 	if t == nil {
 		return nil

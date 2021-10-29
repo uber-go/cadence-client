@@ -425,6 +425,16 @@ func TestResetPoints(t *testing.T) {
 		assert.Equal(t, item, proto.ResetPoints(thrift.ResetPoints(item)))
 	}
 }
+func TestGetTaskListsByDomainRequest(t *testing.T) {
+	for _, item := range []*apiv1.GetTaskListsByDomainRequest{nil, {}, &testdata.GetTaskListsByDomainRequest} {
+		assert.Equal(t, item, proto.GetTaskListsByDomainRequest(thrift.GetTaskListsByDomainRequest(item)))
+	}
+}
+func TestGetTaskListsByDomainResponse(t *testing.T) {
+	for _, item := range []*apiv1.GetTaskListsByDomainResponse{nil, {}, &testdata.GetTaskListsByDomainResponse} {
+		assert.Equal(t, item, proto.GetTaskListsByDomainResponse(thrift.GetTaskListsByDomainResponse(item)))
+	}
+}
 func TestResetStickyTaskListRequest(t *testing.T) {
 	for _, item := range []*apiv1.ResetStickyTaskListRequest{nil, {}, &testdata.ResetStickyTaskListRequest} {
 		assert.Equal(t, item, proto.ResetStickyTaskListRequest(thrift.ResetStickyTaskListRequest(item)))

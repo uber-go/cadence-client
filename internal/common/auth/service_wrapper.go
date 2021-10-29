@@ -22,6 +22,7 @@ package auth
 
 import (
 	"context"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/yarpc"
@@ -386,6 +387,16 @@ func (w *workflowServiceAuthWrapper) QueryWorkflow(ctx context.Context, request 
 	}
 	opts = append(opts, *tokenHeader)
 	result, err := w.service.QueryWorkflow(ctx, request, opts...)
+	return result, err
+}
+
+func (w *workflowServiceAuthWrapper) GetTaskListsByDomain(ctx context.Context, request *shared.GetTaskListsByDomainRequest, opts ...yarpc.CallOption) (*shared.GetTaskListsByDomainResponse, error) {
+	tokenHeader, err := w.getYarpcJWTHeader()
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, *tokenHeader)
+	result, err := w.service.GetTaskListsByDomain(ctx, request, opts...)
 	return result, err
 }
 

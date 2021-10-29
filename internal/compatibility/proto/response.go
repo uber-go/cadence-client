@@ -106,6 +106,16 @@ func GetSearchAttributesResponse(t *shared.GetSearchAttributesResponse) *apiv1.G
 	}
 }
 
+func GetTaskListsByDomainResponse(t *shared.GetTaskListsByDomainResponse) *apiv1.GetTaskListsByDomainResponse {
+	if t == nil {
+		return nil
+	}
+	return &apiv1.GetTaskListsByDomainResponse{
+		DecisionTaskListMap: DescribeTaskListResponseMap(t.DecisionTaskListMap),
+		ActivityTaskListMap: DescribeTaskListResponseMap(t.ActivityTaskListMap),
+	}
+}
+
 func GetWorkflowExecutionHistoryResponse(t *shared.GetWorkflowExecutionHistoryResponse) *apiv1.GetWorkflowExecutionHistoryResponse {
 	if t == nil {
 		return nil
@@ -331,4 +341,15 @@ func UpdateDomainResponse(t *shared.UpdateDomainResponse) *apiv1.UpdateDomainRes
 	return &apiv1.UpdateDomainResponse{
 		Domain: domain,
 	}
+}
+
+func DescribeTaskListResponseMap(t map[string]*shared.DescribeTaskListResponse) map[string]*apiv1.DescribeTaskListResponse {
+	if t == nil {
+		return nil
+	}
+	v := make(map[string]*apiv1.DescribeTaskListResponse, len(t))
+	for key := range t {
+		v[key] = DescribeTaskListResponse(t[key])
+	}
+	return v
 }

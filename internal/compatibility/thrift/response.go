@@ -253,6 +253,25 @@ func RecordActivityTaskHeartbeatResponse(t *apiv1.RecordActivityTaskHeartbeatRes
 	}
 }
 
+func GetTaskListsByDomainRequest(t *apiv1.GetTaskListsByDomainRequest) *shared.GetTaskListsByDomainRequest {
+	if t == nil {
+		return nil
+	}
+	return &shared.GetTaskListsByDomainRequest{
+		DomainName: &t.Domain,
+	}
+}
+
+func GetTaskListsByDomainResponse(t *apiv1.GetTaskListsByDomainResponse) *shared.GetTaskListsByDomainResponse {
+	if t == nil {
+		return nil
+	}
+	return &shared.GetTaskListsByDomainResponse{
+		DecisionTaskListMap: DescribeTaskListResponseMap(t.DecisionTaskListMap),
+		ActivityTaskListMap: DescribeTaskListResponseMap(t.ActivityTaskListMap),
+	}
+}
+
 func ResetWorkflowExecutionResponse(t *apiv1.ResetWorkflowExecutionResponse) *shared.ResetWorkflowExecutionResponse {
 	if t == nil {
 		return nil
@@ -329,4 +348,15 @@ func UpdateDomainResponse(t *apiv1.UpdateDomainResponse) *shared.UpdateDomainRes
 		FailoverVersion: &t.Domain.FailoverVersion,
 		IsGlobalDomain:  &t.Domain.IsGlobalDomain,
 	}
+}
+
+func DescribeTaskListResponseMap(t map[string]*apiv1.DescribeTaskListResponse) map[string]*shared.DescribeTaskListResponse {
+	if t == nil {
+		return nil
+	}
+	v := make(map[string]*shared.DescribeTaskListResponse, len(t))
+	for key := range t {
+		v[key] = DescribeTaskListResponse(t[key])
+	}
+	return v
 }

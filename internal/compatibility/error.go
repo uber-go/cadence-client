@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package thrift
+package compatibility
 
 import (
 	"errors"
@@ -30,7 +30,7 @@ import (
 	"go.uber.org/yarpc/yarpcerrors"
 )
 
-func Error(err error) error {
+func thriftError(err error) error {
 	status := yarpcerrors.FromError(err)
 	if status == nil || status.Code() == yarpcerrors.CodeOK {
 		return nil

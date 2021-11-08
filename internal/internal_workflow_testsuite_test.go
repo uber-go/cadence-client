@@ -2793,7 +2793,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflowAlreadyRunning() {
 		ctx1 := WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
 			WorkflowID:                   "Test_ChildWorkflowAlreadyRunning",
 			ExecutionStartToCloseTimeout: time.Minute,
-			//WorkflowIDReusePolicy:        WorkflowIDReusePolicyAllowDuplicate,
+			// WorkflowIDReusePolicy:        WorkflowIDReusePolicyAllowDuplicate,
 		})
 
 		var result1, result2 string
@@ -3102,4 +3102,71 @@ func (s *WorkflowTestSuiteUnitTest) Test_AwaitWithTimeout() {
 	result := true
 	_ = env.GetWorkflowResult(&result)
 	s.False(result)
+}
+
+func (s *WorkflowTestSuiteUnitTest) Test_Regression_ExecuteChildWorkflowWithCanceledContext() {
+	// cancelTime of:
+	// - <0 == do not cancel
+	// - 0  == cancel synchronously
+	// - >0 == cancel after waiting that long
+	check := func(cancelTime time.Duration, bugport bool, expected string) {
+		env := s.NewTestWorkflowEnvironment()
+		env.Test(s.T())
+		env.RegisterWorkflowWithOptions(func(ctx Context) error {
+			return Sleep(ctx, time.Minute)
+		}, RegisterWorkflowOptions{Name: "child"})
+		env.RegisterWorkflowWithOptions(func(ctx Context) (string, error) {
+			ctx, cancel := WithCancel(ctx)
+			if cancelTime == 0 {
+				cancel()
+			} else if cancelTime > 0 {
+				Go(ctx, func(ctx Context) {
+					_ = Sleep(ctx, cancelTime)
+					cancel()
+				})
+			}
+
+			ctx = WithChildWorkflowOptions(ctx, ChildWorkflowOptions{
+				ExecutionStartToCloseTimeout: 2 * time.Minute,
+				TaskStartToCloseTimeout:      2 * time.Minute,
+				Bugports: Bugports{
+					StartChildWorkflowsOnCanceledContext: bugport,
+				},
+			})
+			err := ExecuteChildWorkflow(ctx, "child").Get(ctx, nil)
+
+			if err == nil {
+				return "no err", nil
+			} else if _, ok := err.(*CanceledError); ok {
+				return "canceled", nil
+			}
+			return "unknown: " + err.Error(), nil
+		}, RegisterWorkflowOptions{Name: "parent"})
+
+		env.ExecuteWorkflow("parent")
+		s.True(env.IsWorkflowCompleted())
+		s.NoError(env.GetWorkflowError())
+
+		var result string
+		s.NoError(env.GetWorkflowResult(&result))
+		s.Equal(expected, result)
+	}
+	s.Run("sanity check", func() {
+		// workflow should run the child successfully normally...
+		check(-1, false, "no err")
+	})
+	s.Run("canceled after child starts", func() {
+		// ... and cancel the child when the child is canceled...
+		check(30*time.Second, false, "canceled")
+	})
+	s.Run("canceled before child starts", func() {
+		// ... and should not start the child (i.e. be canceled) when canceled before it is started.
+		check(0, false, "canceled")
+	})
+	s.Run("canceled before child starts with bugport enabled", func() {
+		// prior to v0.18.4, canceling before the child was started would still start the child,
+		// and it would continue running.
+		// the bugport provides this old behavior to ease migration, at least until we feel the need to remove it.
+		check(0, true, "no err")
+	})
 }

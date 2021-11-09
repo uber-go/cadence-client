@@ -28,3 +28,5 @@ require (
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	honnef.co/go/tools v0.0.1-2019.2.3
 )
+
+retract v0.18.4 // Significant issues found after more thorough testing, use v0.18.5 instaed

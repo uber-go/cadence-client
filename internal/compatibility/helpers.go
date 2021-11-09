@@ -18,24 +18,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package thrift
+package compatibility
 
 import (
-	"time"
-
 	gogo "github.com/gogo/protobuf/types"
 	"go.uber.org/cadence/internal/common"
+	"time"
 )
 
 func boolPtr(b bool) *bool {
 	return &b
 }
 
-func toDoubleValue(v *gogo.DoubleValue) *float64 {
+func fromDoubleValue(v *float64) *gogo.DoubleValue {
 	if v == nil {
 		return nil
 	}
-	return &v.Value
+	return &gogo.DoubleValue{Value: *v}
 }
 
 func toInt64Value(v *gogo.Int64Value) *int64 {
@@ -43,6 +42,17 @@ func toInt64Value(v *gogo.Int64Value) *int64 {
 		return nil
 	}
 	return common.Int64Ptr(v.Value)
+}
+
+func unixNanoToTime(t *int64) *gogo.Timestamp {
+	if t == nil {
+		return nil
+	}
+	time, err := gogo.TimestampProto(time.Unix(0, *t))
+	if err != nil {
+		panic(err)
+	}
+	return time
 }
 
 func timeToUnixNano(t *gogo.Timestamp) *int64 {
@@ -56,6 +66,13 @@ func timeToUnixNano(t *gogo.Timestamp) *int64 {
 	return common.Int64Ptr(timestamp.UnixNano())
 }
 
+func daysToDuration(d *int32) *gogo.Duration {
+	if d == nil {
+		return nil
+	}
+	return gogo.DurationProto(time.Duration(*d) * (24 * time.Hour))
+}
+
 func durationToDays(d *gogo.Duration) *int32 {
 	if d == nil {
 		return nil
@@ -65,6 +82,13 @@ func durationToDays(d *gogo.Duration) *int32 {
 		panic(err)
 	}
 	return common.Int32Ptr(int32(duration / (24 * time.Hour)))
+}
+
+func secondsToDuration(d *int32) *gogo.Duration {
+	if d == nil {
+		return nil
+	}
+	return gogo.DurationProto(time.Duration(*d) * time.Second)
 }
 
 func durationToSeconds(d *gogo.Duration) *int32 {
@@ -85,23 +109,13 @@ func int32To64(v *int32) *int64 {
 	return common.Int64Ptr(int64(*v))
 }
 
-type fieldSet map[string]struct{}
-
-func newFieldSet(mask *gogo.FieldMask) fieldSet {
-	if mask == nil {
+func int64To32(v *int64) *int32 {
+	if v == nil {
 		return nil
 	}
-	fs := map[string]struct{}{}
-	for _, field := range mask.Paths {
-		fs[field] = struct{}{}
-	}
-	return fs
+	return common.Int32Ptr(int32(*v))
 }
 
-func (fs fieldSet) isSet(field string) bool {
-	if fs == nil {
-		return true
-	}
-	_, ok := fs[field]
-	return ok
+func newFieldMask(fields []string) *gogo.FieldMask {
+	return &gogo.FieldMask{Paths: fields}
 }

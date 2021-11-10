@@ -57,13 +57,13 @@ func WorkflowExecution(t *shared.WorkflowExecution) *apiv1.WorkflowExecution {
 	}
 }
 
-func WorkflowRunPair(workflowId, runId *string) *apiv1.WorkflowExecution {
-	if workflowId == nil && runId == nil {
+func WorkflowRunPair(workflowId, runId string) *apiv1.WorkflowExecution {
+	if workflowId == "" && runId == "" {
 		return nil
 	}
 	return &apiv1.WorkflowExecution{
-		WorkflowId: *workflowId,
-		RunId:      *runId,
+		WorkflowId: workflowId,
+		RunId:      runId,
 	}
 }
 
@@ -471,7 +471,7 @@ func PendingChildExecutionInfo(t *shared.PendingChildExecutionInfo) *apiv1.Pendi
 		return nil
 	}
 	return &apiv1.PendingChildExecutionInfo{
-		WorkflowExecution: WorkflowRunPair(t.WorkflowID, t.RunID),
+		WorkflowExecution: WorkflowRunPair(t.GetWorkflowID(), t.GetRunID()),
 		WorkflowTypeName:  t.GetWorkflowTypName(),
 		InitiatedId:       t.GetInitiatedID(),
 		ParentClosePolicy: ParentClosePolicy(t.ParentClosePolicy),

@@ -108,7 +108,7 @@ func Decision(d *shared.Decision) *apiv1.Decision {
 		decision.Attributes = &apiv1.Decision_RequestCancelExternalWorkflowExecutionDecisionAttributes{
 			RequestCancelExternalWorkflowExecutionDecisionAttributes: &apiv1.RequestCancelExternalWorkflowExecutionDecisionAttributes{
 				Domain:            attr.GetDomain(),
-				WorkflowExecution: WorkflowRunPair(attr.WorkflowId, attr.RunId),
+				WorkflowExecution: WorkflowRunPair(attr.GetWorkflowId(), attr.GetRunId()),
 				Control:           attr.Control,
 				ChildWorkflowOnly: attr.GetChildWorkflowOnly(),
 			},

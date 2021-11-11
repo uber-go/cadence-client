@@ -355,6 +355,28 @@ func (w *Workflows) ChildWorkflowSuccessWithParentClosePolicyAbandon(ctx workflo
 	return childWE.ID, err
 }
 
+func (w *Workflows) ChildWorkflowCancel(ctx workflow.Context) (result string, err error) {
+	opts := workflow.ChildWorkflowOptions{
+		TaskStartToCloseTimeout:      5 * time.Second,
+		ExecutionStartToCloseTimeout: 30 * time.Second,
+	}
+	childCtx := workflow.WithChildOptions(ctx, opts)
+	childCtx, cancel := workflow.WithCancel(childCtx)
+	ft := workflow.ExecuteChildWorkflow(childCtx, w.sleep, 20*time.Second)
+	err = workflow.Sleep(ctx, time.Second)
+	if err != nil {
+		return "", err
+	}
+	cancel()
+	err = workflow.Sleep(ctx, time.Second)
+	if err != nil {
+		return "", err
+	}
+	var childWE internal.WorkflowExecution
+	err = ft.GetChildWorkflowExecution().Get(ctx, &childWE)
+	return childWE.ID, err
+}
+
 func (w *Workflows) ActivityCancelRepro(ctx workflow.Context) ([]string, error) {
 	ctx, cancelFunc := workflow.WithCancel(ctx)
 
@@ -567,6 +589,7 @@ func (w *Workflows) register(worker worker.Worker) {
 	worker.RegisterWorkflow(w.ChildWorkflowSuccess)
 	worker.RegisterWorkflow(w.ChildWorkflowSuccessWithParentClosePolicyTerminate)
 	worker.RegisterWorkflow(w.ChildWorkflowSuccessWithParentClosePolicyAbandon)
+	worker.RegisterWorkflow(w.ChildWorkflowCancel)
 	worker.RegisterWorkflow(w.InspectActivityInfo)
 	worker.RegisterWorkflow(w.InspectLocalActivityInfo)
 	worker.RegisterWorkflow(w.sleep)

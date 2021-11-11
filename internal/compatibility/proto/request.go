@@ -182,7 +182,7 @@ func RecordActivityTaskHeartbeatByIdRequest(t *shared.RecordActivityTaskHeartbea
 	}
 	return &apiv1.RecordActivityTaskHeartbeatByIDRequest{
 		Domain:            t.GetDomain(),
-		WorkflowExecution: WorkflowRunPair(t.WorkflowID, t.RunID),
+		WorkflowExecution: WorkflowRunPair(t.GetWorkflowID(), t.GetRunID()),
 		ActivityId:        t.GetActivityID(),
 		Details:           Payload(t.Details),
 		Identity:          t.GetIdentity(),
@@ -263,7 +263,7 @@ func RespondActivityTaskCanceledByIdRequest(t *shared.RespondActivityTaskCancele
 	}
 	return &apiv1.RespondActivityTaskCanceledByIDRequest{
 		Domain:            t.GetDomain(),
-		WorkflowExecution: WorkflowRunPair(t.WorkflowID, t.RunID),
+		WorkflowExecution: WorkflowRunPair(t.GetWorkflowID(), t.GetRunID()),
 		ActivityId:        t.GetActivityID(),
 		Details:           Payload(t.Details),
 		Identity:          t.GetIdentity(),
@@ -287,7 +287,7 @@ func RespondActivityTaskCompletedByIdRequest(t *shared.RespondActivityTaskComple
 	}
 	return &apiv1.RespondActivityTaskCompletedByIDRequest{
 		Domain:            t.GetDomain(),
-		WorkflowExecution: WorkflowRunPair(t.WorkflowID, t.RunID),
+		WorkflowExecution: WorkflowRunPair(t.GetWorkflowID(), t.GetRunID()),
 		ActivityId:        t.GetActivityID(),
 		Result:            Payload(t.Result),
 		Identity:          t.GetIdentity(),
@@ -311,7 +311,7 @@ func RespondActivityTaskFailedByIdRequest(t *shared.RespondActivityTaskFailedByI
 	}
 	return &apiv1.RespondActivityTaskFailedByIDRequest{
 		Domain:            t.GetDomain(),
-		WorkflowExecution: WorkflowRunPair(t.WorkflowID, t.RunID),
+		WorkflowExecution: WorkflowRunPair(t.GetWorkflowID(), t.GetRunID()),
 		ActivityId:        t.GetActivityID(),
 		Failure:           Failure(t.Reason, t.Details),
 		Identity:          t.GetIdentity(),

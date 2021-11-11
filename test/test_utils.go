@@ -31,8 +31,8 @@ import (
 	"go.uber.org/yarpc/transport/grpc"
 	"go.uber.org/yarpc/transport/tchannel"
 
+	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
-	apiv1 "go.uber.org/cadence/.gen/proto/api/v1"
 	"go.uber.org/cadence/compatibility"
 	"go.uber.org/cadence/workflow"
 )

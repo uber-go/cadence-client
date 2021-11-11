@@ -20,7 +20,7 @@
 
 package testdata
 
-import apiv1 "go.uber.org/cadence/.gen/proto/api/v1"
+import apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 
 var (
 	ArchivalStatus                             = apiv1.ArchivalStatus_ARCHIVAL_STATUS_ENABLED

@@ -15,10 +15,11 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
 	github.com/uber-go/tally v3.3.15+incompatible
+	github.com/uber/cadence-idl v0.0.0-20211111101836-d6b70b60eb8c
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/tchannel-go v1.16.0
 	go.uber.org/atomic v1.7.0
-	go.uber.org/fx v1.13.1
+	go.uber.org/fx v1.13.1 // indirect
 	go.uber.org/goleak v1.0.0
 	go.uber.org/multierr v1.6.0
 	go.uber.org/thriftrw v1.25.0

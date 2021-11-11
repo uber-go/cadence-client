@@ -136,6 +136,7 @@ type (
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
 		// - signalName name to identify the signal.
+		// - arg is the data (or nil) to send with the signal, which can be read with the signal channel's Receive out-arg.
 		// The errors it can return:
 		//	- EntityNotExistsError
 		//	- InternalServiceError
@@ -209,7 +210,7 @@ type (
 		// The activity can fail with below errors ErrorWithDetails, TimeoutError, CanceledError.
 		CompleteActivity(ctx context.Context, taskToken []byte, result interface{}, err error) error
 
-		// CompleteActivityById reports activity completed.
+		// CompleteActivityByID reports activity completed.
 		// Similar to CompleteActivity, but may save cadence user from keeping taskToken info.
 		// activity Execute method can return activity.ErrResultPending to
 		// indicate the activity is not completed when it's Execute method returns. In that case, this CompleteActivityById() method
@@ -317,7 +318,7 @@ type (
 		// - workflowID is required.
 		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
 		// - queryType is the type of the query.
-		// - args... are the optional query parameters.
+		// - args... are the optional query parameters, which will be sent to your query handler function's args.
 		// The errors it can return:
 		//  - BadRequestError
 		//  - InternalServiceError

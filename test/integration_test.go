@@ -433,6 +433,15 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() == 0)
 }
 
+func (ts *IntegrationTestSuite) TestChildWFCancel() {
+	var childWorkflowID string
+	err := ts.executeWorkflow("test-childwf-cancel", ts.workflows.ChildWorkflowCancel, &childWorkflowID)
+	ts.NoError(err)
+	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
+	ts.NoError(err)
+	ts.Equal(shared.WorkflowExecutionCloseStatusCanceled, resp.WorkflowExecutionInfo.GetCloseStatus())
+}
+
 func (ts *IntegrationTestSuite) TestActivityCancelUsingReplay() {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterWorkflowWithOptions(ts.workflows.ActivityCancelRepro, workflow.RegisterOptions{DisableAlreadyRegisteredCheck: true})

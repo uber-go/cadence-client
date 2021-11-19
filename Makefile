@@ -53,13 +53,6 @@ $(BINS)/staticcheck: go.mod
 $(BINS)/errcheck: go.mod
 	go build -mod=readonly -o $@ github.com/kisielk/errcheck
 
-$(BINS)/protoc-gen-gogofast: go.mod
-	go build -mod=readonly -o $@ github.com/gogo/protobuf/protoc-gen-gogofast
-
-$(BINS)/protoc-gen-yarpc-go: go.mod
-	go build -mod=readonly -o $@ go.uber.org/yarpc/encoding/protobuf/protoc-gen-yarpc-go
-
-
 $(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 	@echo 'thriftrw: $(THRIFTRW_SRC)'
 	@mkdir -p $(dir $@)
@@ -70,44 +63,6 @@ $(THRIFTRW_OUT): $(THRIFTRW_SRC) $(BINS)/thriftrw $(BINS)/thriftrw-plugin-yarpc
 		        --plugin=yarpc \
 		        --pkg-prefix=$(IMPORT_ROOT)/$(THRIFT_GENDIR) \
 		        --out=$(THRIFT_GENDIR) $(source);)
-
-# https://www.grpc.io/docs/languages/go/quickstart/
-# protoc-gen-gogofast (yarpc) are versioned via tools.go + go.mod (built above) and will be rebuilt as needed.
-# changing PROTOC_VERSION will automatically download and use the specified version
-PROTOC_VERSION = 3.14.0
-PROTOC_URL = https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-$(subst Darwin,osx,$(OS))-$(ARCH).zip
-# the zip contains an /include folder that we need to use to learn the well-known types
-PROTOC_UNZIP_DIR = $(BINS)/protoc-$(PROTOC_VERSION)-zip
-# use PROTOC_VERSION_BIN as a bin prerequisite, not "protoc", so the correct version will be used.
-# otherwise this must be a .PHONY rule, or the buf bin / symlink could become out of date.
-PROTOC_VERSION_BIN = protoc-$(PROTOC_VERSION)
-$(BINS)/$(PROTOC_VERSION_BIN): | $(BINS)
-	@echo "downloading protoc $(PROTOC_VERSION)"
-	@# recover from partial success
-	@rm -rf $(BINS)/protoc.zip $(PROTOC_UNZIP_DIR)
-	@# download, unzip, copy to a normal location
-	@curl -sSL $(PROTOC_URL) -o $(BINS)/protoc.zip
-	@unzip -q $(BINS)/protoc.zip -d $(PROTOC_UNZIP_DIR)
-	@cp $(PROTOC_UNZIP_DIR)/bin/protoc $@
-
-PROTO_ROOT := idls/proto
-PROTO_OUT := .gen/proto
-PROTO_FILES = $(shell find ./$(PROTO_ROOT) -name "*.proto")
-
-protoc: $(PROTO_FILES) $(BINS)/$(PROTOC_VERSION_BIN) $(BINS)/protoc-gen-gogofast $(BINS)/protoc-gen-yarpc-go
-	@mkdir -p $(PROTO_OUT)
-	@echo "protoc..."
-	@$(BINS)/$(PROTOC_VERSION_BIN) \
-		--plugin $(BINS)/protoc-gen-gogofast \
-		--plugin $(BINS)/protoc-gen-yarpc-go \
-		-I=$(PROTO_ROOT) \
-		-I=$(PROTOC_UNZIP_DIR)/include \
-		--gogofast_out=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types,Mgoogle/protobuf/field_mask.proto=github.com/gogo/protobuf/types,Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,Mgoogle/protobuf/wrappers.proto=github.com/gogo/protobuf/types,paths=source_relative:$(PROTO_OUT) \
-		--yarpc-go_out=$(PROTO_OUT) \
-		$(PROTO_FILES);
-	@rm -r $(PROTO_OUT)/api
-	@mv $(PROTO_OUT)/uber/cadence/api $(PROTO_OUT)
-	@rm -r $(PROTO_OUT)/uber
 
 git-submodules:
 	git submodule update --init --recursive

@@ -22,7 +22,7 @@ package testdata
 
 import (
 	gogo "github.com/gogo/protobuf/types"
-	apiv1 "go.uber.org/cadence/.gen/proto/api/v1"
+	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 )
 
 var (

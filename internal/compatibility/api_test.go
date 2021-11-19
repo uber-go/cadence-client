@@ -25,8 +25,8 @@ import (
 
 	gogo "github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
+	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/cadence/.gen/go/shared"
-	apiv1 "go.uber.org/cadence/.gen/proto/api/v1"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/compatibility/proto"
 	"go.uber.org/cadence/internal/compatibility/testdata"

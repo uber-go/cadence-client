@@ -10,12 +10,10 @@
 *.html
 .tmp/
 /vendor
-bins
-cadence-client
-bins
 test.log
 /dummy
 .build
 .bins
+.bin
 .DS_Store
 .gobincache

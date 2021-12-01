@@ -6,9 +6,8 @@ This doc is intended for contributors to `cadence-client` (hopefully that's you!
 
 ## Development Environment
 
-* Go. Install on OS X with `brew install go`. The minimum required Go version is 1.10.
-* `thrift`. Install on OS X with `brew install thrift`.
-* `thrift-gen`. Install with `go get github.com/uber/tchannel-go/thrift/thrift-gen`.
+* Go. Install on OS X with `brew install go`. The minimum required Go version is visible in the go.mod file.
+* `make build` should download and build anything else necessary.
 
 ## Checking out the code
 
@@ -16,34 +15,50 @@ Make sure the repository is cloned to the correct location:
 (Note: the path is `go.uber.org/cadence/` instead of github repo)
 
 ```bash
-go get go.uber.org/cadence/...
+go get -d go.uber.org/cadence
 cd $GOPATH/src/go.uber.org/cadence
 ```
 
 ## Dependency management
 
-Dependencies are tracked via `Gopkg.toml`. If you're not familiar with `dep`,
-read the [docs](https://https://golang.github.io/dep/docs/introduction.html).
+Dependencies are tracked via go modules (tool-only dependencies in `tools.go`), and we no longer support dep/glide/etc
+at all.  If you wish to check for dependencies that may be good to update, try `make deps`.
+
+Dependencies should generally be as _low_ of a version as possible, not whatever is "current",
+unless the project has a proven history of API stability and reliability.  go.uber.org/yarpc is a good example of this.  
+Dependency upgrades may force our users to upgrade as well, so only upgrade them when necessary,
+like on a new needed feature or an important bugfix.
+
+## API stability
+
+While we are pre-1.0 we do our best to maintain backwards compatibility at a binary *and semantic* level, but there will
+be some gaps where this is not practical.  Any known breakages should be mentioned in the associated Github releases
+(soon: also changelog.md).  
+Generally speaking though, all obviously-intentionally-exposed APIs must be highly stable, take care to maintain it.
+
+As a concrete example of gaps that may occur, any use of our generated Thrift or gRPC APIs is quite fragile.  High level
+APIs that accidentally expose this will be _relatively_ stable at the top level of fields/methods, but e.g. use of the
+client.GetWorkflowHistory iterator (which exposes _many_ raw RPC types) is effectively stable only by accident.
+
+In the future we intend to have a clearer split between long-term-stable APIs and ones that are only best-effort.
+Ideally the best-effort APIs will be for special cases only, e.g. RPC clients, and users that access them should be made
+aware of the instability (and how to update when breakages occur) where possible.
 
 ## Licence headers
 
 This project is Open Source Software, and requires a header at the beginning of
-all source files. To verify that all files contain the header execute:
+all source files. `make build` should enforce this for you.
 
-```lang=bash
-make copyright
-```
-
-## Commit Messages
-
-Overcommit adds some requirements to your commit messages. At Uber, we follow the
-[Chris Beams](http://chris.beams.io/posts/git-commit/) guide to writing git
-commit messages. Read it, follow it, learn it, love it.
+To re-generate copyright headers, e.g. to add missing ones, run `make copyright`.
 
 ## Testing
 
-Run all the tests with coverage and race detector enabled:
-
+To run all the tests with coverage and race detector enabled, start a cadence server (e.g. via `docker compose up`) and:
 ```bash
 make test
+```
+
+You can run only unit tests, which is quicker and likely sufficient while in the middle of development, with:
+```bash
+make unit_test
 ```

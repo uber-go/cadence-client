@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
@@ -92,10 +91,6 @@ func (s *CacheEvictionSuite) TearDownTest() {
 }
 
 func TestWorkersTestSuite(t *testing.T) {
-	formatter := &log.TextFormatter{}
-	formatter.FullTimestamp = true
-	log.SetFormatter(formatter)
-	log.SetLevel(log.DebugLevel)
 	suite.Run(t, new(CacheEvictionSuite))
 }
 

@@ -153,6 +153,7 @@ func TestConstructError_TimeoutError(t *testing.T) {
 	// Backward compatibility test
 	reason = errReasonTimeout
 	details, err = dc.ToData(s.TimeoutTypeHeartbeat)
+	require.NoError(t, err)
 	constructedErr = constructError(reason, details, dc)
 	timeoutErr, ok = constructedErr.(*TimeoutError)
 	require.True(t, ok)

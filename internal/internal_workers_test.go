@@ -29,7 +29,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	m "go.uber.org/cadence/.gen/go/shared"
@@ -79,11 +78,6 @@ func (s *WorkersTestSuite) TearDownTest() {
 }
 
 func TestWorkersTestSuite(t *testing.T) {
-	formatter := &log.TextFormatter{}
-	formatter.FullTimestamp = true
-	log.SetFormatter(formatter)
-	log.SetLevel(log.DebugLevel)
-
 	suite.Run(t, new(WorkersTestSuite))
 }
 

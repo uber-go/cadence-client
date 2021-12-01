@@ -22,6 +22,7 @@ package replaytests
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.uber.org/cadence/activity"
@@ -29,9 +30,6 @@ import (
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
 )
-
-// ApplicationName is the task list for this sample
-const ApplicationName = "helloWorldGroup"
 
 // Workflow workflow decider
 func Workflow(ctx workflow.Context, name string) error {
@@ -47,23 +45,23 @@ func Workflow(ctx workflow.Context, name string) error {
 	var helloworldResult string
 	v := workflow.GetVersion(ctx, "test-change", workflow.DefaultVersion, 1)
 	if v == workflow.DefaultVersion {
-		err := workflow.ExecuteActivity(ctx, helloworldActivity, name).Get(ctx, &helloworldResult)
-		if err != nil {
-			logger.Error("Activity failed.", zap.Error(err))
-			return err
-		}
+		return errors.New("no default-version history")
 	} else {
 		err := workflow.ExecuteActivity(ctx, helloworldActivity, name).Get(ctx, &helloworldResult)
+		if err != nil {
+			logger.Error("First activity failed.", zap.Error(err))
+			return err
+		}
 		err = workflow.ExecuteActivity(ctx, helloworldActivity, name).Get(ctx, &helloworldResult)
 		if err != nil {
-			logger.Error("Activity failed.", zap.Error(err))
+			logger.Error("Second activity failed.", zap.Error(err))
 			return err
 		}
 	}
 
 	err := workflow.ExecuteActivity(ctx, helloworldActivity, name).Get(ctx, &helloworldResult)
 	if err != nil {
-		logger.Error("Activity failed.", zap.Error(err))
+		logger.Error("Third activity failed.", zap.Error(err))
 		return err
 	}
 
@@ -87,9 +85,13 @@ func Workflow2(ctx workflow.Context, name string) error {
 
 	workflow.GetVersion(ctx, "test-change", workflow.DefaultVersion, 1)
 
-	workflow.UpsertSearchAttributes(ctx, map[string]interface{}{"CustomKeywordField": "testkey"})
+	err := workflow.UpsertSearchAttributes(ctx, map[string]interface{}{"CustomKeywordField": "testkey"})
+	if err != nil {
+		logger.Error("upsert failed", zap.Error(err))
+		return err
+	}
 
-	err := workflow.ExecuteActivity(ctx, helloworldActivity, name).Get(ctx, &helloworldResult)
+	err = workflow.ExecuteActivity(ctx, helloworldActivity, name).Get(ctx, &helloworldResult)
 	if err != nil {
 		logger.Error("Activity failed.", zap.Error(err))
 		return err

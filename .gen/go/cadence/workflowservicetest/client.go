@@ -287,6 +287,39 @@ func (mr *_MockClientRecorder) GetSearchAttributes(
 	return mr.mock.ctrl.RecordCall(mr.mock, "GetSearchAttributes", args...)
 }
 
+// GetTaskListsByDomain responds to a GetTaskListsByDomain call based on the mock expectations. This
+// call will fail if the mock does not expect this call. Use EXPECT to expect
+// a call to this function.
+//
+// 	client.EXPECT().GetTaskListsByDomain(gomock.Any(), ...).Return(...)
+// 	... := client.GetTaskListsByDomain(...)
+func (m *MockClient) GetTaskListsByDomain(
+	ctx context.Context,
+	_Request *shared.GetTaskListsByDomainRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.GetTaskListsByDomainResponse, err error) {
+
+	args := []interface{}{ctx, _Request}
+	for _, o := range opts {
+		args = append(args, o)
+	}
+	i := 0
+	ret := m.ctrl.Call(m, "GetTaskListsByDomain", args...)
+	success, _ = ret[i].(*shared.GetTaskListsByDomainResponse)
+	i++
+	err, _ = ret[i].(error)
+	return
+}
+
+func (mr *_MockClientRecorder) GetTaskListsByDomain(
+	ctx interface{},
+	_Request interface{},
+	opts ...interface{},
+) *gomock.Call {
+	args := append([]interface{}{ctx, _Request}, opts...)
+	return mr.mock.ctrl.RecordCall(mr.mock, "GetTaskListsByDomain", args...)
+}
+
 // GetWorkflowExecutionHistory responds to a GetWorkflowExecutionHistory call based on the mock expectations. This
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
@@ -681,6 +714,37 @@ func (mr *_MockClientRecorder) RecordActivityTaskHeartbeatByID(
 ) *gomock.Call {
 	args := append([]interface{}{ctx, _HeartbeatRequest}, opts...)
 	return mr.mock.ctrl.RecordCall(mr.mock, "RecordActivityTaskHeartbeatByID", args...)
+}
+
+// RefreshWorkflowTasks responds to a RefreshWorkflowTasks call based on the mock expectations. This
+// call will fail if the mock does not expect this call. Use EXPECT to expect
+// a call to this function.
+//
+// 	client.EXPECT().RefreshWorkflowTasks(gomock.Any(), ...).Return(...)
+// 	... := client.RefreshWorkflowTasks(...)
+func (m *MockClient) RefreshWorkflowTasks(
+	ctx context.Context,
+	_Request *shared.RefreshWorkflowTasksRequest,
+	opts ...yarpc.CallOption,
+) (err error) {
+
+	args := []interface{}{ctx, _Request}
+	for _, o := range opts {
+		args = append(args, o)
+	}
+	i := 0
+	ret := m.ctrl.Call(m, "RefreshWorkflowTasks", args...)
+	err, _ = ret[i].(error)
+	return
+}
+
+func (mr *_MockClientRecorder) RefreshWorkflowTasks(
+	ctx interface{},
+	_Request interface{},
+	opts ...interface{},
+) *gomock.Call {
+	args := append([]interface{}{ctx, _Request}, opts...)
+	return mr.mock.ctrl.RecordCall(mr.mock, "RefreshWorkflowTasks", args...)
 }
 
 // RegisterDomain responds to a RegisterDomain call based on the mock expectations. This

@@ -76,6 +76,12 @@ type Interface interface {
 		opts ...yarpc.CallOption,
 	) (*shared.GetSearchAttributesResponse, error)
 
+	GetTaskListsByDomain(
+		ctx context.Context,
+		Request *shared.GetTaskListsByDomainRequest,
+		opts ...yarpc.CallOption,
+	) (*shared.GetTaskListsByDomainResponse, error)
+
 	GetWorkflowExecutionHistory(
 		ctx context.Context,
 		GetRequest *shared.GetWorkflowExecutionHistoryRequest,
@@ -147,6 +153,12 @@ type Interface interface {
 		HeartbeatRequest *shared.RecordActivityTaskHeartbeatByIDRequest,
 		opts ...yarpc.CallOption,
 	) (*shared.RecordActivityTaskHeartbeatResponse, error)
+
+	RefreshWorkflowTasks(
+		ctx context.Context,
+		Request *shared.RefreshWorkflowTasksRequest,
+		opts ...yarpc.CallOption,
+	) error
 
 	RegisterDomain(
 		ctx context.Context,
@@ -446,6 +458,29 @@ func (c client) GetSearchAttributes(
 	return
 }
 
+func (c client) GetTaskListsByDomain(
+	ctx context.Context,
+	_Request *shared.GetTaskListsByDomainRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.GetTaskListsByDomainResponse, err error) {
+
+	args := cadence.WorkflowService_GetTaskListsByDomain_Helper.Args(_Request)
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_GetTaskListsByDomain_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	success, err = cadence.WorkflowService_GetTaskListsByDomain_Helper.UnwrapResponse(&result)
+	return
+}
+
 func (c client) GetWorkflowExecutionHistory(
 	ctx context.Context,
 	_GetRequest *shared.GetWorkflowExecutionHistoryRequest,
@@ -719,6 +754,29 @@ func (c client) RecordActivityTaskHeartbeatByID(
 	}
 
 	success, err = cadence.WorkflowService_RecordActivityTaskHeartbeatByID_Helper.UnwrapResponse(&result)
+	return
+}
+
+func (c client) RefreshWorkflowTasks(
+	ctx context.Context,
+	_Request *shared.RefreshWorkflowTasksRequest,
+	opts ...yarpc.CallOption,
+) (err error) {
+
+	args := cadence.WorkflowService_RefreshWorkflowTasks_Helper.Args(_Request)
+
+	var body wire.Value
+	body, err = c.c.Call(ctx, args, opts...)
+	if err != nil {
+		return
+	}
+
+	var result cadence.WorkflowService_RefreshWorkflowTasks_Result
+	if err = result.FromWire(body); err != nil {
+		return
+	}
+
+	err = cadence.WorkflowService_RefreshWorkflowTasks_Helper.UnwrapResponse(&result)
 	return
 }
 

@@ -327,6 +327,16 @@ type (
 		//  - InternalServiceError
 		//  - EntityNotExistError
 		DescribeTaskList(ctx context.Context, tasklist string, tasklistType s.TaskListType) (*s.DescribeTaskListResponse, error)
+
+		// RefreshWorkflowTasks refreshes all the tasks of a given workflow.
+		// - workflow ID of the workflow.
+		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
+		// The errors it can return:
+		//  - BadRequestError
+		//  - DomainNotActiveError
+		//  - ServiceBusyError
+		//  - EntityNotExistError
+		RefreshWorkflowTasks(ctx context.Context, workflowID, runID string) error
 	}
 
 	// ClientOptions are optional parameters for Client creation.

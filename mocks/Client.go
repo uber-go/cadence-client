@@ -536,3 +536,17 @@ func (_m *Client) TerminateWorkflow(ctx context.Context, workflowID string, runI
 
 	return r0
 }
+
+// RefreshWorkflowTasks refreshes all the tasks of a given workflow.
+func (_m *Client) RefreshWorkflowTasks(ctx context.Context, workflowID, runID string) error {
+	ret := _m.Called(ctx, workflowID, runID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, workflowID, runID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

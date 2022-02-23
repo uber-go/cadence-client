@@ -86,6 +86,7 @@ const (
 	scopeNameGetSearchAttributes                = CadenceMetricsPrefix + "GetSearchAttributes"
 	scopeNameListTaskListPartitions             = CadenceMetricsPrefix + "ListTaskListPartitions"
 	scopeNameGetClusterInfo                     = CadenceMetricsPrefix + "GetClusterInfo"
+	scopeRefreshWorkflowTasks                   = CadenceMetricsPrefix + "RefreshWorkflowTasks"
 )
 
 // NewWorkflowServiceWrapper creates a new wrapper to WorkflowService that will emit metrics for each service call.
@@ -394,4 +395,15 @@ func (w *workflowServiceMetricsWrapper) GetClusterInfo(ctx context.Context, opts
 	result, err := w.service.GetClusterInfo(ctx, opts...)
 	scope.handleError(err)
 	return result, err
+}
+
+func (w *workflowServiceMetricsWrapper) GetTaskListsByDomain(ctx context.Context, Request *shared.GetTaskListsByDomainRequest, opts ...yarpc.CallOption) (*shared.GetTaskListsByDomainResponse, error) {
+	panic("implement me")
+}
+
+func (w *workflowServiceMetricsWrapper) RefreshWorkflowTasks(ctx context.Context, request *shared.RefreshWorkflowTasksRequest, opts ...yarpc.CallOption) error {
+	scope := w.getOperationScope(scopeRefreshWorkflowTasks)
+	err := w.service.RefreshWorkflowTasks(ctx, request, opts...)
+	scope.handleError(err)
+	return err
 }

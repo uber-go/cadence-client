@@ -987,6 +987,31 @@ func (wc *workflowClient) DescribeTaskList(ctx context.Context, tasklist string,
 	return resp, nil
 }
 
+// RefreshWorkflowTasks refreshes all the tasks of a given workflow.
+// - workflow ID of the workflow.
+// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
+// The errors it can return:
+//  - BadRequestError
+//  - DomainNotActiveError
+//  - ServiceBusyError
+//  - EntityNotExistError
+func (wc *workflowClient) RefreshWorkflowTasks(ctx context.Context, workflowID, runID string) error {
+	request := &s.RefreshWorkflowTasksRequest{
+		Domain: common.StringPtr(wc.domain),
+		Execution: &s.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      getRunID(runID),
+		},
+	}
+
+	return backoff.Retry(ctx,
+		func() error {
+			tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags)
+			defer cancel()
+			return wc.workflowService.RefreshWorkflowTasks(tchCtx, request, opt...)
+		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+}
+
 func (wc *workflowClient) getWorkflowHeader(ctx context.Context) *s.Header {
 	header := &s.Header{
 		Fields: make(map[string][]byte),

@@ -448,3 +448,23 @@ func (w *workflowServiceAuthWrapper) GetClusterInfo(ctx context.Context, opts ..
 	result, err := w.service.GetClusterInfo(ctx, opts...)
 	return result, err
 }
+
+func (w *workflowServiceAuthWrapper) GetTaskListsByDomain(ctx context.Context, request *shared.GetTaskListsByDomainRequest, opts ...yarpc.CallOption) (*shared.GetTaskListsByDomainResponse, error) {
+	tokenHeader, err := w.getYarpcJWTHeader()
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, *tokenHeader)
+	result, err := w.service.GetTaskListsByDomain(ctx,request, opts...)
+	return result, err
+}
+
+func (w *workflowServiceAuthWrapper) RefreshWorkflowTasks(ctx context.Context, request *shared.RefreshWorkflowTasksRequest, opts ...yarpc.CallOption) error {
+	tokenHeader, err := w.getYarpcJWTHeader()
+	if err != nil {
+		return  err
+	}
+	opts = append(opts, *tokenHeader)
+	err = w.service.RefreshWorkflowTasks(ctx, request, opts...)
+	return err
+}

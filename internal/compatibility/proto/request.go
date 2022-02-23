@@ -610,3 +610,14 @@ func ListOpenWorkflowExecutionsRequest(r *shared.ListOpenWorkflowExecutionsReque
 
 	return &request
 }
+
+func RefreshWorkflowTasksRequest(r *shared.RefreshWorkflowTasksRequest) *apiv1.RefreshWorkflowTasksRequest {
+	if r == nil {
+		return nil
+	}
+	request := apiv1.RefreshWorkflowTasksRequest{
+		Domain:          r.GetDomain(),
+		WorkflowExecution:   WorkflowExecution(r.Execution),
+	}
+	return &request
+}

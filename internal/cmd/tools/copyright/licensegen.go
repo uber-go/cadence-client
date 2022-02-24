@@ -54,7 +54,7 @@ const licenseHeaderIndicator = "Copyright (c)"
 
 var (
 	// directories to be excluded
-	dirExcludeList = []string{"vendor/"}
+	dirExcludeList = []string{"vendor/", "idls/"}
 	// default perms for the newly created files
 	defaultFilePerms = os.FileMode(0644)
 )

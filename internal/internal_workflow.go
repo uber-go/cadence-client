@@ -959,6 +959,20 @@ func (d *dispatcherImpl) Close() {
 	d.closed = true
 	d.mutex.Unlock()
 	for i := 0; i < len(d.coroutines); i++ {
+		if i > 0 {
+			// HORRIBLE HACK:
+			// `c.exit()` triggers a `runtime.Goexit()`, and does NOT wait for the goroutine to finish shutting down.
+			// Unfortunately this violates the entire core assumption that all workflow goroutines run effectively
+			// single-threaded, and it can lead to concurrency bugs.  In particular, concurrent map operations, which
+			// will immediately crash the hosting process.
+			//
+			// To attempt to minimize the impact of this, pause briefly between killing each goroutine.
+			//
+			// A complete fix will require waiting for each goroutine's shutdown, as well as detecting abnormally-long
+			// shutdown times so they can be reported... and probably more, e.g. abandoning stuck goroutines, tracking
+			// number of them for alerting, etc.
+			time.Sleep(time.Millisecond)
+		}
 		c := d.coroutines[i]
 		if !c.closed {
 			c.exit()

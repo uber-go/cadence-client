@@ -37,7 +37,7 @@ func TestTracingContextPropagator(t *testing.T) {
 	tracer, closer, err := jaeger_config.Configuration{ServiceName: "test-service"}.NewTracer()
 	require.NoError(t, err)
 	defer closer.Close()
-	ctxProp := NewTracingContextPropagator(zap.NewNop(), tracer)
+	ctxProp := NewOtelBridgeTracingContextPropagator(zap.NewNop(), tracer)
 
 	span := tracer.StartSpan("test-operation")
 	ctx := context.Background()
@@ -59,7 +59,7 @@ func TestTracingContextPropagator(t *testing.T) {
 
 func TestTracingContextPropagatorNoSpan(t *testing.T) {
 	t.Parallel()
-	ctxProp := NewTracingContextPropagator(zap.NewNop(), opentracing.NoopTracer{})
+	ctxProp := NewOtelBridgeTracingContextPropagator(zap.NewNop(), opentracing.NoopTracer{})
 
 	header := &shared.Header{
 		Fields: map[string][]byte{},
@@ -77,7 +77,7 @@ func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
 	tracer, closer, err := jaeger_config.Configuration{ServiceName: "test-service"}.NewTracer()
 	require.NoError(t, err)
 	defer closer.Close()
-	ctxProp := NewTracingContextPropagator(zap.NewNop(), tracer)
+	ctxProp := NewOtelBridgeTracingContextPropagator(zap.NewNop(), tracer)
 
 	span := tracer.StartSpan("test-operation")
 	assert.NotNil(t, span.Context())
@@ -104,7 +104,7 @@ func TestTracingContextPropagatorWorkflowContext(t *testing.T) {
 
 func TestTracingContextPropagatorWorkflowContextNoSpan(t *testing.T) {
 	t.Parallel()
-	ctxProp := NewTracingContextPropagator(zap.NewNop(), opentracing.NoopTracer{})
+	ctxProp := NewOtelBridgeTracingContextPropagator(zap.NewNop(), opentracing.NoopTracer{})
 
 	header := &shared.Header{
 		Fields: map[string][]byte{},
@@ -122,7 +122,7 @@ func TestConsistentInjectionExtraction(t *testing.T) {
 	tracer, closer, err := jaeger_config.Configuration{ServiceName: "test-service"}.NewTracer()
 	require.NoError(t, err)
 	defer closer.Close()
-	ctxProp := NewTracingContextPropagator(zap.NewNop(), tracer)
+	ctxProp := NewOtelBridgeTracingContextPropagator(zap.NewNop(), tracer)
 
 	span := tracer.StartSpan("test-operation")
 	// base64 encoded string '{}'

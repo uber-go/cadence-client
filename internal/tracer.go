@@ -114,3 +114,102 @@ func (t *tracingContextPropagator) ExtractToWorkflow(
 	}
 	return contextWithSpan(ctx, spanContext), nil
 }
+
+// otelBridgeTracingContextPropagator implements the ContextPropagator interface for
+// tracing context propagation with Otel BridgeTracer.
+// The Otel Bridge supports only HTTPHeaders.
+//
+//
+// Inject -> context.Context to Header - this extracts the Span from the
+//		context and places the SpanContext into the Header
+// Extract -> Header to context.Context - this extracts the SpanContext from
+//		the header, returns a context.Context containing the SpanContext
+// InjectFromWorkflow -> Context to Header - extracts a SpanContext from the
+//		workflow context and puts it in the header
+// ExtractToWorkflow -> Header to Context - takes the SpanContext present in
+//		the header and puts it in the Context object. Does not start a new span
+//		as that is started outside when the workflow is actually executed
+type otelBridgeTracingContextPropagator struct {
+	tracingContextPropagator
+}
+
+// NewOtelBridgeTracingContextPropagator returns new bridge tracing context propagator object
+func NewOtelBridgeTracingContextPropagator(logger *zap.Logger, tracer opentracing.Tracer) ContextPropagator {
+	return &otelBridgeTracingContextPropagator{tracingContextPropagator{logger, tracer}}
+}
+
+func (t *otelBridgeTracingContextPropagator) Inject(
+	ctx context.Context,
+	hw HeaderWriter,
+) error {
+	// retrieve span from context object
+	span := opentracing.SpanFromContext(ctx)
+	if span == nil {
+		return nil
+	}
+	carrier := opentracing.HTTPHeadersCarrier(make(map[string][]string))
+	err := t.tracer.Inject(span.Context(), opentracing.HTTPHeaders, carrier)
+	if err != nil {
+		return err
+	}
+	carrier.ForeachKey(func(key, val string) error {
+		hw.Set(key, []byte(val))
+		return nil
+	})
+	return nil
+}
+
+func (t *otelBridgeTracingContextPropagator) Extract(
+	ctx context.Context,
+	hr HeaderReader,
+) (context.Context, error) {
+	carrier := opentracing.HTTPHeadersCarrier(make(map[string][]string))
+	hr.ForEachKey(func(key string, val []byte) error {
+		carrier[key] = append(carrier[key], string(val))
+		return nil
+	})
+	spanContext, err := t.tracer.Extract(opentracing.HTTPHeaders, carrier)
+	if err != nil {
+		// did not find a tracing span, just return the current context
+		return ctx, nil
+	}
+	return context.WithValue(ctx, activeSpanContextKey, spanContext), nil
+}
+
+func (t *otelBridgeTracingContextPropagator) InjectFromWorkflow(
+	ctx Context,
+	hw HeaderWriter,
+) error {
+	// retrieve span from context object
+	spanContext := spanFromContext(ctx)
+	if spanContext == nil {
+		return nil
+	}
+	carrier := opentracing.HTTPHeadersCarrier(make(map[string][]string))
+	err := t.tracer.Inject(spanContext, opentracing.HTTPHeaders, carrier)
+	if err != nil {
+		return err
+	}
+	carrier.ForeachKey(func(key, val string) error {
+		hw.Set(key, []byte(val))
+		return nil
+	})
+	return nil
+}
+
+func (t *otelBridgeTracingContextPropagator) ExtractToWorkflow(
+	ctx Context,
+	hr HeaderReader,
+) (Context, error) {
+	carrier := opentracing.HTTPHeadersCarrier(make(map[string][]string))
+	hr.ForEachKey(func(key string, val []byte) error {
+		carrier[key] = append(carrier[key], string(val))
+		return nil
+	})
+	spanContext, err := t.tracer.Extract(opentracing.HTTPHeaders, carrier)
+	if err != nil {
+		// did not find a tracing span, just return the current context
+		return ctx, nil
+	}
+	return contextWithSpan(ctx, spanContext), nil
+}

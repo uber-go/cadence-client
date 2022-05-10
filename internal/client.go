@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"time"
 
+        otbridge "go.opentelemetry.io/otel/bridge/opentracing"
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
@@ -551,6 +552,12 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	if options != nil && options.Tracer != nil {
 		tracer = options.Tracer
 		contextPropagators = append(contextPropagators, NewTracingContextPropagator(zap.NewNop(), tracer))
+                switch tracer.(type) {
+                case *otbridge.BridgeTracer:
+                        contextPropagators = append(contextPropagators, NewOtelBridgeTracingContextPropagator(zap.NewNop(), tracer))
+                default:
+                        contextPropagators = append(contextPropagators, NewTracingContextPropagator(zap.NewNop(), tracer))
+                }
 	} else {
 		tracer = opentracing.NoopTracer{}
 	}

@@ -81,6 +81,9 @@ func createOpenTracingSpan(
 	span := tracer.StartSpan(
 		name,
 		opentracing.StartTime(start),
+		// Sadly, the Otel BridgeTracer does not consider "FollowsFrom" as a valid reference
+		// for setting a parent SpanContext. A "ChildOf" reference is needed.
+		opentracing.ChildOf(parent),
 		opentracing.FollowsFrom(parent),
 		tags,
 	)

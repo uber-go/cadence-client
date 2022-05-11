@@ -455,14 +455,14 @@ func (w *workflowServiceAuthWrapper) GetTaskListsByDomain(ctx context.Context, r
 		return nil, err
 	}
 	opts = append(opts, *tokenHeader)
-	result, err := w.service.GetTaskListsByDomain(ctx,request, opts...)
+	result, err := w.service.GetTaskListsByDomain(ctx, request, opts...)
 	return result, err
 }
 
 func (w *workflowServiceAuthWrapper) RefreshWorkflowTasks(ctx context.Context, request *shared.RefreshWorkflowTasksRequest, opts ...yarpc.CallOption) error {
 	tokenHeader, err := w.getYarpcJWTHeader()
 	if err != nil {
-		return  err
+		return err
 	}
 	opts = append(opts, *tokenHeader)
 	err = w.service.RefreshWorkflowTasks(ctx, request, opts...)

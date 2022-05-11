@@ -616,8 +616,8 @@ func RefreshWorkflowTasksRequest(r *shared.RefreshWorkflowTasksRequest) *apiv1.R
 		return nil
 	}
 	request := apiv1.RefreshWorkflowTasksRequest{
-		Domain:          r.GetDomain(),
-		WorkflowExecution:   WorkflowExecution(r.Execution),
+		Domain:            r.GetDomain(),
+		WorkflowExecution: WorkflowExecution(r.Execution),
 	}
 	return &request
 }

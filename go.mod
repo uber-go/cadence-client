@@ -14,6 +14,7 @@ require (
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.7.1
+	github.com/streadway/quantile v0.0.0-20220407130108-4246515d968d // indirect
 	github.com/uber-go/tally v3.3.15+incompatible
 	github.com/uber/cadence-idl v0.0.0-20220505064515-7bb6b0808383 // indirect
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
@@ -28,6 +29,7 @@ require (
 	go.uber.org/zap v1.13.0
 	golang.org/x/lint v0.0.0-20200130185559-910be7a94367
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974
+	golang.org/x/sys v0.0.0-20220403205710-6acee93ad0eb // indirect
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	honnef.co/go/tools v0.0.1-2019.2.3
 )

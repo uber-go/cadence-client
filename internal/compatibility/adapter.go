@@ -38,8 +38,6 @@ type thrift2protoAdapter struct {
 	visibility apiv1.VisibilityAPIYARPCClient
 }
 
-
-
 func NewThrift2ProtoAdapter(
 	domain apiv1.DomainAPIYARPCClient,
 	workflow apiv1.WorkflowAPIYARPCClient,
@@ -245,7 +243,7 @@ func (a thrift2protoAdapter) GetTaskListsByDomain(ctx context.Context, Request *
 
 func (a thrift2protoAdapter) RefreshWorkflowTasks(ctx context.Context, request *shared.RefreshWorkflowTasksRequest, opts ...yarpc.CallOption) error {
 	_, err := a.workflow.RefreshWorkflowTasks(ctx, proto.RefreshWorkflowTasksRequest(request), opts...)
-	return  thrift.Error(err)
+	return thrift.Error(err)
 }
 
 type domainAPIthriftAdapter struct {
@@ -435,4 +433,3 @@ func (a visibilityAPIthriftAdapter) GetSearchAttributes(ctx context.Context, req
 	response, err := a.service.GetSearchAttributes(ctx, opts...)
 	return proto.GetSearchAttributesResponse(response), proto.Error(err)
 }
-

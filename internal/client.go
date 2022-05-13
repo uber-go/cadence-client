@@ -551,7 +551,6 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	var tracer opentracing.Tracer
 	if options != nil && options.Tracer != nil {
 		tracer = options.Tracer
-		contextPropagators = append(contextPropagators, NewTracingContextPropagator(zap.NewNop(), tracer))
                 switch tracer.(type) {
                 case *otbridge.BridgeTracer:
                         contextPropagators = append(contextPropagators, NewOtelBridgeTracingContextPropagator(zap.NewNop(), tracer))

@@ -149,7 +149,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 		Name: common.StringPtr(testDomain),
 	}, callOptions()...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
 	// first return a retryable error to check if retry policy is configured
-	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.ServiceBusyError{}).Times(1)
+	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.InternalServiceError{}).Times(1)
 	// then return a non-retryable error
 	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.BadRequestError{}).Times(1)
 

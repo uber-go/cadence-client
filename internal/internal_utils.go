@@ -33,7 +33,7 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/metrics"

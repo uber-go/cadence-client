@@ -72,7 +72,8 @@ func isServiceTransientError(err error) bool {
 		*s.QueryFailedError,
 		*s.DomainNotActiveError,
 		*s.CancellationAlreadyRequestedError,
-		*s.ClientVersionNotSupportedError:
+		*s.ClientVersionNotSupportedError,
+		*s.LimitExceededError:
 		return false
 	}
 
@@ -82,6 +83,5 @@ func isServiceTransientError(err error) bool {
 
 	// s.InternalServiceError
 	// s.ServiceBusyError
-	// s.LimitExceededError
 	return true
 }

@@ -49,6 +49,7 @@ var _ DomainClient = (*domainClient)(nil)
 const (
 	defaultDecisionTaskTimeoutInSecs = 10
 	defaultGetHistoryTimeoutInSecs   = 25
+	minLongPollInterval              = 100 * time.Millisecond
 )
 
 var (
@@ -512,6 +513,15 @@ func (wc *workflowClient) GetWorkflowHistory(
 		var err error
 	Loop:
 		for {
+			// Stop polling the server if the remaining context timeout is too low.
+			// This prevents unnessesary final call which will result in a timeout anyway.
+			if deadline, ok := ctx.Deadline(); ok {
+				remainingTime := deadline.Sub(time.Now())
+				if remainingTime < minLongPollInterval {
+					return nil, context.DeadlineExceeded
+				}
+			}
+
 			err = backoff.Retry(ctx,
 				func() error {
 					var err1 error

@@ -23,7 +23,7 @@ package activity
 import (
 	"context"
 
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/cadence/internal"
 	"go.uber.org/zap"
 )

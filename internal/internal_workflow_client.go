@@ -33,7 +33,7 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
@@ -512,12 +512,18 @@ func (wc *workflowClient) GetWorkflowHistory(
 		var err error
 	Loop:
 		for {
+			var isFinalLongPoll bool
 			err = backoff.Retry(ctx,
 				func() error {
 					var err1 error
 					tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags, func(builder *contextBuilder) {
 						if isLongPoll {
 							builder.Timeout = defaultGetHistoryTimeoutInSecs * time.Second
+							deadline, ok := ctx.Deadline()
+							if ok && deadline.Before(time.Now().Add(builder.Timeout)) {
+								// insufficient time for another poll, so this needs to be the last attempt
+								isFinalLongPoll = true
+							}
 						}
 					})
 					defer cancel()
@@ -546,6 +552,13 @@ func (wc *workflowClient) GetWorkflowHistory(
 				return nil, err
 			}
 			if isLongPoll && len(response.History.Events) == 0 && len(response.NextPageToken) != 0 {
+				if isFinalLongPoll {
+					// essentially a deadline exceeded, the last attempt did not get a result.
+					// this is necessary because the server does not know if we are able to try again,
+					// so it returns an empty result slightly before a timeout occurs, so the next
+					// attempt's token can be returned if it wishes to retry.
+					return nil, fmt.Errorf("timed out waiting for the workflow to finish: %w", context.DeadlineExceeded)
+				}
 				request.NextPageToken = response.NextPageToken
 				continue Loop
 			}

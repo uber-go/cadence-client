@@ -29,8 +29,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type someError struct{}
-
 func TestRetrySuccess(t *testing.T) {
 	t.Parallel()
 	i := 0
@@ -112,19 +110,13 @@ func TestIsRetryableSuccess(t *testing.T) {
 		return &someError{}
 	}
 
-	isRetryable := func(err error) bool {
-		if _, ok := err.(*someError); ok {
-			return true
-		}
-
-		return false
-	}
-
 	policy := NewExponentialRetryPolicy(1 * time.Millisecond)
 	policy.SetMaximumInterval(5 * time.Millisecond)
 	policy.SetMaximumAttempts(10)
 
-	err := Retry(context.Background(), op, policy, isRetryable)
+	err := Retry(context.Background(), op, policy, func(err error) bool {
+		return true // retry on any error
+	})
 	assert.NoError(t, err, "Retry count: %v", i)
 	assert.Equal(t, 5, i)
 }
@@ -146,7 +138,9 @@ func TestIsRetryableFailure(t *testing.T) {
 	policy.SetMaximumInterval(5 * time.Millisecond)
 	policy.SetMaximumAttempts(10)
 
-	err := Retry(context.Background(), op, policy, IgnoreErrors([]error{&someError{}}))
+	err := Retry(context.Background(), op, policy, func(err error) bool {
+		return false // never retry
+	})
 	assert.Error(t, err)
 	assert.Equal(t, 1, i)
 }
@@ -197,6 +191,8 @@ func TestConcurrentRetrier(t *testing.T) {
 		a.Equal(done, val)
 	}
 }
+
+type someError struct{}
 
 func (e *someError) Error() string {
 	return "Some Error"

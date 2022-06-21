@@ -101,9 +101,6 @@ func isServiceTransientError(err error) bool {
 	if target := (*s.QueryFailedError)(nil); errors.As(err, &target) {
 		return false
 	}
-	if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
-		return false
-	}
 	if target := (*s.WorkflowExecutionAlreadyCompletedError)(nil); errors.As(err, &target) {
 		return false
 	}
@@ -117,7 +114,8 @@ func isServiceTransientError(err error) bool {
 	}
 
 	// s.InternalServiceError
-	// a few other possibly-temporary server errors
+	// s.ServiceBusyError (must retry after a delay, but it is transient)
+	// server-side-only error types (as they should not reach clients)
 	// and all other `error` types
 	return true
 }

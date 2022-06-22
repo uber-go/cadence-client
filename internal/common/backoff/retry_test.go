@@ -29,28 +29,56 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type someError struct{}
-
-func TestRetrySuccess(t *testing.T) {
+func TestRetry(t *testing.T) {
 	t.Parallel()
-	i := 0
-	op := func() error {
-		i++
 
-		if i == 5 {
-			return nil
-		}
+	succeedOnAttemptNum := 5
+	tests := []struct {
+		name        string
+		maxAttempts int
+		isRetryable func(error) bool
 
-		return &someError{}
+		shouldError   bool
+		expectedCalls int
+	}{
+		{"success", 2 * succeedOnAttemptNum, nil, false, succeedOnAttemptNum},
+		{"too many tries", 3, nil, true, 4}, // max 3 retries == 4 calls.  must be < succeedOnAttemptNum to work.
+		{"success with always custom retry", 2 * succeedOnAttemptNum, func(err error) bool {
+			return true // retry on all errors, same as no custom retry
+		}, false, succeedOnAttemptNum},
+		{"success with never custom retry", 2 * succeedOnAttemptNum, func(err error) bool {
+			return false // never retry
+		}, true, 1},
 	}
 
-	policy := NewExponentialRetryPolicy(1 * time.Millisecond)
-	policy.SetMaximumInterval(5 * time.Millisecond)
-	policy.SetMaximumAttempts(10)
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			i := 0
+			op := func() error {
+				i++
 
-	err := Retry(context.Background(), op, policy, nil)
-	assert.NoError(t, err)
-	assert.Equal(t, 5, i)
+				if i == succeedOnAttemptNum { // prevent infinite loops, and lets max-attempts > 5 eventually succeed
+					return nil
+				}
+
+				return &someError{}
+			}
+
+			policy := NewExponentialRetryPolicy(1 * time.Millisecond)
+			policy.SetMaximumInterval(5 * time.Millisecond)
+			policy.SetMaximumAttempts(test.maxAttempts)
+
+			err := Retry(context.Background(), op, policy, test.isRetryable)
+			if test.shouldError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err, "Retry count: %v", i)
+			}
+			assert.Equal(t, test.expectedCalls, i, "wrong number of calls")
+		})
+	}
 }
 
 func TestNoRetryAfterContextDone(t *testing.T) {
@@ -76,79 +104,6 @@ func TestNoRetryAfterContextDone(t *testing.T) {
 	err := Retry(ctx, op, policy, nil)
 	assert.Error(t, err)
 	assert.True(t, retryCounter >= 2, "retryCounter should be at least 2 but was %d", retryCounter) // verify that we did retry
-}
-
-func TestRetryFailed(t *testing.T) {
-	t.Parallel()
-	i := 0
-	op := func() error {
-		i++
-
-		if i == 7 {
-			return nil
-		}
-
-		return &someError{}
-	}
-
-	policy := NewExponentialRetryPolicy(1 * time.Millisecond)
-	policy.SetMaximumInterval(5 * time.Millisecond)
-	policy.SetMaximumAttempts(5)
-
-	err := Retry(context.Background(), op, policy, nil)
-	assert.Error(t, err)
-}
-
-func TestIsRetryableSuccess(t *testing.T) {
-	t.Parallel()
-	i := 0
-	op := func() error {
-		i++
-
-		if i == 5 {
-			return nil
-		}
-
-		return &someError{}
-	}
-
-	isRetryable := func(err error) bool {
-		if _, ok := err.(*someError); ok {
-			return true
-		}
-
-		return false
-	}
-
-	policy := NewExponentialRetryPolicy(1 * time.Millisecond)
-	policy.SetMaximumInterval(5 * time.Millisecond)
-	policy.SetMaximumAttempts(10)
-
-	err := Retry(context.Background(), op, policy, isRetryable)
-	assert.NoError(t, err, "Retry count: %v", i)
-	assert.Equal(t, 5, i)
-}
-
-func TestIsRetryableFailure(t *testing.T) {
-	t.Parallel()
-	i := 0
-	op := func() error {
-		i++
-
-		if i == 5 {
-			return nil
-		}
-
-		return &someError{}
-	}
-
-	policy := NewExponentialRetryPolicy(1 * time.Millisecond)
-	policy.SetMaximumInterval(5 * time.Millisecond)
-	policy.SetMaximumAttempts(10)
-
-	err := Retry(context.Background(), op, policy, IgnoreErrors([]error{&someError{}}))
-	assert.Error(t, err)
-	assert.Equal(t, 1, i)
 }
 
 func TestConcurrentRetrier(t *testing.T) {
@@ -197,6 +152,8 @@ func TestConcurrentRetrier(t *testing.T) {
 		a.Equal(done, val)
 	}
 }
+
+type someError struct{}
 
 func (e *someError) Error() string {
 	return "Some Error"

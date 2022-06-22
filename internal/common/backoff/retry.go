@@ -123,16 +123,3 @@ Retry_Loop:
 		time.Sleep(next)
 	}
 }
-
-// IgnoreErrors can be used as IsRetryable handler for Retry function to exclude certain errors from the retry list
-func IgnoreErrors(errorsToExclude []error) func(error) bool {
-	return func(err error) bool {
-		for _, errorToExclude := range errorsToExclude {
-			if err == errorToExclude {
-				return false
-			}
-		}
-
-		return true
-	}
-}

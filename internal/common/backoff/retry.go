@@ -30,8 +30,10 @@ type (
 	// Operation to retry
 	Operation func() error
 
-	// IsRetryable handler can be used to exclude certain errors during retry
-	IsRetryable func(error) bool
+	// RetryAfter handler can be used to exclude certain errors during retry,
+	// and define how long to wait at a minimum before trying again.
+	// delays must be 0 or larger.
+	RetryAfter func(error) (isRetryable bool, retryAfter time.Duration)
 
 	// ConcurrentRetrier is used for client-side throttling. It determines whether to
 	// throttle outgoing traffic in case downstream backend server rejects
@@ -87,7 +89,7 @@ func NewConcurrentRetrier(retryPolicy RetryPolicy) *ConcurrentRetrier {
 }
 
 // Retry function can be used to wrap any call with retry logic using the passed in policy
-func Retry(ctx context.Context, operation Operation, policy RetryPolicy, isRetryable IsRetryable) error {
+func Retry(ctx context.Context, operation Operation, policy RetryPolicy, retryAfter RetryAfter) error {
 	var err error
 	var next time.Duration
 
@@ -104,15 +106,33 @@ Retry_Loop:
 		}
 
 		// Check if the error is retryable
-		if isRetryable != nil && !isRetryable(err) {
-			return err
+		if retryAfter != nil {
+			retryable, minNext := retryAfter(err)
+			// fail on non-retryable errors
+			if !retryable {
+				return err
+			}
+			// update the time to wait until the next attempt.
+			// as this is a *minimum*, just add it to the current pending time.
+			// this way repeated service busy errors will take increasing amounts of time before retrying,
+			// and when the request is not limited it does not further increase the time until trying again.
+			next += minNext
 		}
 
 		// check if ctx is done
+		if ctx.Err() != nil {
+			return err
+		}
+
+		// wait for the next retry period (or context timeout)
 		if ctxDone := ctx.Done(); ctxDone != nil {
+			// we could check if this is longer than context deadline and immediately fail...
+			// ...but wasting time prevents higher-level retries from trying too early.
+			// this is particularly useful for service-busy, but seems valid for essentially all retried errors.
 			timer := time.NewTimer(next)
 			select {
 			case <-ctxDone:
+				timer.Stop()
 				return err
 			case <-timer.C:
 				continue Retry_Loop

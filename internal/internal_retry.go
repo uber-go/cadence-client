@@ -62,7 +62,7 @@ func createDynamicServiceRetryPolicy(ctx context.Context) backoff.RetryPolicy {
 	return policy
 }
 
-func isServiceTransientError(err error) bool {
+func errRetryableAfter(err error) (isRetryable bool, retryAfter time.Duration) {
 	// check intentionally-not-retried error types via errors.As.
 	//
 	// sadly we cannot build this into a list of error values / types to range over, as that
@@ -72,50 +72,55 @@ func isServiceTransientError(err error) bool {
 	// so we're left with this mess.  it's not even generics-friendly.
 	// at least this pattern lets it be done inline without exposing the variable.
 	if target := (*s.AccessDeniedError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.BadRequestError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.CancellationAlreadyRequestedError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.ClientVersionNotSupportedError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.DomainAlreadyExistsError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.DomainNotActiveError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.EntityNotExistsError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.FeatureNotEnabledError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.LimitExceededError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.QueryFailedError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.WorkflowExecutionAlreadyCompletedError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 	if target := (*s.WorkflowExecutionAlreadyStartedError)(nil); errors.As(err, &target) {
-		return false
+		return false, 0
 	}
 
 	// shutdowns are not retryable, of course
 	if errors.Is(err, errShutdown) {
-		return false
+		return false, 0
+	}
+
+	// service busy errors are special, and require a minimum delay
+	if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
+		return true, time.Second
 	}
 
 	// s.InternalServiceError
 	// s.ServiceBusyError (must retry after a delay, but it is transient)
 	// server-side-only error types (as they should not reach clients)
 	// and all other `error` types
-	return true
+	return true, 0
 }

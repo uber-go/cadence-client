@@ -180,7 +180,7 @@ func (sw *shadowWorker) startShadowWorkflow() error {
 		return err
 	}
 
-	return backoff.Retry(ctx, startWorkflowOp, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+	return backoff.Retry(ctx, startWorkflowOp, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
 }
 
 func generateShadowTaskList(domain, taskList string) string {

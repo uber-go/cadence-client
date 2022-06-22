@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
@@ -193,12 +194,12 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 			return err
 		},
 		createDynamicServiceRetryPolicy(ctx),
-		func(err error) bool {
+		func(err error) (bool, time.Duration) {
 			if _, ok := err.(*shared.InternalServiceError); ok {
 				// treat InternalServiceError as non-retryable, as the workflow history may be corrupted
-				return false
+				return false, 0
 			}
-			return isServiceTransientError(err)
+			return errRetryableAfter(err)
 		},
 	); err != nil {
 		return err

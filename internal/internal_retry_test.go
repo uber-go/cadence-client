@@ -27,7 +27,8 @@ func TestErrRetries(t *testing.T) {
 			&s.RemoteSyncMatchedError{},
 			&s.InternalDataInconsistencyError{},
 		} {
-			assert.True(t, isServiceTransientError(err), "%T should be transient", err)
+			retryable, _ := errRetryableAfter(err)
+			assert.True(t, retryable, "%T should be transient", err)
 		}
 	})
 	t.Run("terminal", func(t *testing.T) {
@@ -47,7 +48,8 @@ func TestErrRetries(t *testing.T) {
 
 			errShutdown, // shutdowns can't be stopped
 		} {
-			assert.False(t, isServiceTransientError(err), "%T should be fatal", err)
+			retryable, _ := errRetryableAfter(err)
+			assert.False(t, retryable, "%T should be fatal", err)
 		}
 	})
 }

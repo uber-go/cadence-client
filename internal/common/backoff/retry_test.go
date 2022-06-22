@@ -36,18 +36,32 @@ func TestRetry(t *testing.T) {
 	tests := []struct {
 		name        string
 		maxAttempts int
-		isRetryable func(error) bool
+		maxTime     time.Duration // context timeout
+		isRetryable func(error) (bool, time.Duration)
 
 		shouldError   bool
 		expectedCalls int
 	}{
-		{"success", 2 * succeedOnAttemptNum, nil, false, succeedOnAttemptNum},
-		{"too many tries", 3, nil, true, 4}, // max 3 retries == 4 calls.  must be < succeedOnAttemptNum to work.
-		{"success with always custom retry", 2 * succeedOnAttemptNum, func(err error) bool {
-			return true // retry on all errors, same as no custom retry
+		{"success", 2 * succeedOnAttemptNum, time.Second, nil, false, succeedOnAttemptNum},
+		{"too many tries", 3, time.Second, nil, true, 4}, // max 3 retries == 4 calls.  must be < succeedOnAttemptNum to work.
+		{"success with always custom retry", 2 * succeedOnAttemptNum, time.Second, func(err error) (bool, time.Duration) {
+			return true, 0 // retry on all errors, same as no custom retry
 		}, false, succeedOnAttemptNum},
-		{"success with never custom retry", 2 * succeedOnAttemptNum, func(err error) bool {
-			return false // never retry
+		{"success with never custom retry", 2 * succeedOnAttemptNum, time.Second, func(err error) (bool, time.Duration) {
+			return false, 0 // never retry
+		}, true, 1},
+
+		// elapsed-time-sensitive tests below.
+		// consider raising time granularity if flaky, or we could set up a more complete mock
+		// to resolve flakiness for real, but that's a fair bit more complex.
+
+		// try -> sleep(10ms) -> try -> sleep(20ms) -> try -> sleep(40ms) -> timeout == 3 calls.
+		{"timed out eventually", 5, 50 * time.Millisecond, func(err error) (bool, time.Duration) {
+			return true, 0
+		}, true, 3},
+		// try -> sleep(longer than context timeout) -> timeout == 1 call.
+		{"timed out due to long minimum delay", 5, 10 * time.Millisecond, func(err error) (bool, time.Duration) {
+			return true, 20 * time.Millisecond
 		}, true, 1},
 	}
 
@@ -66,11 +80,13 @@ func TestRetry(t *testing.T) {
 				return &someError{}
 			}
 
-			policy := NewExponentialRetryPolicy(1 * time.Millisecond)
-			policy.SetMaximumInterval(5 * time.Millisecond)
+			policy := NewExponentialRetryPolicy(10 * time.Millisecond)
+			policy.SetMaximumInterval(50 * time.Millisecond)
 			policy.SetMaximumAttempts(test.maxAttempts)
 
-			err := Retry(context.Background(), op, policy, test.isRetryable)
+			ctx, cancel := context.WithTimeout(context.Background(), test.maxTime)
+			defer cancel()
+			err := Retry(ctx, op, policy, test.isRetryable)
 			if test.shouldError {
 				assert.Error(t, err)
 			} else {
@@ -79,31 +95,6 @@ func TestRetry(t *testing.T) {
 			assert.Equal(t, test.expectedCalls, i, "wrong number of calls")
 		})
 	}
-}
-
-func TestNoRetryAfterContextDone(t *testing.T) {
-	t.Parallel()
-	retryCounter := 0
-	op := func() error {
-		retryCounter++
-
-		if retryCounter == 5 {
-			return nil
-		}
-
-		return &someError{}
-	}
-
-	policy := NewExponentialRetryPolicy(10 * time.Millisecond)
-	policy.SetMaximumInterval(50 * time.Millisecond)
-	policy.SetMaximumAttempts(10)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-
-	err := Retry(ctx, op, policy, nil)
-	assert.Error(t, err)
-	assert.True(t, retryCounter >= 2, "retryCounter should be at least 2 but was %d", retryCounter) // verify that we did retry
 }
 
 func TestConcurrentRetrier(t *testing.T) {

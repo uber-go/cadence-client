@@ -104,7 +104,7 @@ func scanWorkflowExecutionsHelper(
 				return err
 			},
 			createDynamicServiceRetryPolicy(ctx),
-			isServiceTransientError,
+			errRetryableAfter,
 		); err != nil {
 			logger.Error("Failed to scan workflow executions",
 				zap.String(tagDomain, params.GetDomain()),

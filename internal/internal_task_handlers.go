@@ -2009,7 +2009,7 @@ func signalWorkflow(
 			tchCtx, cancel, opt := newChannelContext(ctx, featureFlags)
 			defer cancel()
 			return service.SignalWorkflowExecution(tchCtx, request, opt...)
-		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+		}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
 }
 
 func recordActivityHeartbeat(
@@ -2033,7 +2033,7 @@ func recordActivityHeartbeat(
 			var err error
 			heartbeatResponse, err = service.RecordActivityTaskHeartbeat(tchCtx, request, opt...)
 			return err
-		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+		}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
 
 	if heartbeatErr == nil && heartbeatResponse != nil && heartbeatResponse.GetCancelRequested() {
 		return NewCanceledError()
@@ -2067,7 +2067,7 @@ func recordActivityHeartbeatByID(
 			var err error
 			heartbeatResponse, err = service.RecordActivityTaskHeartbeatByID(tchCtx, request, opt...)
 			return err
-		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
+		}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
 
 	if heartbeatErr == nil && heartbeatResponse != nil && heartbeatResponse.GetCancelRequested() {
 		return NewCanceledError()

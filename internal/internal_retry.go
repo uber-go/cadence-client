@@ -24,6 +24,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	s "go.uber.org/cadence/.gen/go/shared"
@@ -62,26 +63,59 @@ func createDynamicServiceRetryPolicy(ctx context.Context) backoff.RetryPolicy {
 }
 
 func isServiceTransientError(err error) bool {
-	// Retrying by default so it covers all transport errors.
-	switch err.(type) {
-	case *s.BadRequestError,
-		*s.EntityNotExistsError,
-		*s.WorkflowExecutionAlreadyStartedError,
-		*s.WorkflowExecutionAlreadyCompletedError,
-		*s.DomainAlreadyExistsError,
-		*s.QueryFailedError,
-		*s.DomainNotActiveError,
-		*s.CancellationAlreadyRequestedError,
-		*s.ClientVersionNotSupportedError,
-		*s.LimitExceededError:
+	// check intentionally-not-retried error types via errors.As.
+	//
+	// sadly we cannot build this into a list of error values / types to range over, as that
+	// would turn the variable passed as the &target into e.g. an interface{} or an error,
+	// which is compatible with ALL errors, so all are .As(err, &target).
+	//
+	// so we're left with this mess.  it's not even generics-friendly.
+	// at least this pattern lets it be done inline without exposing the variable.
+	if target := (*s.AccessDeniedError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.BadRequestError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.CancellationAlreadyRequestedError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.ClientVersionNotSupportedError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.DomainAlreadyExistsError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.DomainNotActiveError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.EntityNotExistsError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.FeatureNotEnabledError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.LimitExceededError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.QueryFailedError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.WorkflowExecutionAlreadyCompletedError)(nil); errors.As(err, &target) {
+		return false
+	}
+	if target := (*s.WorkflowExecutionAlreadyStartedError)(nil); errors.As(err, &target) {
 		return false
 	}
 
-	if err == errShutdown {
+	// shutdowns are not retryable, of course
+	if errors.Is(err, errShutdown) {
 		return false
 	}
 
 	// s.InternalServiceError
-	// s.ServiceBusyError
+	// s.ServiceBusyError (must retry after a delay, but it is transient)
+	// server-side-only error types (as they should not reach clients)
+	// and all other `error` types
 	return true
 }

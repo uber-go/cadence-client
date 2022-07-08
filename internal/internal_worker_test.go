@@ -1184,3 +1184,67 @@ func TestIsNonRetriableError(t *testing.T) {
 		require.Equal(t, test.expected, isNonRetriableError(test.err))
 	}
 }
+
+func Test_augmentWorkerOptions(t *testing.T) {
+	type args struct {
+		options WorkerOptions
+	}
+
+	defaultWorkerOptions := WorkerOptions{
+		MaxConcurrentActivityExecutionSize:      defaultMaxConcurrentActivityExecutionSize,
+		WorkerActivitiesPerSecond:               defaultWorkerActivitiesPerSecond,
+		MaxConcurrentLocalActivityExecutionSize: defaultMaxConcurrentLocalActivityExecutionSize,
+		WorkerLocalActivitiesPerSecond:          defaultWorkerLocalActivitiesPerSecond,
+		TaskListActivitiesPerSecond:             defaultTaskListActivitiesPerSecond,
+		MaxConcurrentActivityTaskPollers:        defaultConcurrentPollRoutineSize,
+		ActivityTaskPollerAutoScalerOptions: PollerAutoScalerOptions{
+			Enabled:              false,
+			MinConcurrentPollers: 1,
+		},
+		MaxConcurrentDecisionTaskExecutionSize: defaultMaxConcurrentTaskExecutionSize,
+		WorkerDecisionTasksPerSecond:           defaultWorkerTaskExecutionRate,
+		MaxConcurrentDecisionTaskPollers:       defaultConcurrentPollRoutineSize,
+		DecisionTaskPollerAutoScalerOptions: PollerAutoScalerOptions{
+			Enabled:              false,
+			MinConcurrentPollers: 1,
+		},
+		Identity:                          "",
+		MetricsScope:                      nil,
+		Logger:                            nil,
+		EnableLoggingInReplay:             false,
+		DisableWorkflowWorker:             false,
+		DisableActivityWorker:             false,
+		DisableStickyExecution:            false,
+		StickyScheduleToStartTimeout:      stickyDecisionScheduleToStartTimeoutSeconds * time.Second,
+		BackgroundActivityContext:         nil,
+		NonDeterministicWorkflowPolicy:    0,
+		DataConverter:                     defaultJSONDataConverter,
+		WorkerStopTimeout:                 0,
+		EnableSessionWorker:               false,
+		MaxConcurrentSessionExecutionSize: defaultMaxConcurrentSessionExecutionSize,
+		WorkflowInterceptorChainFactories: nil,
+		ContextPropagators:                nil,
+		Tracer:                            opentracing.NoopTracer{},
+		EnableShadowWorker:                false,
+		ShadowOptions:                     ShadowOptions{},
+		FeatureFlags:                      FeatureFlags{},
+		Authorization:                     nil,
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want WorkerOptions
+	}{
+		{
+			name: "empty options augmented to default",
+			args: args{options: WorkerOptions{}},
+			want: defaultWorkerOptions,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, augmentWorkerOptions(tt.args.options), "augmentWorkerOptions(%v)", tt.args.options)
+		})
+	}
+}

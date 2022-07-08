@@ -79,6 +79,10 @@ type (
 		// Default value is 2
 		MaxConcurrentActivityTaskPollers int
 
+		// Optional: To set activity task poller options this worker can have.
+		// default: disable
+		ActivityTaskPollerAutoScalerOptions PollerAutoScalerOptions
+
 		// Optional: To set the maximum concurrent decision task executions this worker can have.
 		// The zero value of this uses the default value.
 		// default: defaultMaxConcurrentTaskExecutionSize(1k)
@@ -94,6 +98,10 @@ type (
 		// rate at which the worker is able to consume tasks from a task list.
 		// Default value is 2
 		MaxConcurrentDecisionTaskPollers int
+
+		// Optional: To set decision task poller options this worker can have.
+		// default: if not set, disabled
+		DecisionTaskPollerAutoScalerOptions PollerAutoScalerOptions
 
 		// Optional: Sets an identify that can be used to track this host for debugging.
 		// default: default identity that include hostname, groupName and process ID.
@@ -231,7 +239,25 @@ type (
 		// default: No provider
 		Authorization auth.AuthorizationProvider
 	}
+
+	// PollerAutoScalerOptions is used to configure autoscaler
+	PollerAutoScalerOptions struct {
+		// enable autoscaling
+		// default: false
+		Enabled bool
+
+		// minimum number of concurrent pollers
+		// default: 1 (even if value < 1)
+		MinConcurrentPollers int
+	}
 )
+
+// SetAugmentedValue sanitize and augment values
+func (p *PollerAutoScalerOptions) SetAugmentedValue() {
+	if p.MinConcurrentPollers < 1 {
+		p.MinConcurrentPollers = defaultMinConcurrentPollers
+	}
+}
 
 // NonDeterministicWorkflowPolicy is an enum for configuring how client's decision task handler deals with
 // mismatched history events (presumably arising from non-deterministic workflow definitions).

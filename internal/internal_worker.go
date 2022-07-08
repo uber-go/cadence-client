@@ -71,6 +71,8 @@ const (
 
 	defaultMaxConcurrentSessionExecutionSize = 1000 // Large concurrent session execution size (1k)
 
+	defaultMinConcurrentPollers = 1 // minimum concurrent poller count
+
 	testTagsContextKey = "cadence-testTags"
 )
 
@@ -1042,6 +1044,7 @@ func newAggregatedWorker(
 		zapcore.Field{Key: tagWorkerID, Type: zapcore.StringType, String: workerParams.Identity},
 	)
 	logger := workerParams.Logger
+	// TODO move this to augmentWorkerOptions
 	if options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
@@ -1248,6 +1251,7 @@ func augmentWorkerOptions(options WorkerOptions) WorkerOptions {
 	if options.MaxConcurrentActivityTaskPollers <= 0 {
 		options.MaxConcurrentActivityTaskPollers = defaultConcurrentPollRoutineSize
 	}
+	options.ActivityTaskPollerAutoScalerOptions.SetAugmentedValue()
 	if options.MaxConcurrentDecisionTaskExecutionSize == 0 {
 		options.MaxConcurrentDecisionTaskExecutionSize = defaultMaxConcurrentTaskExecutionSize
 	}
@@ -1257,6 +1261,7 @@ func augmentWorkerOptions(options WorkerOptions) WorkerOptions {
 	if options.MaxConcurrentDecisionTaskPollers <= 0 {
 		options.MaxConcurrentDecisionTaskPollers = defaultConcurrentPollRoutineSize
 	}
+	options.DecisionTaskPollerAutoScalerOptions.SetAugmentedValue()
 	if options.MaxConcurrentLocalActivityExecutionSize == 0 {
 		options.MaxConcurrentLocalActivityExecutionSize = defaultMaxConcurrentLocalActivityExecutionSize
 	}

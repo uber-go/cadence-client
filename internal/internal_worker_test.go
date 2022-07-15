@@ -996,23 +996,23 @@ func TestWorkerOptionDefaults(t *testing.T) {
 	require.Nil(t, decisionWorker.executionParameters.ContextPropagators)
 
 	expected := workerExecutionParameters{
-		TaskList:                             taskList,
-		MaxConcurrentActivityPollers:         defaultConcurrentPollRoutineSize,
-		MaxConcurrentDecisionPollers:         defaultConcurrentPollRoutineSize,
-		ConcurrentLocalActivityExecutionSize: defaultMaxConcurrentLocalActivityExecutionSize,
-		ConcurrentActivityExecutionSize:      defaultMaxConcurrentActivityExecutionSize,
-		ConcurrentDecisionTaskExecutionSize:  defaultMaxConcurrentTaskExecutionSize,
-		WorkerActivitiesPerSecond:            defaultTaskListActivitiesPerSecond,
-		WorkerDecisionTasksPerSecond:         defaultWorkerTaskExecutionRate,
-		TaskListActivitiesPerSecond:          defaultTaskListActivitiesPerSecond,
-		WorkerLocalActivitiesPerSecond:       defaultWorkerLocalActivitiesPerSecond,
-		StickyScheduleToStartTimeout:         stickyDecisionScheduleToStartTimeoutSeconds * time.Second,
-		DataConverter:                        getDefaultDataConverter(),
-		Tracer:                               opentracing.NoopTracer{},
-		Logger:                               decisionWorker.executionParameters.Logger,
-		MetricsScope:                         decisionWorker.executionParameters.MetricsScope,
-		Identity:                             decisionWorker.executionParameters.Identity,
-		UserContext:                          decisionWorker.executionParameters.UserContext,
+		TaskList:                                taskList,
+		MaxConcurrentActivityTaskPollers:        defaultConcurrentPollRoutineSize,
+		MaxConcurrentDecisionTaskPollers:        defaultConcurrentPollRoutineSize,
+		MaxConcurrentLocalActivityExecutionSize: defaultMaxConcurrentLocalActivityExecutionSize,
+		MaxConcurrentActivityExecutionSize:      defaultMaxConcurrentActivityExecutionSize,
+		MaxConcurrentDecisionTaskExecutionSize:  defaultMaxConcurrentTaskExecutionSize,
+		WorkerActivitiesPerSecond:               defaultTaskListActivitiesPerSecond,
+		WorkerDecisionTasksPerSecond:            defaultWorkerTaskExecutionRate,
+		TaskListActivitiesPerSecond:             defaultTaskListActivitiesPerSecond,
+		WorkerLocalActivitiesPerSecond:          defaultWorkerLocalActivitiesPerSecond,
+		StickyScheduleToStartTimeout:            stickyDecisionScheduleToStartTimeoutSeconds * time.Second,
+		DataConverter:                           getDefaultDataConverter(),
+		Tracer:                                  opentracing.NoopTracer{},
+		Logger:                                  decisionWorker.executionParameters.Logger,
+		MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
+		Identity:                                decisionWorker.executionParameters.Identity,
+		UserContext:                             decisionWorker.executionParameters.UserContext,
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
@@ -1054,22 +1054,22 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 	require.True(t, len(decisionWorker.executionParameters.ContextPropagators) > 0)
 
 	expected := workerExecutionParameters{
-		TaskList:                             taskList,
-		MaxConcurrentActivityPollers:         options.MaxConcurrentActivityTaskPollers,
-		MaxConcurrentDecisionPollers:         options.MaxConcurrentDecisionTaskPollers,
-		ConcurrentLocalActivityExecutionSize: options.MaxConcurrentLocalActivityExecutionSize,
-		ConcurrentActivityExecutionSize:      options.MaxConcurrentActivityExecutionSize,
-		ConcurrentDecisionTaskExecutionSize:  options.MaxConcurrentDecisionTaskExecutionSize,
-		WorkerActivitiesPerSecond:            options.WorkerActivitiesPerSecond,
-		WorkerDecisionTasksPerSecond:         options.WorkerDecisionTasksPerSecond,
-		TaskListActivitiesPerSecond:          options.TaskListActivitiesPerSecond,
-		WorkerLocalActivitiesPerSecond:       options.WorkerLocalActivitiesPerSecond,
-		StickyScheduleToStartTimeout:         options.StickyScheduleToStartTimeout,
-		DataConverter:                        options.DataConverter,
-		Tracer:                               options.Tracer,
-		Logger:                               options.Logger,
-		MetricsScope:                         options.MetricsScope,
-		Identity:                             options.Identity,
+		TaskList:                                taskList,
+		MaxConcurrentActivityTaskPollers:        options.MaxConcurrentActivityTaskPollers,
+		MaxConcurrentDecisionTaskPollers:        options.MaxConcurrentDecisionTaskPollers,
+		MaxConcurrentLocalActivityExecutionSize: options.MaxConcurrentLocalActivityExecutionSize,
+		MaxConcurrentActivityExecutionSize:      options.MaxConcurrentActivityExecutionSize,
+		MaxConcurrentDecisionTaskExecutionSize:  options.MaxConcurrentDecisionTaskExecutionSize,
+		WorkerActivitiesPerSecond:               options.WorkerActivitiesPerSecond,
+		WorkerDecisionTasksPerSecond:            options.WorkerDecisionTasksPerSecond,
+		TaskListActivitiesPerSecond:             options.TaskListActivitiesPerSecond,
+		WorkerLocalActivitiesPerSecond:          options.WorkerLocalActivitiesPerSecond,
+		StickyScheduleToStartTimeout:            options.StickyScheduleToStartTimeout,
+		DataConverter:                           options.DataConverter,
+		Tracer:                                  options.Tracer,
+		Logger:                                  options.Logger,
+		MetricsScope:                            options.MetricsScope,
+		Identity:                                options.Identity,
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
@@ -1084,15 +1084,15 @@ func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParam
 	require.Equal(t, paramsA.Identity, paramsB.Identity)
 	require.Equal(t, paramsA.DataConverter, paramsB.DataConverter)
 	require.Equal(t, paramsA.Tracer, paramsB.Tracer)
-	require.Equal(t, paramsA.ConcurrentLocalActivityExecutionSize, paramsB.ConcurrentLocalActivityExecutionSize)
-	require.Equal(t, paramsA.ConcurrentActivityExecutionSize, paramsB.ConcurrentActivityExecutionSize)
-	require.Equal(t, paramsA.ConcurrentDecisionTaskExecutionSize, paramsB.ConcurrentDecisionTaskExecutionSize)
+	require.Equal(t, paramsA.MaxConcurrentLocalActivityExecutionSize, paramsB.MaxConcurrentLocalActivityExecutionSize)
+	require.Equal(t, paramsA.MaxConcurrentActivityExecutionSize, paramsB.MaxConcurrentActivityExecutionSize)
+	require.Equal(t, paramsA.MaxConcurrentDecisionTaskExecutionSize, paramsB.MaxConcurrentDecisionTaskExecutionSize)
 	require.Equal(t, paramsA.WorkerActivitiesPerSecond, paramsB.WorkerActivitiesPerSecond)
 	require.Equal(t, paramsA.WorkerDecisionTasksPerSecond, paramsB.WorkerDecisionTasksPerSecond)
 	require.Equal(t, paramsA.TaskListActivitiesPerSecond, paramsB.TaskListActivitiesPerSecond)
 	require.Equal(t, paramsA.StickyScheduleToStartTimeout, paramsB.StickyScheduleToStartTimeout)
-	require.Equal(t, paramsA.MaxConcurrentDecisionPollers, paramsB.MaxConcurrentDecisionPollers)
-	require.Equal(t, paramsA.MaxConcurrentActivityPollers, paramsB.MaxConcurrentActivityPollers)
+	require.Equal(t, paramsA.MaxConcurrentDecisionTaskPollers, paramsB.MaxConcurrentDecisionTaskPollers)
+	require.Equal(t, paramsA.MaxConcurrentActivityTaskPollers, paramsB.MaxConcurrentActivityTaskPollers)
 	require.Equal(t, paramsA.NonDeterministicWorkflowPolicy, paramsB.NonDeterministicWorkflowPolicy)
 	require.Equal(t, paramsA.EnableLoggingInReplay, paramsB.EnableLoggingInReplay)
 	require.Equal(t, paramsA.DisableStickyExecution, paramsB.DisableStickyExecution)

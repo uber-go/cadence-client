@@ -64,7 +64,7 @@ func newShadowWorker(
 	replayer := NewWorkflowReplayerWithOptions(ReplayOptions{
 		DataConverter:                     params.DataConverter,
 		ContextPropagators:                params.ContextPropagators,
-		WorkflowInterceptorChainFactories: params.WorkflowInterceptors,
+		WorkflowInterceptorChainFactories: params.WorkflowInterceptorChainFactories,
 		Tracer:                            params.Tracer,
 		FeatureFlags:                      params.FeatureFlags,
 	})
@@ -87,7 +87,7 @@ func newShadowWorker(
 	// this is required for data converter, for the other three, it should be ok to still use
 	// the value provided by user.
 	params.DataConverter = getDefaultDataConverter()
-	params.WorkflowInterceptors = []WorkflowInterceptorFactory{}
+	params.WorkflowInterceptorChainFactories = []WorkflowInterceptorFactory{}
 	params.ContextPropagators = []ContextPropagator{}
 	params.Tracer = opentracing.NoopTracer{}
 

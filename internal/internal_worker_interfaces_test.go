@@ -178,11 +178,11 @@ func (s *InterfacesTestSuite) TestInterface() {
 	domain := "testDomain"
 	// Workflow execution parameters.
 	workflowExecutionParameters := workerExecutionParameters{
-		TaskList:                     "testTaskList",
-		MaxConcurrentActivityPollers: 4,
-		MaxConcurrentDecisionPollers: 4,
-		Logger:                       zaptest.NewLogger(s.T()),
-		Tracer:                       opentracing.NoopTracer{},
+		TaskList:                         "testTaskList",
+		MaxConcurrentActivityTaskPollers: 4,
+		MaxConcurrentDecisionTaskPollers: 4,
+		Logger:                           zaptest.NewLogger(s.T()),
+		Tracer:                           opentracing.NoopTracer{},
 	}
 
 	domainStatus := m.DomainStatusRegistered
@@ -209,11 +209,11 @@ func (s *InterfacesTestSuite) TestInterface() {
 
 	// Create activity execution parameters.
 	activityExecutionParameters := workerExecutionParameters{
-		TaskList:                     "testTaskList",
-		MaxConcurrentActivityPollers: 10,
-		MaxConcurrentDecisionPollers: 10,
-		Logger:                       zaptest.NewLogger(s.T()),
-		Tracer:                       opentracing.NoopTracer{},
+		TaskList:                         "testTaskList",
+		MaxConcurrentActivityTaskPollers: 10,
+		MaxConcurrentDecisionTaskPollers: 10,
+		Logger:                           zaptest.NewLogger(s.T()),
+		Tracer:                           opentracing.NoopTracer{},
 	}
 
 	// Register activity instances and launch the worker.

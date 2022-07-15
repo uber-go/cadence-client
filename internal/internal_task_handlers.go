@@ -396,7 +396,7 @@ func newWorkflowTaskHandler(
 		dataConverter:                  params.DataConverter,
 		contextPropagators:             params.ContextPropagators,
 		tracer:                         params.Tracer,
-		workflowInterceptors:           params.WorkflowInterceptors,
+		workflowInterceptors:           params.WorkflowInterceptorChainFactories,
 	}
 }
 

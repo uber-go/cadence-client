@@ -151,17 +151,19 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 
 func (s *internalWorkerTestSuite) TestDecisionTaskHandler() {
 	params := workerExecutionParameters{
-		Identity: "identity",
-		Logger:   getTestLogger(s.T()),
+		WorkerOptions: WorkerOptions{
+			Identity: "identity",
+			Logger:   getTestLogger(s.T())},
 	}
 	s.testDecisionTaskHandlerHelper(params)
 }
 
 func (s *internalWorkerTestSuite) TestDecisionTaskHandler_WithDataConverter() {
 	params := workerExecutionParameters{
-		Identity:      "identity",
-		Logger:        getTestLogger(s.T()),
-		DataConverter: newTestDataConverter(),
+		WorkerOptions: WorkerOptions{
+			Identity:      "identity",
+			Logger:        getTestLogger(s.T()),
+			DataConverter: newTestDataConverter()},
 	}
 	s.testDecisionTaskHandlerHelper(params)
 }
@@ -996,23 +998,24 @@ func TestWorkerOptionDefaults(t *testing.T) {
 	require.Nil(t, decisionWorker.executionParameters.ContextPropagators)
 
 	expected := workerExecutionParameters{
-		TaskList:                                taskList,
-		MaxConcurrentActivityTaskPollers:        defaultConcurrentPollRoutineSize,
-		MaxConcurrentDecisionTaskPollers:        defaultConcurrentPollRoutineSize,
-		MaxConcurrentLocalActivityExecutionSize: defaultMaxConcurrentLocalActivityExecutionSize,
-		MaxConcurrentActivityExecutionSize:      defaultMaxConcurrentActivityExecutionSize,
-		MaxConcurrentDecisionTaskExecutionSize:  defaultMaxConcurrentTaskExecutionSize,
-		WorkerActivitiesPerSecond:               defaultTaskListActivitiesPerSecond,
-		WorkerDecisionTasksPerSecond:            defaultWorkerTaskExecutionRate,
-		TaskListActivitiesPerSecond:             defaultTaskListActivitiesPerSecond,
-		WorkerLocalActivitiesPerSecond:          defaultWorkerLocalActivitiesPerSecond,
-		StickyScheduleToStartTimeout:            stickyDecisionScheduleToStartTimeoutSeconds * time.Second,
-		DataConverter:                           getDefaultDataConverter(),
-		Tracer:                                  opentracing.NoopTracer{},
-		Logger:                                  decisionWorker.executionParameters.Logger,
-		MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
-		Identity:                                decisionWorker.executionParameters.Identity,
-		UserContext:                             decisionWorker.executionParameters.UserContext,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			MaxConcurrentActivityTaskPollers:        defaultConcurrentPollRoutineSize,
+			MaxConcurrentDecisionTaskPollers:        defaultConcurrentPollRoutineSize,
+			MaxConcurrentLocalActivityExecutionSize: defaultMaxConcurrentLocalActivityExecutionSize,
+			MaxConcurrentActivityExecutionSize:      defaultMaxConcurrentActivityExecutionSize,
+			MaxConcurrentDecisionTaskExecutionSize:  defaultMaxConcurrentTaskExecutionSize,
+			WorkerActivitiesPerSecond:               defaultTaskListActivitiesPerSecond,
+			WorkerDecisionTasksPerSecond:            defaultWorkerTaskExecutionRate,
+			TaskListActivitiesPerSecond:             defaultTaskListActivitiesPerSecond,
+			WorkerLocalActivitiesPerSecond:          defaultWorkerLocalActivitiesPerSecond,
+			StickyScheduleToStartTimeout:            stickyDecisionScheduleToStartTimeoutSeconds * time.Second,
+			DataConverter:                           getDefaultDataConverter(),
+			Tracer:                                  opentracing.NoopTracer{},
+			Logger:                                  decisionWorker.executionParameters.Logger,
+			MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
+			Identity:                                decisionWorker.executionParameters.Identity},
+		UserContext: decisionWorker.executionParameters.UserContext,
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
@@ -1054,22 +1057,23 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 	require.True(t, len(decisionWorker.executionParameters.ContextPropagators) > 0)
 
 	expected := workerExecutionParameters{
-		TaskList:                                taskList,
-		MaxConcurrentActivityTaskPollers:        options.MaxConcurrentActivityTaskPollers,
-		MaxConcurrentDecisionTaskPollers:        options.MaxConcurrentDecisionTaskPollers,
-		MaxConcurrentLocalActivityExecutionSize: options.MaxConcurrentLocalActivityExecutionSize,
-		MaxConcurrentActivityExecutionSize:      options.MaxConcurrentActivityExecutionSize,
-		MaxConcurrentDecisionTaskExecutionSize:  options.MaxConcurrentDecisionTaskExecutionSize,
-		WorkerActivitiesPerSecond:               options.WorkerActivitiesPerSecond,
-		WorkerDecisionTasksPerSecond:            options.WorkerDecisionTasksPerSecond,
-		TaskListActivitiesPerSecond:             options.TaskListActivitiesPerSecond,
-		WorkerLocalActivitiesPerSecond:          options.WorkerLocalActivitiesPerSecond,
-		StickyScheduleToStartTimeout:            options.StickyScheduleToStartTimeout,
-		DataConverter:                           options.DataConverter,
-		Tracer:                                  options.Tracer,
-		Logger:                                  options.Logger,
-		MetricsScope:                            options.MetricsScope,
-		Identity:                                options.Identity,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			MaxConcurrentActivityTaskPollers:        options.MaxConcurrentActivityTaskPollers,
+			MaxConcurrentDecisionTaskPollers:        options.MaxConcurrentDecisionTaskPollers,
+			MaxConcurrentLocalActivityExecutionSize: options.MaxConcurrentLocalActivityExecutionSize,
+			MaxConcurrentActivityExecutionSize:      options.MaxConcurrentActivityExecutionSize,
+			MaxConcurrentDecisionTaskExecutionSize:  options.MaxConcurrentDecisionTaskExecutionSize,
+			WorkerActivitiesPerSecond:               options.WorkerActivitiesPerSecond,
+			WorkerDecisionTasksPerSecond:            options.WorkerDecisionTasksPerSecond,
+			TaskListActivitiesPerSecond:             options.TaskListActivitiesPerSecond,
+			WorkerLocalActivitiesPerSecond:          options.WorkerLocalActivitiesPerSecond,
+			StickyScheduleToStartTimeout:            options.StickyScheduleToStartTimeout,
+			DataConverter:                           options.DataConverter,
+			Tracer:                                  options.Tracer,
+			Logger:                                  options.Logger,
+			MetricsScope:                            options.MetricsScope,
+			Identity:                                options.Identity},
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)

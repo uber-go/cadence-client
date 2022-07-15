@@ -268,14 +268,16 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		logger = zap.NewNop()
 	}
 	workerParams := workerExecutionParameters{
-		TaskList:                          replayTaskListName,
-		Identity:                          replayWorkerIdentity,
-		DataConverter:                     r.options.DataConverter,
-		ContextPropagators:                r.options.ContextPropagators,
-		WorkflowInterceptorChainFactories: r.options.WorkflowInterceptorChainFactories,
-		Tracer:                            r.options.Tracer,
-		Logger:                            logger,
-		DisableStickyExecution:            true,
+		WorkerOptions: WorkerOptions{
+			Identity:                          replayWorkerIdentity,
+			DataConverter:                     r.options.DataConverter,
+			ContextPropagators:                r.options.ContextPropagators,
+			WorkflowInterceptorChainFactories: r.options.WorkflowInterceptorChainFactories,
+			Tracer:                            r.options.Tracer,
+			Logger:                            logger,
+			DisableStickyExecution:            true,
+		},
+		TaskList: replayTaskListName,
 	}
 
 	metricScope := tally.NoopScope

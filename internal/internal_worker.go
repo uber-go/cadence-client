@@ -118,63 +118,16 @@ type (
 
 	// workerExecutionParameters defines worker configure/execution options.
 	workerExecutionParameters struct {
+		WorkerOptions
+
 		// Task list name to poll.
 		TaskList string
-
-		// Defines how many concurrent activity executions by this worker.
-		MaxConcurrentActivityExecutionSize int
-
-		// Defines rate limiting on number of activity tasks that can be executed per second per worker.
-		WorkerActivitiesPerSecond float64
-
-		// MaxConcurrentActivityTaskPollers is the max number of pollers for activity task list
-		MaxConcurrentActivityTaskPollers int
-
-		// Defines how many concurrent decision task executions by this worker.
-		MaxConcurrentDecisionTaskExecutionSize int
-
-		// Defines rate limiting on number of decision tasks that can be executed per second per worker.
-		WorkerDecisionTasksPerSecond float64
-
-		// MaxConcurrentDecisionTaskPollers is the max number of pollers for decision task list
-		MaxConcurrentDecisionTaskPollers int
-
-		// Defines how many concurrent local activity executions by this worker.
-		MaxConcurrentLocalActivityExecutionSize int
-
-		// Defines rate limiting on number of local activities that can be executed per second per worker.
-		WorkerLocalActivitiesPerSecond float64
-
-		// TaskListActivitiesPerSecond is the throttling limit for activity tasks controlled by the server
-		TaskListActivitiesPerSecond float64
-
-		// User can provide an identity for the debuggability. If not provided the framework has
-		// a default option.
-		Identity string
-
-		MetricsScope tally.Scope
-
-		Logger *zap.Logger
-
-		// Enable logging in replay mode
-		EnableLoggingInReplay bool
 
 		// Context to store user provided key/value pairs
 		UserContext context.Context
 
 		// Context cancel function to cancel user context
 		UserContextCancel context.CancelFunc
-
-		// Disable sticky execution
-		DisableStickyExecution bool
-
-		StickyScheduleToStartTimeout time.Duration
-
-		// NonDeterministicWorkflowPolicy is used for configuring how client's decision task handler deals with
-		// mismatched history events (presumably arising from non-deterministic workflow definitions).
-		NonDeterministicWorkflowPolicy NonDeterministicWorkflowPolicy
-
-		DataConverter DataConverter
 
 		// WorkerStopTimeout is the time delay before hard terminate worker
 		WorkerStopTimeout time.Duration
@@ -184,15 +137,6 @@ type (
 
 		// SessionResourceID is a unique identifier of the resource the session will consume
 		SessionResourceID string
-
-		ContextPropagators []ContextPropagator
-
-		Tracer opentracing.Tracer
-
-		WorkflowInterceptorChainFactories []WorkflowInterceptorFactory
-
-		// flags to turn on/off some server side features
-		FeatureFlags FeatureFlags
 	}
 )
 
@@ -1007,31 +951,10 @@ func newAggregatedWorker(
 	backgroundActivityContext, backgroundActivityContextCancel := context.WithCancel(ctx)
 
 	workerParams := workerExecutionParameters{
-		TaskList:                                taskList,
-		MaxConcurrentActivityExecutionSize:      wOptions.MaxConcurrentActivityExecutionSize,
-		WorkerActivitiesPerSecond:               wOptions.WorkerActivitiesPerSecond,
-		MaxConcurrentActivityTaskPollers:        wOptions.MaxConcurrentActivityTaskPollers,
-		MaxConcurrentLocalActivityExecutionSize: wOptions.MaxConcurrentLocalActivityExecutionSize,
-		WorkerLocalActivitiesPerSecond:          wOptions.WorkerLocalActivitiesPerSecond,
-		MaxConcurrentDecisionTaskExecutionSize:  wOptions.MaxConcurrentDecisionTaskExecutionSize,
-		WorkerDecisionTasksPerSecond:            wOptions.WorkerDecisionTasksPerSecond,
-		MaxConcurrentDecisionTaskPollers:        wOptions.MaxConcurrentDecisionTaskPollers,
-		Identity:                                wOptions.Identity,
-		MetricsScope:                            wOptions.MetricsScope,
-		Logger:                                  wOptions.Logger,
-		EnableLoggingInReplay:                   wOptions.EnableLoggingInReplay,
-		UserContext:                             backgroundActivityContext,
-		UserContextCancel:                       backgroundActivityContextCancel,
-		DisableStickyExecution:                  wOptions.DisableStickyExecution,
-		StickyScheduleToStartTimeout:            wOptions.StickyScheduleToStartTimeout,
-		TaskListActivitiesPerSecond:             wOptions.TaskListActivitiesPerSecond,
-		NonDeterministicWorkflowPolicy:          wOptions.NonDeterministicWorkflowPolicy,
-		DataConverter:                           wOptions.DataConverter,
-		WorkerStopTimeout:                       wOptions.WorkerStopTimeout,
-		ContextPropagators:                      wOptions.ContextPropagators,
-		Tracer:                                  wOptions.Tracer,
-		WorkflowInterceptorChainFactories:       wOptions.WorkflowInterceptorChainFactories,
-		FeatureFlags:                            wOptions.FeatureFlags,
+		WorkerOptions:     wOptions,
+		TaskList:          taskList,
+		UserContext:       backgroundActivityContext,
+		UserContextCancel: backgroundActivityContextCancel,
 	}
 
 	ensureRequiredParams(&workerParams)

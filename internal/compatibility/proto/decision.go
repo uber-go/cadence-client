@@ -140,6 +140,7 @@ func Decision(d *shared.Decision) *apiv1.Decision {
 				Header:                       Header(attr.Header),
 				Memo:                         Memo(attr.Memo),
 				SearchAttributes:             SearchAttributes(attr.SearchAttributes),
+				JitterStart:                  secondsToDuration(attr.JitterStartSeconds),
 			},
 		}
 	case shared.DecisionTypeStartChildWorkflowExecution:

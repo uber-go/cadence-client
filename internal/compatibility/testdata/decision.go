@@ -105,6 +105,7 @@ var (
 		Header:                       &Header,
 		Memo:                         &Memo,
 		SearchAttributes:             &SearchAttributes,
+		JitterStart:                  Duration4,
 	}
 	FailWorkflowExecutionDecisionAttributes = apiv1.FailWorkflowExecutionDecisionAttributes{
 		Failure: &Failure,

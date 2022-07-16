@@ -408,6 +408,7 @@ func SignalWithStartWorkflowExecutionRequest(t *shared.SignalWithStartWorkflowEx
 			SearchAttributes:             SearchAttributes(t.SearchAttributes),
 			Header:                       Header(t.Header),
 			DelayStart:                   secondsToDuration(t.DelayStartSeconds),
+			JitterStart:                  secondsToDuration(t.JitterStartSeconds),
 		},
 		SignalName:  t.GetSignalName(),
 		SignalInput: Payload(t.SignalInput),
@@ -451,6 +452,7 @@ func StartWorkflowExecutionRequest(t *shared.StartWorkflowExecutionRequest) *api
 		SearchAttributes:             SearchAttributes(t.SearchAttributes),
 		Header:                       Header(t.Header),
 		DelayStart:                   secondsToDuration(t.DelayStartSeconds),
+		JitterStart:                  secondsToDuration(t.JitterStartSeconds),
 	}
 }
 

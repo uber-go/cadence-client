@@ -461,6 +461,7 @@ func StartWorkflowExecutionRequest(t *apiv1.StartWorkflowExecutionRequest) *shar
 		SearchAttributes:                    SearchAttributes(t.SearchAttributes),
 		Header:                              Header(t.Header),
 		DelayStartSeconds:                   durationToSeconds(t.DelayStart),
+		JitterStartSeconds:                  durationToSeconds(t.JitterStart),
 	}
 }
 

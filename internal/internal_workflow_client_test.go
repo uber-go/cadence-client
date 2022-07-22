@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"go.uber.org/cadence/internal/common/serializer"
+	"go.uber.org/yarpc"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -291,6 +292,67 @@ func (s *historyEventIteratorSuite) TestIterator_Error() {
 	event, err = iter.Next()
 	s.Nil(event)
 	s.NotNil(err)
+}
+
+func (s *historyEventIteratorSuite) TestIterator_StopsTryingNearTimeout() {
+	// ensuring "when GetWorkflow().Get(...) times out while waiting", we return a timed-out error of some kind,
+	// and stop sending requests rather than trying again and getting some other kind of error.
+	// historically this led to a "bad request", insufficient time left for long poll, which was confusing and noisy.
+
+	filterType := shared.HistoryEventFilterTypeCloseEvent
+	reqNormal := getGetWorkflowExecutionHistoryRequest(filterType)
+	reqFinal := getGetWorkflowExecutionHistoryRequest(filterType)
+
+	// all items filtered out for both requests
+	resEmpty := &shared.GetWorkflowExecutionHistoryResponse{
+		History:       &shared.History{Events: nil}, // this or RawHistory must be non-nil, but they can be empty
+		NextPageToken: []byte{1, 2, 3, 4, 5},
+	}
+	reqFinal.NextPageToken = resEmpty.NextPageToken
+
+	s.True(time.Second < (defaultGetHistoryTimeoutInSecs*time.Second), "sanity check: default timeout must be longer than how long we extend the timeout for tests")
+
+	// begin with a deadline that is long enough to allow 2 requests
+	d := time.Now().Add((defaultGetHistoryTimeoutInSecs * time.Second) + time.Second)
+	baseCtx, cancel := context.WithDeadline(context.Background(), d)
+	defer cancel()
+	ctx := &fakeDeadlineContext{baseCtx, d}
+
+	// prep the iterator
+	iter := s.wfClient.GetWorkflowHistory(ctx, workflowID, runID, true, filterType)
+
+	// first attempt should occur, and trigger a second request with less than the requested timeout
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), reqNormal, gomock.Any()).DoAndReturn(func(_ context.Context, _ *shared.GetWorkflowExecutionHistoryRequest, _ ...yarpc.CallOption) (*shared.GetWorkflowExecutionHistoryResponse, error) {
+		// first request is being sent, modify the context to simulate time passing,
+		// and give the second request insufficient time to trigger another poll.
+		//
+		// without this, you should see an attempt at a third call, as the context is not canceled,
+		// and this mock took no time to respond.
+		ctx.d = time.Now().Add(time.Second)
+		return resEmpty, nil
+	}).Times(1)
+	// second request should occur, but not another
+	s.workflowServiceClient.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), reqFinal, gomock.Any()).Return(resEmpty, nil).Times(1)
+
+	// trigger both paginated requests as part of the single HasNext call
+	s.True(iter.HasNext())
+	event, err := iter.Next()
+	s.Nil(event, "iterator should not have returned any events")
+	s.Error(err, "iterator should have errored")
+	// canceled may also be appropriate, but currently this is true
+	s.Truef(errors.Is(err, context.DeadlineExceeded), "iterator should have returned a deadline-exceeded error, but returned a: %#v", err)
+	s.Contains(err.Error(), "waiting for the workflow to finish", "should be descriptive of what happened")
+}
+
+// minor helper type to allow faking deadlines between calls, as we cannot normally modify a context that way.
+type fakeDeadlineContext struct {
+	context.Context
+
+	d time.Time
+}
+
+func (f *fakeDeadlineContext) Deadline() (time.Time, bool) {
+	return f.d, true
 }
 
 // workflowRunSuite

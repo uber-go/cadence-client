@@ -31,7 +31,7 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
@@ -602,25 +602,8 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		}
 	}
 
-	// panic handler
+	// count all failures beyond this point, as they come from the activity itself
 	defer func() {
-		if p := recover(); p != nil {
-			topLine := fmt.Sprintf("local activity for %s [panic]:", activityType)
-			st := getStackTraceRaw(topLine, 7, 0)
-			lath.logger.Error("LocalActivity panic.",
-				zap.String(tagWorkflowID, task.params.WorkflowInfo.WorkflowExecution.ID),
-				zap.String(tagRunID, task.params.WorkflowInfo.WorkflowExecution.RunID),
-				zap.String(tagActivityType, activityType),
-				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
-				zap.String(tagPanicStack, st))
-			metricsScope.Counter(metrics.LocalActivityPanicCounter).Inc(1)
-			panicErr := newPanicError(p, st)
-			result = &localActivityResult{
-				task:   task,
-				result: nil,
-				err:    panicErr,
-			}
-		}
 		if result.err != nil {
 			metricsScope.Counter(metrics.LocalActivityFailedCounter).Inc(1)
 		}
@@ -648,12 +631,28 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 	var err error
 	doneCh := make(chan struct{})
 	go func(ch chan struct{}) {
+		defer close(ch)
+
+		defer func() {
+			if p := recover(); p != nil {
+				topLine := fmt.Sprintf("local activity for %s [panic]:", activityType)
+				st := getStackTraceRaw(topLine, 7, 0)
+				lath.logger.Error("LocalActivity panic.",
+					zap.String(tagWorkflowID, task.params.WorkflowInfo.WorkflowExecution.ID),
+					zap.String(tagRunID, task.params.WorkflowInfo.WorkflowExecution.RunID),
+					zap.String(tagActivityType, activityType),
+					zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+					zap.String(tagPanicStack, st))
+				metricsScope.Counter(metrics.LocalActivityPanicCounter).Inc(1)
+				err = newPanicError(p, st)
+			}
+		}()
+
 		laStartTime := time.Now()
 		ctx, span := createOpenTracingActivitySpan(ctx, lath.tracer, time.Now(), task.params.ActivityType, task.params.WorkflowInfo.WorkflowExecution.ID, task.params.WorkflowInfo.WorkflowExecution.RunID)
 		defer span.Finish()
 		laResult, err = ae.ExecuteWithActualArgs(ctx, task.params.InputArgs)
 		executionLatency := time.Now().Sub(laStartTime)
-		close(ch)
 		metricsScope.Timer(metrics.LocalActivityExecutionLatency).Record(executionLatency)
 		if executionLatency > timeoutDuration {
 			// If local activity takes longer than expected timeout, the context would already be DeadlineExceeded and

@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/auth"
@@ -413,6 +413,11 @@ type (
 		// The resolution is seconds.
 		// Optional: defaulted to 0 seconds
 		DelayStart time.Duration
+
+		// JitterStart - Seconds to jitter the workflow start. For example, if set to 10, the workflow will start some time between 0-10 seconds.
+		// This works with CronSchedule and with DelayStart.
+		// Optional: defaulted to 0 seconds
+		JitterStart time.Duration
 	}
 
 	// RetryPolicy defines the retry policy.

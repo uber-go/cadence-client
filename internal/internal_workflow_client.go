@@ -33,7 +33,7 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
@@ -196,6 +196,11 @@ func (wc *workflowClient) StartWorkflow(
 		return nil, errors.New("Invalid DelayStart option")
 	}
 
+	jitterStartSeconds := common.Int32Ceil(options.JitterStart.Seconds())
+	if jitterStartSeconds < 0 {
+		return nil, errors.New("Invalid JitterStart option")
+	}
+
 	// create a workflow start span and attach it to the context object.
 	// N.B. we need to finish this immediately as jaeger does not give us a way
 	// to recreate a span given a span context - which means we will run into
@@ -227,6 +232,7 @@ func (wc *workflowClient) StartWorkflow(
 		SearchAttributes:                    searchAttr,
 		Header:                              header,
 		DelayStartSeconds:                   common.Int32Ptr(delayStartSeconds),
+		JitterStartSeconds:                  common.Int32Ptr(jitterStartSeconds),
 	}
 
 	var response *s.StartWorkflowExecutionResponse
@@ -383,6 +389,11 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 		return nil, errors.New("Invalid DelayStart option")
 	}
 
+	jitterStartSeconds := common.Int32Ceil(options.JitterStart.Seconds())
+	if jitterStartSeconds < 0 {
+		return nil, errors.New("Invalid JitterStart option")
+	}
+
 	// create a workflow start span and attach it to the context object. finish it immediately
 	ctx, span := createOpenTracingWorkflowSpan(ctx, wc.tracer, time.Now(), fmt.Sprintf("SignalWithStartWorkflow-%s", workflowType.Name), workflowID)
 	span.Finish()
@@ -409,6 +420,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 		WorkflowIdReusePolicy:               options.WorkflowIDReusePolicy.toThriftPtr(),
 		Header:                              header,
 		DelayStartSeconds:                   common.Int32Ptr(delayStartSeconds),
+		JitterStartSeconds:                  common.Int32Ptr(jitterStartSeconds),
 	}
 
 	var response *s.StartWorkflowExecutionResponse
@@ -512,12 +524,18 @@ func (wc *workflowClient) GetWorkflowHistory(
 		var err error
 	Loop:
 		for {
+			var isFinalLongPoll bool
 			err = backoff.Retry(ctx,
 				func() error {
 					var err1 error
 					tchCtx, cancel, opt := newChannelContext(ctx, wc.featureFlags, func(builder *contextBuilder) {
 						if isLongPoll {
 							builder.Timeout = defaultGetHistoryTimeoutInSecs * time.Second
+							deadline, ok := ctx.Deadline()
+							if ok && deadline.Before(time.Now().Add(builder.Timeout)) {
+								// insufficient time for another poll, so this needs to be the last attempt
+								isFinalLongPoll = true
+							}
 						}
 					})
 					defer cancel()
@@ -546,6 +564,13 @@ func (wc *workflowClient) GetWorkflowHistory(
 				return nil, err
 			}
 			if isLongPoll && len(response.History.Events) == 0 && len(response.NextPageToken) != 0 {
+				if isFinalLongPoll {
+					// essentially a deadline exceeded, the last attempt did not get a result.
+					// this is necessary because the server does not know if we are able to try again,
+					// so it returns an empty result slightly before a timeout occurs, so the next
+					// attempt's token can be returned if it wishes to retry.
+					return nil, fmt.Errorf("timed out waiting for the workflow to finish: %w", context.DeadlineExceeded)
+				}
 				request.NextPageToken = response.NextPageToken
 				continue Loop
 			}

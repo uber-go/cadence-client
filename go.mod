@@ -14,9 +14,9 @@ require (
 	github.com/robfig/cron v1.2.0
 	github.com/stretchr/testify v1.5.1
 	github.com/uber-go/tally v3.3.15+incompatible
-	github.com/uber/cadence-idl v0.0.0-20220223020740-f2f5b7fc2bbd
+	github.com/uber/cadence-idl v0.0.0-20211111101836-d6b70b60eb8c
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
-	github.com/uber/tchannel-go v1.22.4-0.20220407103326-4170479a646a
+	github.com/uber/tchannel-go v1.32.0
 	go.uber.org/atomic v1.7.0
 	go.uber.org/fx v1.13.1 // indirect
 	go.uber.org/goleak v1.0.0

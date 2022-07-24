@@ -540,6 +540,7 @@ func StartChildWorkflowExecutionInitiatedEventAttributes(t *shared.StartChildWor
 		Memo:                         Memo(t.Memo),
 		SearchAttributes:             SearchAttributes(t.SearchAttributes),
 		DelayStart:                   secondsToDuration(t.DelayStartSeconds),
+		JitterStart:                  secondsToDuration(t.JitterStartSeconds),
 	}
 }
 

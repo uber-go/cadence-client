@@ -16,7 +16,7 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/twmb/murmur3 v1.1.6 // indirect
 	github.com/uber-go/tally/v4 v4.1.1
-	github.com/uber/cadence-idl v0.0.0-20220223020740-f2f5b7fc2bbd
+	github.com/uber/cadence-idl v0.0.0-20220713235846-fda89e95df1e
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/tchannel-go v1.16.0
 	go.opentelemetry.io/otel/bridge/opentracing v1.7.0

@@ -414,6 +414,11 @@ type (
 		// The resolution is seconds.
 		// Optional: defaulted to 0 seconds
 		DelayStart time.Duration
+
+		// JitterStart - Seconds to jitter the workflow start. For example, if set to 10, the workflow will start some time between 0-10 seconds.
+		// This works with CronSchedule and with DelayStart.
+		// Optional: defaulted to 0 seconds
+		JitterStart time.Duration
 	}
 
 	// RetryPolicy defines the retry policy.

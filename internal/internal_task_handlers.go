@@ -125,7 +125,7 @@ type (
 		dataConverter                  DataConverter
 		contextPropagators             []ContextPropagator
 		tracer                         opentracing.Tracer
-		workflowInterceptors           []WorkflowInterceptorFactory
+		workflowInterceptorFactories   []WorkflowInterceptorFactory
 	}
 
 	activityProvider func(name string) activity
@@ -396,7 +396,7 @@ func newWorkflowTaskHandler(
 		dataConverter:                  params.DataConverter,
 		contextPropagators:             params.ContextPropagators,
 		tracer:                         params.Tracer,
-		workflowInterceptors:           params.WorkflowInterceptorChainFactories,
+		workflowInterceptorFactories:   params.WorkflowInterceptorChainFactories,
 	}
 }
 
@@ -591,7 +591,7 @@ func (w *workflowExecutionContextImpl) createEventHandler() {
 		w.wth.dataConverter,
 		w.wth.contextPropagators,
 		w.wth.tracer,
-		w.wth.workflowInterceptors,
+		w.wth.workflowInterceptorFactories,
 	)
 	w.eventHandler.Store(eventHandler)
 }

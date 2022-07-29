@@ -68,7 +68,8 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		registry,
 	)
@@ -99,7 +100,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 		},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)
@@ -118,7 +120,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)
@@ -136,7 +139,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 		testDomain,
 		ShadowOptions{},
 		workerExecutionParameters{
-			Logger: zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)
@@ -159,7 +163,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)
@@ -202,7 +207,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 		},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)

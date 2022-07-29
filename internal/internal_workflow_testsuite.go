@@ -1612,16 +1612,12 @@ func (m *mockWrapper) executeMockWithActualArgs(ctx interface{}, inputArgs []int
 
 func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList string, dataConverter DataConverter) ActivityTaskHandler {
 	wOptions := augmentWorkerOptions(env.workerOptions)
+	wOptions.DataConverter = dataConverter
 	params := workerExecutionParameters{
-		TaskList:           taskList,
-		Identity:           wOptions.Identity,
-		MetricsScope:       wOptions.MetricsScope,
-		Logger:             wOptions.Logger,
-		UserContext:        wOptions.BackgroundActivityContext,
-		DataConverter:      dataConverter,
-		WorkerStopChannel:  env.workerStopChannel,
-		ContextPropagators: wOptions.ContextPropagators,
-		Tracer:             wOptions.Tracer,
+		WorkerOptions:     wOptions,
+		TaskList:          taskList,
+		UserContext:       wOptions.BackgroundActivityContext,
+		WorkerStopChannel: env.workerStopChannel,
 	}
 	ensureRequiredParams(&params)
 	if params.UserContext == nil {

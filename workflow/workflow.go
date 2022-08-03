@@ -21,7 +21,7 @@
 package workflow
 
 import (
-	"github.com/uber-go/tally/v4"
+	"github.com/uber-go/tally"
 	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal"
 	"go.uber.org/zap"

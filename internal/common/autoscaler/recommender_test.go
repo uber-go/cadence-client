@@ -24,19 +24,19 @@ import "testing"
 
 func Test_linearRecommender_Recommend(t *testing.T) {
 	type fields struct {
-		lower        Resource
-		upper        Resource
+		lower        ResourceUnit
+		upper        ResourceUnit
 		targetUsages Usages
 	}
 	type args struct {
-		currentResource Resource
+		currentResource ResourceUnit
 		currentUsages   Usages
 	}
 
 	defaultFields := fields{
 		lower: 5,
 		upper: 15,
-		targetUsages: map[UsageType]UsageInMilli{
+		targetUsages: map[UsageType]MilliUsage{
 			PollerUtilizationRate: 500,
 		},
 	}
@@ -45,73 +45,73 @@ func Test_linearRecommender_Recommend(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   Resource
+		want   ResourceUnit
 	}{
 		{
 			name:   "on target usage",
 			fields: defaultFields,
 			args: args{
 				currentResource: 10,
-				currentUsages: map[UsageType]UsageInMilli{
+				currentUsages: map[UsageType]MilliUsage{
 					PollerUtilizationRate: 500,
 				},
 			},
-			want: Resource(10),
+			want: ResourceUnit(10),
 		},
 		{
 			name:   "under utilized, scale down",
 			fields: defaultFields,
 			args: args{
 				currentResource: 10,
-				currentUsages: map[UsageType]UsageInMilli{
+				currentUsages: map[UsageType]MilliUsage{
 					PollerUtilizationRate: 400,
 				},
 			},
-			want: Resource(8),
+			want: ResourceUnit(8),
 		},
 		{
 			name:   "under utilized, scale down but bounded",
 			fields: defaultFields,
 			args: args{
 				currentResource: 10,
-				currentUsages: map[UsageType]UsageInMilli{
+				currentUsages: map[UsageType]MilliUsage{
 					PollerUtilizationRate: 200,
 				},
 			},
-			want: Resource(5),
+			want: ResourceUnit(5),
+		},
+		{
+			name:   "zero utilization, scale down to min",
+			fields: defaultFields,
+			args: args{
+				currentResource: 10,
+				currentUsages: map[UsageType]MilliUsage{
+					PollerUtilizationRate: 0,
+				},
+			},
+			want: ResourceUnit(5),
 		},
 		{
 			name:   "over utilized, scale up",
 			fields: defaultFields,
 			args: args{
 				currentResource: 10,
-				currentUsages: map[UsageType]UsageInMilli{
+				currentUsages: map[UsageType]MilliUsage{
 					PollerUtilizationRate: 600,
 				},
 			},
-			want: Resource(12),
-		},
-		{
-			name:   "over utilized, scale up",
-			fields: defaultFields,
-			args: args{
-				currentResource: 10,
-				currentUsages: map[UsageType]UsageInMilli{
-					PollerUtilizationRate: 600,
-				},
-			},
-			want: Resource(12),
+			want: ResourceUnit(12),
 		},
 		{
 			name:   "over utilized, scale up but bounded",
 			fields: defaultFields,
 			args: args{
 				currentResource: 10,
-				currentUsages: map[UsageType]UsageInMilli{
+				currentUsages: map[UsageType]MilliUsage{
 					PollerUtilizationRate: 1000,
 				},
 			},
-			want: Resource(15),
+			want: ResourceUnit(15),
 		},
 	}
 	for _, tt := range tests {

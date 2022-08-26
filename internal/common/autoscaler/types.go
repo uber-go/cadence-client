@@ -21,14 +21,14 @@
 package autoscaler
 
 type (
-	// Resource is the unit of scalable resources
-	Resource uint
+	// ResourceUnit is the unit of scalable resources
+	ResourceUnit uint
 
-	// UsageInMilli is the unit of Resource usage times 1000
-	UsageInMilli uint64
+	// MilliUsage is the custom defined usage of ResourceUnit times 1000
+	MilliUsage uint64
 
-	// Usages are different measurements used by a Recommender to provide a recommended Resource
-	Usages map[UsageType]UsageInMilli
+	// Usages are different measurements used by a Recommender to provide a recommended ResourceUnit
+	Usages map[UsageType]MilliUsage
 
 	// UsageType type of usage
 	UsageType string
@@ -40,11 +40,11 @@ const (
 )
 
 // Value helper method for type conversion
-func (r Resource) Value() float64 {
+func (r ResourceUnit) Value() float64 {
 	return float64(r)
 }
 
 // Value helper method for type conversion
-func (u UsageInMilli) Value() float64 {
+func (u MilliUsage) Value() float64 {
 	return float64(u)
 }

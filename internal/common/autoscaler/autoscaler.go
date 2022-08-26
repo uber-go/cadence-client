@@ -24,13 +24,13 @@ package autoscaler
 type (
 	AutoScaler interface {
 		Estimator
-		// Acquire X unit of Resource
-		Acquire(Resource) error
-		// Release X unit of Resource
-		Release(Resource)
-		// GetCurrent unit of Resource
-		GetCurrent() Resource
-		// Start starts the autoscaler go routine that scales the Resource according to Estimator
+		// Acquire X ResourceUnit of resource
+		Acquire(ResourceUnit) error
+		// Release X ResourceUnit of resource
+		Release(ResourceUnit)
+		// GetCurrent ResourceUnit of resource
+		GetCurrent() ResourceUnit
+		// Start starts the autoscaler go routine that scales the ResourceUnit according to Estimator
 		Start() DoneFunc
 	}
 	// DoneFunc func to turn off auto scaler

@@ -22,18 +22,18 @@ package autoscaler
 
 import "math"
 
-// Recommender a recommendation generator for Resource
+// Recommender a recommendation generator for ResourceUnit
 type Recommender interface {
-	Recommend(currentResource Resource, currentUsages Usages) Resource
+	Recommend(currentResource ResourceUnit, currentUsages Usages) ResourceUnit
 }
 
 type linearRecommender struct {
-	lower, upper Resource
+	lower, upper ResourceUnit
 	targetUsages Usages
 }
 
 // NewLinearRecommender create a linear Recommender
-func NewLinearRecommender(lower, upper Resource, targetUsages Usages) Recommender {
+func NewLinearRecommender(lower, upper ResourceUnit, targetUsages Usages) Recommender {
 	return &linearRecommender{
 		lower:        lower,
 		upper:        upper,
@@ -42,7 +42,7 @@ func NewLinearRecommender(lower, upper Resource, targetUsages Usages) Recommende
 }
 
 // Recommend recommends the new value
-func (l *linearRecommender) Recommend(currentResource Resource, currentUsages Usages) Resource {
+func (l *linearRecommender) Recommend(currentResource ResourceUnit, currentUsages Usages) ResourceUnit {
 	var recommend float64
 
 	// average recommendation over all UsageType
@@ -58,5 +58,5 @@ func (l *linearRecommender) Recommend(currentResource Resource, currentUsages Us
 		recommend += r
 	}
 	recommend /= float64(len(currentUsages))
-	return Resource(recommend)
+	return ResourceUnit(recommend)
 }

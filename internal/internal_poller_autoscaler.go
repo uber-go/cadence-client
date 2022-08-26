@@ -51,6 +51,7 @@ type (
 		ctx          context.Context
 		cancel       context.CancelFunc
 		recommender  autoscaler.Recommender
+		onAutoScale  []func() // hook functions that run post autoscale
 	}
 
 	pollerUsageEstimator struct {
@@ -65,10 +66,11 @@ func newPollerScaler(
 	initialPollerCount int,
 	minPollerCount int,
 	maxPollerCount int,
-	targetUtilizationInMilli uint64,
+	targetMilliUsage uint64,
 	isDryRun bool,
 	cooldownTime time.Duration,
-	logger *zap.Logger) *pollerAutoScaler {
+	logger *zap.Logger,
+	hooks ...func()) *pollerAutoScaler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &pollerAutoScaler{
 		isDryRun:             isDryRun,
@@ -79,28 +81,29 @@ func newPollerScaler(
 		cancel:               cancel,
 		pollerUsageEstimator: pollerUsageEstimator{atomicBits: atomic.NewUint64(0)},
 		recommender: autoscaler.NewLinearRecommender(
-			autoscaler.Resource(minPollerCount),
-			autoscaler.Resource(maxPollerCount),
+			autoscaler.ResourceUnit(minPollerCount),
+			autoscaler.ResourceUnit(maxPollerCount),
 			autoscaler.Usages{
-				autoscaler.PollerUtilizationRate: autoscaler.UsageInMilli(targetUtilizationInMilli),
+				autoscaler.PollerUtilizationRate: autoscaler.MilliUsage(targetMilliUsage),
 			},
 		),
+		onAutoScale: hooks,
 	}
 }
 
 // Acquire concurrent poll quota
-func (p *pollerAutoScaler) Acquire(resource autoscaler.Resource) error {
+func (p *pollerAutoScaler) Acquire(resource autoscaler.ResourceUnit) error {
 	return p.sem.Acquire(p.ctx, int(resource))
 }
 
 // Release concurrent poll quota
-func (p *pollerAutoScaler) Release(resource autoscaler.Resource) {
+func (p *pollerAutoScaler) Release(resource autoscaler.ResourceUnit) {
 	p.sem.Release(int(resource))
 }
 
 // GetCurrent poll quota
-func (p *pollerAutoScaler) GetCurrent() autoscaler.Resource {
-	return autoscaler.Resource(p.sem.GetLimit())
+func (p *pollerAutoScaler) GetCurrent() autoscaler.ResourceUnit {
+	return autoscaler.ResourceUnit(p.sem.GetLimit())
 }
 
 // Start an auto-scaler go routine and returns a done to stop it
@@ -110,8 +113,9 @@ func (p *pollerAutoScaler) Start() autoscaler.DoneFunc {
 		for {
 			select {
 			case <-p.ctx.Done():
+				return
 			case <-time.After(p.cooldownTime):
-				currentResource := autoscaler.Resource(p.sem.GetLimit())
+				currentResource := autoscaler.ResourceUnit(p.sem.GetLimit())
 				currentUsages, err := p.pollerUsageEstimator.Estimate()
 				if err != nil {
 					logger.Warnw("poller autoscaler skip due to estimator error", "error", err)
@@ -127,6 +131,11 @@ func (p *pollerAutoScaler) Start() autoscaler.DoneFunc {
 					p.sem.SetLimit(int(proposedResource))
 				}
 				p.pollerUsageEstimator.Reset()
+
+				// hooks
+				for i := range p.onAutoScale {
+					p.onAutoScale[i]()
+				}
 			}
 		}
 	}()
@@ -163,6 +172,6 @@ func (m *pollerUsageEstimator) Estimate() (autoscaler.Usages, error) {
 	}
 
 	return autoscaler.Usages{
-		autoscaler.PollerUtilizationRate: autoscaler.UsageInMilli(taskCounts * 1000 / (noTaskCounts + taskCounts)),
+		autoscaler.PollerUtilizationRate: autoscaler.MilliUsage(taskCounts * 1000 / (noTaskCounts + taskCounts)),
 	}, nil
 }

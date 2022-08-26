@@ -37,10 +37,13 @@ func Test_pollerAutoscaler(t *testing.T) {
 		initialPollerCount              int
 		minPollerCount                  int
 		maxPollerCount                  int
-		targetUtilizationInMilli        uint64
+		targetMilliUsage                uint64
 		cooldownTime                    time.Duration
+		autoScalerEpoch                 int
 		isDryRun                        bool
 	}
+
+	coolDownTime := time.Millisecond * 50
 
 	tests := []struct {
 		name string
@@ -48,95 +51,121 @@ func Test_pollerAutoscaler(t *testing.T) {
 		want int
 	}{
 		{
-			name: "dry run don't change anything",
+			name: "dry run doesn't change anything",
 			args: args{
-				noTaskPoll:               100,
-				taskPoll:                 0,
-				unrelated:                0,
-				initialPollerCount:       10,
-				minPollerCount:           1,
-				maxPollerCount:           10,
-				targetUtilizationInMilli: 500,
-				cooldownTime:             time.Millisecond * 200,
-				isDryRun:                 true,
+				noTaskPoll:         100,
+				taskPoll:           0,
+				unrelated:          0,
+				initialPollerCount: 10,
+				minPollerCount:     1,
+				maxPollerCount:     10,
+				targetMilliUsage:   500,
+				cooldownTime:       coolDownTime,
+				autoScalerEpoch:    1,
+				isDryRun:           true,
 			},
 			want: 10,
 		},
 		{
 			name: "no utilization, scale to min",
 			args: args{
-				noTaskPoll:               100,
-				taskPoll:                 0,
-				unrelated:                0,
-				initialPollerCount:       10,
-				minPollerCount:           1,
-				maxPollerCount:           10,
-				targetUtilizationInMilli: 500,
-				cooldownTime:             time.Millisecond * 200,
-				isDryRun:                 false,
+				noTaskPoll:         100,
+				taskPoll:           0,
+				unrelated:          0,
+				initialPollerCount: 10,
+				minPollerCount:     1,
+				maxPollerCount:     10,
+				targetMilliUsage:   500,
+				cooldownTime:       coolDownTime,
+				autoScalerEpoch:    1,
+				isDryRun:           false,
 			},
 			want: 1,
 		},
 		{
 			name: "low utilization, scale down",
 			args: args{
-				noTaskPoll:               75,
-				taskPoll:                 25,
-				unrelated:                0,
-				initialPollerCount:       10,
-				minPollerCount:           1,
-				maxPollerCount:           10,
-				targetUtilizationInMilli: 500,
-				cooldownTime:             time.Millisecond * 200,
-				isDryRun:                 false,
+				noTaskPoll:         75,
+				taskPoll:           25,
+				unrelated:          0,
+				initialPollerCount: 10,
+				minPollerCount:     1,
+				maxPollerCount:     10,
+				targetMilliUsage:   500,
+				cooldownTime:       coolDownTime,
+				autoScalerEpoch:    1,
+				isDryRun:           false,
 			},
 			want: 5,
 		},
 		{
 			name: "over utilized, scale up",
 			args: args{
-				noTaskPoll:               0,
-				taskPoll:                 100,
-				unrelated:                0,
-				initialPollerCount:       2,
-				minPollerCount:           1,
-				maxPollerCount:           10,
-				targetUtilizationInMilli: 500,
-				cooldownTime:             time.Millisecond * 200,
-				isDryRun:                 false,
+				noTaskPoll:         0,
+				taskPoll:           100,
+				unrelated:          0,
+				initialPollerCount: 2,
+				minPollerCount:     1,
+				maxPollerCount:     10,
+				targetMilliUsage:   500,
+				cooldownTime:       coolDownTime,
+				autoScalerEpoch:    1,
+				isDryRun:           false,
 			},
 			want: 4,
 		},
 		{
 			name: "over utilized, scale up to max",
 			args: args{
-				noTaskPoll:               0,
-				taskPoll:                 100,
-				unrelated:                0,
-				initialPollerCount:       6,
-				minPollerCount:           1,
-				maxPollerCount:           10,
-				targetUtilizationInMilli: 500,
-				cooldownTime:             time.Millisecond * 200,
-				isDryRun:                 false,
+				noTaskPoll:         0,
+				taskPoll:           100,
+				unrelated:          0,
+				initialPollerCount: 6,
+				minPollerCount:     1,
+				maxPollerCount:     10,
+				targetMilliUsage:   500,
+				cooldownTime:       coolDownTime,
+				autoScalerEpoch:    1,
+				isDryRun:           false,
 			},
 			want: 10,
+		},
+		{
+			name: "over utilized, but wait time less than cooldown time",
+			args: args{
+				noTaskPoll:         0,
+				taskPoll:           100,
+				unrelated:          0,
+				initialPollerCount: 6,
+				minPollerCount:     1,
+				maxPollerCount:     10,
+				targetMilliUsage:   500,
+				cooldownTime:       coolDownTime,
+				autoScalerEpoch:    0,
+				isDryRun:           false,
+			},
+			want: 6,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			autoscalerEpoch := atomic.NewUint64(0)
 			pollerScaler := newPollerScaler(
 				tt.args.initialPollerCount,
 				tt.args.minPollerCount,
 				tt.args.maxPollerCount,
-				tt.args.targetUtilizationInMilli,
+				tt.args.targetMilliUsage,
 				tt.args.isDryRun,
 				tt.args.cooldownTime,
-				zaptest.NewLogger(t))
-			done := pollerScaler.Start()
-			defer done()
+				zaptest.NewLogger(t),
+				// hook function that collects number of iterations
+				func() {
+					autoscalerEpoch.Add(1)
+				})
+			pollerScalerDone := pollerScaler.Start()
 
+			// simulate concurrent polling
 			pollChan := generateRandomPollResults(tt.args.noTaskPoll, tt.args.taskPoll, tt.args.unrelated)
 			wg := &sync.WaitGroup{}
 			for i := 0; i < tt.args.maxPollerCount; i++ {
@@ -150,9 +179,11 @@ func Test_pollerAutoscaler(t *testing.T) {
 					}
 				}()
 			}
-			wg.Wait()
-			time.Sleep(time.Millisecond * 500)
 
+			assert.Eventually(t, func() bool {
+				return autoscalerEpoch.Load() == uint64(tt.args.autoScalerEpoch)
+			}, tt.args.cooldownTime+20*time.Millisecond, 10*time.Millisecond)
+			pollerScalerDone()
 			res := pollerScaler.GetCurrent()
 			assert.Equal(t, tt.want, int(res))
 		})

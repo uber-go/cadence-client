@@ -107,6 +107,7 @@ type (
 
 	// baseWorkerOptions options to configure base worker.
 	baseWorkerOptions struct {
+		pollerAutoScaler  pollerAutoScalerOptions
 		pollerCount       int
 		pollerRate        int
 		maxConcurrentTask int
@@ -133,6 +134,7 @@ type (
 		metricsScope         tally.Scope
 
 		pollerRequestCh    chan struct{}
+		pollerAutoScaler   *pollerAutoScaler
 		taskQueueCh        chan interface{}
 		sessionTokenBucket *sessionTokenBucket
 	}
@@ -156,15 +158,25 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 
 func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, sessionTokenBucket *sessionTokenBucket) *baseWorker {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	var pollerAS *pollerAutoScaler
+	if pollerOptions := options.pollerAutoScaler; pollerOptions.Enabled {
+		pollerAS = newPollerScaler(
+			pollerOptions,
+			logger,
+		)
+	}
+
 	bw := &baseWorker{
-		options:         options,
-		shutdownCh:      make(chan struct{}),
-		taskLimiter:     rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
-		retrier:         backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
-		logger:          logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
-		metricsScope:    tagScope(metricsScope, tagWorkerType, options.workerType),
-		pollerRequestCh: make(chan struct{}, options.maxConcurrentTask),
-		taskQueueCh:     make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
+		options:          options,
+		shutdownCh:       make(chan struct{}),
+		taskLimiter:      rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
+		retrier:          backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
+		logger:           logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
+		metricsScope:     tagScope(metricsScope, tagWorkerType, options.workerType),
+		pollerRequestCh:  make(chan struct{}, options.maxConcurrentTask),
+		pollerAutoScaler: pollerAS,
+		taskQueueCh:      make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
 
 		limiterContext:       ctx,
 		limiterContextCancel: cancel,

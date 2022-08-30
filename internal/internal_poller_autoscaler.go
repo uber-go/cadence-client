@@ -60,31 +60,36 @@ type (
 		// This avoids unnecessary usage of CompareAndSwap
 		atomicBits *atomic.Uint64
 	}
+
+	pollerAutoScalerOptions struct {
+		Enabled           bool
+		InitCount         int
+		MinCount          int
+		MaxCount          int
+		Cooldown          time.Duration
+		DryRun            bool
+		TargetUtilization float64
+	}
 )
 
 func newPollerScaler(
-	initialPollerCount int,
-	minPollerCount int,
-	maxPollerCount int,
-	targetMilliUsage uint64,
-	isDryRun bool,
-	cooldownTime time.Duration,
+	options pollerAutoScalerOptions,
 	logger *zap.Logger,
 	hooks ...func()) *pollerAutoScaler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &pollerAutoScaler{
-		isDryRun:             isDryRun,
-		cooldownTime:         cooldownTime,
+		isDryRun:             options.DryRun,
+		cooldownTime:         options.Cooldown,
 		logger:               logger,
-		sem:                  semaphore.New(initialPollerCount),
+		sem:                  semaphore.New(options.InitCount),
 		ctx:                  ctx,
 		cancel:               cancel,
 		pollerUsageEstimator: pollerUsageEstimator{atomicBits: atomic.NewUint64(0)},
 		recommender: autoscaler.NewLinearRecommender(
-			autoscaler.ResourceUnit(minPollerCount),
-			autoscaler.ResourceUnit(maxPollerCount),
+			autoscaler.ResourceUnit(options.MinCount),
+			autoscaler.ResourceUnit(options.MaxCount),
 			autoscaler.Usages{
-				autoscaler.PollerUtilizationRate: autoscaler.MilliUsage(targetMilliUsage),
+				autoscaler.PollerUtilizationRate: autoscaler.MilliUsage(options.TargetUtilization * 1000),
 			},
 		),
 		onAutoScale: hooks,

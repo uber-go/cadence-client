@@ -1216,6 +1216,18 @@ func augmentWorkerOptions(options WorkerOptions) WorkerOptions {
 	if options.MaxConcurrentSessionExecutionSize == 0 {
 		options.MaxConcurrentSessionExecutionSize = defaultMaxConcurrentSessionExecutionSize
 	}
+	if options.MinConcurrentActivityTaskPollers == 0 {
+		options.MinConcurrentActivityTaskPollers = defaultMinConcurrentPollerSize
+	}
+	if options.MinConcurrentDecisionTaskPollers == 0 {
+		options.MinConcurrentDecisionTaskPollers = defaultMinConcurrentPollerSize
+	}
+	if options.PollerAutoScalerCooldown == 0 {
+		options.PollerAutoScalerCooldown = defaultPollerAutoScalerCooldown
+	}
+	if options.PollerAutoScalerTargetUtilization == 0 {
+		options.PollerAutoScalerTargetUtilization = defaultPollerAutoScalerTargetUtilization
+	}
 
 	// if the user passes in a tracer then add a tracing context propagator
 	if options.Tracer != nil {

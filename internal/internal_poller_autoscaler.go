@@ -32,7 +32,9 @@ import (
 
 // defaultPollerScalerCooldownInSeconds
 const (
-	defaultPollerScalerCooldownInSeconds = 120
+	defaultPollerAutoScalerCooldown          = time.Minute
+	defaultPollerAutoScalerTargetUtilization = 0.6
+	defaultMinConcurrentPollerSize           = 1
 )
 
 var (
@@ -77,6 +79,10 @@ func newPollerScaler(
 	logger *zap.Logger,
 	hooks ...func()) *pollerAutoScaler {
 	ctx, cancel := context.WithCancel(context.Background())
+	if !options.Enabled {
+		return nil
+	}
+
 	return &pollerAutoScaler{
 		isDryRun:             options.DryRun,
 		cooldownTime:         options.Cooldown,

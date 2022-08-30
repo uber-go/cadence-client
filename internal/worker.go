@@ -116,7 +116,7 @@ type (
 		// optional: Sets the target utilization rate between [0,1].
 		// Utilization Rate = pollResultWithTask / (pollResultWithTask + pollResultWithNoTask)
 		// It takes effect if FeatureFlags.PollerAutoScalerEnabled is set to true.
-		// Default value is 0.7
+		// Default value is 0.6
 		PollerAutoScalerTargetUtilization float64
 
 		// optional: Sets whether to start dry run mode of autoscaler.

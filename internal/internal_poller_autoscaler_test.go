@@ -176,7 +176,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 				return
 			}
 
-			pollerScalerDone := pollerScaler.Start()
+			pollerScaler.Start()
 
 			// simulate concurrent polling
 			pollChan := generateRandomPollResults(tt.args.noTaskPoll, tt.args.taskPoll, tt.args.unrelated)
@@ -196,7 +196,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 			assert.Eventually(t, func() bool {
 				return autoscalerEpoch.Load() == uint64(tt.args.autoScalerEpoch)
 			}, tt.args.cooldownTime+20*time.Millisecond, 10*time.Millisecond)
-			pollerScalerDone()
+			pollerScaler.Stop()
 			res := pollerScaler.GetCurrent()
 			assert.Equal(t, tt.want, int(res))
 		})

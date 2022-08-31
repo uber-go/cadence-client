@@ -31,8 +31,8 @@ type (
 		// GetCurrent ResourceUnit of resource
 		GetCurrent() ResourceUnit
 		// Start starts the autoscaler go routine that scales the ResourceUnit according to Estimator
-		Start() DoneFunc
+		Start()
+		// Stop stops the autoscaler if started or do nothing if not yet started
+		Stop()
 	}
-	// DoneFunc func to turn off auto scaler
-	DoneFunc func()
 )

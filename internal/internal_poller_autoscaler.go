@@ -118,7 +118,7 @@ func (p *pollerAutoScaler) GetCurrent() autoscaler.ResourceUnit {
 }
 
 // Start an auto-scaler go routine and returns a done to stop it
-func (p *pollerAutoScaler) Start() autoscaler.DoneFunc {
+func (p *pollerAutoScaler) Start() {
 	logger := p.logger.Sugar()
 	go func() {
 		for {
@@ -150,9 +150,12 @@ func (p *pollerAutoScaler) Start() autoscaler.DoneFunc {
 			}
 		}
 	}()
-	return func() {
-		p.cancel()
-	}
+	return
+}
+
+// Stop stops the poller autoscaler
+func (p *pollerAutoScaler) Stop() {
+	p.cancel()
 }
 
 // Reset metrics from the start

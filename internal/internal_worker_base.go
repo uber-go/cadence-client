@@ -197,6 +197,10 @@ func (bw *baseWorker) Start() {
 
 	bw.metricsScope.Counter(metrics.WorkerStartCounter).Inc(1)
 
+	if bw.pollerAutoScaler != nil {
+		bw.pollerAutoScaler.Start()
+	}
+
 	for i := 0; i < bw.options.pollerCount; i++ {
 		bw.shutdownWG.Add(1)
 		go bw.runPoller()
@@ -272,6 +276,14 @@ func (bw *baseWorker) pollTask() {
 	var task interface{}
 	bw.retrier.Throttle()
 	if bw.pollLimiter == nil || bw.pollLimiter.Wait(bw.limiterContext) == nil {
+		if bw.pollerAutoScaler != nil {
+			if pErr := bw.pollerAutoScaler.Acquire(1); pErr == nil {
+				defer bw.pollerAutoScaler.Release(1)
+			} else {
+				bw.logger.Warn("poller auto scaler acquire error", zap.Error(pErr))
+			}
+		}
+
 		task, err = bw.options.taskWorker.PollTask()
 		if err != nil && enableVerboseLogging {
 			bw.logger.Debug("Failed to poll for task.", zap.Error(err))
@@ -285,6 +297,11 @@ func (bw *baseWorker) pollTask() {
 			}
 			bw.retrier.Failed()
 		} else {
+			if bw.pollerAutoScaler != nil {
+				if pErr := bw.pollerAutoScaler.CollectUsage(task); pErr != nil {
+					bw.logger.Warn("poller auto scaler collect usage error", zap.Error(pErr))
+				}
+			}
 			bw.retrier.Succeeded()
 		}
 	}
@@ -359,6 +376,9 @@ func (bw *baseWorker) Stop() {
 	}
 	close(bw.shutdownCh)
 	bw.limiterContextCancel()
+	if bw.pollerAutoScaler != nil {
+		bw.pollerAutoScaler.Stop()
+	}
 
 	if success := util.AwaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {
 		traceLog(func() {

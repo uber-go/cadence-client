@@ -271,19 +271,26 @@ func (bw *baseWorker) runTaskDispatcher() {
 	}
 }
 
+/*
+There are three types of constraint on polling tasks:
+1. poller auto scaler is to constraint number of concurrent pollers
+2. retrier is a backoff constraint on errors
+3. limiter is a per-second constraint
+*/
 func (bw *baseWorker) pollTask() {
 	var err error
 	var task interface{}
+
+	if bw.pollerAutoScaler != nil {
+		if pErr := bw.pollerAutoScaler.Acquire(1); pErr == nil {
+			defer bw.pollerAutoScaler.Release(1)
+		} else {
+			bw.logger.Warn("poller auto scaler acquire error", zap.Error(pErr))
+		}
+	}
+
 	bw.retrier.Throttle()
 	if bw.pollLimiter == nil || bw.pollLimiter.Wait(bw.limiterContext) == nil {
-		if bw.pollerAutoScaler != nil {
-			if pErr := bw.pollerAutoScaler.Acquire(1); pErr == nil {
-				defer bw.pollerAutoScaler.Release(1)
-			} else {
-				bw.logger.Warn("poller auto scaler acquire error", zap.Error(pErr))
-			}
-		}
-
 		task, err = bw.options.taskWorker.PollTask()
 		if err != nil && enableVerboseLogging {
 			bw.logger.Debug("Failed to poll for task.", zap.Error(err))

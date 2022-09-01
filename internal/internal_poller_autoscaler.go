@@ -27,6 +27,7 @@ import (
 	"go.uber.org/atomic"
 	"go.uber.org/cadence/internal/common/autoscaler"
 	"go.uber.org/zap"
+	"sync"
 	"time"
 )
 
@@ -52,6 +53,7 @@ type (
 		sem          semaphore.Semaphore // resizable semaphore to control number of concurrent pollers
 		ctx          context.Context
 		cancel       context.CancelFunc
+		wg           *sync.WaitGroup // graceful stop
 		recommender  autoscaler.Recommender
 		onAutoScale  []func() // hook functions that run post autoscale
 	}
@@ -88,6 +90,7 @@ func newPollerScaler(
 		cooldownTime:         options.Cooldown,
 		logger:               logger,
 		sem:                  semaphore.New(options.InitCount),
+		wg:                   &sync.WaitGroup{},
 		ctx:                  ctx,
 		cancel:               cancel,
 		pollerUsageEstimator: pollerUsageEstimator{atomicBits: atomic.NewUint64(0)},
@@ -120,7 +123,9 @@ func (p *pollerAutoScaler) GetCurrent() autoscaler.ResourceUnit {
 // Start an auto-scaler go routine and returns a done to stop it
 func (p *pollerAutoScaler) Start() {
 	logger := p.logger.Sugar()
+	p.wg.Add(1)
 	go func() {
+		defer p.wg.Done()
 		for {
 			select {
 			case <-p.ctx.Done():
@@ -156,6 +161,7 @@ func (p *pollerAutoScaler) Start() {
 // Stop stops the poller autoscaler
 func (p *pollerAutoScaler) Stop() {
 	p.cancel()
+	p.wg.Wait()
 }
 
 // Reset metrics from the start

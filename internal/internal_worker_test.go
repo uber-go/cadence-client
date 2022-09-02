@@ -195,7 +195,7 @@ func testActivityMultipleArgsWithStruct(ctx context.Context, i int, s testActivi
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorker() {
-	worker := createWorkerWithThrottle(s.T(), s.service, float64(500.0), nil, nil)
+	worker := createWorkerWithThrottle(s.T(), s.service, float64(500.0), WorkerOptions{})
 	err := worker.Start()
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
@@ -216,6 +216,14 @@ func (s *internalWorkerTestSuite) TestCreateShadowWorker() {
 	s.Nil(worker.activityWorker)
 	s.Nil(worker.locallyDispatchedActivityWorker)
 	s.Nil(worker.sessionWorker)
+}
+
+func (s *internalWorkerTestSuite) TestCreateWorker_WithAutoScaler() {
+	worker := createWorkerWithAutoscaler(s.T(), s.service)
+	err := worker.Start()
+	require.NoError(s.T(), err)
+	time.Sleep(time.Millisecond * 200)
+	worker.Stop()
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
@@ -329,7 +337,7 @@ func createWorker(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), nil, nil)
+	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{})
 }
 
 func createShadowWorker(
@@ -337,15 +345,17 @@ func createShadowWorker(
 	service *workflowservicetest.MockClient,
 	shadowOptions *ShadowOptions,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), nil, shadowOptions)
+	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{
+		EnableShadowWorker: true,
+		ShadowOptions:      *shadowOptions,
+	})
 }
 
 func createWorkerWithThrottle(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 	activitiesPerSecond float64,
-	dc DataConverter,
-	shadowOptions *ShadowOptions,
+	workerOptions WorkerOptions,
 ) *aggregatedWorker {
 	domain := "testDomain"
 	domainStatus := shared.DomainStatusRegistered
@@ -376,19 +386,10 @@ func createWorkerWithThrottle(
 	service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, nil).AnyTimes()
 
 	// Configure worker options.
-	workerOptions := WorkerOptions{}
 	workerOptions.WorkerActivitiesPerSecond = 20
 	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
 	workerOptions.Logger = zaptest.NewLogger(t)
-	if dc != nil {
-		workerOptions.DataConverter = dc
-	}
 	workerOptions.EnableSessionWorker = true
-
-	if shadowOptions != nil {
-		workerOptions.EnableShadowWorker = true
-		workerOptions.ShadowOptions = *shadowOptions
-	}
 
 	// Start Worker.
 	worker := NewWorker(
@@ -403,7 +404,14 @@ func createWorkerWithDataConverter(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), newTestDataConverter(), nil)
+	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{DataConverter: newTestDataConverter()})
+}
+
+func createWorkerWithAutoscaler(
+	t *testing.T,
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
 }
 
 func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions) {

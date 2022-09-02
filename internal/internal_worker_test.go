@@ -195,7 +195,7 @@ func testActivityMultipleArgsWithStruct(ctx context.Context, i int, s testActivi
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorker() {
-	worker := createWorkerWithThrottle(s.T(), s.service, float64(500.0), nil, nil)
+	worker := createWorkerWithThrottle(s.T(), s.service, float64(500.0), WorkerOptions{})
 	err := worker.Start()
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
@@ -216,6 +216,14 @@ func (s *internalWorkerTestSuite) TestCreateShadowWorker() {
 	s.Nil(worker.activityWorker)
 	s.Nil(worker.locallyDispatchedActivityWorker)
 	s.Nil(worker.sessionWorker)
+}
+
+func (s *internalWorkerTestSuite) TestCreateWorker_WithAutoScaler() {
+	worker := createWorkerWithAutoscaler(s.T(), s.service)
+	err := worker.Start()
+	require.NoError(s.T(), err)
+	time.Sleep(time.Millisecond * 200)
+	worker.Stop()
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
@@ -329,7 +337,7 @@ func createWorker(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), nil, nil)
+	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{})
 }
 
 func createShadowWorker(
@@ -337,15 +345,17 @@ func createShadowWorker(
 	service *workflowservicetest.MockClient,
 	shadowOptions *ShadowOptions,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), nil, shadowOptions)
+	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{
+		EnableShadowWorker: true,
+		ShadowOptions:      *shadowOptions,
+	})
 }
 
 func createWorkerWithThrottle(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 	activitiesPerSecond float64,
-	dc DataConverter,
-	shadowOptions *ShadowOptions,
+	workerOptions WorkerOptions,
 ) *aggregatedWorker {
 	domain := "testDomain"
 	domainStatus := shared.DomainStatusRegistered
@@ -376,19 +386,10 @@ func createWorkerWithThrottle(
 	service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, nil).AnyTimes()
 
 	// Configure worker options.
-	workerOptions := WorkerOptions{}
 	workerOptions.WorkerActivitiesPerSecond = 20
 	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
 	workerOptions.Logger = zaptest.NewLogger(t)
-	if dc != nil {
-		workerOptions.DataConverter = dc
-	}
 	workerOptions.EnableSessionWorker = true
-
-	if shadowOptions != nil {
-		workerOptions.EnableShadowWorker = true
-		workerOptions.ShadowOptions = *shadowOptions
-	}
 
 	// Start Worker.
 	worker := NewWorker(
@@ -403,7 +404,14 @@ func createWorkerWithDataConverter(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), newTestDataConverter(), nil)
+	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{DataConverter: newTestDataConverter()})
+}
+
+func createWorkerWithAutoscaler(
+	t *testing.T,
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
 }
 
 func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions) {
@@ -1186,5 +1194,140 @@ func TestIsNonRetriableError(t *testing.T) {
 
 	for _, test := range tests {
 		require.Equal(t, test.expected, isNonRetriableError(test.err))
+	}
+}
+
+func Test_augmentWorkerOptions(t *testing.T) {
+	type args struct {
+		options WorkerOptions
+	}
+	tests := []struct {
+		name string
+		args args
+		want WorkerOptions
+	}{
+		{
+			name: "happy",
+			args: args{options: WorkerOptions{
+				MaxConcurrentActivityExecutionSize:      3,
+				WorkerActivitiesPerSecond:               10,
+				MaxConcurrentLocalActivityExecutionSize: 4,
+				WorkerLocalActivitiesPerSecond:          20,
+				TaskListActivitiesPerSecond:             30,
+				MaxConcurrentActivityTaskPollers:        10,
+				MinConcurrentActivityTaskPollers:        2,
+				MaxConcurrentDecisionTaskExecutionSize:  40,
+				WorkerDecisionTasksPerSecond:            50,
+				MaxConcurrentDecisionTaskPollers:        15,
+				MinConcurrentDecisionTaskPollers:        4,
+				PollerAutoScalerCooldown:                time.Minute * 2,
+				PollerAutoScalerTargetUtilization:       0.8,
+				PollerAutoScalerDryRun:                  false,
+				Identity:                                "identity",
+				MetricsScope:                            tally.NoopScope,
+				Logger:                                  zap.NewNop(),
+				EnableLoggingInReplay:                   false,
+				DisableWorkflowWorker:                   false,
+				DisableActivityWorker:                   false,
+				DisableStickyExecution:                  false,
+				StickyScheduleToStartTimeout:            time.Minute * 4,
+				BackgroundActivityContext:               context.Background(),
+				NonDeterministicWorkflowPolicy:          NonDeterministicWorkflowPolicyBlockWorkflow,
+				DataConverter:                           DefaultDataConverter,
+				WorkerStopTimeout:                       time.Minute * 5,
+				EnableSessionWorker:                     false,
+				MaxConcurrentSessionExecutionSize:       80,
+				WorkflowInterceptorChainFactories:       nil,
+				ContextPropagators:                      nil,
+				Tracer:                                  nil,
+				EnableShadowWorker:                      false,
+				ShadowOptions:                           ShadowOptions{},
+				FeatureFlags:                            FeatureFlags{},
+				Authorization:                           nil,
+			}},
+			want: WorkerOptions{
+				MaxConcurrentActivityExecutionSize:      3,
+				WorkerActivitiesPerSecond:               10,
+				MaxConcurrentLocalActivityExecutionSize: 4,
+				WorkerLocalActivitiesPerSecond:          20,
+				TaskListActivitiesPerSecond:             30,
+				MaxConcurrentActivityTaskPollers:        10,
+				MinConcurrentActivityTaskPollers:        2,
+				MaxConcurrentDecisionTaskExecutionSize:  40,
+				WorkerDecisionTasksPerSecond:            50,
+				MaxConcurrentDecisionTaskPollers:        15,
+				MinConcurrentDecisionTaskPollers:        4,
+				PollerAutoScalerCooldown:                time.Minute * 2,
+				PollerAutoScalerTargetUtilization:       0.8,
+				PollerAutoScalerDryRun:                  false,
+				Identity:                                "identity",
+				MetricsScope:                            tally.NoopScope,
+				Logger:                                  zap.NewNop(),
+				EnableLoggingInReplay:                   false,
+				DisableWorkflowWorker:                   false,
+				DisableActivityWorker:                   false,
+				DisableStickyExecution:                  false,
+				StickyScheduleToStartTimeout:            time.Minute * 4,
+				BackgroundActivityContext:               context.Background(),
+				NonDeterministicWorkflowPolicy:          NonDeterministicWorkflowPolicyBlockWorkflow,
+				DataConverter:                           DefaultDataConverter,
+				WorkerStopTimeout:                       time.Minute * 5,
+				EnableSessionWorker:                     false,
+				MaxConcurrentSessionExecutionSize:       80,
+				WorkflowInterceptorChainFactories:       nil,
+				ContextPropagators:                      nil,
+				Tracer:                                  opentracing.NoopTracer{},
+				EnableShadowWorker:                      false,
+				ShadowOptions:                           ShadowOptions{},
+				FeatureFlags:                            FeatureFlags{},
+				Authorization:                           nil,
+			},
+		},
+		{
+			name: "empty payload",
+			args: args{options: WorkerOptions{}},
+			want: WorkerOptions{
+				MaxConcurrentActivityExecutionSize:      1000,
+				WorkerActivitiesPerSecond:               100000,
+				MaxConcurrentLocalActivityExecutionSize: 1000,
+				WorkerLocalActivitiesPerSecond:          100000,
+				TaskListActivitiesPerSecond:             100000,
+				MaxConcurrentActivityTaskPollers:        2,
+				MinConcurrentActivityTaskPollers:        1,
+				MaxConcurrentDecisionTaskExecutionSize:  1000,
+				WorkerDecisionTasksPerSecond:            100000,
+				MaxConcurrentDecisionTaskPollers:        2,
+				MinConcurrentDecisionTaskPollers:        1,
+				PollerAutoScalerCooldown:                time.Minute,
+				PollerAutoScalerTargetUtilization:       0.6,
+				PollerAutoScalerDryRun:                  false,
+				Identity:                                "",
+				MetricsScope:                            nil,
+				Logger:                                  nil,
+				EnableLoggingInReplay:                   false,
+				DisableWorkflowWorker:                   false,
+				DisableActivityWorker:                   false,
+				DisableStickyExecution:                  false,
+				StickyScheduleToStartTimeout:            time.Second * 5,
+				BackgroundActivityContext:               nil,
+				NonDeterministicWorkflowPolicy:          NonDeterministicWorkflowPolicyBlockWorkflow,
+				DataConverter:                           DefaultDataConverter,
+				WorkerStopTimeout:                       0,
+				EnableSessionWorker:                     false,
+				MaxConcurrentSessionExecutionSize:       1000,
+				WorkflowInterceptorChainFactories:       nil,
+				ContextPropagators:                      nil,
+				Tracer:                                  opentracing.NoopTracer{},
+				EnableShadowWorker:                      false,
+				ShadowOptions:                           ShadowOptions{},
+				FeatureFlags:                            FeatureFlags{},
+				Authorization:                           nil,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, augmentWorkerOptions(tt.args.options), "augmentWorkerOptions(%v)", tt.args.options)
+		})
 	}
 }

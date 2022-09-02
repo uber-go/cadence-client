@@ -33,6 +33,7 @@ import (
 
 func Test_pollerAutoscaler(t *testing.T) {
 	type args struct {
+		disabled                        bool
 		noTaskPoll, taskPoll, unrelated int
 		initialPollerCount              int
 		minPollerCount                  int
@@ -146,24 +147,36 @@ func Test_pollerAutoscaler(t *testing.T) {
 			},
 			want: 6,
 		},
+		{
+			name: "disabled",
+			args: args{disabled: true},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			autoscalerEpoch := atomic.NewUint64(0)
 			pollerScaler := newPollerScaler(
-				tt.args.initialPollerCount,
-				tt.args.minPollerCount,
-				tt.args.maxPollerCount,
-				tt.args.targetMilliUsage,
-				tt.args.isDryRun,
-				tt.args.cooldownTime,
+				pollerAutoScalerOptions{
+					Enabled:           !tt.args.disabled,
+					InitCount:         tt.args.initialPollerCount,
+					MinCount:          tt.args.minPollerCount,
+					MaxCount:          tt.args.maxPollerCount,
+					Cooldown:          tt.args.cooldownTime,
+					DryRun:            tt.args.isDryRun,
+					TargetUtilization: float64(tt.args.targetMilliUsage) / 1000,
+				},
 				zaptest.NewLogger(t),
 				// hook function that collects number of iterations
 				func() {
 					autoscalerEpoch.Add(1)
 				})
-			pollerScalerDone := pollerScaler.Start()
+			if tt.args.disabled {
+				assert.Nil(t, pollerScaler)
+				return
+			}
+
+			pollerScaler.Start()
 
 			// simulate concurrent polling
 			pollChan := generateRandomPollResults(tt.args.noTaskPoll, tt.args.taskPoll, tt.args.unrelated)
@@ -183,7 +196,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 			assert.Eventually(t, func() bool {
 				return autoscalerEpoch.Load() == uint64(tt.args.autoScalerEpoch)
 			}, tt.args.cooldownTime+20*time.Millisecond, 10*time.Millisecond)
-			pollerScalerDone()
+			pollerScaler.Stop()
 			res := pollerScaler.GetCurrent()
 			assert.Equal(t, tt.want, int(res))
 		})

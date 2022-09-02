@@ -107,6 +107,7 @@ type (
 
 	// baseWorkerOptions options to configure base worker.
 	baseWorkerOptions struct {
+		pollerAutoScaler  pollerAutoScalerOptions
 		pollerCount       int
 		pollerRate        int
 		maxConcurrentTask int
@@ -133,6 +134,7 @@ type (
 		metricsScope         tally.Scope
 
 		pollerRequestCh    chan struct{}
+		pollerAutoScaler   *pollerAutoScaler
 		taskQueueCh        chan interface{}
 		sessionTokenBucket *sessionTokenBucket
 	}
@@ -156,15 +158,25 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 
 func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, sessionTokenBucket *sessionTokenBucket) *baseWorker {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	var pollerAS *pollerAutoScaler
+	if pollerOptions := options.pollerAutoScaler; pollerOptions.Enabled {
+		pollerAS = newPollerScaler(
+			pollerOptions,
+			logger,
+		)
+	}
+
 	bw := &baseWorker{
-		options:         options,
-		shutdownCh:      make(chan struct{}),
-		taskLimiter:     rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
-		retrier:         backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
-		logger:          logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
-		metricsScope:    tagScope(metricsScope, tagWorkerType, options.workerType),
-		pollerRequestCh: make(chan struct{}, options.maxConcurrentTask),
-		taskQueueCh:     make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
+		options:          options,
+		shutdownCh:       make(chan struct{}),
+		taskLimiter:      rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
+		retrier:          backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
+		logger:           logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
+		metricsScope:     tagScope(metricsScope, tagWorkerType, options.workerType),
+		pollerRequestCh:  make(chan struct{}, options.maxConcurrentTask),
+		pollerAutoScaler: pollerAS,
+		taskQueueCh:      make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
 
 		limiterContext:       ctx,
 		limiterContextCancel: cancel,
@@ -184,6 +196,10 @@ func (bw *baseWorker) Start() {
 	}
 
 	bw.metricsScope.Counter(metrics.WorkerStartCounter).Inc(1)
+
+	if bw.pollerAutoScaler != nil {
+		bw.pollerAutoScaler.Start()
+	}
 
 	for i := 0; i < bw.options.pollerCount; i++ {
 		bw.shutdownWG.Add(1)
@@ -255,9 +271,24 @@ func (bw *baseWorker) runTaskDispatcher() {
 	}
 }
 
+/*
+There are three types of constraint on polling tasks:
+1. poller auto scaler is to constraint number of concurrent pollers
+2. retrier is a backoff constraint on errors
+3. limiter is a per-second constraint
+*/
 func (bw *baseWorker) pollTask() {
 	var err error
 	var task interface{}
+
+	if bw.pollerAutoScaler != nil {
+		if pErr := bw.pollerAutoScaler.Acquire(1); pErr == nil {
+			defer bw.pollerAutoScaler.Release(1)
+		} else {
+			bw.logger.Warn("poller auto scaler acquire error", zap.Error(pErr))
+		}
+	}
+
 	bw.retrier.Throttle()
 	if bw.pollLimiter == nil || bw.pollLimiter.Wait(bw.limiterContext) == nil {
 		task, err = bw.options.taskWorker.PollTask()
@@ -273,6 +304,11 @@ func (bw *baseWorker) pollTask() {
 			}
 			bw.retrier.Failed()
 		} else {
+			if bw.pollerAutoScaler != nil {
+				if pErr := bw.pollerAutoScaler.CollectUsage(task); pErr != nil {
+					bw.logger.Warn("poller auto scaler collect usage error", zap.Error(pErr))
+				}
+			}
 			bw.retrier.Succeeded()
 		}
 	}
@@ -347,6 +383,9 @@ func (bw *baseWorker) Stop() {
 	}
 	close(bw.shutdownCh)
 	bw.limiterContextCancel()
+	if bw.pollerAutoScaler != nil {
+		bw.pollerAutoScaler.Stop()
+	}
 
 	if success := util.AwaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {
 		traceLog(func() {

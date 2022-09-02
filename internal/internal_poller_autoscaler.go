@@ -27,12 +27,15 @@ import (
 	"go.uber.org/atomic"
 	"go.uber.org/cadence/internal/common/autoscaler"
 	"go.uber.org/zap"
+	"sync"
 	"time"
 )
 
 // defaultPollerScalerCooldownInSeconds
 const (
-	defaultPollerScalerCooldownInSeconds = 120
+	defaultPollerAutoScalerCooldown          = time.Minute
+	defaultPollerAutoScalerTargetUtilization = 0.6
+	defaultMinConcurrentPollerSize           = 1
 )
 
 var (
@@ -50,6 +53,7 @@ type (
 		sem          semaphore.Semaphore // resizable semaphore to control number of concurrent pollers
 		ctx          context.Context
 		cancel       context.CancelFunc
+		wg           *sync.WaitGroup // graceful stop
 		recommender  autoscaler.Recommender
 		onAutoScale  []func() // hook functions that run post autoscale
 	}
@@ -60,31 +64,41 @@ type (
 		// This avoids unnecessary usage of CompareAndSwap
 		atomicBits *atomic.Uint64
 	}
+
+	pollerAutoScalerOptions struct {
+		Enabled           bool
+		InitCount         int
+		MinCount          int
+		MaxCount          int
+		Cooldown          time.Duration
+		DryRun            bool
+		TargetUtilization float64
+	}
 )
 
 func newPollerScaler(
-	initialPollerCount int,
-	minPollerCount int,
-	maxPollerCount int,
-	targetMilliUsage uint64,
-	isDryRun bool,
-	cooldownTime time.Duration,
+	options pollerAutoScalerOptions,
 	logger *zap.Logger,
 	hooks ...func()) *pollerAutoScaler {
 	ctx, cancel := context.WithCancel(context.Background())
+	if !options.Enabled {
+		return nil
+	}
+
 	return &pollerAutoScaler{
-		isDryRun:             isDryRun,
-		cooldownTime:         cooldownTime,
+		isDryRun:             options.DryRun,
+		cooldownTime:         options.Cooldown,
 		logger:               logger,
-		sem:                  semaphore.New(initialPollerCount),
+		sem:                  semaphore.New(options.InitCount),
+		wg:                   &sync.WaitGroup{},
 		ctx:                  ctx,
 		cancel:               cancel,
 		pollerUsageEstimator: pollerUsageEstimator{atomicBits: atomic.NewUint64(0)},
 		recommender: autoscaler.NewLinearRecommender(
-			autoscaler.ResourceUnit(minPollerCount),
-			autoscaler.ResourceUnit(maxPollerCount),
+			autoscaler.ResourceUnit(options.MinCount),
+			autoscaler.ResourceUnit(options.MaxCount),
 			autoscaler.Usages{
-				autoscaler.PollerUtilizationRate: autoscaler.MilliUsage(targetMilliUsage),
+				autoscaler.PollerUtilizationRate: autoscaler.MilliUsage(options.TargetUtilization * 1000),
 			},
 		),
 		onAutoScale: hooks,
@@ -107,9 +121,11 @@ func (p *pollerAutoScaler) GetCurrent() autoscaler.ResourceUnit {
 }
 
 // Start an auto-scaler go routine and returns a done to stop it
-func (p *pollerAutoScaler) Start() autoscaler.DoneFunc {
+func (p *pollerAutoScaler) Start() {
 	logger := p.logger.Sugar()
+	p.wg.Add(1)
 	go func() {
+		defer p.wg.Done()
 		for {
 			select {
 			case <-p.ctx.Done():
@@ -139,9 +155,13 @@ func (p *pollerAutoScaler) Start() autoscaler.DoneFunc {
 			}
 		}
 	}()
-	return func() {
-		p.cancel()
-	}
+	return
+}
+
+// Stop stops the poller autoscaler
+func (p *pollerAutoScaler) Stop() {
+	p.cancel()
+	p.wg.Wait()
 }
 
 // Reset metrics from the start

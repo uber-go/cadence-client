@@ -199,6 +199,42 @@ func (s *queryBuilderSuite) TestToWorkflowStatus() {
 			expectErr:      false,
 			expectedStatus: WorkflowStatusTerminated,
 		},
+		{
+			msg:            "all",
+			statusString:   "ALL",
+			expectErr:      false,
+			expectedStatus: WorkflowStatusALL,
+		},
+		{
+			msg:            "closed",
+			statusString:   "CLOSED",
+			expectErr:      false,
+			expectedStatus: WorkflowStatusClosed,
+		},
+		{
+			msg:            "failed",
+			statusString:   "FAILED",
+			expectErr:      false,
+			expectedStatus: WorkflowStatusFailed,
+		},
+		{
+			msg:            "completed",
+			statusString:   "COMPLETED",
+			expectErr:      false,
+			expectedStatus: WorkflowStatusCompleted,
+		},
+		{
+			msg:            "canceled",
+			statusString:   "CANCELED",
+			expectErr:      false,
+			expectedStatus: WorkflowStatusCanceled,
+		},
+		{
+			msg:            "continued as new",
+			statusString:   "CONTINUED_AS_NEW",
+			expectErr:      false,
+			expectedStatus: WorkflowStatusContinuedAsNew,
+		},
 	}
 
 	for _, test := range testCases {

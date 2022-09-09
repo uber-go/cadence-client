@@ -155,7 +155,7 @@ func ToWorkflowStatus(statusString string) (WorkflowStatus, error) {
 	switch status {
 	case WorkflowStatusOpen, WorkflowStatusClosed, WorkflowStatusCompleted,
 		WorkflowStatusFailed, WorkflowStatusCanceled, WorkflowStatusTerminated,
-		WorkflowStatusContinuedAsNew, WorkflowStatusTimedOut:
+		WorkflowStatusContinuedAsNew, WorkflowStatusTimedOut, WorkflowStatusALL:
 		return status, nil
 	default:
 		return "", fmt.Errorf("unknown workflow status: %v", statusString)

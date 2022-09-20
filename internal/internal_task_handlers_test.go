@@ -1279,24 +1279,26 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_Interleaved() {
 
 	heartbeatErr := cadenceInvoker.BatchHeartbeat([]byte("1"))
 	t.NoError(heartbeatErr)
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	for i := 0; i < 4; i++ {
 		heartbeatErr = cadenceInvoker.BackgroundHeartbeat()
 		t.NoError(heartbeatErr)
-		time.Sleep(time.Second)
+		time.Sleep(800 * time.Millisecond)
 	}
+
+	time.Sleep(time.Second)
 
 	heartbeatErr = cadenceInvoker.BatchHeartbeat([]byte("2"))
 	t.NoError(heartbeatErr)
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	for i := 0; i < 4; i++ {
 		heartbeatErr = cadenceInvoker.BackgroundHeartbeat()
 		t.NoError(heartbeatErr)
-		time.Sleep(time.Second)
+		time.Sleep(800 * time.Millisecond)
 	}
-	time.Sleep(time.Second)
+	time.Sleep(1 * time.Second)
 }
 
 func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {

@@ -306,7 +306,9 @@ func (bw *baseWorker) pollTask() {
 		} else {
 			if bw.pollerAutoScaler != nil {
 				if pErr := bw.pollerAutoScaler.CollectUsage(task); pErr != nil {
-					bw.logger.Warn("poller auto scaler collect usage error", zap.Error(pErr))
+					bw.logger.Sugar().Warnw("poller auto scaler collect usage error",
+						"error", pErr,
+						"task", task)
 				}
 			}
 			bw.retrier.Succeeded()

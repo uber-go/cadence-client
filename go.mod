@@ -14,8 +14,7 @@ require (
 	github.com/pborman/uuid v0.0.0-20160209185913-a97ce2ca70fa
 	github.com/robfig/cron v1.2.0
 	github.com/stretchr/testify v1.5.1
-	github.com/twmb/murmur3 v1.1.6 // indirect
-	github.com/uber-go/tally/v4 v4.1.1
+	github.com/uber-go/tally v3.3.15+incompatible
 	github.com/uber/cadence-idl v0.0.0-20220713235846-fda89e95df1e
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/tchannel-go v1.32.1

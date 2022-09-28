@@ -171,15 +171,29 @@ func (m *pollerUsageEstimator) Reset() {
 
 // CollectUsage counts past poll results to estimate autoscaler.Usages
 func (m *pollerUsageEstimator) CollectUsage(data interface{}) error {
-	switch v := data.(type) {
-	case *polledTask:
-		if v == nil { // no-task poll
-			m.atomicBits.Add(1 << 32)
-		} else {
-			m.atomicBits.Add(1)
-		}
+	isEmpty, err := isTaskEmpty(data)
+	if err != nil {
+		return err
+	}
+	if isEmpty { // no-task poll
+		m.atomicBits.Add(1 << 32)
+	} else {
+		m.atomicBits.Add(1)
 	}
 	return nil
+}
+
+func isTaskEmpty(task interface{}) (bool, error) {
+	switch t := task.(type) {
+	case *workflowTask:
+		return t == nil || t.task == nil, nil
+	case *activityTask:
+		return t == nil || t.task == nil, nil
+	case *localActivityTask:
+		return t == nil || t.workflowTask == nil, nil
+	default:
+		return false, errors.New("unknown task type")
+	}
 }
 
 // Estimate is based on past poll counts

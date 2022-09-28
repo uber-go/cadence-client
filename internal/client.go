@@ -524,6 +524,7 @@ func getFeatureFlags(options *ClientOptions) FeatureFlags {
 	if options != nil {
 		return FeatureFlags{
 			WorkflowExecutionAlreadyCompletedErrorEnabled: options.FeatureFlags.WorkflowExecutionAlreadyCompletedErrorEnabled,
+			PollerAutoScalerEnabled:                       options.FeatureFlags.PollerAutoScalerEnabled,
 		}
 	}
 	return FeatureFlags{}

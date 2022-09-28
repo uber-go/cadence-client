@@ -91,11 +91,12 @@ func (s *WorkersTestSuite) TestWorkflowWorker() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	executionParameters := workerExecutionParameters{
-		TaskList:                     "testTaskList",
-		MaxConcurrentDecisionPollers: 5,
-		Logger:                       logger,
-		UserContext:                  ctx,
-		UserContextCancel:            cancel,
+		TaskList: "testTaskList",
+		WorkerOptions: WorkerOptions{
+			MaxConcurrentDecisionTaskPollers: 5,
+			Logger:                           logger},
+		UserContext:       ctx,
+		UserContextCancel: cancel,
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
@@ -122,9 +123,10 @@ func (s *WorkersTestSuite) testActivityWorker(useLocallyDispatched bool) {
 	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).AnyTimes()
 
 	executionParameters := workerExecutionParameters{
-		TaskList:                     "testTaskList",
-		MaxConcurrentActivityPollers: 5,
-		Logger:                       zaptest.NewLogger(s.T()),
+		TaskList: "testTaskList",
+		WorkerOptions: WorkerOptions{
+			MaxConcurrentActivityTaskPollers: 5,
+			Logger:                           zaptest.NewLogger(s.T())},
 	}
 	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler(), useLocallyDispatchedActivityPoller: useLocallyDispatched}
 	a := &greeterActivity{}
@@ -165,14 +167,15 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	stopC := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 	executionParameters := workerExecutionParameters{
-		TaskList:                        "testTaskList",
-		MaxConcurrentActivityPollers:    5,
-		ConcurrentActivityExecutionSize: 2,
-		Logger:                          zaptest.NewLogger(s.T()),
-		UserContext:                     ctx,
-		UserContextCancel:               cancel,
-		WorkerStopTimeout:               time.Second * 2,
-		WorkerStopChannel:               stopC,
+		TaskList: "testTaskList",
+		WorkerOptions: WorkerOptions{
+			MaxConcurrentActivityTaskPollers:   5,
+			MaxConcurrentActivityExecutionSize: 2,
+			Logger:                             zaptest.NewLogger(s.T())},
+		UserContext:       ctx,
+		UserContextCancel: cancel,
+		WorkerStopTimeout: time.Second * 2,
+		WorkerStopChannel: stopC,
 	}
 	activityTaskHandler := newNoResponseActivityTaskHandler()
 	overrides := &workerOverrides{activityTaskHandler: activityTaskHandler}
@@ -202,9 +205,10 @@ func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions()...).Return(&m.PollForDecisionTaskResponse{}, &m.InternalServiceError{}).AnyTimes()
 
 	executionParameters := workerExecutionParameters{
-		TaskList:                     "testDecisionTaskList",
-		MaxConcurrentDecisionPollers: 5,
-		Logger:                       zaptest.NewLogger(s.T()),
+		TaskList: "testDecisionTaskList",
+		WorkerOptions: WorkerOptions{
+			MaxConcurrentDecisionTaskPollers: 5,
+			Logger:                           zaptest.NewLogger(s.T())},
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(

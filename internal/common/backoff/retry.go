@@ -23,9 +23,10 @@ package backoff
 import (
 	"context"
 	"errors"
-	s "go.uber.org/cadence/.gen/go/shared"
 	"sync"
 	"time"
+
+	s "go.uber.org/cadence/.gen/go/shared"
 )
 
 type (
@@ -105,21 +106,22 @@ Retry_Loop:
 			return err
 		}
 
-		// Check if the error is retryable
-		if isRetriable(err) {
-			retryAfter := ErrRetryableAfter(err)
-			// update the time to wait until the next attempt.
-			// as this is a *minimum*, just add it to the current delay time.
-			//
-			// this could be changed to clamp to retryAfter as a minimum.
-			// this is intentionally *not* done here, so repeated service-busy errors are guaranteed
-			// to generate *increasing* amount of time between requests, and not just send N in a row
-			// with 1 second of delay.  duplicates imply "still overloaded", so this will hopefully
-			// help reduce the odds of snowballing.
-			// this is a pretty minor thing though, and it should not cause problems if we change it
-			// to make behavior more predictable.
-			next += retryAfter
+		if !isRetriable(err) {
+			return err
 		}
+
+		retryAfter := ErrRetryableAfter(err)
+		// update the time to wait until the next attempt.
+		// as this is a *minimum*, just add it to the current delay time.
+		//
+		// this could be changed to clamp to retryAfter as a minimum.
+		// this is intentionally *not* done here, so repeated service-busy errors are guaranteed
+		// to generate *increasing* amount of time between requests, and not just send N in a row
+		// with 1 second of delay.  duplicates imply "still overloaded", so this will hopefully
+		// help reduce the odds of snowballing.
+		// this is a pretty minor thing though, and it should not cause problems if we change it
+		// to make behavior more predictable.
+		next += retryAfter
 
 		// check if ctx is done
 		if ctx.Err() != nil {

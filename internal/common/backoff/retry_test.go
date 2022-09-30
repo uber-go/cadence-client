@@ -23,11 +23,11 @@ package backoff
 
 import (
 	"context"
-	"go.uber.org/cadence/.gen/go/shared"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/cadence/.gen/go/shared"
 )
 
 type errCategory int
@@ -51,8 +51,8 @@ func TestRetry(t *testing.T) {
 		err           errCategory
 		expectedCalls int
 	}{
-		{"success", 2 * succeedOnAttemptNum, time.Second, nil, noErr, succeedOnAttemptNum},
-		{"too many tries", 3, time.Second, nil, anyErr, 4}, // max 3 retries == 4 calls.  must be < succeedOnAttemptNum to work.
+		{"success", 2 * succeedOnAttemptNum, time.Second, func(err error) bool { return true }, noErr, succeedOnAttemptNum},
+		{"too many tries", 3, time.Second, func(err error) bool { return true }, anyErr, 4}, // max 3 retries == 4 calls.  must be < succeedOnAttemptNum to work.
 		{"success with always custom retry", 2 * succeedOnAttemptNum, time.Second, func(err error) bool {
 			return true // retry on all errors, same as no custom retry
 		}, noErr, succeedOnAttemptNum},

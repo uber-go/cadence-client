@@ -22,6 +22,8 @@ package backoff
 
 import (
 	"context"
+	"errors"
+	s "go.uber.org/cadence/.gen/go/shared"
 	"sync"
 	"time"
 )
@@ -30,10 +32,8 @@ type (
 	// Operation to retry
 	Operation func() error
 
-	// RetryAfter handler can be used to exclude certain errors during retry,
-	// and define how long to wait at a minimum before trying again.
-	// delays must be 0 or larger.
-	RetryAfter func(error) (isRetryable bool, retryAfter time.Duration)
+	// IsRetryable handler can be used to exclude certain errors during retry
+	IsRetryable func(error) bool
 
 	// ConcurrentRetrier is used for client-side throttling. It determines whether to
 	// throttle outgoing traffic in case downstream backend server rejects
@@ -89,7 +89,7 @@ func NewConcurrentRetrier(retryPolicy RetryPolicy) *ConcurrentRetrier {
 }
 
 // Retry function can be used to wrap any call with retry logic using the passed in policy
-func Retry(ctx context.Context, operation Operation, policy RetryPolicy, retryAfter RetryAfter) error {
+func Retry(ctx context.Context, operation Operation, policy RetryPolicy, isRetriable IsRetryable) error {
 	var err error
 	var next time.Duration
 
@@ -106,17 +106,19 @@ Retry_Loop:
 		}
 
 		// Check if the error is retryable
-		if retryAfter != nil {
-			retryable, minNext := retryAfter(err)
-			// fail on non-retryable errors
-			if !retryable {
-				return err
-			}
+		if isRetriable(err) {
+			retryAfter := ErrRetryableAfter(err)
 			// update the time to wait until the next attempt.
-			// as this is a *minimum*, just add it to the current pending time.
-			// this way repeated service busy errors will take increasing amounts of time before retrying,
-			// and when the request is not limited it does not further increase the time until trying again.
-			next += minNext
+			// as this is a *minimum*, just add it to the current delay time.
+			//
+			// this could be changed to clamp to retryAfter as a minimum.
+			// this is intentionally *not* done here, so repeated service-busy errors are guaranteed
+			// to generate *increasing* amount of time between requests, and not just send N in a row
+			// with 1 second of delay.  duplicates imply "still overloaded", so this will hopefully
+			// help reduce the odds of snowballing.
+			// this is a pretty minor thing though, and it should not cause problems if we change it
+			// to make behavior more predictable.
+			next += retryAfter
 		}
 
 		// check if ctx is done
@@ -129,6 +131,9 @@ Retry_Loop:
 			// we could check if this is longer than context deadline and immediately fail...
 			// ...but wasting time prevents higher-level retries from trying too early.
 			// this is particularly useful for service-busy, but seems valid for essentially all retried errors.
+			//
+			// this could probably be changed if we get requests for it, but for now it better-protects
+			// the server by preventing "external" retry storms.
 			timer := time.NewTimer(next)
 			select {
 			case <-ctxDone:
@@ -142,4 +147,22 @@ Retry_Loop:
 		// ctx is not cancellable
 		time.Sleep(next)
 	}
+}
+
+// ErrRetryableAfter returns a minimum delay until the next attempt.
+//
+// for most errors this will be 0, and normal backoff logic will determine
+// the full retry period, but e.g. service busy errors (or any case where the
+// server knows a "time until it is not useful to retry") are safe to assume
+// that a literally immediate retry is *not* going to be useful.
+//
+// note that this is only a minimum, however.  longer delays are assumed to
+// be equally valid.
+func ErrRetryableAfter(err error) (retryAfter time.Duration) {
+	if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
+		// eventually: return a time-until-retry from the server.
+		// for now though, just ensure at least one second before the next attempt.
+		return time.Second
+	}
+	return 0
 }

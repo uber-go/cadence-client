@@ -513,7 +513,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 			}
 
 			return err1
-		}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
+		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 
 	return
 }
@@ -765,7 +765,7 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 
 	response, err := wtp.service.PollForDecisionTask(ctx, request, getYarpcCallOptions(wtp.featureFlags)...)
 	if err != nil {
-		retryable, retryAfter := errRetryableAfter(err)
+		retryable := isServiceTransientError(err)
 		if retryable {
 			wtp.metricsScope.Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
 		} else {
@@ -774,7 +774,9 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 		wtp.updateBacklog(request.TaskList.GetKind(), 0)
 
 		// pause for the retry delay if present.
-		// failures also have an exponential backoff, but this ensures a minimum is respected.
+		// failures also have an exponential backoff, implemented at a higher level,
+		// but this ensures a minimum is respected.
+		retryAfter := backoff.ErrRetryableAfter(err)
 		if retryAfter > 0 {
 			t := time.NewTimer(retryAfter)
 			select {
@@ -909,7 +911,7 @@ func newGetHistoryPageFunc(
 					NextPageToken: nextPageToken,
 				}, opt...)
 				return err1
-			}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 		if err != nil {
 			metricsScope.Counter(metrics.WorkflowGetHistoryFailedCounter).Inc(1)
 			return nil, nil, err
@@ -1003,14 +1005,17 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTask
 	response, err := atp.service.PollForActivityTask(ctx, request, getYarpcCallOptions(atp.featureFlags)...)
 
 	if err != nil {
-		retryable, retryAfter := errRetryableAfter(err)
+		retryable := isServiceTransientError(err)
 		if retryable {
 			atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
 		} else {
 			atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
 		}
 
-		// pause for the retry delay if present
+		// pause for the retry delay if present.
+		// failures also have an exponential backoff, implemented at a higher level,
+		// but this ensures a minimum is respected.
+		retryAfter := backoff.ErrRetryableAfter(err)
 		if retryAfter > 0 {
 			t := time.NewTimer(retryAfter)
 			select {
@@ -1194,7 +1199,7 @@ func reportActivityComplete(
 				defer cancel()
 
 				return service.RespondActivityTaskCanceled(tchCtx, request, opt...)
-			}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	case *s.RespondActivityTaskFailedRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
@@ -1202,7 +1207,7 @@ func reportActivityComplete(
 				defer cancel()
 
 				return service.RespondActivityTaskFailed(tchCtx, request, opt...)
-			}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	case *s.RespondActivityTaskCompletedRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
@@ -1210,7 +1215,7 @@ func reportActivityComplete(
 				defer cancel()
 
 				return service.RespondActivityTaskCompleted(tchCtx, request, opt...)
-			}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	}
 	if reportErr == nil {
 		switch request.(type) {
@@ -1247,7 +1252,7 @@ func reportActivityCompleteByID(
 				defer cancel()
 
 				return service.RespondActivityTaskCanceledByID(tchCtx, request, opt...)
-			}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	case *s.RespondActivityTaskFailedByIDRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
@@ -1255,7 +1260,7 @@ func reportActivityCompleteByID(
 				defer cancel()
 
 				return service.RespondActivityTaskFailedByID(tchCtx, request, opt...)
-			}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	case *s.RespondActivityTaskCompletedByIDRequest:
 		reportErr = backoff.Retry(ctx,
 			func() error {
@@ -1263,7 +1268,7 @@ func reportActivityCompleteByID(
 				defer cancel()
 
 				return service.RespondActivityTaskCompletedByID(tchCtx, request, opt...)
-			}, createDynamicServiceRetryPolicy(ctx), errRetryableAfter)
+			}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 	}
 	if reportErr == nil {
 		switch request.(type) {

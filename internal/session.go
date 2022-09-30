@@ -426,7 +426,7 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 				// is 1 sec.)
 				return activityEnv.serviceInvoker.Heartbeat([]byte{})
 			}
-			isRetryable := func(_ error) (bool, time.Duration) {
+			isRetryable := func(_ error) bool {
 				// there will be two types of error here:
 				// 1. transient errors like timeout, in which case we should not fail the session
 				// 2. non-retryable errors like activity cancelled, activity not found or domain
@@ -435,9 +435,9 @@ func sessionCreationActivity(ctx context.Context, sessionID string) error {
 				// internal implementation to tell which error is non-retryable.
 				select {
 				case <-ctx.Done():
-					return false, 0
+					return false
 				default:
-					return true, 0 // any extra delay is already handled by code called by heartbeatOp
+					return true
 				}
 			}
 			err := backoff.Retry(ctx, heartbeatOp, heartbeatRetryPolicy, isRetryable)

@@ -23,10 +23,19 @@ package backoff
 
 import (
 	"context"
+	"go.uber.org/cadence/.gen/go/shared"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+)
+
+type errCategory int
+
+const (
+	noErr errCategory = iota
+	anyErr
+	serviceBusyErr
 )
 
 func TestRetry(t *testing.T) {
@@ -37,32 +46,33 @@ func TestRetry(t *testing.T) {
 		name        string
 		maxAttempts int
 		maxTime     time.Duration // context timeout
-		isRetryable func(error) (bool, time.Duration)
+		isRetryable func(error) bool
 
-		shouldError   bool
+		err           errCategory
 		expectedCalls int
 	}{
-		{"success", 2 * succeedOnAttemptNum, time.Second, nil, false, succeedOnAttemptNum},
-		{"too many tries", 3, time.Second, nil, true, 4}, // max 3 retries == 4 calls.  must be < succeedOnAttemptNum to work.
-		{"success with always custom retry", 2 * succeedOnAttemptNum, time.Second, func(err error) (bool, time.Duration) {
-			return true, 0 // retry on all errors, same as no custom retry
-		}, false, succeedOnAttemptNum},
-		{"success with never custom retry", 2 * succeedOnAttemptNum, time.Second, func(err error) (bool, time.Duration) {
-			return false, 0 // never retry
-		}, true, 1},
+		{"success", 2 * succeedOnAttemptNum, time.Second, nil, noErr, succeedOnAttemptNum},
+		{"too many tries", 3, time.Second, nil, anyErr, 4}, // max 3 retries == 4 calls.  must be < succeedOnAttemptNum to work.
+		{"success with always custom retry", 2 * succeedOnAttemptNum, time.Second, func(err error) bool {
+			return true // retry on all errors, same as no custom retry
+		}, noErr, succeedOnAttemptNum},
+		{"success with never custom retry", 2 * succeedOnAttemptNum, time.Second, func(err error) bool {
+			return false // never retry
+		}, anyErr, 1},
 
 		// elapsed-time-sensitive tests below.
 		// consider raising time granularity if flaky, or we could set up a more complete mock
 		// to resolve flakiness for real, but that's a fair bit more complex.
 
 		// try -> sleep(10ms) -> try -> sleep(20ms) -> try -> sleep(40ms) -> timeout == 3 calls.
-		{"timed out eventually", 5, 50 * time.Millisecond, func(err error) (bool, time.Duration) {
-			return true, 0
-		}, true, 3},
-		// try -> sleep(longer than context timeout) -> timeout == 1 call.
-		{"timed out due to long minimum delay", 5, 10 * time.Millisecond, func(err error) (bool, time.Duration) {
-			return true, 20 * time.Millisecond
-		}, true, 1},
+		{"timed out eventually", 5, 50 * time.Millisecond, func(err error) bool {
+			return true
+		}, anyErr, 3},
+
+		// try -> sleep(longer than context timeout due to busy err) -> timeout == 1 call.
+		{"timed out due to long minimum delay", 5, 10 * time.Millisecond, func(err error) bool {
+			return true
+		}, serviceBusyErr, 1},
 	}
 
 	for _, test := range tests {
@@ -77,7 +87,15 @@ func TestRetry(t *testing.T) {
 					return nil
 				}
 
-				return &someError{}
+				switch test.err {
+				case noErr:
+					return &someError{} // non-erroring tests should not reach this branch
+				case anyErr:
+					return &someError{}
+				case serviceBusyErr:
+					return &shared.ServiceBusyError{}
+				}
+				panic("unreachable")
 			}
 
 			policy := NewExponentialRetryPolicy(10 * time.Millisecond)
@@ -87,10 +105,10 @@ func TestRetry(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), test.maxTime)
 			defer cancel()
 			err := Retry(ctx, op, policy, test.isRetryable)
-			if test.shouldError {
-				assert.Error(t, err)
-			} else {
+			if test.err == noErr {
 				assert.NoError(t, err, "Retry count: %v", i)
+			} else {
+				assert.Error(t, err)
 			}
 			assert.Equal(t, test.expectedCalls, i, "wrong number of calls")
 		})

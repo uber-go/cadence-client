@@ -26,10 +26,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"math"
-	"time"
-
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
@@ -41,6 +37,8 @@ import (
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/serializer"
 	"go.uber.org/zap"
+	"io/ioutil"
+	"math"
 )
 
 const (
@@ -194,12 +192,12 @@ func (r *WorkflowReplayer) ReplayWorkflowExecution(
 			return err
 		},
 		createDynamicServiceRetryPolicy(ctx),
-		func(err error) (bool, time.Duration) {
+		func(err error) bool {
 			if _, ok := err.(*shared.InternalServiceError); ok {
 				// treat InternalServiceError as non-retryable, as the workflow history may be corrupted
-				return false, 0
+				return false
 			}
-			return errRetryableAfter(err)
+			return isServiceTransientError(err)
 		},
 	); err != nil {
 		return err

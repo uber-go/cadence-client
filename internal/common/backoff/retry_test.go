@@ -41,6 +41,13 @@ const (
 func TestRetry(t *testing.T) {
 	t.Parallel()
 
+	always := func(err error) bool {
+		return true
+	}
+	never := func(err error) bool {
+		return false
+	}
+
 	succeedOnAttemptNum := 5
 	tests := []struct {
 		name        string
@@ -51,28 +58,20 @@ func TestRetry(t *testing.T) {
 		err           errCategory
 		expectedCalls int
 	}{
-		{"success", 2 * succeedOnAttemptNum, time.Second, func(err error) bool { return true }, noErr, succeedOnAttemptNum},
-		{"too many tries", 3, time.Second, func(err error) bool { return true }, anyErr, 4}, // max 3 retries == 4 calls.  must be < succeedOnAttemptNum to work.
-		{"success with always custom retry", 2 * succeedOnAttemptNum, time.Second, func(err error) bool {
-			return true // retry on all errors, same as no custom retry
-		}, noErr, succeedOnAttemptNum},
-		{"success with never custom retry", 2 * succeedOnAttemptNum, time.Second, func(err error) bool {
-			return false // never retry
-		}, anyErr, 1},
+		{"success", 2 * succeedOnAttemptNum, time.Second, always, noErr, succeedOnAttemptNum},
+		{"too many tries", 3, time.Second, always, anyErr, 4}, // max 3 retries == 4 calls.  must be < succeedOnAttemptNum to work.
+		{"success with always custom retry", 2 * succeedOnAttemptNum, time.Second, always, noErr, succeedOnAttemptNum},
+		{"success with never custom retry", 2 * succeedOnAttemptNum, time.Second, never, anyErr, 1},
 
 		// elapsed-time-sensitive tests below.
 		// consider raising time granularity if flaky, or we could set up a more complete mock
 		// to resolve flakiness for real, but that's a fair bit more complex.
 
 		// try -> sleep(10ms) -> try -> sleep(20ms) -> try -> sleep(40ms) -> timeout == 3 calls.
-		{"timed out eventually", 5, 50 * time.Millisecond, func(err error) bool {
-			return true
-		}, anyErr, 3},
+		{"timed out eventually", 5, 50 * time.Millisecond, always, anyErr, 3},
 
 		// try -> sleep(longer than context timeout due to busy err) -> timeout == 1 call.
-		{"timed out due to long minimum delay", 5, 10 * time.Millisecond, func(err error) bool {
-			return true
-		}, serviceBusyErr, 1},
+		{"timed out due to long minimum delay", 5, 10 * time.Millisecond, always, serviceBusyErr, 1},
 	}
 
 	for _, test := range tests {

@@ -589,6 +589,7 @@ func StartChildWorkflowExecutionInitiatedEventAttributes(t *apiv1.StartChildWork
 		Memo:                                Memo(t.Memo),
 		SearchAttributes:                    SearchAttributes(t.SearchAttributes),
 		DelayStartSeconds:                   durationToSeconds(t.DelayStart),
+		JitterStartSeconds:                  durationToSeconds(t.JitterStart),
 	}
 }
 

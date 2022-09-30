@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="Go + Not Tests + Not RPC" pattern="file[cadence]:*.go&amp;&amp;!file[cadence]:*_test.go&amp;&amp;!file[cadence]:.gen//*&amp;&amp;!file[cadence]:idls//*" />
+</component>

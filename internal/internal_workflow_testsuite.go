@@ -35,7 +35,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/robfig/cron"
 	"github.com/stretchr/testify/mock"
-	"github.com/uber-go/tally/v4"
+	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -1612,16 +1612,12 @@ func (m *mockWrapper) executeMockWithActualArgs(ctx interface{}, inputArgs []int
 
 func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList string, dataConverter DataConverter) ActivityTaskHandler {
 	wOptions := augmentWorkerOptions(env.workerOptions)
+	wOptions.DataConverter = dataConverter
 	params := workerExecutionParameters{
-		TaskList:           taskList,
-		Identity:           wOptions.Identity,
-		MetricsScope:       wOptions.MetricsScope,
-		Logger:             wOptions.Logger,
-		UserContext:        wOptions.BackgroundActivityContext,
-		DataConverter:      dataConverter,
-		WorkerStopChannel:  env.workerStopChannel,
-		ContextPropagators: wOptions.ContextPropagators,
-		Tracer:             wOptions.Tracer,
+		WorkerOptions:     wOptions,
+		TaskList:          taskList,
+		UserContext:       wOptions.BackgroundActivityContext,
+		WorkerStopChannel: env.workerStopChannel,
 	}
 	ensureRequiredParams(&params)
 	if params.UserContext == nil {

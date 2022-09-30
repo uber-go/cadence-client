@@ -21,14 +21,15 @@
 package common
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
 )
 
 // TSerialize is used to serialize thrift TStruct to []byte
-func TSerialize(t thrift.TStruct) (b []byte, err error) {
-	return thrift.NewTSerializer().Write(t)
+func TSerialize(ctx context.Context, t thrift.TStruct) (b []byte, err error) {
+	return thrift.NewTSerializer().Write(ctx, t)
 }
 
 // TListSerialize is used to serialize list of thrift TStruct to []byte
@@ -43,18 +44,20 @@ func TListSerialize(ts []thrift.TStruct) (b []byte, err error) {
 	// NOTE: we don't write any markers as thrift by design being a streaming protocol doesn't
 	// recommend writing length.
 
+	// TODO populate context from argument
+	ctx := context.Background()
 	for _, v := range ts {
-		if e := v.Write(t.Protocol); e != nil {
+		if e := v.Write(ctx, t.Protocol); e != nil {
 			err = thrift.PrependError("error writing TStruct: ", e)
 			return
 		}
 	}
 
-	if err = t.Protocol.Flush(); err != nil {
+	if err = t.Protocol.Flush(ctx); err != nil {
 		return
 	}
 
-	if err = t.Transport.Flush(); err != nil {
+	if err = t.Transport.Flush(ctx); err != nil {
 		return
 	}
 
@@ -63,8 +66,8 @@ func TListSerialize(ts []thrift.TStruct) (b []byte, err error) {
 }
 
 // TDeserialize is used to deserialize []byte to thrift TStruct
-func TDeserialize(t thrift.TStruct, b []byte) (err error) {
-	return thrift.NewTDeserializer().Read(t, b)
+func TDeserialize(ctx context.Context, t thrift.TStruct, b []byte) (err error) {
+	return thrift.NewTDeserializer().Read(ctx, t, b)
 }
 
 // TListDeserialize is used to deserialize []byte to list of thrift TStruct
@@ -75,8 +78,10 @@ func TListDeserialize(ts []thrift.TStruct, b []byte) (err error) {
 		return
 	}
 
+	// TODO populate context from argument
+	ctx := context.Background()
 	for i := 0; i < len(ts); i++ {
-		if e := ts[i].Read(t.Protocol); e != nil {
+		if e := ts[i].Read(ctx, t.Protocol); e != nil {
 			err = thrift.PrependError("error reading TStruct: ", e)
 			return
 		}

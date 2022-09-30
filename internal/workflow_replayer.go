@@ -33,7 +33,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
-	"github.com/uber-go/tally/v4"
+	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -269,14 +269,16 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		logger = zap.NewNop()
 	}
 	workerParams := workerExecutionParameters{
-		TaskList:               replayTaskListName,
-		Identity:               replayWorkerIdentity,
-		DataConverter:          r.options.DataConverter,
-		ContextPropagators:     r.options.ContextPropagators,
-		WorkflowInterceptors:   r.options.WorkflowInterceptorChainFactories,
-		Tracer:                 r.options.Tracer,
-		Logger:                 logger,
-		DisableStickyExecution: true,
+		WorkerOptions: WorkerOptions{
+			Identity:                          replayWorkerIdentity,
+			DataConverter:                     r.options.DataConverter,
+			ContextPropagators:                r.options.ContextPropagators,
+			WorkflowInterceptorChainFactories: r.options.WorkflowInterceptorChainFactories,
+			Tracer:                            r.options.Tracer,
+			Logger:                            logger,
+			DisableStickyExecution:            true,
+		},
+		TaskList: replayTaskListName,
 	}
 
 	metricScope := tally.NoopScope

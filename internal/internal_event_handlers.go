@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
-	"github.com/uber-go/tally/v4"
+	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/shared"
 	m "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
@@ -112,12 +112,12 @@ type (
 		isReplay              bool // flag to indicate if workflow is in replay mode
 		enableLoggingInReplay bool // flag to indicate if workflow should enable logging in replay mode
 
-		metricsScope         tally.Scope
-		registry             *registry
-		dataConverter        DataConverter
-		contextPropagators   []ContextPropagator
-		tracer               opentracing.Tracer
-		workflowInterceptors []WorkflowInterceptorFactory
+		metricsScope                 tally.Scope
+		registry                     *registry
+		dataConverter                DataConverter
+		contextPropagators           []ContextPropagator
+		tracer                       opentracing.Tracer
+		workflowInterceptorFactories []WorkflowInterceptorFactory
 	}
 
 	localActivityTask struct {
@@ -201,24 +201,24 @@ func newWorkflowExecutionEventHandler(
 	dataConverter DataConverter,
 	contextPropagators []ContextPropagator,
 	tracer opentracing.Tracer,
-	workflowInterceptors []WorkflowInterceptorFactory,
+	workflowInterceptorFactories []WorkflowInterceptorFactory,
 ) workflowExecutionEventHandler {
 	context := &workflowEnvironmentImpl{
-		workflowInfo:          workflowInfo,
-		decisionsHelper:       newDecisionsHelper(),
-		sideEffectResult:      make(map[int32][]byte),
-		mutableSideEffect:     make(map[string][]byte),
-		changeVersions:        make(map[string]Version),
-		pendingLaTasks:        make(map[string]*localActivityTask),
-		unstartedLaTasks:      make(map[string]struct{}),
-		openSessions:          make(map[string]*SessionInfo),
-		completeHandler:       completeHandler,
-		enableLoggingInReplay: enableLoggingInReplay,
-		registry:              registry,
-		dataConverter:         dataConverter,
-		contextPropagators:    contextPropagators,
-		tracer:                tracer,
-		workflowInterceptors:  workflowInterceptors,
+		workflowInfo:                 workflowInfo,
+		decisionsHelper:              newDecisionsHelper(),
+		sideEffectResult:             make(map[int32][]byte),
+		mutableSideEffect:            make(map[string][]byte),
+		changeVersions:               make(map[string]Version),
+		pendingLaTasks:               make(map[string]*localActivityTask),
+		unstartedLaTasks:             make(map[string]struct{}),
+		openSessions:                 make(map[string]*SessionInfo),
+		completeHandler:              completeHandler,
+		enableLoggingInReplay:        enableLoggingInReplay,
+		registry:                     registry,
+		dataConverter:                dataConverter,
+		contextPropagators:           contextPropagators,
+		tracer:                       tracer,
+		workflowInterceptorFactories: workflowInterceptorFactories,
 	}
 	context.logger = logger.With(
 		zapcore.Field{Key: tagWorkflowType, Type: zapcore.StringType, String: workflowInfo.WorkflowType.Name},
@@ -771,7 +771,7 @@ func (wc *workflowEnvironmentImpl) GetRegistry() *registry {
 }
 
 func (wc *workflowEnvironmentImpl) GetWorkflowInterceptors() []WorkflowInterceptorFactory {
-	return wc.workflowInterceptors
+	return wc.workflowInterceptorFactories
 }
 
 func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(

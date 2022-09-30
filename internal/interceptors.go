@@ -24,7 +24,7 @@ package internal
 import (
 	"time"
 
-	"github.com/uber-go/tally/v4"
+	"github.com/uber-go/tally"
 	"go.uber.org/zap"
 )
 
@@ -72,7 +72,7 @@ type WorkflowInterceptor interface {
 
 var _ WorkflowInterceptor = (*WorkflowInterceptorBase)(nil)
 
-// WorkflowInterceptorBase is a helper type that can simplify creation of WorkflowInterceptors
+// WorkflowInterceptorBase is a helper type that can simplify creation of WorkflowInterceptorChainFactories
 type WorkflowInterceptorBase struct {
 	Next WorkflowInterceptor
 }

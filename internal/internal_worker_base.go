@@ -32,7 +32,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/uber-go/tally/v4"
+	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
@@ -306,7 +306,9 @@ func (bw *baseWorker) pollTask() {
 		} else {
 			if bw.pollerAutoScaler != nil {
 				if pErr := bw.pollerAutoScaler.CollectUsage(task); pErr != nil {
-					bw.logger.Warn("poller auto scaler collect usage error", zap.Error(pErr))
+					bw.logger.Sugar().Warnw("poller auto scaler collect usage error",
+						"error", pErr,
+						"task", task)
 				}
 			}
 			bw.retrier.Succeeded()

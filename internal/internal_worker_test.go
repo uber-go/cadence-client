@@ -151,17 +151,19 @@ func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExe
 
 func (s *internalWorkerTestSuite) TestDecisionTaskHandler() {
 	params := workerExecutionParameters{
-		Identity: "identity",
-		Logger:   getTestLogger(s.T()),
+		WorkerOptions: WorkerOptions{
+			Identity: "identity",
+			Logger:   getTestLogger(s.T())},
 	}
 	s.testDecisionTaskHandlerHelper(params)
 }
 
 func (s *internalWorkerTestSuite) TestDecisionTaskHandler_WithDataConverter() {
 	params := workerExecutionParameters{
-		Identity:      "identity",
-		Logger:        getTestLogger(s.T()),
-		DataConverter: newTestDataConverter(),
+		WorkerOptions: WorkerOptions{
+			Identity:      "identity",
+			Logger:        getTestLogger(s.T()),
+			DataConverter: newTestDataConverter()},
 	}
 	s.testDecisionTaskHandlerHelper(params)
 }
@@ -193,7 +195,7 @@ func testActivityMultipleArgsWithStruct(ctx context.Context, i int, s testActivi
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorker() {
-	worker := createWorkerWithThrottle(s.T(), s.service, float64(500.0), nil, nil)
+	worker := createWorkerWithThrottle(s.T(), s.service, float64(500.0), WorkerOptions{})
 	err := worker.Start()
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
@@ -214,6 +216,14 @@ func (s *internalWorkerTestSuite) TestCreateShadowWorker() {
 	s.Nil(worker.activityWorker)
 	s.Nil(worker.locallyDispatchedActivityWorker)
 	s.Nil(worker.sessionWorker)
+}
+
+func (s *internalWorkerTestSuite) TestCreateWorker_WithAutoScaler() {
+	worker := createWorkerWithAutoscaler(s.T(), s.service)
+	err := worker.Start()
+	require.NoError(s.T(), err)
+	time.Sleep(time.Millisecond * 200)
+	worker.Stop()
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
@@ -327,7 +337,7 @@ func createWorker(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), nil, nil)
+	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{})
 }
 
 func createShadowWorker(
@@ -335,15 +345,17 @@ func createShadowWorker(
 	service *workflowservicetest.MockClient,
 	shadowOptions *ShadowOptions,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), nil, shadowOptions)
+	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{
+		EnableShadowWorker: true,
+		ShadowOptions:      *shadowOptions,
+	})
 }
 
 func createWorkerWithThrottle(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 	activitiesPerSecond float64,
-	dc DataConverter,
-	shadowOptions *ShadowOptions,
+	workerOptions WorkerOptions,
 ) *aggregatedWorker {
 	domain := "testDomain"
 	domainStatus := shared.DomainStatusRegistered
@@ -374,19 +386,10 @@ func createWorkerWithThrottle(
 	service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, nil).AnyTimes()
 
 	// Configure worker options.
-	workerOptions := WorkerOptions{}
 	workerOptions.WorkerActivitiesPerSecond = 20
 	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
 	workerOptions.Logger = zaptest.NewLogger(t)
-	if dc != nil {
-		workerOptions.DataConverter = dc
-	}
 	workerOptions.EnableSessionWorker = true
-
-	if shadowOptions != nil {
-		workerOptions.EnableShadowWorker = true
-		workerOptions.ShadowOptions = *shadowOptions
-	}
 
 	// Start Worker.
 	worker := NewWorker(
@@ -401,7 +404,14 @@ func createWorkerWithDataConverter(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), newTestDataConverter(), nil)
+	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{DataConverter: newTestDataConverter()})
+}
+
+func createWorkerWithAutoscaler(
+	t *testing.T,
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
 }
 
 func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions) {
@@ -996,23 +1006,24 @@ func TestWorkerOptionDefaults(t *testing.T) {
 	require.Nil(t, decisionWorker.executionParameters.ContextPropagators)
 
 	expected := workerExecutionParameters{
-		TaskList:                             taskList,
-		MaxConcurrentActivityPollers:         defaultConcurrentPollRoutineSize,
-		MaxConcurrentDecisionPollers:         defaultConcurrentPollRoutineSize,
-		ConcurrentLocalActivityExecutionSize: defaultMaxConcurrentLocalActivityExecutionSize,
-		ConcurrentActivityExecutionSize:      defaultMaxConcurrentActivityExecutionSize,
-		ConcurrentDecisionTaskExecutionSize:  defaultMaxConcurrentTaskExecutionSize,
-		WorkerActivitiesPerSecond:            defaultTaskListActivitiesPerSecond,
-		WorkerDecisionTasksPerSecond:         defaultWorkerTaskExecutionRate,
-		TaskListActivitiesPerSecond:          defaultTaskListActivitiesPerSecond,
-		WorkerLocalActivitiesPerSecond:       defaultWorkerLocalActivitiesPerSecond,
-		StickyScheduleToStartTimeout:         stickyDecisionScheduleToStartTimeoutSeconds * time.Second,
-		DataConverter:                        getDefaultDataConverter(),
-		Tracer:                               opentracing.NoopTracer{},
-		Logger:                               decisionWorker.executionParameters.Logger,
-		MetricsScope:                         decisionWorker.executionParameters.MetricsScope,
-		Identity:                             decisionWorker.executionParameters.Identity,
-		UserContext:                          decisionWorker.executionParameters.UserContext,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			MaxConcurrentActivityTaskPollers:        defaultConcurrentPollRoutineSize,
+			MaxConcurrentDecisionTaskPollers:        defaultConcurrentPollRoutineSize,
+			MaxConcurrentLocalActivityExecutionSize: defaultMaxConcurrentLocalActivityExecutionSize,
+			MaxConcurrentActivityExecutionSize:      defaultMaxConcurrentActivityExecutionSize,
+			MaxConcurrentDecisionTaskExecutionSize:  defaultMaxConcurrentTaskExecutionSize,
+			WorkerActivitiesPerSecond:               defaultTaskListActivitiesPerSecond,
+			WorkerDecisionTasksPerSecond:            defaultWorkerTaskExecutionRate,
+			TaskListActivitiesPerSecond:             defaultTaskListActivitiesPerSecond,
+			WorkerLocalActivitiesPerSecond:          defaultWorkerLocalActivitiesPerSecond,
+			StickyScheduleToStartTimeout:            stickyDecisionScheduleToStartTimeoutSeconds * time.Second,
+			DataConverter:                           getDefaultDataConverter(),
+			Tracer:                                  opentracing.NoopTracer{},
+			Logger:                                  decisionWorker.executionParameters.Logger,
+			MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
+			Identity:                                decisionWorker.executionParameters.Identity},
+		UserContext: decisionWorker.executionParameters.UserContext,
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
@@ -1054,22 +1065,23 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 	require.True(t, len(decisionWorker.executionParameters.ContextPropagators) > 0)
 
 	expected := workerExecutionParameters{
-		TaskList:                             taskList,
-		MaxConcurrentActivityPollers:         options.MaxConcurrentActivityTaskPollers,
-		MaxConcurrentDecisionPollers:         options.MaxConcurrentDecisionTaskPollers,
-		ConcurrentLocalActivityExecutionSize: options.MaxConcurrentLocalActivityExecutionSize,
-		ConcurrentActivityExecutionSize:      options.MaxConcurrentActivityExecutionSize,
-		ConcurrentDecisionTaskExecutionSize:  options.MaxConcurrentDecisionTaskExecutionSize,
-		WorkerActivitiesPerSecond:            options.WorkerActivitiesPerSecond,
-		WorkerDecisionTasksPerSecond:         options.WorkerDecisionTasksPerSecond,
-		TaskListActivitiesPerSecond:          options.TaskListActivitiesPerSecond,
-		WorkerLocalActivitiesPerSecond:       options.WorkerLocalActivitiesPerSecond,
-		StickyScheduleToStartTimeout:         options.StickyScheduleToStartTimeout,
-		DataConverter:                        options.DataConverter,
-		Tracer:                               options.Tracer,
-		Logger:                               options.Logger,
-		MetricsScope:                         options.MetricsScope,
-		Identity:                             options.Identity,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			MaxConcurrentActivityTaskPollers:        options.MaxConcurrentActivityTaskPollers,
+			MaxConcurrentDecisionTaskPollers:        options.MaxConcurrentDecisionTaskPollers,
+			MaxConcurrentLocalActivityExecutionSize: options.MaxConcurrentLocalActivityExecutionSize,
+			MaxConcurrentActivityExecutionSize:      options.MaxConcurrentActivityExecutionSize,
+			MaxConcurrentDecisionTaskExecutionSize:  options.MaxConcurrentDecisionTaskExecutionSize,
+			WorkerActivitiesPerSecond:               options.WorkerActivitiesPerSecond,
+			WorkerDecisionTasksPerSecond:            options.WorkerDecisionTasksPerSecond,
+			TaskListActivitiesPerSecond:             options.TaskListActivitiesPerSecond,
+			WorkerLocalActivitiesPerSecond:          options.WorkerLocalActivitiesPerSecond,
+			StickyScheduleToStartTimeout:            options.StickyScheduleToStartTimeout,
+			DataConverter:                           options.DataConverter,
+			Tracer:                                  options.Tracer,
+			Logger:                                  options.Logger,
+			MetricsScope:                            options.MetricsScope,
+			Identity:                                options.Identity},
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
@@ -1084,15 +1096,15 @@ func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParam
 	require.Equal(t, paramsA.Identity, paramsB.Identity)
 	require.Equal(t, paramsA.DataConverter, paramsB.DataConverter)
 	require.Equal(t, paramsA.Tracer, paramsB.Tracer)
-	require.Equal(t, paramsA.ConcurrentLocalActivityExecutionSize, paramsB.ConcurrentLocalActivityExecutionSize)
-	require.Equal(t, paramsA.ConcurrentActivityExecutionSize, paramsB.ConcurrentActivityExecutionSize)
-	require.Equal(t, paramsA.ConcurrentDecisionTaskExecutionSize, paramsB.ConcurrentDecisionTaskExecutionSize)
+	require.Equal(t, paramsA.MaxConcurrentLocalActivityExecutionSize, paramsB.MaxConcurrentLocalActivityExecutionSize)
+	require.Equal(t, paramsA.MaxConcurrentActivityExecutionSize, paramsB.MaxConcurrentActivityExecutionSize)
+	require.Equal(t, paramsA.MaxConcurrentDecisionTaskExecutionSize, paramsB.MaxConcurrentDecisionTaskExecutionSize)
 	require.Equal(t, paramsA.WorkerActivitiesPerSecond, paramsB.WorkerActivitiesPerSecond)
 	require.Equal(t, paramsA.WorkerDecisionTasksPerSecond, paramsB.WorkerDecisionTasksPerSecond)
 	require.Equal(t, paramsA.TaskListActivitiesPerSecond, paramsB.TaskListActivitiesPerSecond)
 	require.Equal(t, paramsA.StickyScheduleToStartTimeout, paramsB.StickyScheduleToStartTimeout)
-	require.Equal(t, paramsA.MaxConcurrentDecisionPollers, paramsB.MaxConcurrentDecisionPollers)
-	require.Equal(t, paramsA.MaxConcurrentActivityPollers, paramsB.MaxConcurrentActivityPollers)
+	require.Equal(t, paramsA.MaxConcurrentDecisionTaskPollers, paramsB.MaxConcurrentDecisionTaskPollers)
+	require.Equal(t, paramsA.MaxConcurrentActivityTaskPollers, paramsB.MaxConcurrentActivityTaskPollers)
 	require.Equal(t, paramsA.NonDeterministicWorkflowPolicy, paramsB.NonDeterministicWorkflowPolicy)
 	require.Equal(t, paramsA.EnableLoggingInReplay, paramsB.EnableLoggingInReplay)
 	require.Equal(t, paramsA.DisableStickyExecution, paramsB.DisableStickyExecution)
@@ -1182,5 +1194,140 @@ func TestIsNonRetriableError(t *testing.T) {
 
 	for _, test := range tests {
 		require.Equal(t, test.expected, isNonRetriableError(test.err))
+	}
+}
+
+func Test_augmentWorkerOptions(t *testing.T) {
+	type args struct {
+		options WorkerOptions
+	}
+	tests := []struct {
+		name string
+		args args
+		want WorkerOptions
+	}{
+		{
+			name: "happy",
+			args: args{options: WorkerOptions{
+				MaxConcurrentActivityExecutionSize:      3,
+				WorkerActivitiesPerSecond:               10,
+				MaxConcurrentLocalActivityExecutionSize: 4,
+				WorkerLocalActivitiesPerSecond:          20,
+				TaskListActivitiesPerSecond:             30,
+				MaxConcurrentActivityTaskPollers:        10,
+				MinConcurrentActivityTaskPollers:        2,
+				MaxConcurrentDecisionTaskExecutionSize:  40,
+				WorkerDecisionTasksPerSecond:            50,
+				MaxConcurrentDecisionTaskPollers:        15,
+				MinConcurrentDecisionTaskPollers:        4,
+				PollerAutoScalerCooldown:                time.Minute * 2,
+				PollerAutoScalerTargetUtilization:       0.8,
+				PollerAutoScalerDryRun:                  false,
+				Identity:                                "identity",
+				MetricsScope:                            tally.NoopScope,
+				Logger:                                  zap.NewNop(),
+				EnableLoggingInReplay:                   false,
+				DisableWorkflowWorker:                   false,
+				DisableActivityWorker:                   false,
+				DisableStickyExecution:                  false,
+				StickyScheduleToStartTimeout:            time.Minute * 4,
+				BackgroundActivityContext:               context.Background(),
+				NonDeterministicWorkflowPolicy:          NonDeterministicWorkflowPolicyBlockWorkflow,
+				DataConverter:                           DefaultDataConverter,
+				WorkerStopTimeout:                       time.Minute * 5,
+				EnableSessionWorker:                     false,
+				MaxConcurrentSessionExecutionSize:       80,
+				WorkflowInterceptorChainFactories:       nil,
+				ContextPropagators:                      nil,
+				Tracer:                                  nil,
+				EnableShadowWorker:                      false,
+				ShadowOptions:                           ShadowOptions{},
+				FeatureFlags:                            FeatureFlags{},
+				Authorization:                           nil,
+			}},
+			want: WorkerOptions{
+				MaxConcurrentActivityExecutionSize:      3,
+				WorkerActivitiesPerSecond:               10,
+				MaxConcurrentLocalActivityExecutionSize: 4,
+				WorkerLocalActivitiesPerSecond:          20,
+				TaskListActivitiesPerSecond:             30,
+				MaxConcurrentActivityTaskPollers:        10,
+				MinConcurrentActivityTaskPollers:        2,
+				MaxConcurrentDecisionTaskExecutionSize:  40,
+				WorkerDecisionTasksPerSecond:            50,
+				MaxConcurrentDecisionTaskPollers:        15,
+				MinConcurrentDecisionTaskPollers:        4,
+				PollerAutoScalerCooldown:                time.Minute * 2,
+				PollerAutoScalerTargetUtilization:       0.8,
+				PollerAutoScalerDryRun:                  false,
+				Identity:                                "identity",
+				MetricsScope:                            tally.NoopScope,
+				Logger:                                  zap.NewNop(),
+				EnableLoggingInReplay:                   false,
+				DisableWorkflowWorker:                   false,
+				DisableActivityWorker:                   false,
+				DisableStickyExecution:                  false,
+				StickyScheduleToStartTimeout:            time.Minute * 4,
+				BackgroundActivityContext:               context.Background(),
+				NonDeterministicWorkflowPolicy:          NonDeterministicWorkflowPolicyBlockWorkflow,
+				DataConverter:                           DefaultDataConverter,
+				WorkerStopTimeout:                       time.Minute * 5,
+				EnableSessionWorker:                     false,
+				MaxConcurrentSessionExecutionSize:       80,
+				WorkflowInterceptorChainFactories:       nil,
+				ContextPropagators:                      nil,
+				Tracer:                                  opentracing.NoopTracer{},
+				EnableShadowWorker:                      false,
+				ShadowOptions:                           ShadowOptions{},
+				FeatureFlags:                            FeatureFlags{},
+				Authorization:                           nil,
+			},
+		},
+		{
+			name: "empty payload",
+			args: args{options: WorkerOptions{}},
+			want: WorkerOptions{
+				MaxConcurrentActivityExecutionSize:      1000,
+				WorkerActivitiesPerSecond:               100000,
+				MaxConcurrentLocalActivityExecutionSize: 1000,
+				WorkerLocalActivitiesPerSecond:          100000,
+				TaskListActivitiesPerSecond:             100000,
+				MaxConcurrentActivityTaskPollers:        2,
+				MinConcurrentActivityTaskPollers:        1,
+				MaxConcurrentDecisionTaskExecutionSize:  1000,
+				WorkerDecisionTasksPerSecond:            100000,
+				MaxConcurrentDecisionTaskPollers:        2,
+				MinConcurrentDecisionTaskPollers:        1,
+				PollerAutoScalerCooldown:                time.Minute,
+				PollerAutoScalerTargetUtilization:       0.6,
+				PollerAutoScalerDryRun:                  false,
+				Identity:                                "",
+				MetricsScope:                            nil,
+				Logger:                                  nil,
+				EnableLoggingInReplay:                   false,
+				DisableWorkflowWorker:                   false,
+				DisableActivityWorker:                   false,
+				DisableStickyExecution:                  false,
+				StickyScheduleToStartTimeout:            time.Second * 5,
+				BackgroundActivityContext:               nil,
+				NonDeterministicWorkflowPolicy:          NonDeterministicWorkflowPolicyBlockWorkflow,
+				DataConverter:                           DefaultDataConverter,
+				WorkerStopTimeout:                       0,
+				EnableSessionWorker:                     false,
+				MaxConcurrentSessionExecutionSize:       1000,
+				WorkflowInterceptorChainFactories:       nil,
+				ContextPropagators:                      nil,
+				Tracer:                                  opentracing.NoopTracer{},
+				EnableShadowWorker:                      false,
+				ShadowOptions:                           ShadowOptions{},
+				FeatureFlags:                            FeatureFlags{},
+				Authorization:                           nil,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, augmentWorkerOptions(tt.args.options), "augmentWorkerOptions(%v)", tt.args.options)
+		})
 	}
 }

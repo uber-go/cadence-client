@@ -79,6 +79,13 @@ type (
 		// Default value is 2
 		MaxConcurrentActivityTaskPollers int
 
+		// optional: Sets the minimum number of goroutines that will concurrently poll the
+		// cadence-server to retrieve activity tasks. Changing this value will NOT affect the
+		// rate at which the worker is able to consume tasks from a task list,
+		// unless FeatureFlags.PollerAutoScalerEnabled is set to true.
+		// Default value is 1
+		MinConcurrentActivityTaskPollers int
+
 		// Optional: To set the maximum concurrent decision task executions this worker can have.
 		// The zero value of this uses the default value.
 		// default: defaultMaxConcurrentTaskExecutionSize(1k)
@@ -94,6 +101,27 @@ type (
 		// rate at which the worker is able to consume tasks from a task list.
 		// Default value is 2
 		MaxConcurrentDecisionTaskPollers int
+
+		// optional: Sets the minimum number of goroutines that will concurrently poll the
+		// cadence-server to retrieve decision tasks. If FeatureFlags.PollerAutoScalerEnabled is set to true,
+		// changing this value will NOT affect the rate at which the worker is able to consume tasks from a task list.
+		// Default value is 1
+		MinConcurrentDecisionTaskPollers int
+
+		// optional: Sets the interval of poller autoscaling, between which poller autoscaler changes the poller count
+		// based on poll result. It takes effect if FeatureFlags.PollerAutoScalerEnabled is set to true.
+		// Default value is 1 min
+		PollerAutoScalerCooldown time.Duration
+
+		// optional: Sets the target utilization rate between [0,1].
+		// Utilization Rate = pollResultWithTask / (pollResultWithTask + pollResultWithNoTask)
+		// It takes effect if FeatureFlags.PollerAutoScalerEnabled is set to true.
+		// Default value is 0.6
+		PollerAutoScalerTargetUtilization float64
+
+		// optional: Sets whether to start dry run mode of autoscaler.
+		// Default value is false
+		PollerAutoScalerDryRun bool
 
 		// Optional: Sets an identify that can be used to track this host for debugging.
 		// default: default identity that include hostname, groupName and process ID.

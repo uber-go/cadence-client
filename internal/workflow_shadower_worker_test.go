@@ -68,7 +68,8 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		registry,
 	)
@@ -99,7 +100,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 		},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)
@@ -118,7 +120,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)
@@ -136,7 +139,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 		testDomain,
 		ShadowOptions{},
 		workerExecutionParameters{
-			Logger: zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)
@@ -149,7 +153,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 		Name: common.StringPtr(testDomain),
 	}, callOptions()...).Return(&shared.DescribeDomainResponse{}, nil).Times(1)
 	// first return a retryable error to check if retry policy is configured
-	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.ServiceBusyError{}).Times(1)
+	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.InternalServiceError{}).Times(1)
 	// then return a non-retryable error
 	s.mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, &shared.BadRequestError{}).Times(1)
 
@@ -159,7 +163,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 		ShadowOptions{},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)
@@ -202,7 +207,8 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 		},
 		workerExecutionParameters{
 			TaskList: testTaskList,
-			Logger:   zaptest.NewLogger(s.T()),
+			WorkerOptions: WorkerOptions{
+				Logger: zaptest.NewLogger(s.T())},
 		},
 		newRegistry(),
 	)

@@ -314,18 +314,22 @@ func (t *TaskHandlersTestSuite) testWorkflowTaskWorkflowExecutionStartedHelper(p
 func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted() {
 	params := workerExecutionParameters{
 		TaskList: testWorkflowTaskTasklist,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   t.logger,
+		},
 	}
 	t.testWorkflowTaskWorkflowExecutionStartedHelper(params)
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowExecutionStarted_WithDataConverter() {
 	params := workerExecutionParameters{
-		TaskList:      testWorkflowTaskTasklist,
-		Identity:      "test-id-1",
-		Logger:        t.logger,
-		DataConverter: newTestDataConverter(),
+		TaskList: testWorkflowTaskTasklist,
+		WorkerOptions: WorkerOptions{
+			Identity:      "test-id-1",
+			Logger:        t.logger,
+			DataConverter: newTestDataConverter(),
+		},
 	}
 	t.testWorkflowTaskWorkflowExecutionStartedHelper(params)
 }
@@ -354,8 +358,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_BinaryChecksum() {
 	task := createWorkflowTask(testEvents, 8, "BinaryChecksumWorkflow")
 	params := workerExecutionParameters{
 		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   t.logger,
+		},
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
@@ -394,8 +400,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_ActivityTaskScheduled() {
 	task := createWorkflowTask(testEvents[0:3], 0, "HelloWorld_Workflow")
 	params := workerExecutionParameters{
 		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   t.logger,
+		},
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
@@ -440,8 +448,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_QueryWorkflow() {
 	}
 	params := workerExecutionParameters{
 		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   t.logger,
+		},
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
 
@@ -491,8 +501,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_QueryWorkflow_2() {
 	}
 	params := workerExecutionParameters{
 		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   t.logger,
+		},
 	}
 
 	// TODO: the following comment is not true, previousStartEventID is either 0 or points to a valid decisionTaskStartedID
@@ -559,10 +571,12 @@ func (t *TaskHandlersTestSuite) TestCacheEvictionWhenErrorOccurs() {
 		}),
 	}
 	params := workerExecutionParameters{
-		TaskList:                       taskList,
-		Identity:                       "test-id-1",
-		Logger:                         zap.NewNop(),
-		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:                       "test-id-1",
+			Logger:                         zap.NewNop(),
+			NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		},
 	}
 
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
@@ -593,10 +607,12 @@ func (t *TaskHandlersTestSuite) TestWithMissingHistoryEvents() {
 		createTestEventDecisionTaskStarted(7),
 	}
 	params := workerExecutionParameters{
-		TaskList:                       taskList,
-		Identity:                       "test-id-1",
-		Logger:                         zap.NewNop(),
-		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:                       "test-id-1",
+			Logger:                         zap.NewNop(),
+			NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		},
 	}
 
 	for _, startEventID := range []int64{0, 3} {
@@ -633,10 +649,12 @@ func (t *TaskHandlersTestSuite) TestWithTruncatedHistory() {
 		}),
 	}
 	params := workerExecutionParameters{
-		TaskList:                       taskList,
-		Identity:                       "test-id-1",
-		Logger:                         zap.NewNop(),
-		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:                       "test-id-1",
+			Logger:                         zap.NewNop(),
+			NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		},
 	}
 
 	testCases := []struct {
@@ -708,10 +726,12 @@ func (t *TaskHandlersTestSuite) testSideEffectDeferHelper(disableSticky bool) {
 	}
 
 	params := workerExecutionParameters{
-		TaskList:               taskList,
-		Identity:               "test-id-1",
-		Logger:                 zap.NewNop(),
-		DisableStickyExecution: disableSticky,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:               "test-id-1",
+			Logger:                 zap.NewNop(),
+			DisableStickyExecution: disableSticky,
+		},
 	}
 
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
@@ -750,11 +770,13 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 	task := createWorkflowTask(testEvents, 3, "HelloWorld_Workflow")
 	stopC := make(chan struct{})
 	params := workerExecutionParameters{
-		TaskList:                       taskList,
-		Identity:                       "test-id-1",
-		Logger:                         zap.NewNop(),
-		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
-		WorkerStopChannel:              stopC,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:                       "test-id-1",
+			Logger:                         zap.NewNop(),
+			NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		},
+		WorkerStopChannel: stopC,
 	}
 
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
@@ -812,10 +834,12 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowReturnsPanicError() {
 	}
 	task := createWorkflowTask(testEvents, 3, "ReturnPanicWorkflow")
 	params := workerExecutionParameters{
-		TaskList:                       taskList,
-		Identity:                       "test-id-1",
-		Logger:                         zap.NewNop(),
-		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:                       "test-id-1",
+			Logger:                         zap.NewNop(),
+			NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		},
 	}
 
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
@@ -840,10 +864,12 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowPanics() {
 	}
 	task := createWorkflowTask(testEvents, 3, "PanicWorkflow")
 	params := workerExecutionParameters{
-		TaskList:                       taskList,
-		Identity:                       "test-id-1",
-		Logger:                         zap.NewNop(),
-		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:                       "test-id-1",
+			Logger:                         zap.NewNop(),
+			NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		},
 	}
 
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
@@ -899,10 +925,12 @@ func (t *TaskHandlersTestSuite) TestGetWorkflowInfo() {
 	}
 	task := createWorkflowTask(testEvents, 3, workflowType)
 	params := workerExecutionParameters{
-		TaskList:                       taskList,
-		Identity:                       "test-id-1",
-		Logger:                         zap.NewNop(),
-		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:                       "test-id-1",
+			Logger:                         zap.NewNop(),
+			NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		},
 	}
 
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
@@ -932,10 +960,12 @@ func (t *TaskHandlersTestSuite) TestGetWorkflowInfo() {
 func (t *TaskHandlersTestSuite) TestConsistentQuery_InvalidQueryTask() {
 	taskList := "taskList"
 	params := workerExecutionParameters{
-		TaskList:                       taskList,
-		Identity:                       "test-id-1",
-		Logger:                         zap.NewNop(),
-		NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:                       "test-id-1",
+			Logger:                         zap.NewNop(),
+			NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
+		},
 	}
 
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
@@ -983,8 +1013,10 @@ func (t *TaskHandlersTestSuite) TestConsistentQuery_Success() {
 
 	params := workerExecutionParameters{
 		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   t.logger,
+		},
 	}
 
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
@@ -1048,8 +1080,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_CancelActivityBeforeSent() {
 
 	params := workerExecutionParameters{
 		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   t.logger,
+		},
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
 	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
@@ -1073,8 +1107,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_PageToken() {
 
 	params := workerExecutionParameters{
 		TaskList: taskList,
-		Identity: "test-id-1",
-		Logger:   t.logger,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   t.logger,
+		},
 	}
 
 	nextEvents := []*s.HistoryEvent{
@@ -1136,10 +1172,12 @@ func (t *TaskHandlersTestSuite) TestLocalActivityRetry_DecisionHeartbeatFail() {
 	task := createWorkflowTask(testEvents, 0, "RetryLocalActivityWorkflow")
 	stopCh := make(chan struct{})
 	params := workerExecutionParameters{
-		TaskList:          testWorkflowTaskTasklist,
-		Identity:          "test-id-1",
-		Logger:            t.logger,
-		Tracer:            opentracing.NoopTracer{},
+		TaskList: testWorkflowTaskTasklist,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   t.logger,
+			Tracer:   opentracing.NoopTracer{},
+		},
 		WorkerStopChannel: stopCh,
 	}
 	defer close(stopCh)
@@ -1241,23 +1279,26 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_Interleaved() {
 
 	heartbeatErr := cadenceInvoker.BatchHeartbeat([]byte("1"))
 	t.NoError(heartbeatErr)
-	time.Sleep(1 * time.Second)
+	time.Sleep(1000 * time.Millisecond)
 
 	for i := 0; i < 4; i++ {
 		heartbeatErr = cadenceInvoker.BackgroundHeartbeat()
 		t.NoError(heartbeatErr)
-		time.Sleep(time.Second)
+		time.Sleep(800 * time.Millisecond)
 	}
+
+	time.Sleep(time.Second)
 
 	heartbeatErr = cadenceInvoker.BatchHeartbeat([]byte("2"))
 	t.NoError(heartbeatErr)
-	time.Sleep(1 * time.Second)
+	time.Sleep(1000 * time.Millisecond)
 
 	for i := 0; i < 4; i++ {
 		heartbeatErr = cadenceInvoker.BackgroundHeartbeat()
 		t.NoError(heartbeatErr)
-		time.Sleep(time.Second)
+		time.Sleep(800 * time.Millisecond)
 	}
+	time.Sleep(1 * time.Second)
 }
 
 func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
@@ -1370,9 +1411,11 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
 	for i, d := range deadlineTests {
 		a.d = d.actWaitDuration
 		wep := workerExecutionParameters{
-			Logger:        t.logger,
-			DataConverter: getDefaultDataConverter(),
-			Tracer:        opentracing.NoopTracer{},
+			WorkerOptions: WorkerOptions{
+				Logger:        t.logger,
+				DataConverter: getDefaultDataConverter(),
+				Tracer:        opentracing.NoopTracer{},
+			},
 		}
 		activityHandler := newActivityTaskHandler(mockService, wep, registry)
 		pats := &s.PollForActivityTaskResponse{
@@ -1427,8 +1470,10 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionWorkerStop() {
 	workerStopCh := make(chan struct{}, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	wep := workerExecutionParameters{
-		Logger:            t.logger,
-		DataConverter:     getDefaultDataConverter(),
+		WorkerOptions: WorkerOptions{
+			Logger:        t.logger,
+			DataConverter: getDefaultDataConverter(),
+		},
 		UserContext:       ctx,
 		UserContextCancel: cancel,
 		WorkerStopChannel: workerStopCh,
@@ -1503,10 +1548,12 @@ func (t *TaskHandlersTestSuite) TestRegression_QueriesDoNotLeakGoroutines() {
 
 	taskList := "tl1"
 	params := workerExecutionParameters{
-		TaskList:               taskList,
-		Identity:               "test-id-1",
-		Logger:                 t.logger,
-		DisableStickyExecution: false,
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity:               "test-id-1",
+			Logger:                 t.logger,
+			DisableStickyExecution: false,
+		},
 	}
 	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
 

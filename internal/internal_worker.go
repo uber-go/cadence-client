@@ -118,63 +118,16 @@ type (
 
 	// workerExecutionParameters defines worker configure/execution options.
 	workerExecutionParameters struct {
+		WorkerOptions
+
 		// Task list name to poll.
 		TaskList string
-
-		// Defines how many concurrent activity executions by this worker.
-		ConcurrentActivityExecutionSize int
-
-		// Defines rate limiting on number of activity tasks that can be executed per second per worker.
-		WorkerActivitiesPerSecond float64
-
-		// MaxConcurrentActivityPollers is the max number of pollers for activity task list
-		MaxConcurrentActivityPollers int
-
-		// Defines how many concurrent decision task executions by this worker.
-		ConcurrentDecisionTaskExecutionSize int
-
-		// Defines rate limiting on number of decision tasks that can be executed per second per worker.
-		WorkerDecisionTasksPerSecond float64
-
-		// MaxConcurrentDecisionPollers is the max number of pollers for decision task list
-		MaxConcurrentDecisionPollers int
-
-		// Defines how many concurrent local activity executions by this worker.
-		ConcurrentLocalActivityExecutionSize int
-
-		// Defines rate limiting on number of local activities that can be executed per second per worker.
-		WorkerLocalActivitiesPerSecond float64
-
-		// TaskListActivitiesPerSecond is the throttling limit for activity tasks controlled by the server
-		TaskListActivitiesPerSecond float64
-
-		// User can provide an identity for the debuggability. If not provided the framework has
-		// a default option.
-		Identity string
-
-		MetricsScope tally.Scope
-
-		Logger *zap.Logger
-
-		// Enable logging in replay mode
-		EnableLoggingInReplay bool
 
 		// Context to store user provided key/value pairs
 		UserContext context.Context
 
 		// Context cancel function to cancel user context
 		UserContextCancel context.CancelFunc
-
-		// Disable sticky execution
-		DisableStickyExecution bool
-
-		StickyScheduleToStartTimeout time.Duration
-
-		// NonDeterministicWorkflowPolicy is used for configuring how client's decision task handler deals with
-		// mismatched history events (presumably arising from non-deterministic workflow definitions).
-		NonDeterministicWorkflowPolicy NonDeterministicWorkflowPolicy
-
-		DataConverter DataConverter
 
 		// WorkerStopTimeout is the time delay before hard terminate worker
 		WorkerStopTimeout time.Duration
@@ -184,15 +137,6 @@ type (
 
 		// SessionResourceID is a unique identifier of the resource the session will consume
 		SessionResourceID string
-
-		ContextPropagators []ContextPropagator
-
-		Tracer opentracing.Tracer
-
-		WorkflowInterceptors []WorkflowInterceptorFactory
-
-		// flags to turn on/off some server side features
-		FeatureFlags FeatureFlags
 	}
 )
 
@@ -311,9 +255,18 @@ func newWorkflowTaskWorkerInternal(
 		params,
 	)
 	worker := newBaseWorker(baseWorkerOptions{
-		pollerCount:       params.MaxConcurrentDecisionPollers,
+		pollerAutoScaler: pollerAutoScalerOptions{
+			Enabled:           params.FeatureFlags.PollerAutoScalerEnabled,
+			InitCount:         params.MaxConcurrentDecisionTaskPollers,
+			MinCount:          params.MinConcurrentDecisionTaskPollers,
+			MaxCount:          params.MaxConcurrentDecisionTaskPollers,
+			Cooldown:          params.PollerAutoScalerCooldown,
+			DryRun:            params.PollerAutoScalerDryRun,
+			TargetUtilization: params.PollerAutoScalerTargetUtilization,
+		},
+		pollerCount:       params.MaxConcurrentDecisionTaskPollers,
 		pollerRate:        defaultPollerRate,
-		maxConcurrentTask: params.ConcurrentDecisionTaskExecutionSize,
+		maxConcurrentTask: params.MaxConcurrentDecisionTaskExecutionSize,
 		maxTaskPerSecond:  params.WorkerDecisionTasksPerSecond,
 		taskWorker:        poller,
 		identity:          params.Identity,
@@ -336,7 +289,7 @@ func newWorkflowTaskWorkerInternal(
 	localActivityTaskPoller := newLocalActivityPoller(params, laTunnel)
 	localActivityWorker := newBaseWorker(baseWorkerOptions{
 		pollerCount:       1, // 1 poller (from local channel) is enough for local activity
-		maxConcurrentTask: params.ConcurrentLocalActivityExecutionSize,
+		maxConcurrentTask: params.MaxConcurrentLocalActivityExecutionSize,
 		maxTaskPerSecond:  params.WorkerLocalActivitiesPerSecond,
 		taskWorker:        localActivityTaskPoller,
 		identity:          params.Identity,
@@ -415,7 +368,7 @@ func newSessionWorker(service workflowserviceclient.Interface,
 	params.TaskList = sessionEnvironment.GetResourceSpecificTasklist()
 	activityWorker := newActivityWorker(service, domain, params, overrides, env, nil)
 
-	params.MaxConcurrentActivityPollers = 1
+	params.MaxConcurrentActivityTaskPollers = 1
 	params.TaskList = creationTasklist
 	creationWorker := newActivityWorker(service, domain, params, overrides, env, sessionEnvironment.GetTokenBucket())
 
@@ -499,9 +452,18 @@ func newActivityTaskWorker(
 	ensureRequiredParams(&workerParams)
 	base := newBaseWorker(
 		baseWorkerOptions{
-			pollerCount:       workerParams.MaxConcurrentActivityPollers,
+			pollerAutoScaler: pollerAutoScalerOptions{
+				Enabled:           workerParams.FeatureFlags.PollerAutoScalerEnabled,
+				InitCount:         workerParams.MaxConcurrentActivityTaskPollers,
+				MinCount:          workerParams.MinConcurrentActivityTaskPollers,
+				MaxCount:          workerParams.MaxConcurrentActivityTaskPollers,
+				Cooldown:          workerParams.PollerAutoScalerCooldown,
+				DryRun:            workerParams.PollerAutoScalerDryRun,
+				TargetUtilization: workerParams.PollerAutoScalerTargetUtilization,
+			},
+			pollerCount:       workerParams.MaxConcurrentActivityTaskPollers,
 			pollerRate:        defaultPollerRate,
-			maxConcurrentTask: workerParams.ConcurrentActivityExecutionSize,
+			maxConcurrentTask: workerParams.MaxConcurrentActivityExecutionSize,
 			maxTaskPerSecond:  workerParams.WorkerActivitiesPerSecond,
 			taskWorker:        poller,
 			identity:          workerParams.Identity,
@@ -1007,31 +969,10 @@ func newAggregatedWorker(
 	backgroundActivityContext, backgroundActivityContextCancel := context.WithCancel(ctx)
 
 	workerParams := workerExecutionParameters{
-		TaskList:                             taskList,
-		ConcurrentActivityExecutionSize:      wOptions.MaxConcurrentActivityExecutionSize,
-		WorkerActivitiesPerSecond:            wOptions.WorkerActivitiesPerSecond,
-		MaxConcurrentActivityPollers:         wOptions.MaxConcurrentActivityTaskPollers,
-		ConcurrentLocalActivityExecutionSize: wOptions.MaxConcurrentLocalActivityExecutionSize,
-		WorkerLocalActivitiesPerSecond:       wOptions.WorkerLocalActivitiesPerSecond,
-		ConcurrentDecisionTaskExecutionSize:  wOptions.MaxConcurrentDecisionTaskExecutionSize,
-		WorkerDecisionTasksPerSecond:         wOptions.WorkerDecisionTasksPerSecond,
-		MaxConcurrentDecisionPollers:         wOptions.MaxConcurrentDecisionTaskPollers,
-		Identity:                             wOptions.Identity,
-		MetricsScope:                         wOptions.MetricsScope,
-		Logger:                               wOptions.Logger,
-		EnableLoggingInReplay:                wOptions.EnableLoggingInReplay,
-		UserContext:                          backgroundActivityContext,
-		UserContextCancel:                    backgroundActivityContextCancel,
-		DisableStickyExecution:               wOptions.DisableStickyExecution,
-		StickyScheduleToStartTimeout:         wOptions.StickyScheduleToStartTimeout,
-		TaskListActivitiesPerSecond:          wOptions.TaskListActivitiesPerSecond,
-		NonDeterministicWorkflowPolicy:       wOptions.NonDeterministicWorkflowPolicy,
-		DataConverter:                        wOptions.DataConverter,
-		WorkerStopTimeout:                    wOptions.WorkerStopTimeout,
-		ContextPropagators:                   wOptions.ContextPropagators,
-		Tracer:                               wOptions.Tracer,
-		WorkflowInterceptors:                 wOptions.WorkflowInterceptorChainFactories,
-		FeatureFlags:                         wOptions.FeatureFlags,
+		WorkerOptions:     wOptions,
+		TaskList:          taskList,
+		UserContext:       backgroundActivityContext,
+		UserContextCancel: backgroundActivityContextCancel,
 	}
 
 	ensureRequiredParams(&workerParams)
@@ -1173,8 +1114,8 @@ func processTestTags(wOptions *WorkerOptions, ep *workerExecutionParameters) {
 				switch key {
 				case workerOptionsConfigConcurrentPollRoutineSize:
 					if size, err := strconv.Atoi(val); err == nil {
-						ep.MaxConcurrentActivityPollers = size
-						ep.MaxConcurrentDecisionPollers = size
+						ep.MaxConcurrentActivityTaskPollers = size
+						ep.MaxConcurrentDecisionTaskPollers = size
 					}
 				}
 			}
@@ -1274,6 +1215,18 @@ func augmentWorkerOptions(options WorkerOptions) WorkerOptions {
 	}
 	if options.MaxConcurrentSessionExecutionSize == 0 {
 		options.MaxConcurrentSessionExecutionSize = defaultMaxConcurrentSessionExecutionSize
+	}
+	if options.MinConcurrentActivityTaskPollers == 0 {
+		options.MinConcurrentActivityTaskPollers = defaultMinConcurrentPollerSize
+	}
+	if options.MinConcurrentDecisionTaskPollers == 0 {
+		options.MinConcurrentDecisionTaskPollers = defaultMinConcurrentPollerSize
+	}
+	if options.PollerAutoScalerCooldown == 0 {
+		options.PollerAutoScalerCooldown = defaultPollerAutoScalerCooldown
+	}
+	if options.PollerAutoScalerTargetUtilization == 0 {
+		options.PollerAutoScalerTargetUtilization = defaultPollerAutoScalerTargetUtilization
 	}
 
 	// if the user passes in a tracer then add a tracing context propagator

@@ -71,6 +71,7 @@ const (
 type (
 	FeatureFlags struct {
 		WorkflowExecutionAlreadyCompletedErrorEnabled bool
+		PollerAutoScalerEnabled                       bool
 	}
 )
 

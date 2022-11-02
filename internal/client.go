@@ -53,7 +53,7 @@ const (
 	WorkflowClientFeatureVersion string = "workflow_client_feature_version"
 	// WorkflowClientLibraryVersion is the string for the workflow client library metric
 	WorkflowClientLibraryVersion string = "workflow_client_library_version"
-	// WorkflowClientVersionMetricName is the string for the domain client metric name
+	// WorkflowClientVersionMetricName is the string for the workflow client metric name
 	WorkflowClientVersionMetricName string = "workflow_client_version_metric"
 )
 

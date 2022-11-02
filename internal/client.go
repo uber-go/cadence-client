@@ -43,6 +43,18 @@ const (
 	// QueryTypeOpenSessions is the build in query type for Client.QueryWorkflow() call. Use this query type to get all open
 	// sessions in the workflow. The result will be a list of SessionInfo encoded in the EncodedValue.
 	QueryTypeOpenSessions string = "__open_sessions"
+	// DomainClientFeatureVersion is the string for the domain client feature metric
+	DomainClientFeatureVersion string = "domain_client_feature_version"
+	// DomainClientLibraryVersion is the string for the domain client library metric
+	DomainClientLibraryVersion string = "domain_client_library_version"
+	// DomainClientVersionMetricName is the string for the domain client metric name
+	DomainClientVersionMetricName string = "domain_client_version_metric"
+	// WorkflowClientFeatureVersion is the string for the workflow client feature metric
+	WorkflowClientFeatureVersion string = "workflow_client_feature_version"
+	// WorkflowClientLibraryVersion is the string for the workflow client library metric
+	WorkflowClientLibraryVersion string = "workflow_client_library_version"
+	// WorkflowClientVersionMetricName is the string for the domain client metric name
+	WorkflowClientVersionMetricName string = "workflow_client_version_metric"
 )
 
 type (
@@ -564,6 +576,11 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
+	metricTags := map[string]string{
+		WorkflowClientLibraryVersion: LibraryVersion,
+		WorkflowClientFeatureVersion: FeatureVersion,
+	}
+	go EmitVersionMetrics(metricScope, metricTags, WorkflowClientVersionMetricName)
 	return &workflowClient{
 		workflowService:    service,
 		domain:             domain,
@@ -593,7 +610,13 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 	if options != nil && options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
+
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
+	metricTags := map[string]string{
+		DomainClientLibraryVersion: LibraryVersion,
+		DomainClientFeatureVersion: FeatureVersion,
+	}
+	go EmitVersionMetrics(metricScope, metricTags, DomainClientVersionMetricName)
 	return &domainClient{
 		workflowService: service,
 		metricsScope:    metricScope,
@@ -638,8 +661,9 @@ func (p ParentClosePolicy) toThriftPtr() *s.ParentClosePolicy {
 // User had Activity.RecordHeartbeat(ctx, "my-heartbeat") and then got response from calling Client.DescribeWorkflowExecution.
 // The response contains binary field PendingActivityInfo.HeartbeatDetails,
 // which can be decoded by using:
-//   var result string // This need to be same type as the one passed to RecordHeartbeat
-//   NewValue(data).Get(&result)
+//
+//	var result string // This need to be same type as the one passed to RecordHeartbeat
+//	NewValue(data).Get(&result)
 func NewValue(data []byte) Value {
 	return newEncodedValue(data, nil)
 }
@@ -648,9 +672,21 @@ func NewValue(data []byte) Value {
 // User had Activity.RecordHeartbeat(ctx, "my-heartbeat", 123) and then got response from calling Client.DescribeWorkflowExecution.
 // The response contains binary field PendingActivityInfo.HeartbeatDetails,
 // which can be decoded by using:
-//   var result1 string
-//   var result2 int // These need to be same type as those arguments passed to RecordHeartbeat
-//   NewValues(data).Get(&result1, &result2)
+//
+//	var result1 string
+//	var result2 int // These need to be same type as those arguments passed to RecordHeartbeat
+//	NewValues(data).Get(&result1, &result2)
 func NewValues(data []byte) Values {
 	return newEncodedValues(data, nil)
+}
+
+// EmitVersionMetrics emits the version metrics of the client
+func EmitVersionMetrics(scope tally.Scope, tags map[string]string, metricName string) {
+	ticker := time.NewTicker(time.Minute)
+	for {
+		select {
+		case <-ticker.C:
+			scope.Tagged(tags).Gauge(metricName).Update(1)
+		}
+	}
 }

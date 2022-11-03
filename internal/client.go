@@ -580,7 +580,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 		WorkflowClientLibraryVersion: LibraryVersion,
 		WorkflowClientFeatureVersion: FeatureVersion,
 	}
-	go EmitVersionMetrics(metricScope, metricTags, WorkflowClientVersionMetricName)
+	EmitVersionMetrics(metricScope, metricTags, WorkflowClientVersionMetricName)
 	return &workflowClient{
 		workflowService:    service,
 		domain:             domain,
@@ -616,7 +616,7 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 		DomainClientLibraryVersion: LibraryVersion,
 		DomainClientFeatureVersion: FeatureVersion,
 	}
-	go EmitVersionMetrics(metricScope, metricTags, DomainClientVersionMetricName)
+	EmitVersionMetrics(metricScope, metricTags, DomainClientVersionMetricName)
 	return &domainClient{
 		workflowService: service,
 		metricsScope:    metricScope,
@@ -682,11 +682,5 @@ func NewValues(data []byte) Values {
 
 // EmitVersionMetrics emits the version metrics of the client
 func EmitVersionMetrics(scope tally.Scope, tags map[string]string, metricName string) {
-	ticker := time.NewTicker(time.Minute)
-	for {
-		select {
-		case <-ticker.C:
-			scope.Tagged(tags).Gauge(metricName).Update(1)
-		}
-	}
+	scope.Tagged(tags).Gauge(metricName).Update(1)
 }

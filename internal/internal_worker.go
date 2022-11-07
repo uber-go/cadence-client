@@ -161,7 +161,7 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 		config := zap.NewProductionConfig()
 		// set default time formatter to "2006-01-02T15:04:05.000Z0700"
 		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-		//config.Level.SetLevel(zapcore.DebugLevel)
+		// config.Level.SetLevel(zapcore.DebugLevel)
 		logger, _ := config.Build()
 		params.Logger = logger
 		params.Logger.Info("No logger configured for cadence worker. Created default one.")

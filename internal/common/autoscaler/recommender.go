@@ -51,7 +51,11 @@ func (l *linearRecommender) Recommend(currentResource ResourceUnit, currentUsage
 		if l.targetUsages[usageType] == 0 { // avoid division by zero
 			r = math.MaxFloat64
 		} else {
-			r = currentResource.Value() * currentUsages[usageType].Value() / l.targetUsages[usageType].Value()
+			if currentUsages[usageType].Value() == float64(1000) {
+				r = l.upper.Value()
+			} else {
+				r = currentResource.Value() * currentUsages[usageType].Value() / l.targetUsages[usageType].Value()
+			}
 		}
 		// boundary check
 		r = math.Min(l.upper.Value(), math.Max(l.lower.Value(), r))

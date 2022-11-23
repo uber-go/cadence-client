@@ -45,6 +45,8 @@ import (
 const (
 	retryPollOperationInitialInterval = 20 * time.Millisecond
 	retryPollOperationMaxInterval     = 10 * time.Second
+	clientVersionTag                  = "cadence_client_version"
+	clientGauge                       = "client_version_metric"
 )
 
 var (
@@ -52,6 +54,8 @@ var (
 )
 
 var errShutdown = errors.New("worker shutting down")
+var startVersionMetric sync.Once
+var StopMetrics = make(chan struct{})
 
 type (
 	// resultHandler that returns result
@@ -185,7 +189,20 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 	if options.pollerRate > 0 {
 		bw.pollLimiter = rate.NewLimiter(rate.Limit(options.pollerRate), 1)
 	}
-
+	go func() {
+		startVersionMetric.Do(func() {
+			ticker := time.NewTicker(time.Minute)
+			versionTags := map[string]string{clientVersionTag: LibraryVersion}
+			for {
+				select {
+				case <-StopMetrics:
+					return
+				case <-ticker.C:
+					bw.metricsScope.Tagged(versionTags).Gauge(clientGauge).Update(1)
+				}
+			}
+		})
+	}()
 	return bw
 }
 

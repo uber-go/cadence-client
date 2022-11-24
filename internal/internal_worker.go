@@ -77,6 +77,8 @@ const (
 	defaultMaxConcurrentSessionExecutionSize = 1000 // Large concurrent session execution size (1k)
 
 	testTagsContextKey = "cadence-testTags"
+	clientVersionTag   = "cadence_client_version"
+	clientGauge        = "client_version_metric"
 )
 
 type (

@@ -45,8 +45,6 @@ import (
 const (
 	retryPollOperationInitialInterval = 20 * time.Millisecond
 	retryPollOperationMaxInterval     = 10 * time.Second
-	clientVersionTag                  = "cadence_client_version"
-	clientGauge                       = "client_version_metric"
 )
 
 var (

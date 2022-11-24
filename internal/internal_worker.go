@@ -53,8 +53,6 @@ import (
 
 var startVersionMetric sync.Once
 var stopMetrics = make(chan struct{})
-var startMutex sync.Mutex
-var isEmittingMetrics = false
 
 const (
 	// Set to 2 pollers for now, can adjust later if needed. The typical RTT (round-trip time) is below 1ms within data
@@ -1265,31 +1263,23 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 
 // StartVersionMetrics starts emitting version metrics
 func StartVersionMetrics(metricsScope tally.Scope) {
-	startMutex.Lock()
-	defer startMutex.Unlock()
-	if !isEmittingMetrics {
-		startVersionMetric.Do(func() {
-			go func() {
-				ticker := time.NewTicker(time.Minute)
-				versionTags := map[string]string{clientVersionTag: LibraryVersion}
-				for {
-					select {
-					case <-stopMetrics:
-						return
-					case <-ticker.C:
-						metricsScope.Tagged(versionTags).Gauge(clientGauge).Update(1)
-					}
+	startVersionMetric.Do(func() {
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			versionTags := map[string]string{clientVersionTag: LibraryVersion}
+			for {
+				select {
+				case <-stopMetrics:
+					return
+				case <-ticker.C:
+					metricsScope.Tagged(versionTags).Gauge(clientGauge).Update(1)
 				}
-			}()
-		})
-		isEmittingMetrics = true
-	}
+			}
+		}()
+	})
 }
 
 func StopVersionMetrics() {
-	startMutex.Lock()
-	defer startMutex.Unlock()
 	close(stopMetrics)
-	isEmittingMetrics = false
 	stopMetrics = make(chan struct{})
 }

@@ -1282,7 +1282,7 @@ func StartVersionMetrics(metricsScope tally.Scope) {
 		})
 		isEmittingMetrics = true
 	}
-	startMutex.Unlock()
+	defer startMutex.Unlock()
 }
 
 func StopVersionMetrics() {
@@ -1290,5 +1290,5 @@ func StopVersionMetrics() {
 	close(stopMetrics)
 	isEmittingMetrics = false
 	stopMetrics = make(chan struct{})
-	stopMutex.Unlock()
+	defer stopMutex.Unlock()
 }

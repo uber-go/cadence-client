@@ -53,8 +53,8 @@ import (
 
 var startVersionMetric sync.Once
 var stopMetrics = make(chan struct{})
-var startMutex sync.Mutex
-var stopMutex sync.Mutex
+var startMutex *sync.Mutex
+var stopMutex *sync.Mutex
 var isEmittingMetrics = false
 
 const (
@@ -1286,9 +1286,9 @@ func StartVersionMetrics(metricsScope tally.Scope) {
 }
 
 func StopVersionMetrics() {
-	stopMutex.Lock()
+	startMutex.Lock()
 	close(stopMetrics)
 	isEmittingMetrics = false
 	stopMetrics = make(chan struct{})
-	defer stopMutex.Unlock()
+	defer startMutex.Unlock()
 }

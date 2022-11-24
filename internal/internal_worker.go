@@ -52,6 +52,7 @@ import (
 )
 
 var startVersionMetric sync.Once
+var stopVersionMutex sync.Mutex
 var stopMetrics = make(chan struct{})
 
 const (
@@ -1280,6 +1281,8 @@ func StartVersionMetrics(metricsScope tally.Scope) {
 }
 
 func StopVersionMetrics() {
+	stopVersionMutex.Lock()
+	defer stopVersionMutex.Unlock()
 	close(stopMetrics)
 	stopMetrics = make(chan struct{})
 }

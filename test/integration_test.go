@@ -115,7 +115,6 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 func (ts *IntegrationTestSuite) TearDownSuite() {
 	ts.Assertions = require.New(ts.T())
 	ts.rpcClient.Close()
-	close(internal.StopMetrics)
 	// allow the pollers to shut down, and ensure there are no goroutine leaks.
 	// this will wait for up to 1 minute for leaks to subside, but exit relatively quickly if possible.
 	max := time.After(time.Minute)
@@ -160,10 +159,12 @@ func (ts *IntegrationTestSuite) SetupTest() {
 	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, options)
 	ts.registerWorkflowsAndActivities(ts.worker)
 	ts.Nil(ts.worker.Start())
+	internal.StartVersionMetrics(options.MetricsScope)
 }
 
 func (ts *IntegrationTestSuite) TearDownTest() {
 	ts.worker.Stop()
+	internal.StopVersionMetrics()
 }
 
 func (ts *IntegrationTestSuite) TestBasic() {

@@ -51,6 +51,11 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var startVersionMetric sync.Once
+var stopMetrics = make(chan struct{})
+var metricsMutex sync.Mutex
+var isEmittingMetrics = false
+
 const (
 	// Set to 2 pollers for now, can adjust later if needed. The typical RTT (round-trip time) is below 1ms within data
 	// center. And the poll API latency is about 5ms. With 2 poller, we could achieve around 300~400 RPS.
@@ -1254,4 +1259,35 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 		}
 	}
 	return nil
+}
+
+// StartVersionMetrics starts emitting version metrics
+func StartVersionMetrics(metricsScope tally.Scope) {
+	metricsMutex.Lock()
+	if !isEmittingMetrics {
+		startVersionMetric.Do(func() {
+			go func() {
+				ticker := time.NewTicker(time.Minute)
+				versionTags := map[string]string{clientVersionTag: LibraryVersion}
+				for {
+					select {
+					case <-stopMetrics:
+						return
+					case <-ticker.C:
+						metricsScope.Tagged(versionTags).Gauge(clientGauge).Update(1)
+					}
+				}
+			}()
+		})
+		isEmittingMetrics = true
+	}
+	metricsMutex.Unlock()
+}
+
+func StopVersionMetrics() {
+	metricsMutex.Lock()
+	close(stopMetrics)
+	isEmittingMetrics = false
+	stopMetrics = make(chan struct{})
+	metricsMutex.Unlock()
 }

@@ -24,6 +24,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/uber-go/tally"
 	"go.uber.org/cadence/internal"
 	"net"
 	"strings"
@@ -110,7 +111,7 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 		})
 	ts.domainClient = client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ts.registerDomain()
-	internal.StartVersionMetrics(nil)
+	internal.StartVersionMetrics(tally.NoopScope)
 }
 
 func (ts *IntegrationTestSuite) TearDownSuite() {

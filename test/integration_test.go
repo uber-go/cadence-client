@@ -110,6 +110,7 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 		})
 	ts.domainClient = client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ts.registerDomain()
+	internal.StartVersionMetrics(nil)
 }
 
 func (ts *IntegrationTestSuite) TearDownSuite() {
@@ -160,7 +161,6 @@ func (ts *IntegrationTestSuite) SetupTest() {
 	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, options)
 	ts.registerWorkflowsAndActivities(ts.worker)
 	ts.Nil(ts.worker.Start())
-	internal.StartVersionMetrics(options.MetricsScope)
 }
 
 func (ts *IntegrationTestSuite) TearDownTest() {

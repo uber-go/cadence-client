@@ -53,8 +53,7 @@ import (
 
 var startVersionMetric sync.Once
 var stopMetrics = make(chan struct{})
-var startMutex *sync.Mutex
-var stopMutex *sync.Mutex
+var startMutex sync.Mutex
 var isEmittingMetrics = false
 
 const (
@@ -1265,6 +1264,7 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 // StartVersionMetrics starts emitting version metrics
 func StartVersionMetrics(metricsScope tally.Scope) {
 	startMutex.Lock()
+	defer startMutex.Unlock()
 	if !isEmittingMetrics {
 		startVersionMetric.Do(func() {
 			go func() {
@@ -1282,13 +1282,12 @@ func StartVersionMetrics(metricsScope tally.Scope) {
 		})
 		isEmittingMetrics = true
 	}
-	defer startMutex.Unlock()
 }
 
 func StopVersionMetrics() {
 	startMutex.Lock()
+	defer startMutex.Unlock()
 	close(stopMetrics)
 	isEmittingMetrics = false
 	stopMetrics = make(chan struct{})
-	defer startMutex.Unlock()
 }

@@ -13,14 +13,14 @@ require (
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pborman/uuid v0.0.0-20160209185913-a97ce2ca70fa
 	github.com/robfig/cron v1.2.0
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.8.1
 	github.com/uber-go/tally v3.3.15+incompatible
 	github.com/uber/cadence-idl v0.0.0-20220713235846-fda89e95df1e
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/tchannel-go v1.32.1
 	go.uber.org/atomic v1.9.0
 	go.uber.org/fx v1.13.1 // indirect
-	go.uber.org/goleak v1.0.0
+	go.uber.org/goleak v1.1.12
 	go.uber.org/multierr v1.6.0
 	go.uber.org/thriftrw v1.25.0
 	go.uber.org/yarpc v1.55.0
@@ -29,5 +29,5 @@ require (
 	golang.org/x/net v0.0.0-20220121210141-e204ce36a2ba
 	golang.org/x/sys v0.0.0-20220403205710-6acee93ad0eb // indirect
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
-	honnef.co/go/tools v0.0.1-2019.2.3
+	honnef.co/go/tools v0.3.2
 )

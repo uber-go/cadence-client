@@ -422,7 +422,7 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	// Need to wait for child workflow to finish as well otherwise test becomes flaky
-	err = ts.waitForWorkflowFinish(resp.WorkflowExecutionInfo.Execution.GetWorkflowId(), resp.WorkflowExecutionInfo.Execution.GetRunId())
+	ts.waitForWorkflowFinish(resp.WorkflowExecutionInfo.Execution.GetWorkflowId(), resp.WorkflowExecutionInfo.Execution.GetRunId())
 	resp, err = ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
@@ -591,8 +591,7 @@ func (ts *IntegrationTestSuite) waitForWorkflowFinish(wid string, runId string) 
 	defer cancel()
 	wfRun := ts.libClient.GetWorkflow(ctx, wid, runId)
 	var val interface{}
-	err := wfRun.Get(ctx, &val)
-	return err
+	return wfRun.Get(ctx, &val)
 }
 
 var _ interceptors.WorkflowInterceptorFactory = (*tracingInterceptorFactory)(nil)

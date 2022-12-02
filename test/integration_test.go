@@ -421,7 +421,8 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	ts.NoError(err)
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
-	err = ts.getWorkflow(resp.WorkflowExecutionInfo.Execution.GetWorkflowId(), resp.WorkflowExecutionInfo.Execution.GetRunId())
+	// Need to wait for child workflow to finish as well otherwise test becomes flaky
+	err = ts.waitForWorkflowFinish(resp.WorkflowExecutionInfo.Execution.GetWorkflowId(), resp.WorkflowExecutionInfo.Execution.GetRunId())
 	resp, err = ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
@@ -585,7 +586,7 @@ func (ts *IntegrationTestSuite) registerWorkflowsAndActivities(w worker.Worker) 
 	ts.activities.register(w)
 }
 
-func (ts *IntegrationTestSuite) getWorkflow(wid string, runId string) error {
+func (ts *IntegrationTestSuite) waitForWorkflowFinish(wid string, runId string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	wfRun := ts.libClient.GetWorkflow(ctx, wid, runId)

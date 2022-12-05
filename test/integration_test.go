@@ -419,9 +419,12 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	var childWorkflowID string
 	err := ts.executeWorkflow("test-childwf-parent-close-policy", ts.workflows.ChildWorkflowSuccessWithParentClosePolicyTerminate, &childWorkflowID)
 	ts.NoError(err)
+	// Need to wait for child workflow to finish as well otherwise test becomes flaky
+	ts.waitForWorkflowFinish(childWorkflowID, "")
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
+
 }
 
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
@@ -579,6 +582,13 @@ func (ts *IntegrationTestSuite) startWorkflowOptions(wfID string) client.StartWo
 func (ts *IntegrationTestSuite) registerWorkflowsAndActivities(w worker.Worker) {
 	ts.workflows.register(w)
 	ts.activities.register(w)
+}
+
+func (ts *IntegrationTestSuite) waitForWorkflowFinish(wid string, runId string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	wfRun := ts.libClient.GetWorkflow(ctx, wid, runId)
+	return wfRun.Get(ctx, nil)
 }
 
 var _ interceptors.WorkflowInterceptorFactory = (*tracingInterceptorFactory)(nil)

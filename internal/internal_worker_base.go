@@ -185,7 +185,6 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 	if options.pollerRate > 0 {
 		bw.pollLimiter = rate.NewLimiter(rate.Limit(options.pollerRate), 1)
 	}
-
 	return bw
 }
 

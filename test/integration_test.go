@@ -24,6 +24,8 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/uber-go/tally"
+	"go.uber.org/cadence/internal"
 	"net"
 	"strings"
 	"sync"
@@ -109,12 +111,13 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 		})
 	ts.domainClient = client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ts.registerDomain()
+	internal.StartVersionMetrics(tally.NoopScope)
 }
 
 func (ts *IntegrationTestSuite) TearDownSuite() {
 	ts.Assertions = require.New(ts.T())
 	ts.rpcClient.Close()
-
+	close(internal.StopMetrics)
 	// allow the pollers to shut down, and ensure there are no goroutine leaks.
 	// this will wait for up to 1 minute for leaks to subside, but exit relatively quickly if possible.
 	max := time.After(time.Minute)

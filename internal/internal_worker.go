@@ -51,6 +51,9 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var startVersionMetric sync.Once
+var StopMetrics = make(chan struct{})
+
 const (
 	// Set to 2 pollers for now, can adjust later if needed. The typical RTT (round-trip time) is below 1ms within data
 	// center. And the poll API latency is about 5ms. With 2 poller, we could achieve around 300~400 RPS.
@@ -72,6 +75,8 @@ const (
 	defaultMaxConcurrentSessionExecutionSize = 1000 // Large concurrent session execution size (1k)
 
 	testTagsContextKey = "cadence-testTags"
+	clientVersionTag   = "cadence_client_version"
+	clientGauge        = "client_version_metric"
 )
 
 type (
@@ -1254,4 +1259,22 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 		}
 	}
 	return nil
+}
+
+// StartVersionMetrics starts emitting version metrics
+func StartVersionMetrics(metricsScope tally.Scope) {
+	startVersionMetric.Do(func() {
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			versionTags := map[string]string{clientVersionTag: LibraryVersion}
+			for {
+				select {
+				case <-StopMetrics:
+					return
+				case <-ticker.C:
+					metricsScope.Tagged(versionTags).Gauge(clientGauge).Update(1)
+				}
+			}
+		}()
+	})
 }

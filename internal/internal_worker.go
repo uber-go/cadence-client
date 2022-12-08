@@ -789,7 +789,7 @@ func (aw *aggregatedWorker) Start() error {
 	}
 
 	if aw.workflowWorker != nil {
-		if len(aw.registry.getRegisteredWorkflowTypes()) == 0 {
+		if len(aw.registry.GetRegisteredWorkflowTypes()) == 0 {
 			aw.logger.Info(
 				"Worker has no workflows registered, so workflow worker will not be started.",
 			)

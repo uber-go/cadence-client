@@ -105,7 +105,7 @@ func TestWorkflowRegistration(t *testing.T) {
 			tt.register(r)
 
 			// Verify registered workflow type
-			workflowType := r.getRegisteredWorkflowTypes()[0]
+			workflowType := r.GetRegisteredWorkflowTypes()[0]
 			require.Equal(t, tt.workflowType, workflowType)
 
 			// Verify workflow is resolved from workflow type

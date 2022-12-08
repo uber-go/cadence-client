@@ -243,7 +243,7 @@ func (r *registry) getWorkflowNoLock(registerName string) (interface{}, bool) {
 	return a, ok
 }
 
-func (r *registry) getRegisteredWorkflowTypes() []string {
+func (r *registry) GetRegisteredWorkflowTypes() []string {
 	r.Lock() // do not defer for Unlock to call next.getRegisteredWorkflowTypes without lock
 	var result []string
 	for t := range r.workflowFuncMap {
@@ -251,7 +251,7 @@ func (r *registry) getRegisteredWorkflowTypes() []string {
 	}
 	r.Unlock()
 	if r.next != nil {
-		nextTypes := r.next.getRegisteredWorkflowTypes()
+		nextTypes := r.next.GetRegisteredWorkflowTypes()
 		result = append(result, nextTypes...)
 	}
 	return result
@@ -318,7 +318,7 @@ func (r *registry) getWorkflowDefinition(wt WorkflowType) (workflowDefinition, e
 	}
 	wf, ok := r.getWorkflowFn(lookup)
 	if !ok {
-		supported := strings.Join(r.getRegisteredWorkflowTypes(), ", ")
+		supported := strings.Join(r.GetRegisteredWorkflowTypes(), ", ")
 		return nil, fmt.Errorf(errMsgUnknownWorkflowType+": %v. Supported types: [%v]", lookup, supported)
 	}
 	wd := &workflowExecutor{workflowType: lookup, fn: wf}

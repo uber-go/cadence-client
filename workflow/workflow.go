@@ -89,6 +89,11 @@ func RegisterWithOptions(workflowFunc interface{}, opts RegisterOptions) {
 	internal.RegisterWorkflowWithOptions(workflowFunc, opts)
 }
 
+// GetRegisteredWorkflowTypes returns the registered workflow function/alias names.
+func GetRegisteredWorkflowTypes() []string {
+	return internal.GetRegisteredWorkflowTypes()
+}
+
 // ExecuteActivity requests activity execution in the context of a workflow.
 // Context can be used to pass the settings for this activity.
 // For example: task list that this need to be routed, timeouts that need to be configured.

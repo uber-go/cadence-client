@@ -250,7 +250,7 @@ func (s *internalWorkerTestSuite) TestNoActivitiesOrWorkflows() {
 	w := createWorker(s.T(), s.service)
 	w.registry = newRegistry()
 	assert.Empty(t, w.registry.getRegisteredActivities())
-	assert.Empty(t, w.registry.getRegisteredWorkflowTypes())
+	assert.Empty(t, w.registry.GetRegisteredWorkflowTypes())
 	assert.NoError(t, w.Start())
 }
 

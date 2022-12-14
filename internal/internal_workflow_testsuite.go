@@ -517,7 +517,7 @@ func (env *testWorkflowEnvironmentImpl) executeWorkflowInternal(delayStart time.
 func (env *testWorkflowEnvironmentImpl) getWorkflowDefinition(wt WorkflowType) (workflowDefinition, error) {
 	wf, ok := env.registry.getWorkflowFn(wt.Name)
 	if !ok {
-		supported := strings.Join(env.registry.getRegisteredWorkflowTypes(), ", ")
+		supported := strings.Join(env.registry.GetRegisteredWorkflowTypes(), ", ")
 		return nil, fmt.Errorf("unable to find workflow type: %v. Supported types: [%v]", wt.Name, supported)
 	}
 	wd := &workflowExecutorWrapper{

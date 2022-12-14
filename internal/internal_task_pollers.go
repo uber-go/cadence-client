@@ -765,12 +765,27 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 
 	response, err := wtp.service.PollForDecisionTask(ctx, request, getYarpcCallOptions(wtp.featureFlags)...)
 	if err != nil {
-		if isServiceTransientError(err) {
+		retryable := isServiceTransientError(err)
+		if retryable {
 			wtp.metricsScope.Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
 		} else {
 			wtp.metricsScope.Counter(metrics.DecisionPollFailedCounter).Inc(1)
 		}
 		wtp.updateBacklog(request.TaskList.GetKind(), 0)
+
+		// pause for the retry delay if present.
+		// failures also have an exponential backoff, implemented at a higher level,
+		// but this ensures a minimum is respected.
+		retryAfter := backoff.ErrRetryableAfter(err)
+		if retryAfter > 0 {
+			t := time.NewTimer(retryAfter)
+			select {
+			case <-ctx.Done():
+				t.Stop()
+			case <-t.C:
+			}
+		}
+
 		return nil, err
 	}
 
@@ -990,11 +1005,26 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTask
 	response, err := atp.service.PollForActivityTask(ctx, request, getYarpcCallOptions(atp.featureFlags)...)
 
 	if err != nil {
-		if isServiceTransientError(err) {
+		retryable := isServiceTransientError(err)
+		if retryable {
 			atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
 		} else {
 			atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
 		}
+
+		// pause for the retry delay if present.
+		// failures also have an exponential backoff, implemented at a higher level,
+		// but this ensures a minimum is respected.
+		retryAfter := backoff.ErrRetryableAfter(err)
+		if retryAfter > 0 {
+			t := time.NewTimer(retryAfter)
+			select {
+			case <-ctx.Done():
+				t.Stop()
+			case <-t.C:
+			}
+		}
+
 		return nil, startTime, err
 	}
 	if response == nil || len(response.TaskToken) == 0 {

@@ -113,6 +113,10 @@ func isServiceTransientError(err error) bool {
 		return false
 	}
 
+	if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
+		return true
+	}
+
 	// s.InternalServiceError
 	// s.ServiceBusyError (must retry after a delay, but it is transient)
 	// server-side-only error types (as they should not reach clients)

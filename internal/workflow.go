@@ -581,6 +581,13 @@ func RegisterWorkflowWithOptions(workflowFunc interface{}, opts RegisterWorkflow
 	registry.RegisterWorkflowWithOptions(workflowFunc, opts)
 }
 
+// GetRegisteredWorkflowTypes returns the registered workflow function/alias names.
+// The public form is: workflow.GetRegisteredWorkflowTypes(...)
+func GetRegisteredWorkflowTypes() []string {
+	registry := getGlobalRegistry()
+	return registry.GetRegisteredWorkflowTypes()
+}
+
 // Await blocks the calling thread until condition() returns true
 // Returns CanceledError if the ctx is canceled.
 func Await(ctx Context, condition func() bool) error {

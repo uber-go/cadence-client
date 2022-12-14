@@ -21,14 +21,16 @@
 package internal
 
 import (
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/atomic"
-	"go.uber.org/cadence/internal/common/autoscaler"
-	"go.uber.org/zap/zaptest"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/atomic"
+	s "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/autoscaler"
+	"go.uber.org/zap/zaptest"
 )
 
 func Test_pollerAutoscaler(t *testing.T) {
@@ -113,7 +115,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 				autoScalerEpoch:    1,
 				isDryRun:           false,
 			},
-			want: 4,
+			want: 10,
 		},
 		{
 			name: "over utilized, scale up to max",
@@ -270,10 +272,10 @@ type unrelatedPolledTask struct{}
 func generateRandomPollResults(noTaskPoll, taskPoll, unrelated int) <-chan interface{} {
 	var result []interface{}
 	for i := 0; i < noTaskPoll; i++ {
-		result = append(result, (*polledTask)(nil))
+		result = append(result, &activityTask{})
 	}
 	for i := 0; i < taskPoll; i++ {
-		result = append(result, &polledTask{})
+		result = append(result, &activityTask{task: &s.PollForActivityTaskResponse{}})
 	}
 	for i := 0; i < unrelated; i++ {
 		result = append(result, &unrelatedPolledTask{})

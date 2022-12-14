@@ -52,6 +52,9 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var startVersionMetric sync.Once
+var StopMetrics = make(chan struct{})
+
 const (
 	// Set to 2 pollers for now, can adjust later if needed. The typical RTT (round-trip time) is below 1ms within data
 	// center. And the poll API latency is about 5ms. With 2 poller, we could achieve around 300~400 RPS.
@@ -73,6 +76,8 @@ const (
 	defaultMaxConcurrentSessionExecutionSize = 1000 // Large concurrent session execution size (1k)
 
 	testTagsContextKey = "cadence-testTags"
+	clientVersionTag   = "cadence_client_version"
+	clientGauge        = "client_version_metric"
 )
 
 type (
@@ -162,7 +167,7 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 		config := zap.NewProductionConfig()
 		// set default time formatter to "2006-01-02T15:04:05.000Z0700"
 		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-		//config.Level.SetLevel(zapcore.DebugLevel)
+		// config.Level.SetLevel(zapcore.DebugLevel)
 		logger, _ := config.Build()
 		params.Logger = logger
 		params.Logger.Info("No logger configured for cadence worker. Created default one.")
@@ -785,7 +790,7 @@ func (aw *aggregatedWorker) Start() error {
 	}
 
 	if aw.workflowWorker != nil {
-		if len(aw.registry.getRegisteredWorkflowTypes()) == 0 {
+		if len(aw.registry.GetRegisteredWorkflowTypes()) == 0 {
 			aw.logger.Info(
 				"Worker has no workflows registered, so workflow worker will not be started.",
 			)
@@ -1261,4 +1266,22 @@ func getTestTags(ctx context.Context) map[string]map[string]string {
 		}
 	}
 	return nil
+}
+
+// StartVersionMetrics starts emitting version metrics
+func StartVersionMetrics(metricsScope tally.Scope) {
+	startVersionMetric.Do(func() {
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			versionTags := map[string]string{clientVersionTag: LibraryVersion}
+			for {
+				select {
+				case <-StopMetrics:
+					return
+				case <-ticker.C:
+					metricsScope.Tagged(versionTags).Gauge(clientGauge).Update(1)
+				}
+			}
+		}()
+	})
 }

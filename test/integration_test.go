@@ -24,6 +24,8 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/uber-go/tally"
+	"go.uber.org/cadence/internal"
 	"net"
 	"strings"
 	"sync"
@@ -109,12 +111,13 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 		})
 	ts.domainClient = client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ts.registerDomain()
+	internal.StartVersionMetrics(tally.NoopScope)
 }
 
 func (ts *IntegrationTestSuite) TearDownSuite() {
 	ts.Assertions = require.New(ts.T())
 	ts.rpcClient.Close()
-
+	close(internal.StopMetrics)
 	// allow the pollers to shut down, and ensure there are no goroutine leaks.
 	// this will wait for up to 1 minute for leaks to subside, but exit relatively quickly if possible.
 	max := time.After(time.Minute)
@@ -419,9 +422,12 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	var childWorkflowID string
 	err := ts.executeWorkflow("test-childwf-parent-close-policy", ts.workflows.ChildWorkflowSuccessWithParentClosePolicyTerminate, &childWorkflowID)
 	ts.NoError(err)
+	// Need to wait for child workflow to finish as well otherwise test becomes flaky
+	ts.waitForWorkflowFinish(childWorkflowID, "")
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
+
 }
 
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
@@ -579,6 +585,13 @@ func (ts *IntegrationTestSuite) startWorkflowOptions(wfID string) client.StartWo
 func (ts *IntegrationTestSuite) registerWorkflowsAndActivities(w worker.Worker) {
 	ts.workflows.register(w)
 	ts.activities.register(w)
+}
+
+func (ts *IntegrationTestSuite) waitForWorkflowFinish(wid string, runId string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	wfRun := ts.libClient.GetWorkflow(ctx, wid, runId)
+	return wfRun.Get(ctx, nil)
 }
 
 var _ interceptors.WorkflowInterceptorFactory = (*tracingInterceptorFactory)(nil)

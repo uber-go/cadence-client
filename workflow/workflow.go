@@ -192,7 +192,7 @@ func GetLogger(ctx Context) *zap.Logger {
 	return internal.GetLogger(ctx)
 }
 
-// GetUnhandledSignalNames returns signal names that have not been consumed.
+// GetUnhandledSignalNames returns signal names that have  unconsumed signals.
 func GetUnhandledSignalNames(ctx Context) []string {
 	return internal.GetUnhandledSignalNames(ctx)
 }

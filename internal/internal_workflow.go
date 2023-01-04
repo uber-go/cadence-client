@@ -1264,12 +1264,12 @@ func (w *workflowOptions) getSignalChannel(ctx Context, signalName string) Chann
 	return ch
 }
 
-// GetUnhandledSignalNames returns signal names that have not been consumed.
+// GetUnhandledSignalNames returns signal names that have  unconsumed signals.
 func GetUnhandledSignalNames(ctx Context) []string {
 	return getWorkflowEnvOptions(ctx).getUnhandledSignalNames()
 }
 
-// getUnhandledSignalNames returns signal names that have not been consumed.
+// getUnhandledSignalNames returns signal names that have  unconsumed signals.
 func (w *workflowOptions) getUnhandledSignalNames() []string {
 	unhandledSignals := []string{}
 	for k, c := range w.signalChannels {

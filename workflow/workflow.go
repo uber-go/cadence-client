@@ -192,6 +192,11 @@ func GetLogger(ctx Context) *zap.Logger {
 	return internal.GetLogger(ctx)
 }
 
+// GetUnhandledSignalNames returns signal names that have not been consumed.
+func GetUnhandledSignalNames(ctx Context) []string {
+	return internal.GetUnhandledSignalNames(ctx)
+}
+
 // GetMetricsScope returns a metrics scope to be used in workflow's context
 func GetMetricsScope(ctx Context) tally.Scope {
 	return internal.GetMetricsScope(ctx)

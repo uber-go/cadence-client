@@ -549,7 +549,7 @@ func executeDispatcher(ctx Context, dispatcher dispatcher) {
 		return
 	}
 
-	us := getWorkflowEnvOptions(ctx).getUnhandledSignals()
+	us := getWorkflowEnvOptions(ctx).getUnhandledSignalNames()
 	if len(us) > 0 {
 		env.GetLogger().Info("Workflow has unhandled signals", zap.Strings("SignalNames", us))
 		env.GetMetricsScope().Counter(metrics.UnhandledSignalsCounter).Inc(1)
@@ -1264,8 +1264,13 @@ func (w *workflowOptions) getSignalChannel(ctx Context, signalName string) Chann
 	return ch
 }
 
-// getUnhandledSignals checks if there are any signal channels that have data to be consumed.
-func (w *workflowOptions) getUnhandledSignals() []string {
+// GetUnhandledSignalNames returns signal names that have  unconsumed signals.
+func GetUnhandledSignalNames(ctx Context) []string {
+	return getWorkflowEnvOptions(ctx).getUnhandledSignalNames()
+}
+
+// getUnhandledSignalNames returns signal names that have  unconsumed signals.
+func (w *workflowOptions) getUnhandledSignalNames() []string {
 	unhandledSignals := []string{}
 	for k, c := range w.signalChannels {
 		ch := c.(*channelImpl)

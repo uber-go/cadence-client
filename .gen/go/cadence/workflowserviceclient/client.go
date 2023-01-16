@@ -25,13 +25,14 @@ package workflowserviceclient
 
 import (
 	context "context"
+	reflect "reflect"
+
 	cadence "go.uber.org/cadence/.gen/go/cadence"
 	shared "go.uber.org/cadence/.gen/go/shared"
 	wire "go.uber.org/thriftrw/wire"
 	yarpc "go.uber.org/yarpc"
 	transport "go.uber.org/yarpc/api/transport"
 	thrift "go.uber.org/yarpc/encoding/thrift"
-	reflect "reflect"
 )
 
 // Interface is a client for the WorkflowService service.
@@ -277,7 +278,7 @@ type Interface interface {
 
 // New builds a new client for the WorkflowService service.
 //
-// 	client := workflowserviceclient.New(dispatcher.ClientConfig("workflowservice"))
+//	client := workflowserviceclient.New(dispatcher.ClientConfig("workflowservice"))
 func New(c transport.ClientConfig, opts ...thrift.ClientOption) Interface {
 	return client{
 		c: thrift.New(thrift.Config{

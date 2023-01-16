@@ -216,14 +216,19 @@ func (t *TestWorkflowEnvironment) SetStartTime(startTime time.Time) {
 // the Return() call should either be a function that has exact same signature as the mocked activity, or it should be
 // mock values with the same types as the mocked activity function returns.
 // Example: assume the activity you want to mock has function signature as:
-//   func MyActivity(ctx context.Context, msg string) (string, error)
+//
+//	func MyActivity(ctx context.Context, msg string) (string, error)
+//
 // You can mock it by return a function with exact same signature:
-//   t.OnActivity(MyActivity, mock.Anything, mock.Anything).Return(func(ctx context.Context, msg string) (string, error) {
-//      // your mock function implementation
-//      return "", nil
-//   })
+//
+//	t.OnActivity(MyActivity, mock.Anything, mock.Anything).Return(func(ctx context.Context, msg string) (string, error) {
+//	   // your mock function implementation
+//	   return "", nil
+//	})
+//
 // OR return mock values with same types as activity function's return types:
-//   t.OnActivity(MyActivity, mock.Anything, mock.Anything).Return("mock_result", nil)
+//
+//	t.OnActivity(MyActivity, mock.Anything, mock.Anything).Return("mock_result", nil)
 func (t *TestWorkflowEnvironment) OnActivity(activity interface{}, args ...interface{}) *MockCallWrapper {
 	fType := reflect.TypeOf(activity)
 	var call *mock.Call
@@ -254,14 +259,20 @@ var ErrMockStartChildWorkflowFailed = fmt.Errorf("start child workflow failed: %
 // the Return() call should either be a function that has exact same signature as the mocked workflow, or it should be
 // mock values with the same types as the mocked workflow function returns.
 // Example: assume the workflow you want to mock has function signature as:
-//   func MyChildWorkflow(ctx workflow.Context, msg string) (string, error)
+//
+//	func MyChildWorkflow(ctx workflow.Context, msg string) (string, error)
+//
 // You can mock it by return a function with exact same signature:
-//   t.OnWorkflow(MyChildWorkflow, mock.Anything, mock.Anything).Return(func(ctx workflow.Context, msg string) (string, error) {
-//      // your mock function implementation
-//      return "", nil
-//   })
+//
+//	t.OnWorkflow(MyChildWorkflow, mock.Anything, mock.Anything).Return(func(ctx workflow.Context, msg string) (string, error) {
+//	   // your mock function implementation
+//	   return "", nil
+//	})
+//
 // OR return mock values with same types as workflow function's return types:
-//   t.OnWorkflow(MyChildWorkflow, mock.Anything, mock.Anything).Return("mock_result", nil)
+//
+//	t.OnWorkflow(MyChildWorkflow, mock.Anything, mock.Anything).Return("mock_result", nil)
+//
 // You could also setup mock to simulate start child workflow failure case by returning ErrMockStartChildWorkflowFailed
 // as error.
 func (t *TestWorkflowEnvironment) OnWorkflow(workflow interface{}, args ...interface{}) *MockCallWrapper {
@@ -299,17 +310,17 @@ const mockMethodForUpsertSearchAttributes = "workflow.UpsertSearchAttributes"
 // In that case, you will need to setup mock for those signal calls.
 // Some examples of how to setup mock:
 //
-// * mock for specific target workflow that matches specific signal name and signal data
-// 	 env.OnSignalExternalWorkflow("test-domain", "test-workflow-id1", "test-runid1", "test-signal", "test-data").Return(nil).Once()
-// * mock for anything and succeed the send
-// 	 env.OnSignalExternalWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-// * mock for anything and fail the send
-// 	 env.OnSignalExternalWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("unknown external workflow")).Once()
-// * mock function for SignalExternalWorkflow
-//   env.OnSignalExternalWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+//   - mock for specific target workflow that matches specific signal name and signal data
+//     env.OnSignalExternalWorkflow("test-domain", "test-workflow-id1", "test-runid1", "test-signal", "test-data").Return(nil).Once()
+//   - mock for anything and succeed the send
+//     env.OnSignalExternalWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+//   - mock for anything and fail the send
+//     env.OnSignalExternalWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("unknown external workflow")).Once()
+//   - mock function for SignalExternalWorkflow
+//     env.OnSignalExternalWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 //     func(domainName, workflowID, runID, signalName string, arg interface{}) error {
-//       // you can do differently based on the parameters
-//       return nil
+//     // you can do differently based on the parameters
+//     return nil
 //     })
 func (t *TestWorkflowEnvironment) OnSignalExternalWorkflow(domainName, workflowID, runID, signalName, arg interface{}) *MockCallWrapper {
 	call := t.Mock.On(mockMethodForSignalExternalWorkflow, domainName, workflowID, runID, signalName, arg)
@@ -323,17 +334,17 @@ func (t *TestWorkflowEnvironment) OnSignalExternalWorkflow(domainName, workflowI
 // In that case, you will need to setup mock for those cancel calls.
 // Some examples of how to setup mock:
 //
-// * mock for specific target workflow that matches specific workflow ID and run ID
-// 	 env.OnRequestCancelExternalWorkflow("test-domain", "test-workflow-id1", "test-runid1").Return(nil).Once()
-// * mock for anything and succeed the cancellation
-// 	 env.OnRequestCancelExternalWorkflow(mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-// * mock for anything and fail the cancellation
-// 	 env.OnRequestCancelExternalWorkflow(mock.Anything, mock.Anything, mock.Anything).Return(errors.New("unknown external workflow")).Once()
-// * mock function for RequestCancelExternalWorkflow
-//   env.OnRequestCancelExternalWorkflow(mock.Anything, mock.Anything, mock.Anything).Return(
+//   - mock for specific target workflow that matches specific workflow ID and run ID
+//     env.OnRequestCancelExternalWorkflow("test-domain", "test-workflow-id1", "test-runid1").Return(nil).Once()
+//   - mock for anything and succeed the cancellation
+//     env.OnRequestCancelExternalWorkflow(mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+//   - mock for anything and fail the cancellation
+//     env.OnRequestCancelExternalWorkflow(mock.Anything, mock.Anything, mock.Anything).Return(errors.New("unknown external workflow")).Once()
+//   - mock function for RequestCancelExternalWorkflow
+//     env.OnRequestCancelExternalWorkflow(mock.Anything, mock.Anything, mock.Anything).Return(
 //     func(domainName, workflowID, runID) error {
-//       // you can do differently based on the parameters
-//       return nil
+//     // you can do differently based on the parameters
+//     return nil
 //     })
 func (t *TestWorkflowEnvironment) OnRequestCancelExternalWorkflow(domainName, workflowID, runID string) *MockCallWrapper {
 	call := t.Mock.On(mockMethodForRequestCancelExternalWorkflow, domainName, workflowID, runID)

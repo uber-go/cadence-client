@@ -719,10 +719,11 @@ func (wtp *workflowTaskPoller) updateBacklog(taskListKind s.TaskListKind, backlo
 
 // getNextPollRequest returns appropriate next poll request based on poller configuration.
 // Simple rules:
-// 1) if sticky execution is disabled, always poll for regular task list
-// 2) otherwise:
-//   2.1) if sticky task list has backlog, always prefer to process sticky task first
-//   2.2) poll from the task list that has less pending requests (prefer sticky when they are the same).
+//  1. if sticky execution is disabled, always poll for regular task list
+//  2. otherwise:
+//     2.1) if sticky task list has backlog, always prefer to process sticky task first
+//     2.2) poll from the task list that has less pending requests (prefer sticky when they are the same).
+//
 // TODO: make this more smart to auto adjust based on poll latency
 func (wtp *workflowTaskPoller) getNextPollRequest() (request *s.PollForDecisionTaskRequest) {
 	taskListName := wtp.taskListName

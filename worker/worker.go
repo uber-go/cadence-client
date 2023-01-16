@@ -227,12 +227,13 @@ const (
 )
 
 // New creates an instance of worker for managing workflow and activity executions.
-//    service  - thrift connection to the cadence server
-//    domain   - the name of the cadence domain
-//    taskList - is the task list name you use to identify your client worker, also
-//               identifies group of workflow and activity implementations that are
-//               hosted by a single worker process
-//    options  - configure any worker specific options like logger, metrics, identity
+//
+//	service  - thrift connection to the cadence server
+//	domain   - the name of the cadence domain
+//	taskList - is the task list name you use to identify your client worker, also
+//	           identifies group of workflow and activity implementations that are
+//	           hosted by a single worker process
+//	options  - configure any worker specific options like logger, metrics, identity
 func New(
 	service workflowserviceclient.Interface,
 	domain string,
@@ -290,7 +291,7 @@ func ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string) 
 }
 
 // ReplayPartialWorkflowHistoryFromJSONFile executes a single decision task for the json history file upto provided
-//// lastEventID(inclusive), downloaded from the cli.
+// // lastEventID(inclusive), downloaded from the cli.
 // To download the history file: cadence workflow showid <workflow_id> -of <output_filename>
 // See https://github.com/uber/cadence/blob/master/tools/cli/README.md for full documentation
 // Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.

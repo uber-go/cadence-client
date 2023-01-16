@@ -32,7 +32,7 @@ In order to facilitate this operational model both the Cadence programming frame
 some requirements and restrictions on the implementation of the coordination logic. The details of these requirements
 and restrictions are described in the "Implementation" section below.
 
-Overview
+# Overview
 
 The sample code below shows a simple implementation of a workflow that executes one activity. The workflow also passes
 the sole parameter it receives as part of its initialization as a parameter to the activity.
@@ -71,7 +71,7 @@ the sole parameter it receives as part of its initialization as a parameter to t
 
 The following sections describe what is going on in the above code.
 
-Declaration
+# Declaration
 
 In the Cadence programing model a workflow is implemented with a function. The function declaration specifies the
 parameters the workflow accepts as well as any values it might return.
@@ -91,7 +91,7 @@ essentially means that params can’t be channels, functions, variadic, or unsaf
 Since it only declares error as the return value it means that the workflow does not return a value. The error return
 value is used to indicate an error was encountered during execution and the workflow should be terminated.
 
-Implementation
+# Implementation
 
 In order to support the synchronous and sequential programming model for the workflow implementation there are certain
 restrictions and requirements on how the workflow implementation must behave in order to guarantee correctness. The
@@ -119,7 +119,7 @@ A simplistic way to think about these requirements is that the workflow code:
 
 Now that we laid out the ground rules we can take a look at how to implement some common patterns inside workflows.
 
-Special Cadence client library functions and types
+# Special Cadence client library functions and types
 
 The Cadence client library provides a number of functions and types as alternatives to some native Go functions and
 types. Usage of these replacement functions/types is necessary in order to ensure that the workflow code execution is
@@ -137,13 +137,13 @@ Time related functions:
   - workflow.Now() : This is a replacement for time.Now()
   - workflow.Sleep() : This is a replacement for time.Sleep()
 
-Failing a Workflow
+# Failing a Workflow
 
 To mark a workflow as failed, return an error from your workflow function via the err return value.
 Note that failed workflows do not record the non-error return's value: you cannot usefully return both a
 value and an error, only the error will be recorded.
 
-Ending a Workflow externally
+# Ending a Workflow externally
 
 Inside a workflow, to end you must finish your function by returning a result or error.
 
@@ -153,7 +153,7 @@ cancellation and termination.  Termination is forceful, cancellation allows a wo
 Workflows can also time out, based on their ExecutionStartToClose duration.  A timeout behaves the same as
 termination (it is a hard deadline on the workflow), but a different close status and final event will be reported.
 
-Terminating a Workflow
+# Terminating a Workflow
 
 Terminating is roughly equivalent to using `kill -9` on a process - the workflow will be ended immediately,
 and no further decisions will be made.  It cannot be prevented or delayed by the workflow, or by any configuration.
@@ -164,14 +164,14 @@ Because termination does not allow for any further code to be run, this also mea
 chance to clean up after itself (e.g. running a cleanup Activity to adjust a database record).
 If you need to run additional logic when your workflow, use cancellation instead.
 
-Canceling a Workflow
+# Canceling a Workflow
 
 Canceling marks a workflow as canceled (this is a one-time, one-way operation), and immediately wakes the workflow
 up to process the cancellation (schedules a new decision task).  When the workflow resumes after being canceled,
 the context that was passed into the workflow (and thus all derived contexts) will be canceled, which changes the
 behavior of many workflow.* functions.
 
-Canceled workflow.Context behavior
+# Canceled workflow.Context behavior
 
 A workflow's context can be canceled by either canceling the workflow, or calling the cancel-func returned from
 a worfklow.WithCancel(ctx) call.  Both behave identically.
@@ -226,7 +226,7 @@ And actions like this will be completely unaffected:
     nor stop new ones from being started)
   - workflow.GetVersion, workflow.GetLogger, workflow.GetMetricsScope, workflow.Now, many others
 
-Execute Activity
+# Execute Activity
 
 The primary responsibility of the workflow implementation is to schedule activities for execution. The most
 straightforward way to do that is via the library method workflow.ExecuteActivity:
@@ -297,7 +297,7 @@ Get() methods of the future at a later time.
 To implement more complex wait conditions on the returned future objects, use the workflow.Selector class. Take a look
 at our Pickfirst sample for an example of how to use of workflow.Selector.
 
-Child Workflow
+# Child Workflow
 
 workflow.ExecuteChildWorkflow enables the scheduling of other workflows from within a workflow's implementation. The
 parent workflow has the ability to "monitor" and impact the life-cycle of the child workflow in a similar way it can do
@@ -367,7 +367,7 @@ pattern, extra care needs to be taken to ensure the child workflow is started be
 		return err
 	}
 
-Error Handling
+# Error Handling
 
 Activities and child workflows can fail. You could handle errors differently based on different error cases. If the
 activity returns an error as errors.New() or fmt.Errorf(), those errors will be converted to workflow.GenericError. If the
@@ -416,7 +416,7 @@ So the error handling code would look like:
 		// all other cases (ideally, this should not happen)
 	}
 
-Signals
+# Signals
 
 Signals provide a mechanism to send data directly to a running workflow. Previously, you had two options for passing
 data to the workflow implementation:
@@ -453,7 +453,7 @@ workflow also has the option to stop execution by blocking on a signal channel.
 In the example above, the workflow code uses workflow.GetSignalChannel to open a workflow.Channel for the named signal.
 We then use a workflow.Selector to wait on this channel and process the payload received with the signal.
 
-ContinueAsNew Workflow Completion
+# ContinueAsNew Workflow Completion
 
 Workflows that need to rerun periodically could naively be implemented as a big for loop with a sleep where the entire
 logic of the workflow is inside the body of the for loop. The problem with this approach is that the history for that
@@ -471,7 +471,7 @@ workflow function should terminate by returning the special ContinueAsNewError e
 
 For a complete example implementing this pattern please refer to the Cron example.
 
-SideEffect API
+# SideEffect API
 
 workflow.SideEffect executes the provided function once, records its result into the workflow history, and doesn't
 re-execute upon replay. Instead, it returns the recorded result. Use it only for short, nondeterministic code snippets,
@@ -496,7 +496,7 @@ SideEffect function any other way than through its recorded return value.
 		....
 	}
 
-Query API
+# Query API
 
 A workflow execution could be stuck at some state for longer than expected period. Cadence provide facilities to query
 the current call stack of a workflow execution. You can use cadence-cli to do the query, for example:
@@ -541,7 +541,7 @@ cli:
 
 Besides using cadence-cli, you can also issue query from code using QueryWorkflow() API on cadence Client object.
 
-Registration
+# Registration
 
 For some client code to be able to invoke a workflow type, the worker process needs to be aware of all the
 implementations it has access to. A workflow is registered with the following call:
@@ -553,7 +553,7 @@ and the implementation. It is safe to call this registration method from an **in
 receives tasks for a workflow type it does not know it will fail that task. However, the failure of the task will not
 cause the entire workflow to fail.
 
-Testing
+# Testing
 
 The Cadence client library provides a test framework to facilitate testing workflow implementations. The framework is
 suited for implementing unit tests as well as functional tests of the workflow logic.
@@ -623,7 +623,7 @@ The code below implements the unit tests for the SimpleWorkflow sample.
 		suite.Run(t, new(UnitTestSuite))
 	}
 
-Setup
+# Setup
 
 First, we define a "test suite" struct that absorbs both the basic suite functionality from testify
 http://godoc.org/github.com/stretchr/testify/suite via suite.Suite and the suite functionality from the Cadence test
@@ -637,7 +637,7 @@ indeed called by invoking s.env.AssertExpectations(s.T()).
 
 Finally, we create a regular test function recognized by "go test" and pass the struct to suite.Run.
 
-A Simple Test
+# A Simple Test
 
 The simplest test case we can write is to have the test environment execute the workflow and then evaluate the results.
 
@@ -659,7 +659,7 @@ to s.env.IsWorkflowComplete(). We also assert that no errors where returned by a
 s.env.GetWorkflowError(). If our workflow returned a value, we we can retrieve that value via a call to
 s.env.GetWorkflowResult(&value) and add asserts on that value.
 
-Activity Mocking and Overriding
+# Activity Mocking and Overriding
 
 When testing workflows, especially unit testing workflows, we want to test the workflow logic in isolation.
 Additionally, we want to inject activity errors during our tests runs. The test framework provides two mechanisms that

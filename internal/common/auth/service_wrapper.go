@@ -22,6 +22,7 @@ package auth
 
 import (
 	"context"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/yarpc"
@@ -467,4 +468,18 @@ func (w *workflowServiceAuthWrapper) RefreshWorkflowTasks(ctx context.Context, r
 	opts = append(opts, *tokenHeader)
 	err = w.service.RefreshWorkflowTasks(ctx, request, opts...)
 	return err
+}
+
+func (w *workflowServiceAuthWrapper) RestartWorkflowExecution(
+	ctx context.Context,
+	request *shared.RestartWorkflowExecutionRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.RestartWorkflowExecutionResponse, err error) {
+	tokenHeader, err := w.getYarpcJWTHeader()
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, *tokenHeader)
+	result, err := w.service.RestartWorkflowExecution(ctx, request, opts...)
+	return result, err
 }

@@ -46,6 +46,8 @@ const (
 )
 
 type (
+	Option func(r *s.RequestCancelWorkflowExecutionRequest)
+
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.
 	Client interface {
@@ -139,7 +141,7 @@ type (
 		//	- BadRequestError
 		//	- InternalServiceError
 		//	- WorkflowExecutionAlreadyCompletedError
-		CancelWorkflow(ctx context.Context, workflowID string, runID string) error
+		CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...Option) error
 
 		// TerminateWorkflow terminates a workflow execution.
 		// workflowID is required, other parameters are optional.

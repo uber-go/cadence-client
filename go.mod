@@ -9,26 +9,19 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.5.0
 	github.com/kisielk/errcheck v1.5.0
+	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pborman/uuid v0.0.0-20160209185913-a97ce2ca70fa
 	github.com/robfig/cron v1.2.0
 	github.com/streadway/quantile v0.0.0-20220407130108-4246515d968d // indirect
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.8.1
 	github.com/twmb/murmur3 v1.1.6 // indirect
+	github.com/uber-go/tally v3.3.15+incompatible
 	github.com/uber-go/tally/v4 v4.1.1
 	github.com/uber/cadence-idl v0.0.0-20220713235846-fda89e95df1e
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
-	github.com/uber/tchannel-go v1.16.0
-	go.opentelemetry.io/otel/bridge/opentracing v1.7.0
-	github.com/marusama/semaphore/v2 v2.5.0
-	github.com/opentracing/opentracing-go v1.1.0
-	github.com/pborman/uuid v0.0.0-20160209185913-a97ce2ca70fa
-	github.com/robfig/cron v1.2.0
-	github.com/stretchr/testify v1.8.1
-	github.com/uber-go/tally v3.3.15+incompatible
-	github.com/uber/cadence-idl v0.0.0-20220713235846-fda89e95df1e
-	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/tchannel-go v1.32.1
+	go.opentelemetry.io/otel/bridge/opentracing v1.7.0
 	go.uber.org/atomic v1.9.0
 	go.uber.org/fx v1.13.1 // indirect
 	go.uber.org/goleak v1.1.12

@@ -23,6 +23,19 @@ BUILD := .build
 # usually unnecessary to clean, and may require downloads to restore, so this folder is not automatically cleaned.
 BIN := .bin
 
+# current (when committed) version of Go used in CI, and ideally also our docker images.
+# this generally does not matter, but can impact goimports or formatting output.
+# for maximum stability, make sure you use the same version as CI uses.
+#
+# this can _likely_ remain a major version, as fmt output does not tend to change in minor versions,
+# which will allow findstring to match any minor version.
+EXPECTED_GO_VERSION := go1.16
+CURRENT_GO_VERSION := $(shell go version)
+ifeq (,$(findstring $(EXPECTED_GO_VERSION),$(CURRENT_GO_VERSION)))
+# if you are seeing this warning: consider using https://github.com/travis-ci/gimme to pin your version
+$(warning Caution: you are not using CI's go version. Expected: $(EXPECTED_GO_VERSION), current: $(CURRENT_GO_VERSION))
+endif
+
 # ====================================
 # book-keeping files that are used to control sequencing.
 #

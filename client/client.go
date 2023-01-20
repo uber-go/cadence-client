@@ -447,8 +447,9 @@ var _ internal.DomainClient = DomainClient(nil)
 // User had Activity.RecordHeartbeat(ctx, "my-heartbeat") and then got response from calling Client.DescribeWorkflowExecution.
 // The response contains binary field PendingActivityInfo.HeartbeatDetails,
 // which can be decoded by using:
-//   var result string // This need to be same type as the one passed to RecordHeartbeat
-//   NewValue(data).Get(&result)
+//
+//	var result string // This need to be same type as the one passed to RecordHeartbeat
+//	NewValue(data).Get(&result)
 func NewValue(data []byte) encoded.Value {
 	return internal.NewValue(data)
 }
@@ -457,9 +458,10 @@ func NewValue(data []byte) encoded.Value {
 // User had Activity.RecordHeartbeat(ctx, "my-heartbeat", 123) and then got response from calling Client.DescribeWorkflowExecution.
 // The response contains binary field PendingActivityInfo.HeartbeatDetails,
 // which can be decoded by using:
-//   var result1 string
-//   var result2 int // These need to be same type as those arguments passed to RecordHeartbeat
-//   NewValues(data).Get(&result1, &result2)
+//
+//	var result1 string
+//	var result2 int // These need to be same type as those arguments passed to RecordHeartbeat
+//	NewValues(data).Get(&result1, &result2)
 func NewValues(data []byte) encoded.Values {
 	return internal.NewValues(data)
 }

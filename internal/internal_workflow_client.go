@@ -142,9 +142,11 @@ type (
 // StartWorkflow starts a workflow execution
 // The user can use this to start using a functor like.
 // Either by
-//     StartWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
-//     or
-//     StartWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+//
+//	StartWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
+//	or
+//	StartWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+//
 // The current timeout resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
 // subjected to change in the future.
 func (wc *workflowClient) StartWorkflow(
@@ -267,9 +269,11 @@ func (wc *workflowClient) StartWorkflow(
 // reaches the end state, such as workflow finished successfully or timeout.
 // The user can use this to start using a functor like below and get the workflow execution result, as Value
 // Either by
-//     ExecuteWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
-//     or
-//     ExecuteWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+//
+//	ExecuteWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
+//	or
+//	ExecuteWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+//
 // The current timeout resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
 // subjected to change in the future.
 // NOTE: the context.Context should have a fairly large timeout, since workflow execution may take a while to be finished
@@ -659,9 +663,9 @@ func (wc *workflowClient) RecordActivityHeartbeatByID(ctx context.Context,
 
 // ListClosedWorkflow gets closed workflow executions based on request filters
 // The errors it can throw:
-//  - BadRequestError
-//  - InternalServiceError
-//  - EntityNotExistError
+//   - BadRequestError
+//   - InternalServiceError
+//   - EntityNotExistError
 func (wc *workflowClient) ListClosedWorkflow(ctx context.Context, request *s.ListClosedWorkflowExecutionsRequest) (*s.ListClosedWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
 		request.Domain = common.StringPtr(wc.domain)
@@ -683,9 +687,9 @@ func (wc *workflowClient) ListClosedWorkflow(ctx context.Context, request *s.Lis
 
 // ListOpenWorkflow gets open workflow executions based on request filters
 // The errors it can throw:
-//  - BadRequestError
-//  - InternalServiceError
-//  - EntityNotExistError
+//   - BadRequestError
+//   - InternalServiceError
+//   - EntityNotExistError
 func (wc *workflowClient) ListOpenWorkflow(ctx context.Context, request *s.ListOpenWorkflowExecutionsRequest) (*s.ListOpenWorkflowExecutionsResponse, error) {
 	if len(request.GetDomain()) == 0 {
 		request.Domain = common.StringPtr(wc.domain)
@@ -836,9 +840,9 @@ func (wc *workflowClient) GetSearchAttributes(ctx context.Context) (*s.GetSearch
 
 // DescribeWorkflowExecution returns information about the specified workflow execution.
 // The errors it can return:
-//  - BadRequestError
-//  - InternalServiceError
-//  - EntityNotExistError
+//   - BadRequestError
+//   - InternalServiceError
+//   - EntityNotExistError
 func (wc *workflowClient) DescribeWorkflowExecution(ctx context.Context, workflowID, runID string) (*s.DescribeWorkflowExecutionResponse, error) {
 	request := &s.DescribeWorkflowExecutionRequest{
 		Domain: common.StringPtr(wc.domain),
@@ -870,10 +874,10 @@ func (wc *workflowClient) DescribeWorkflowExecution(ctx context.Context, workflo
 // - queryType is the type of the query.
 // - args... are the optional query parameters.
 // The errors it can return:
-//  - BadRequestError
-//  - InternalServiceError
-//  - EntityNotExistError
-//  - QueryFailError
+//   - BadRequestError
+//   - InternalServiceError
+//   - EntityNotExistError
+//   - QueryFailError
 func (wc *workflowClient) QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (Value, error) {
 	queryWorkflowWithOptionsRequest := &QueryWorkflowWithOptionsRequest{
 		WorkflowID: workflowID,
@@ -930,10 +934,10 @@ type QueryWorkflowWithOptionsResponse struct {
 // QueryWorkflowWithOptions queries a given workflow execution and returns the query result synchronously.
 // See QueryWorkflowWithOptionsRequest and QueryWorkflowWithOptionsResult for more information.
 // The errors it can return:
-//  - BadRequestError
-//  - InternalServiceError
-//  - EntityNotExistError
-//  - QueryFailError
+//   - BadRequestError
+//   - InternalServiceError
+//   - EntityNotExistError
+//   - QueryFailError
 func (wc *workflowClient) QueryWorkflowWithOptions(ctx context.Context, request *QueryWorkflowWithOptionsRequest) (*QueryWorkflowWithOptionsResponse, error) {
 	var input []byte
 	if len(request.Args) > 0 {
@@ -986,9 +990,9 @@ func (wc *workflowClient) QueryWorkflowWithOptions(ctx context.Context, request 
 // - tasklist name of tasklist
 // - tasklistType type of tasklist, can be decision or activity
 // The errors it can return:
-//  - BadRequestError
-//  - InternalServiceError
-//  - EntityNotExistError
+//   - BadRequestError
+//   - InternalServiceError
+//   - EntityNotExistError
 func (wc *workflowClient) DescribeTaskList(ctx context.Context, tasklist string, tasklistType s.TaskListType) (*s.DescribeTaskListResponse, error) {
 	request := &s.DescribeTaskListRequest{
 		Domain:       common.StringPtr(wc.domain),
@@ -1016,10 +1020,10 @@ func (wc *workflowClient) DescribeTaskList(ctx context.Context, tasklist string,
 // - workflow ID of the workflow.
 // - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
 // The errors it can return:
-//  - BadRequestError
-//  - DomainNotActiveError
-//  - ServiceBusyError
-//  - EntityNotExistError
+//   - BadRequestError
+//   - DomainNotActiveError
+//   - ServiceBusyError
+//   - EntityNotExistError
 func (wc *workflowClient) RefreshWorkflowTasks(ctx context.Context, workflowID, runID string) error {
 	request := &s.RefreshWorkflowTasksRequest{
 		Domain: common.StringPtr(wc.domain),
@@ -1050,9 +1054,9 @@ func (wc *workflowClient) getWorkflowHeader(ctx context.Context) *s.Header {
 
 // Register a domain with cadence server
 // The errors it can throw:
-//	- DomainAlreadyExistsError
-//	- BadRequestError
-//	- InternalServiceError
+//   - DomainAlreadyExistsError
+//   - BadRequestError
+//   - InternalServiceError
 func (dc *domainClient) Register(ctx context.Context, request *s.RegisterDomainRequest) error {
 	return backoff.Retry(ctx,
 		func() error {
@@ -1067,9 +1071,9 @@ func (dc *domainClient) Register(ctx context.Context, request *s.RegisterDomainR
 // DomainConfiguration - Configuration like Workflow Execution Retention Period In Days, Whether to emit metrics.
 // ReplicationConfiguration - replication config like clusters and active cluster name
 // The errors it can throw:
-//	- EntityNotExistsError
-//	- BadRequestError
-//	- InternalServiceError
+//   - EntityNotExistsError
+//   - BadRequestError
+//   - InternalServiceError
 func (dc *domainClient) Describe(ctx context.Context, name string) (*s.DescribeDomainResponse, error) {
 	request := &s.DescribeDomainRequest{
 		Name: common.StringPtr(name),
@@ -1092,9 +1096,9 @@ func (dc *domainClient) Describe(ctx context.Context, name string) (*s.DescribeD
 
 // Update a domain.
 // The errors it can throw:
-//	- EntityNotExistsError
-//	- BadRequestError
-//	- InternalServiceError
+//   - EntityNotExistsError
+//   - BadRequestError
+//   - InternalServiceError
 func (dc *domainClient) Update(ctx context.Context, request *s.UpdateDomainRequest) error {
 	return backoff.Retry(ctx,
 		func() error {

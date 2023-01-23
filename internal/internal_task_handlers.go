@@ -1463,9 +1463,10 @@ func isSearchAttributesMatched(attrFromEvent, attrFromDecision *s.SearchAttribut
 }
 
 // return true if the check fails:
-//    domain is not empty in decision
-//    and domain is not replayDomain
-//    and domains unmatch in decision and events
+//
+//	domain is not empty in decision
+//	and domain is not replayDomain
+//	and domains unmatch in decision and events
 func checkDomainsInDecisionAndEvent(eventDomainName, decisionDomainName string) bool {
 	if decisionDomainName == "" || IsReplayDomain(decisionDomainName) {
 		return false

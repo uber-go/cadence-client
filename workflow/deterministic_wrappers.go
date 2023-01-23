@@ -55,9 +55,9 @@ type (
 // The following code is going to block until the captured count
 // variable is set to 5.
 //
-// workflow.Await(ctx, func() bool {
-//   return count == 5
-// })
+//	workflow.Await(ctx, func() bool {
+//	  return count == 5
+//	})
 func Await(ctx Context, condition func() bool) error {
 	return internal.Await(ctx, condition)
 }

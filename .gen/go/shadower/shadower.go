@@ -70,14 +70,14 @@ type ExitCondition struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *ExitCondition) ToWire() (wire.Value, error) {
 	var (
 		fields [2]wire.Field
@@ -113,16 +113,16 @@ func (v *ExitCondition) ToWire() (wire.Value, error) {
 // An error is returned if we were unable to build a ExitCondition struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v ExitCondition
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v ExitCondition
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *ExitCondition) FromWire(w wire.Value) error {
 	var err error
 
@@ -268,8 +268,8 @@ func Mode_Values() []Mode {
 // UnmarshalText tries to decode Mode from a byte slice
 // containing its name.
 //
-//   var v Mode
-//   err := v.UnmarshalText([]byte("Normal"))
+//	var v Mode
+//	err := v.UnmarshalText([]byte("Normal"))
 func (v *Mode) UnmarshalText(value []byte) error {
 	switch s := string(value); s {
 	case "Normal":
@@ -336,16 +336,16 @@ func (v Mode) ToWire() (wire.Value, error) {
 // FromWire deserializes Mode from its Thrift-level
 // representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TI32)
-//   if err != nil {
-//     return Mode(0), err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TI32)
+//	if err != nil {
+//	  return Mode(0), err
+//	}
 //
-//   var v Mode
-//   if err := v.FromWire(x); err != nil {
-//     return Mode(0), err
-//   }
-//   return v, nil
+//	var v Mode
+//	if err := v.FromWire(x); err != nil {
+//	  return Mode(0), err
+//	}
+//	return v, nil
 func (v *Mode) FromWire(w wire.Value) error {
 	*v = (Mode)(w.GetI32())
 	return nil
@@ -462,14 +462,14 @@ func (_List_WorkflowExecution_ValueList) Close() {}
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *ReplayWorkflowActivityParams) ToWire() (wire.Value, error) {
 	var (
 		fields [2]wire.Field
@@ -529,16 +529,16 @@ func _List_WorkflowExecution_Read(l wire.ValueList) ([]*shared.WorkflowExecution
 // An error is returned if we were unable to build a ReplayWorkflowActivityParams struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v ReplayWorkflowActivityParams
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v ReplayWorkflowActivityParams
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *ReplayWorkflowActivityParams) FromWire(w wire.Value) error {
 	var err error
 
@@ -703,14 +703,14 @@ type ReplayWorkflowActivityResult struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *ReplayWorkflowActivityResult) ToWire() (wire.Value, error) {
 	var (
 		fields [3]wire.Field
@@ -754,16 +754,16 @@ func (v *ReplayWorkflowActivityResult) ToWire() (wire.Value, error) {
 // An error is returned if we were unable to build a ReplayWorkflowActivityResult struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v ReplayWorkflowActivityResult
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v ReplayWorkflowActivityResult
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *ReplayWorkflowActivityResult) FromWire(w wire.Value) error {
 	var err error
 
@@ -931,14 +931,14 @@ type ScanWorkflowActivityParams struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *ScanWorkflowActivityParams) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -998,16 +998,16 @@ func (v *ScanWorkflowActivityParams) ToWire() (wire.Value, error) {
 // An error is returned if we were unable to build a ScanWorkflowActivityParams struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v ScanWorkflowActivityParams
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v ScanWorkflowActivityParams
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *ScanWorkflowActivityParams) FromWire(w wire.Value) error {
 	var err error
 
@@ -1250,14 +1250,14 @@ type ScanWorkflowActivityResult struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *ScanWorkflowActivityResult) ToWire() (wire.Value, error) {
 	var (
 		fields [2]wire.Field
@@ -1293,16 +1293,16 @@ func (v *ScanWorkflowActivityResult) ToWire() (wire.Value, error) {
 // An error is returned if we were unable to build a ScanWorkflowActivityResult struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v ScanWorkflowActivityResult
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v ScanWorkflowActivityResult
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *ScanWorkflowActivityResult) FromWire(w wire.Value) error {
 	var err error
 
@@ -1435,14 +1435,14 @@ type WorkflowParams struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowParams) ToWire() (wire.Value, error) {
 	var (
 		fields [9]wire.Field
@@ -1552,16 +1552,16 @@ func _WorkflowResult_Read(w wire.Value) (*WorkflowResult, error) {
 // An error is returned if we were unable to build a WorkflowParams struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowParams
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowParams
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowParams) FromWire(w wire.Value) error {
 	var err error
 
@@ -1941,14 +1941,14 @@ type WorkflowResult struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowResult) ToWire() (wire.Value, error) {
 	var (
 		fields [3]wire.Field
@@ -1992,16 +1992,16 @@ func (v *WorkflowResult) ToWire() (wire.Value, error) {
 // An error is returned if we were unable to build a WorkflowResult struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowResult
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowResult
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowResult) FromWire(w wire.Value) error {
 	var err error
 

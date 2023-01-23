@@ -43,7 +43,7 @@ The root cadence package contains common data structures. The subpackages are:
     activity code.
   - testsuite - unit testing framework for activity and workflow testing
 
-How Cadence works
+# How Cadence works
 
 The Cadence hosted service brokers and persists events generated during workflow execution. Worker nodes owned and
 operated by customers execute the coordination and task logic. To facilitate the implementation of worker nodes Cadence
@@ -52,7 +52,7 @@ provides a client-side library for the Go language.
 In Cadence, you can code the logical flow of events separately as a workflow and code business logic as activities. The
 workflow identifies the activities and sequences them, while an activity executes the logic.
 
-Key Features
+# Key Features
 
 Dynamic workflow execution graphs - Determine the workflow execution graphs at runtime based on the data you are
 processing. Cadence does not pre-compute the execution graphs at compile time or at workflow start time. Therefore, you
@@ -117,7 +117,6 @@ current workflow executions.
 
 Debuggability - Replay any workflow execution history locally under a debugger. The Cadence client library provides an
 API to allow you to capture a stack trace from any failed workflow execution history.
-
 */
 package cadence
 

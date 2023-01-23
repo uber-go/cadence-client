@@ -49,14 +49,21 @@ func (t tracingWriter) Set(key, val string) {
 // tracing context propagation.
 //
 // Inject -> context.Context to Header - this extracts the Span from the
-//		context and places the SpanContext into the Header
+//
+//	context and places the SpanContext into the Header
+//
 // Extract -> Header to context.Context - this extracts the SpanContext from
-//		the header, returns a context.Context containing the SpanContext
+//
+//	the header, returns a context.Context containing the SpanContext
+//
 // InjectFromWorkflow -> Context to Header - extracts a SpanContext from the
-//		workflow context and puts it in the header
+//
+//	workflow context and puts it in the header
+//
 // ExtractToWorkflow -> Header to Context - takes the SpanContext present in
-//		the header and puts it in the Context object. Does not start a new span
-//		as that is started outside when the workflow is actually executed
+//
+//	the header and puts it in the Context object. Does not start a new span
+//	as that is started outside when the workflow is actually executed
 type tracingContextPropagator struct {
 	logger *zap.Logger
 	tracer opentracing.Tracer

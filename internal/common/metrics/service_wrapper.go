@@ -407,3 +407,10 @@ func (w *workflowServiceMetricsWrapper) RefreshWorkflowTasks(ctx context.Context
 	scope.handleError(err)
 	return err
 }
+
+func (w *workflowServiceMetricsWrapper) RestartWorkflowExecution(ctx context.Context, request *shared.RestartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.RestartWorkflowExecutionResponse, error) {
+	scope := w.getOperationScope(scopeRefreshWorkflowTasks)
+	resp, err := w.service.RestartWorkflowExecution(ctx, request, opts...)
+	scope.handleError(err)
+	return resp, err
+}

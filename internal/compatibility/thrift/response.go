@@ -330,3 +330,13 @@ func UpdateDomainResponse(t *apiv1.UpdateDomainResponse) *shared.UpdateDomainRes
 		IsGlobalDomain:  &t.Domain.IsGlobalDomain,
 	}
 }
+
+func RestartWorkflowExecutionResponse(t *apiv1.RestartWorkflowExecutionResponse) *shared.RestartWorkflowExecutionResponse {
+	if t == nil {
+		return nil
+	}
+
+	return &shared.RestartWorkflowExecutionResponse{
+		RunId: &t.RunId,
+	}
+}

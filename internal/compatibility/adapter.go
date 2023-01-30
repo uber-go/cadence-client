@@ -246,6 +246,11 @@ func (a thrift2protoAdapter) RefreshWorkflowTasks(ctx context.Context, request *
 	return thrift.Error(err)
 }
 
+func (a thrift2protoAdapter) RestartWorkflowExecution(ctx context.Context, request *shared.RestartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.RestartWorkflowExecutionResponse, error) {
+	response, err := a.workflow.RestartWorkflowExecution(ctx, proto.RestartWorkflowExecutionRequest(request), opts...)
+	return thrift.RestartWorkflowExecutionResponse(response), proto.Error(err)
+}
+
 type domainAPIthriftAdapter struct {
 	service workflowserviceclient.Interface
 }

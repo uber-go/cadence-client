@@ -623,3 +623,16 @@ func RefreshWorkflowTasksRequest(r *shared.RefreshWorkflowTasksRequest) *apiv1.R
 	}
 	return &request
 }
+
+func RestartWorkflowExecutionRequest(r *shared.RestartWorkflowExecutionRequest) *apiv1.RestartWorkflowExecutionRequest {
+	if r == nil {
+		return nil
+	}
+	request := apiv1.RestartWorkflowExecutionRequest{
+		Domain:            r.GetDomain(),
+		WorkflowExecution: WorkflowExecution(r.GetWorkflowExecution()),
+		Identity:          r.GetIdentity(),
+	}
+
+	return &request
+}

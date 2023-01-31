@@ -25,7 +25,6 @@ package workflowserviceserver
 
 import (
 	context "context"
-
 	cadence "go.uber.org/cadence/.gen/go/cadence"
 	shared "go.uber.org/cadence/.gen/go/shared"
 	wire "go.uber.org/thriftrw/wire"
@@ -203,6 +202,11 @@ type Interface interface {
 		ctx context.Context,
 		CompleteRequest *shared.RespondQueryTaskCompletedRequest,
 	) error
+
+	RestartWorkflowExecution(
+		ctx context.Context,
+		RestartRequest *shared.RestartWorkflowExecutionRequest,
+	) (*shared.RestartWorkflowExecutionResponse, error)
 
 	ScanWorkflowExecutions(
 		ctx context.Context,
@@ -621,6 +625,17 @@ func New(impl Interface, opts ...thrift.RegisterOption) []transport.Procedure {
 			},
 
 			thrift.Method{
+				Name: "RestartWorkflowExecution",
+				HandlerSpec: thrift.HandlerSpec{
+
+					Type:  transport.Unary,
+					Unary: thrift.UnaryHandler(h.RestartWorkflowExecution),
+				},
+				Signature:    "RestartWorkflowExecution(RestartRequest *shared.RestartWorkflowExecutionRequest) (*shared.RestartWorkflowExecutionResponse)",
+				ThriftModule: cadence.ThriftModule,
+			},
+
+			thrift.Method{
 				Name: "ScanWorkflowExecutions",
 				HandlerSpec: thrift.HandlerSpec{
 
@@ -688,7 +703,7 @@ func New(impl Interface, opts ...thrift.RegisterOption) []transport.Procedure {
 		},
 	}
 
-	procedures := make([]transport.Procedure, 0, 40)
+	procedures := make([]transport.Procedure, 0, 41)
 	procedures = append(procedures, thrift.BuildProcedures(service, opts...)...)
 	return procedures
 }
@@ -1700,6 +1715,36 @@ func (h handler) RespondQueryTaskCompleted(ctx context.Context, body wire.Value)
 
 	hadError := appErr != nil
 	result, err := cadence.WorkflowService_RespondQueryTaskCompleted_Helper.WrapResponse(appErr)
+
+	var response thrift.Response
+	if err == nil {
+		response.IsApplicationError = hadError
+		response.Body = result
+		if namer, ok := appErr.(yarpcErrorNamer); ok {
+			response.ApplicationErrorName = namer.YARPCErrorName()
+		}
+		if extractor, ok := appErr.(yarpcErrorCoder); ok {
+			response.ApplicationErrorCode = extractor.YARPCErrorCode()
+		}
+		if appErr != nil {
+			response.ApplicationErrorDetails = appErr.Error()
+		}
+	}
+
+	return response, err
+}
+
+func (h handler) RestartWorkflowExecution(ctx context.Context, body wire.Value) (thrift.Response, error) {
+	var args cadence.WorkflowService_RestartWorkflowExecution_Args
+	if err := args.FromWire(body); err != nil {
+		return thrift.Response{}, yarpcerrors.InvalidArgumentErrorf(
+			"could not decode Thrift request for service 'WorkflowService' procedure 'RestartWorkflowExecution': %w", err)
+	}
+
+	success, appErr := h.impl.RestartWorkflowExecution(ctx, args.RestartRequest)
+
+	hadError := appErr != nil
+	result, err := cadence.WorkflowService_RestartWorkflowExecution_Helper.WrapResponse(success, appErr)
 
 	var response thrift.Response
 	if err == nil {

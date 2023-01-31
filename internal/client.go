@@ -47,12 +47,12 @@ const (
 
 type Option interface{ private() }
 
-type CancelReason string
+type cancelReason string
 
-func (CancelReason) private() {}
+func (cancelReason) private() {}
 
 func WithCancelReason(reason string) Option {
-	return CancelReason(reason)
+	return cancelReason(reason)
 }
 
 type (

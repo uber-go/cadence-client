@@ -632,6 +632,7 @@ func RestartWorkflowExecutionRequest(r *shared.RestartWorkflowExecutionRequest) 
 		Domain:            r.GetDomain(),
 		WorkflowExecution: WorkflowExecution(r.GetWorkflowExecution()),
 		Identity:          r.GetIdentity(),
+		Reason:            r.GetReason(),
 	}
 
 	return &request

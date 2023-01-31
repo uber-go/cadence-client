@@ -42,7 +42,7 @@ type Client struct {
 }
 
 // CancelWorkflow provides a mock function with given fields: ctx, workflowID, runID
-func (_m *Client) CancelWorkflow(ctx context.Context, workflowID string, runID string) error {
+func (_m *Client) CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...internal.Option) error {
 	ret := _m.Called(ctx, workflowID, runID)
 
 	var r0 error

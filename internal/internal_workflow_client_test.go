@@ -1403,3 +1403,44 @@ func serializeEvents(events []*shared.HistoryEvent) *shared.DataBlob {
 		Data:         blob.Data,
 	}
 }
+
+func (s *workflowClientTestSuite) TestCancelWorkflow() {
+	s.service.EXPECT().RequestCancelWorkflowExecution(gomock.Any(), newPartialCancelRequestMatcher(common.StringPtr("testWf"), common.StringPtr("test reason")), gomock.All(gomock.Any())).Return(nil)
+
+	err := s.client.CancelWorkflow(context.Background(), "testWf", "testRun", WithCancelReason("test reason"))
+
+	s.Nil(err)
+}
+
+func (s *workflowClientTestSuite) TestCancelWorkflowBackwardsCompatible() {
+	s.service.EXPECT().RequestCancelWorkflowExecution(gomock.Any(), newPartialCancelRequestMatcher(common.StringPtr("testWf"), nil), gomock.All(gomock.Any())).Return(nil)
+
+	err := s.client.CancelWorkflow(context.Background(), "testWf", "testRun")
+
+	s.Nil(err)
+}
+
+type PartialCancelRequestMatcher struct {
+	wfId  *string
+	cause *string
+}
+
+func newPartialCancelRequestMatcher(wfId *string, cause *string) gomock.Matcher {
+	return &PartialCancelRequestMatcher{
+		wfId:  wfId,
+		cause: cause,
+	}
+}
+
+func (m *PartialCancelRequestMatcher) Matches(a interface{}) bool {
+	aEx, ok := a.(*shared.RequestCancelWorkflowExecutionRequest)
+	if !ok {
+		return false
+	}
+
+	return (aEx.Cause == m.cause || *aEx.Cause == *m.cause) && *aEx.WorkflowExecution.WorkflowId == *m.wfId
+}
+
+func (m *PartialCancelRequestMatcher) String() string {
+	return "partial cancellation request matcher matches cause and wfId fields"
+}

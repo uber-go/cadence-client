@@ -25,6 +25,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -47,6 +48,9 @@ const (
 	stickyDecisionScheduleToStartTimeoutSeconds = 5
 
 	ratioToForceCompleteDecisionTaskComplete = 0.8
+
+	causeTag    = "Cause"
+	serviceBusy = "serviceBusy"
 )
 
 type (
@@ -767,8 +771,15 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 	response, err := wtp.service.PollForDecisionTask(ctx, request, getYarpcCallOptions(wtp.featureFlags)...)
 	if err != nil {
 		retryable := isServiceTransientError(err)
+
 		if retryable {
-			wtp.metricsScope.Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
+			if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
+				tagsMap := map[string]string{}
+				tagsMap[causeTag] = serviceBusy
+				wtp.metricsScope.Tagged(tagsMap).Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
+			} else {
+				wtp.metricsScope.Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
+			}
 		} else {
 			wtp.metricsScope.Counter(metrics.DecisionPollFailedCounter).Inc(1)
 		}
@@ -1008,7 +1019,14 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTask
 	if err != nil {
 		retryable := isServiceTransientError(err)
 		if retryable {
-			atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
+
+			if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
+				tagsMap := map[string]string{}
+				tagsMap[causeTag] = serviceBusy
+				atp.metricsScope.Tagged(tagsMap).Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
+			} else {
+				atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
+			}
 		} else {
 			atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
 		}

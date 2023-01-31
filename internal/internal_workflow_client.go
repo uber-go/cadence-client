@@ -458,7 +458,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(ctx context.Context, workflowI
 // CancelWorkflow cancels a workflow in execution.  It allows workflow to properly clean up and gracefully close.
 // workflowID is required, other parameters are optional.
 // If runID is omit, it will terminate currently running workflow (if there is one) based on the workflowID.
-func (wc *workflowClient) CancelWorkflow(ctx context.Context, workflowID string, runID string) error {
+func (wc *workflowClient) CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...Option) error {
 	request := &s.RequestCancelWorkflowExecutionRequest{
 		Domain: common.StringPtr(wc.domain),
 		WorkflowExecution: &s.WorkflowExecution{
@@ -466,6 +466,14 @@ func (wc *workflowClient) CancelWorkflow(ctx context.Context, workflowID string,
 			RunId:      getRunID(runID),
 		},
 		Identity: common.StringPtr(wc.identity),
+	}
+
+	for _, opt := range opts {
+		switch o := opt.(type) {
+		case CancelReason:
+			cause := string(o)
+			request.Cause = &cause
+		}
 	}
 
 	return backoff.Retry(ctx,

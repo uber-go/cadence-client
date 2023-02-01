@@ -45,7 +45,18 @@ const (
 	QueryTypeOpenSessions string = "__open_sessions"
 )
 
+type Option interface{ private() }
+
+type cancelReason string
+
+func (cancelReason) private() {}
+
+func WithCancelReason(reason string) Option {
+	return cancelReason(reason)
+}
+
 type (
+
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.
 	Client interface {
@@ -139,7 +150,7 @@ type (
 		//	- BadRequestError
 		//	- InternalServiceError
 		//	- WorkflowExecutionAlreadyCompletedError
-		CancelWorkflow(ctx context.Context, workflowID string, runID string) error
+		CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...Option) error
 
 		// TerminateWorkflow terminates a workflow execution.
 		// workflowID is required, other parameters are optional.

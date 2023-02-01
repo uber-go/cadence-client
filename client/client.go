@@ -162,7 +162,7 @@ type (
 		//	- BadRequestError
 		//	- InternalServiceError
 		//	- WorkflowExecutionAlreadyCompletedError
-		CancelWorkflow(ctx context.Context, workflowID string, runID string) error
+		CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...internal.Option) error
 
 		// TerminateWorkflow terminates a workflow execution.
 		// workflowID is required, other parameters are optional.

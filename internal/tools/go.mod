@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/kisielk/errcheck v1.5.0
+	github.com/mattn/goveralls v0.0.11
 	go.uber.org/thriftrw v1.25.0
 	go.uber.org/yarpc v1.55.0
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5

@@ -151,6 +151,9 @@ $(BIN)/staticcheck: internal/tools/go.mod
 $(BIN)/errcheck: internal/tools/go.mod
 	$(call go_build_tool,github.com/kisielk/errcheck)
 
+$(BIN)/goveralls: internal/tools/go.mod
+	$(call go_build_tool,github.com/mattn/goveralls)
+
 # copyright header checker/writer.  only requires stdlib, so no other dependencies are needed.
 $(BIN)/copyright: internal/cmd/tools/copyright/licensegen.go
 	go build -mod=readonly -o $@ ./internal/cmd/tools/copyright/licensegen.go
@@ -387,7 +390,8 @@ integ_test_grpc: $(ALL_SRC)
 	$Q mkdir -p $(COVER_ROOT)
 	STICKY_OFF=false go test $(TEST_ARG) ./test -coverprofile=$(INTEG_GRPC_COVER_FILE) -coverpkg=./...
 
-# intermediate product, ci needs a stable output
+# intermediate product, ci needs a stable output, so use coverage_report.
+# running this target requires coverage files to have already been created, e.g. run ^ the above by hand, which happens in ci.
 $(COVER_ROOT)/cover.out: $(UT_COVER_FILE) $(INTEG_STICKY_OFF_COVER_FILE) $(INTEG_STICKY_ON_COVER_FILE) $(INTEG_GRPC_COVER_FILE)
 	$Q echo "mode: atomic" > $(COVER_ROOT)/cover.out
 	cat $(UT_COVER_FILE) | grep -v "mode: atomic" | grep -v ".gen" >> $(COVER_ROOT)/cover.out
@@ -401,5 +405,5 @@ coverage_report: $(COVER_ROOT)/cover.out
 cover: $(COVER_ROOT)/cover.out
 	go tool cover -html=$(COVER_ROOT)/cover.out;
 
-cover_ci: $(COVER_ROOT)/cover.out
-	goveralls -coverprofile=$(COVER_ROOT)/cover.out -service=buildkite || echo -e "\x1b[31mCoveralls failed\x1b[m";
+cover_ci: $(COVER_ROOT)/cover.out $(BIN)/goveralls
+	$(BIN)/goveralls -coverprofile=$(COVER_ROOT)/cover.out -service=buildkite || echo -e "\x1b[31mCoveralls failed\x1b[m";

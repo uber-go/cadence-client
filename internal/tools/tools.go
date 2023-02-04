@@ -25,6 +25,7 @@ package tools
 
 import (
 	_ "github.com/kisielk/errcheck"
+	_ "github.com/mattn/goveralls"
 	_ "go.uber.org/thriftrw"
 	_ "go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc"
 	_ "golang.org/x/lint/golint"

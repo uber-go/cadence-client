@@ -184,9 +184,9 @@ $(BUILD)/codegen: $(BUILD)/thrift | $(BUILD)
 
 THRIFT_FILES := idls/thrift/cadence.thrift idls/thrift/shadower.thrift
 # book-keeping targets to build.  one per thrift file.
-# idls/thrift/thing.thrift -> .build/thing.thrift
+# idls/thrift/thing.thrift -> .build/go_version/thing.thrift
 # the reverse is done in the recipe.
-THRIFT_GEN := $(subst idls/thrift/,.build/,$(THRIFT_FILES))
+THRIFT_GEN := $(subst idls/thrift,$(BUILD),$(THRIFT_FILES))
 
 # dummy targets to detect when the idls submodule does not exist, to provide a better error message
 $(THRIFT_FILES):
@@ -202,12 +202,12 @@ $(BUILD)/thrift: $(THRIFT_GEN)
 # ideally this would --no-recurse like the server does, but currently that produces a new output file, and parallel
 # compiling appears to work fine.  seems likely it only risks rare flaky builds.
 $(THRIFT_GEN): $(THRIFT_FILES) $(BIN)/thriftrw $(BIN)/thriftrw-plugin-yarpc
-	$Q echo 'thriftrw for $(subst .build/,idls/thrift/,$@)...'
+	$Q echo 'thriftrw for $(subst $(BUILD),idls/thrift,$@)...'
 	$Q $(BIN_PATH) $(BIN)/thriftrw \
 		--plugin=yarpc \
 		--pkg-prefix=$(PROJECT_ROOT)/.gen/go \
 		--out=.gen/go \
-		$(subst .build/,idls/thrift/,$@)
+		$(subst $(BUILD),idls/thrift,$@)
 	$Q touch $@
 
 # ====================================

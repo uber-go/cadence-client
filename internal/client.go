@@ -47,12 +47,15 @@ const (
 
 type Option interface{ private() }
 
-type cancelReason string
+type CancelReason string
 
-func (cancelReason) private() {}
+func (CancelReason) private() {}
 
+// WithCancelReason can be passed to Client.CancelWorkflow to provide an explicit cancellation reason,
+// which will be recorded in the cancellation event in the workflow's history, similar to termination reasons.
+// This is purely informational, and does not influence Cadence behavior at all.
 func WithCancelReason(reason string) Option {
-	return cancelReason(reason)
+	return CancelReason(reason)
 }
 
 type (

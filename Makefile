@@ -4,13 +4,6 @@ MAKEFLAGS += --no-builtin-rules
 
 default: help
 
-# a literal space value, for makefile purposes.
-# the full "trailing # one space after $(null)" is necessary for correct behavior,
-# and this strategy works in both new and old versions of make, `SPACE +=` does not.
-null  :=
-SPACE := $(null) #
-COMMA := ,
-
 # ###########################################
 #                TL;DR DOCS:
 # ###########################################
@@ -28,7 +21,8 @@ COMMA := ,
 #
 # the go version is embedded in the path, so changing Go's version or arch triggers rebuilds.
 # other things can be added if necessary, but hopefully only go's formatting behavior matters?
-BUILD := .build/$(subst $(SPACE),_,$(shell go version | cut -d' ' -f3- | sed 's/[^a-zA-Z0-9.]/_/g'))
+# converts: "go version go1.19.5 darwin/arm64" -> "go1.19.5_darwin_arm64"
+BUILD := .build/$(shell go version | cut -d' ' -f3- | sed 's/[^a-zA-Z0-9.]/_/g')
 # tools that can be easily re-built on demand, and may be sensitive to dependency or go versions.
 # currently this covers all needs.  if not, consider STABLE_BIN like github.com/uber/cadence has.
 BIN := $(BUILD)/bin

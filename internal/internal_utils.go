@@ -34,10 +34,11 @@ import (
 
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
+	"go.uber.org/yarpc"
+
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/metrics"
-	"go.uber.org/yarpc"
 )
 
 const (

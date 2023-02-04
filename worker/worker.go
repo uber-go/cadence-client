@@ -25,13 +25,14 @@ package worker
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/activity"
 	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/workflow"
-	"go.uber.org/zap"
 )
 
 type (

@@ -27,6 +27,7 @@ import (
 
 	"github.com/cristalhq/jwt/v3"
 	"github.com/stretchr/testify/suite"
+
 	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/util"
 )

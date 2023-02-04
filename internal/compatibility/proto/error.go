@@ -21,10 +21,12 @@
 package proto
 
 import (
-	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
-	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/yarpc/encoding/protobuf"
 	"go.uber.org/yarpc/yarpcerrors"
+
+	"go.uber.org/cadence/.gen/go/shared"
+
+	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 )
 
 func Error(err error) error {

@@ -29,8 +29,9 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/cadence/internal/common/serializer"
 	"go.uber.org/yarpc"
+
+	"go.uber.org/cadence/internal/common/serializer"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -39,6 +40,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/suite"
+
 	"go.uber.org/cadence/internal/common/metrics"
 )
 

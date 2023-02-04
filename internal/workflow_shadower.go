@@ -31,11 +31,12 @@ import (
 	"time"
 
 	"github.com/facebookgo/clock"
+	"go.uber.org/zap"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shadower"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/util"
-	"go.uber.org/zap"
 )
 
 const (

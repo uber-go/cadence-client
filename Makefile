@@ -4,6 +4,13 @@ MAKEFLAGS += --no-builtin-rules
 
 default: help
 
+# a literal space value, for makefile purposes.
+# the full "trailing # one space after $(null)" is necessary for correct behavior,
+# and this strategy works in both new and old versions of make, `SPACE +=` does not.
+null  :=
+SPACE := $(null) #
+COMMA := ,
+
 # ###########################################
 #                TL;DR DOCS:
 # ###########################################
@@ -18,10 +25,13 @@ default: help
 # - Test your changes with `make -d ...`!  It should be reasonable!
 
 # temporary build products and book-keeping targets that are always good to / safe to clean.
-BUILD := .build
+#
+# the go version is embedded in the path, so changing Go's version or arch triggers rebuilds.
+# other things can be added if necessary, but hopefully only go's formatting behavior matters?
+BUILD := .build/$(subst $(SPACE),_,$(shell go version | cut -d' ' -f3- | sed 's/[^a-zA-Z0-9.]/_/g'))
 # tools that can be easily re-built on demand, and may be sensitive to dependency or go versions.
 # currently this covers all needs.  if not, consider STABLE_BIN like github.com/uber/cadence has.
-BIN := .build/bin
+BIN := $(BUILD)/bin
 
 # current (when committed) version of Go used in CI, and ideally also our docker images.
 # this generally does not matter, but can impact goimports or formatting output.
@@ -303,7 +313,8 @@ all: $(BUILD)/lint ## refresh codegen, lint, and ensure the dummy binary builds,
 
 .PHONY: clean
 clean:
-	rm -Rf $(BUILD) .gen
+	$Q # intentionally not using $(BUILD) as that covers only a single version
+	rm -Rf .build .gen
 	$Q # remove old things (no longer in use).  this can be removed "eventually", when we feel like they're unlikely to exist.
 	rm -Rf .bin
 

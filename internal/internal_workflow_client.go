@@ -470,7 +470,7 @@ func (wc *workflowClient) CancelWorkflow(ctx context.Context, workflowID string,
 
 	for _, opt := range opts {
 		switch o := opt.(type) {
-		case cancelReason:
+		case CancelReason:
 			cause := string(o)
 			request.Cause = &cause
 		}

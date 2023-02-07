@@ -45,7 +45,21 @@ const (
 	QueryTypeOpenSessions string = "__open_sessions"
 )
 
+type Option interface{ private() }
+
+type CancelReason string
+
+func (CancelReason) private() {}
+
+// WithCancelReason can be passed to Client.CancelWorkflow to provide an explicit cancellation reason,
+// which will be recorded in the cancellation event in the workflow's history, similar to termination reasons.
+// This is purely informational, and does not influence Cadence behavior at all.
+func WithCancelReason(reason string) Option {
+	return CancelReason(reason)
+}
+
 type (
+
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.
 	Client interface {
@@ -139,7 +153,7 @@ type (
 		//	- BadRequestError
 		//	- InternalServiceError
 		//	- WorkflowExecutionAlreadyCompletedError
-		CancelWorkflow(ctx context.Context, workflowID string, runID string) error
+		CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...Option) error
 
 		// TerminateWorkflow terminates a workflow execution.
 		// workflowID is required, other parameters are optional.

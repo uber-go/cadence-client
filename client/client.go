@@ -73,6 +73,11 @@ type (
 	// ParentClosePolicy defines the behavior performed on a child workflow when its parent is closed
 	ParentClosePolicy = internal.ParentClosePolicy
 
+	// CancelOption values are functional options for the CancelWorkflow method.
+	// Supported values can be created with:
+	//  - WithCancelReason(...)
+	CancelOption = internal.Option
+
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.
 	Client interface {
@@ -162,7 +167,7 @@ type (
 		//	- BadRequestError
 		//	- InternalServiceError
 		//	- WorkflowExecutionAlreadyCompletedError
-		CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...internal.Option) error
+		CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...CancelOption) error
 
 		// TerminateWorkflow terminates a workflow execution.
 		// workflowID is required, other parameters are optional.
@@ -515,4 +520,11 @@ func IsWorkflowError(err error) bool {
 		return true
 	}
 	return false
+}
+
+// WithCancelReason can be passed to Client.CancelWorkflow to provide an explicit cancellation reason,
+// which will be recorded in the cancellation event in the workflow's history, similar to termination reasons.
+// This is purely informational, and does not influence Cadence behavior at all.
+func WithCancelReason(reason string) CancelOption {
+	return internal.WithCancelReason(reason)
 }

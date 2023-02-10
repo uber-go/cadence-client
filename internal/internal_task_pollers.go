@@ -48,9 +48,7 @@ const (
 	stickyDecisionScheduleToStartTimeoutSeconds = 5
 
 	ratioToForceCompleteDecisionTaskComplete = 0.8
-
-	causeTag    = "Cause"
-	serviceBusy = "serviceBusy"
+	serviceBusy                              = "serviceBusy"
 )
 
 type (
@@ -774,9 +772,7 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 
 		if retryable {
 			if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
-				tagsMap := map[string]string{}
-				tagsMap[causeTag] = serviceBusy
-				wtp.metricsScope.Tagged(tagsMap).Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
+				wtp.metricsScope.Tagged(map[string]string{causeTag: serviceBusy}).Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
 			} else {
 				wtp.metricsScope.Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
 			}
@@ -1021,9 +1017,7 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTask
 		if retryable {
 
 			if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
-				tagsMap := map[string]string{}
-				tagsMap[causeTag] = serviceBusy
-				atp.metricsScope.Tagged(tagsMap).Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
+				atp.metricsScope.Tagged(map[string]string{causeTag: serviceBusy}).Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
 			} else {
 				atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
 			}

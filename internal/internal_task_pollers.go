@@ -564,6 +564,14 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 	activityType := task.params.ActivityType
 	metricsScope := getMetricsScopeForLocalActivity(lath.metricsScope, workflowType, activityType)
 
+	// keep in sync with regular activity logger tags
+	logger := lath.logger.With(
+		zap.String(tagLocalActivityID, task.activityID),
+		zap.String(tagLocalActivityType, activityType),
+		zap.String(tagWorkflowType, workflowType),
+		zap.String(tagWorkflowID, task.params.WorkflowInfo.WorkflowExecution.ID),
+		zap.String(tagRunID, task.params.WorkflowInfo.WorkflowExecution.RunID))
+
 	metricsScope.Counter(metrics.LocalActivityTotalCounter).Inc(1)
 
 	ae := activityExecutor{name: activityType, fn: task.params.ActivityFn}
@@ -582,7 +590,7 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		activityType:      ActivityType{Name: activityType},
 		activityID:        fmt.Sprintf("%v", task.activityID),
 		workflowExecution: task.params.WorkflowInfo.WorkflowExecution,
-		logger:            lath.logger,
+		logger:            logger,
 		metricsScope:      metricsScope,
 		isLocalActivity:   true,
 		dataConverter:     lath.dataConverter,
@@ -637,10 +645,7 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 			if p := recover(); p != nil {
 				topLine := fmt.Sprintf("local activity for %s [panic]:", activityType)
 				st := getStackTraceRaw(topLine, 7, 0)
-				lath.logger.Error("LocalActivity panic.",
-					zap.String(tagWorkflowID, task.params.WorkflowInfo.WorkflowExecution.ID),
-					zap.String(tagRunID, task.params.WorkflowInfo.WorkflowExecution.RunID),
-					zap.String(tagActivityType, activityType),
+				logger.Error("LocalActivity panic.",
 					zap.String(tagPanicError, fmt.Sprintf("%v", p)),
 					zap.String(tagPanicStack, st))
 				metricsScope.Counter(metrics.LocalActivityPanicCounter).Inc(1)
@@ -657,9 +662,7 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		if executionLatency > timeoutDuration {
 			// If local activity takes longer than expected timeout, the context would already be DeadlineExceeded and
 			// the result would be discarded. Print a warning in this case.
-			lath.logger.Warn("LocalActivity takes too long to complete.",
-				zap.String("LocalActivityID", task.activityID),
-				zap.String("LocalActivityType", activityType),
+			logger.Warn("LocalActivity takes too long to complete.",
 				zap.Int32("ScheduleToCloseTimeoutSeconds", task.params.ScheduleToCloseTimeoutSeconds),
 				zap.Duration("ActualExecutionDuration", executionLatency))
 		}

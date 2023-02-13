@@ -10,7 +10,7 @@ steps:
       docker: "*"
     command: "make unit_test"
     artifact_paths:
-      - ".build/coverage/*.out"
+      - ".build/*/coverage/*.out"
     plugins:
       - docker-compose#v3.0.0:
           run: unit-test
@@ -22,7 +22,7 @@ steps:
       docker: "*"
     command: "make integ_test_sticky_off"
     artifact_paths:
-      - ".build/coverage/*.out"
+      - ".build/*/coverage/*.out"
     retry:
       automatic:
         limit: 1
@@ -37,7 +37,7 @@ steps:
       docker: "*"
     command: "make integ_test_sticky_on"
     artifact_paths:
-      - ".build/coverage/*.out"
+      - ".build/*/coverage/*.out"
     retry:
       automatic:
         limit: 1
@@ -52,7 +52,7 @@ steps:
       docker: "*"
     command: "make integ_test_grpc"
     artifact_paths:
-      - ".build/coverage/*.out"
+      - ".build/*/coverage/*.out"
     retry:
       automatic:
         limit: 1

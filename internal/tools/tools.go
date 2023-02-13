@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Copyright (c) 2017-2021 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,10 +21,11 @@
 //go:build tools
 // +build tools
 
-package cadence
+package tools
 
 import (
 	_ "github.com/kisielk/errcheck"
+	_ "github.com/mattn/goveralls"
 	_ "go.uber.org/thriftrw"
 	_ "go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc"
 	_ "golang.org/x/lint/golint"

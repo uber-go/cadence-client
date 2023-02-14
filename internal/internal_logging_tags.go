@@ -41,4 +41,5 @@ const (
 	tagVisibilityQuery   = "VisibilityQuery"
 	tagPanicError        = "PanicError"
 	tagPanicStack        = "PanicStack"
+	causeTag             = "pollerrorcause"
 )

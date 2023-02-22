@@ -334,6 +334,7 @@ func WithActivityTask(
 		deadline = startToCloseDeadline
 	}
 
+	// keep in sync with local activity logger tags
 	logger = logger.With(
 		zapcore.Field{Key: tagActivityID, Type: zapcore.StringType, String: *task.ActivityId},
 		zapcore.Field{Key: tagActivityType, Type: zapcore.StringType, String: *task.ActivityType.Name},

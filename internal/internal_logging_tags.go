@@ -36,8 +36,10 @@ const (
 	tagSideEffectID      = "SideEffectID"
 	tagChildWorkflowID   = "ChildWorkflowID"
 	tagLocalActivityType = "LocalActivityType"
+	tagLocalActivityID   = "LocalActivityID"
 	tagQueryType         = "QueryType"
 	tagVisibilityQuery   = "VisibilityQuery"
 	tagPanicError        = "PanicError"
 	tagPanicStack        = "PanicStack"
+	causeTag             = "pollerrorcause"
 )

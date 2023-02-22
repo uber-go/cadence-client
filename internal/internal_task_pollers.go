@@ -25,6 +25,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -47,6 +48,7 @@ const (
 	stickyDecisionScheduleToStartTimeoutSeconds = 5
 
 	ratioToForceCompleteDecisionTaskComplete = 0.8
+	serviceBusy                              = "serviceBusy"
 )
 
 type (
@@ -564,6 +566,14 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 	activityType := task.params.ActivityType
 	metricsScope := getMetricsScopeForLocalActivity(lath.metricsScope, workflowType, activityType)
 
+	// keep in sync with regular activity logger tags
+	logger := lath.logger.With(
+		zap.String(tagLocalActivityID, task.activityID),
+		zap.String(tagLocalActivityType, activityType),
+		zap.String(tagWorkflowType, workflowType),
+		zap.String(tagWorkflowID, task.params.WorkflowInfo.WorkflowExecution.ID),
+		zap.String(tagRunID, task.params.WorkflowInfo.WorkflowExecution.RunID))
+
 	metricsScope.Counter(metrics.LocalActivityTotalCounter).Inc(1)
 
 	ae := activityExecutor{name: activityType, fn: task.params.ActivityFn}
@@ -582,7 +592,7 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		activityType:      ActivityType{Name: activityType},
 		activityID:        fmt.Sprintf("%v", task.activityID),
 		workflowExecution: task.params.WorkflowInfo.WorkflowExecution,
-		logger:            lath.logger,
+		logger:            logger,
 		metricsScope:      metricsScope,
 		isLocalActivity:   true,
 		dataConverter:     lath.dataConverter,
@@ -637,10 +647,7 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 			if p := recover(); p != nil {
 				topLine := fmt.Sprintf("local activity for %s [panic]:", activityType)
 				st := getStackTraceRaw(topLine, 7, 0)
-				lath.logger.Error("LocalActivity panic.",
-					zap.String(tagWorkflowID, task.params.WorkflowInfo.WorkflowExecution.ID),
-					zap.String(tagRunID, task.params.WorkflowInfo.WorkflowExecution.RunID),
-					zap.String(tagActivityType, activityType),
+				logger.Error("LocalActivity panic.",
 					zap.String(tagPanicError, fmt.Sprintf("%v", p)),
 					zap.String(tagPanicStack, st))
 				metricsScope.Counter(metrics.LocalActivityPanicCounter).Inc(1)
@@ -657,9 +664,7 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 		if executionLatency > timeoutDuration {
 			// If local activity takes longer than expected timeout, the context would already be DeadlineExceeded and
 			// the result would be discarded. Print a warning in this case.
-			lath.logger.Warn("LocalActivity takes too long to complete.",
-				zap.String("LocalActivityID", task.activityID),
-				zap.String("LocalActivityType", activityType),
+			logger.Warn("LocalActivity takes too long to complete.",
 				zap.Int32("ScheduleToCloseTimeoutSeconds", task.params.ScheduleToCloseTimeoutSeconds),
 				zap.Duration("ActualExecutionDuration", executionLatency))
 		}
@@ -767,8 +772,13 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 	response, err := wtp.service.PollForDecisionTask(ctx, request, getYarpcCallOptions(wtp.featureFlags)...)
 	if err != nil {
 		retryable := isServiceTransientError(err)
+
 		if retryable {
-			wtp.metricsScope.Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
+			if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
+				wtp.metricsScope.Tagged(map[string]string{causeTag: serviceBusy}).Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
+			} else {
+				wtp.metricsScope.Counter(metrics.DecisionPollTransientFailedCounter).Inc(1)
+			}
 		} else {
 			wtp.metricsScope.Counter(metrics.DecisionPollFailedCounter).Inc(1)
 		}
@@ -1008,7 +1018,12 @@ func (atp *activityTaskPoller) poll(ctx context.Context) (*s.PollForActivityTask
 	if err != nil {
 		retryable := isServiceTransientError(err)
 		if retryable {
-			atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
+
+			if target := (*s.ServiceBusyError)(nil); errors.As(err, &target) {
+				atp.metricsScope.Tagged(map[string]string{causeTag: serviceBusy}).Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
+			} else {
+				atp.metricsScope.Counter(metrics.ActivityPollTransientFailedCounter).Inc(1)
+			}
 		} else {
 			atp.metricsScope.Counter(metrics.ActivityPollFailedCounter).Inc(1)
 		}

@@ -350,16 +350,6 @@ func (e *ContinueAsNewError) Error() string {
 	return "ContinueAsNew"
 }
 
-// Memo return memo before serialization in the new run
-func (e *ContinueAsNewError) Memo() map[string]interface{} {
-	return e.params.memo
-}
-
-// SearchAttributes return search attributes before serialization in the new run
-func (e *ContinueAsNewError) SearchAttributes() map[string]interface{} {
-	return e.params.searchAttributes
-}
-
 // WorkflowIDReusePolicy return workflow id reuse policy in the new run
 func (e *ContinueAsNewError) WorkflowIDReusePolicy() WorkflowIDReusePolicy {
 	return e.params.workflowIDReusePolicy

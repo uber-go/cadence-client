@@ -350,6 +350,11 @@ func (e *ContinueAsNewError) Error() string {
 	return "ContinueAsNew"
 }
 
+// WorkflowIDReusePolicy return workflow id reuse policy in the new run
+func (e *ContinueAsNewError) WorkflowIDReusePolicy() WorkflowIDReusePolicy {
+	return e.params.workflowIDReusePolicy
+}
+
 // WorkflowType return workflowType of the new run
 func (e *ContinueAsNewError) WorkflowType() *WorkflowType {
 	return e.params.workflowType

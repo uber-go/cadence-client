@@ -168,10 +168,13 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	ctx, cancel := context.WithCancel(context.Background())
 	executionParameters := workerExecutionParameters{
 		TaskList: "testTaskList",
-		WorkerOptions: WorkerOptions{
-			MaxConcurrentActivityTaskPollers:   5,
-			MaxConcurrentActivityExecutionSize: 2,
-			Logger:                             zaptest.NewLogger(s.T())},
+		WorkerOptions: augmentWorkerOptions(
+			WorkerOptions{
+				MaxConcurrentActivityTaskPollers:   5,
+				MaxConcurrentActivityExecutionSize: 2,
+				Logger:                             zaptest.NewLogger(s.T()),
+			},
+		),
 		UserContext:       ctx,
 		UserContextCancel: cancel,
 		WorkerStopTimeout: time.Second * 2,

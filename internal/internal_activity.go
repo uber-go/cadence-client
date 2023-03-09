@@ -181,10 +181,10 @@ func getValidatedActivityOptions(ctx Context) (*activityOptions, error) {
 		p.TaskListName = p.OriginalTaskListName
 	}
 	if p.ScheduleToStartTimeoutSeconds <= 0 {
-		return nil, errors.New("invalid non-positive ScheduleToStartTimeoutSeconds")
+		return nil, errors.New("missing or negative ScheduleToStartTimeoutSeconds")
 	}
 	if p.StartToCloseTimeoutSeconds <= 0 {
-		return nil, errors.New("invalid non-positive StartToCloseTimeoutSeconds")
+		return nil, errors.New("missing or negative StartToCloseTimeoutSeconds")
 	}
 	if p.ScheduleToCloseTimeoutSeconds < 0 {
 		return nil, errors.New("invalid negative ScheduleToCloseTimeoutSeconds")

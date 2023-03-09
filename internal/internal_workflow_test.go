@@ -112,41 +112,51 @@ func (s *WorkflowUnitTest) Test_SingleActivityWorkflow() {
 	s.NoError(err)
 }
 
-func (s *WorkflowUnitTest) Test_SingleActivityWorkflowZeroScheduleToStartTimeoutError() {
-	ao := ActivityOptions{
-		ScheduleToStartTimeout: 0 * time.Second,
-		StartToCloseTimeout:    5 * time.Second,
-		HeartbeatTimeout:       2 * time.Second,
-		ActivityID:             "id1",
-		TaskList:               tasklist,
+func (s *WorkflowUnitTest) Test_SingleActivityWorkflowIsErrorMessagesMatched() {
+	testCases := []struct {
+		name                   string
+		ScheduleToStartTimeout time.Duration
+		StartToCloseTimeout    time.Duration
+		ScheduleToCloseTimeout time.Duration
+		expectedErrorMessage   string
+	}{
+		{
+			name:                   "ZeroScheduleToStartTimeout",
+			ScheduleToStartTimeout: 0 * time.Second,
+			StartToCloseTimeout:    5 * time.Second,
+			ScheduleToCloseTimeout: 0 * time.Second,
+			expectedErrorMessage:   "missing or negative ScheduleToStartTimeoutSeconds",
+		},
+		{
+			name:                   "ZeroStartToCloseTimeout",
+			ScheduleToStartTimeout: 10 * time.Second,
+			StartToCloseTimeout:    0 * time.Second,
+			ScheduleToCloseTimeout: 0 * time.Second,
+			expectedErrorMessage:   "missing or negative StartToCloseTimeoutSeconds",
+		},
+		{
+			name:                   "NegativeScheduleToCloseTimeout",
+			ScheduleToStartTimeout: 10 * time.Second,
+			StartToCloseTimeout:    5 * time.Second,
+			ScheduleToCloseTimeout: -1 * time.Second,
+			expectedErrorMessage:   "invalid negative ScheduleToCloseTimeoutSeconds",
+		},
 	}
-	err := singleActivityWorkflowWithOptions(s, ao)
-	s.ErrorContains(err, "invalid non-positive ScheduleToStartTimeoutSeconds")
-}
 
-func (s *WorkflowUnitTest) Test_SingleActivityWorkflowZeroStartToCloseTimeoutError() {
-	ao := ActivityOptions{
-		ScheduleToStartTimeout: 10 * time.Second,
-		StartToCloseTimeout:    0 * time.Second,
-		HeartbeatTimeout:       2 * time.Second,
-		ActivityID:             "id1",
-		TaskList:               tasklist,
+	for _, testCase := range testCases {
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: testCase.ScheduleToStartTimeout,
+			StartToCloseTimeout:    testCase.StartToCloseTimeout,
+			ScheduleToCloseTimeout: testCase.ScheduleToCloseTimeout,
+			HeartbeatTimeout:       2 * time.Second,
+			ActivityID:             "id1",
+			TaskList:               tasklist,
+		}
+		s.Run(testCase.name, func() {
+			err := singleActivityWorkflowWithOptions(s, ao)
+			s.ErrorContains(err, testCase.expectedErrorMessage)
+		})
 	}
-	err := singleActivityWorkflowWithOptions(s, ao)
-	s.ErrorContains(err, "invalid non-positive StartToCloseTimeoutSeconds")
-}
-
-func (s *WorkflowUnitTest) Test_SingleActivityWorkflowNegativeScheduleToCloseTimeoutSecondsTimeoutError() {
-	ao := ActivityOptions{
-		ScheduleToStartTimeout: 10 * time.Second,
-		StartToCloseTimeout:    5 * time.Second,
-		ScheduleToCloseTimeout: -1 * time.Second,
-		HeartbeatTimeout:       2 * time.Second,
-		ActivityID:             "id1",
-		TaskList:               tasklist,
-	}
-	err := singleActivityWorkflowWithOptions(s, ao)
-	s.ErrorContains(err, "invalid negative ScheduleToCloseTimeoutSeconds")
 }
 
 func splitJoinActivityWorkflow(ctx Context, testPanic bool) (result string, err error) {

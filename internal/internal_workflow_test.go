@@ -75,7 +75,32 @@ func helloWorldAct(ctx context.Context) (string, error) {
 	return "test", nil
 }
 
-func helloWorldActivityWorkflow(ctx Context, input string) (result string, err error) {
+type key int
+
+const unitTestKey key = 1
+
+func singleActivityWorkflowWithOptions(s *WorkflowUnitTest, ao ActivityOptions) error {
+	helloWorldActivityWorkflow := func(ctx Context, input string) (result string, err error) {
+		ctx1 := WithActivityOptions(ctx, ao)
+		f := ExecuteActivity(ctx1, helloWorldAct)
+		var r1 string
+		err = f.Get(ctx, &r1)
+		if err != nil {
+			return "", err
+		}
+		return r1, nil
+	}
+
+	env := newTestWorkflowEnv(s.T())
+	ctx := context.WithValue(context.Background(), unitTestKey, s)
+	env.SetWorkerOptions(WorkerOptions{BackgroundActivityContext: ctx})
+	env.RegisterActivity(helloWorldAct)
+	env.ExecuteWorkflow(helloWorldActivityWorkflow, "Hello")
+	s.True(env.IsWorkflowCompleted())
+	return env.GetWorkflowError()
+}
+
+func (s *WorkflowUnitTest) Test_SingleActivityWorkflow() {
 	ao := ActivityOptions{
 		ScheduleToStartTimeout: 10 * time.Second,
 		StartToCloseTimeout:    5 * time.Second,
@@ -83,28 +108,45 @@ func helloWorldActivityWorkflow(ctx Context, input string) (result string, err e
 		ActivityID:             "id1",
 		TaskList:               tasklist,
 	}
-	ctx1 := WithActivityOptions(ctx, ao)
-	f := ExecuteActivity(ctx1, helloWorldAct)
-	var r1 string
-	err = f.Get(ctx, &r1)
-	if err != nil {
-		return "", err
-	}
-	return r1, nil
+	err := singleActivityWorkflowWithOptions(s, ao)
+	s.NoError(err)
 }
 
-type key int
+func (s *WorkflowUnitTest) Test_SingleActivityWorkflowZeroScheduleToStartTimeoutError() {
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 0 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
+		HeartbeatTimeout:       2 * time.Second,
+		ActivityID:             "id1",
+		TaskList:               tasklist,
+	}
+	err := singleActivityWorkflowWithOptions(s, ao)
+	s.ErrorContains(err, "invalid non-positive ScheduleToStartTimeoutSeconds")
+}
 
-const unitTestKey key = 1
+func (s *WorkflowUnitTest) Test_SingleActivityWorkflowZeroStartToCloseTimeoutError() {
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    0 * time.Second,
+		HeartbeatTimeout:       2 * time.Second,
+		ActivityID:             "id1",
+		TaskList:               tasklist,
+	}
+	err := singleActivityWorkflowWithOptions(s, ao)
+	s.ErrorContains(err, "invalid non-positive StartToCloseTimeoutSeconds")
+}
 
-func (s *WorkflowUnitTest) Test_SingleActivityWorkflow() {
-	env := newTestWorkflowEnv(s.T())
-	ctx := context.WithValue(context.Background(), unitTestKey, s)
-	env.SetWorkerOptions(WorkerOptions{BackgroundActivityContext: ctx})
-	env.RegisterActivity(helloWorldAct)
-	env.ExecuteWorkflow(helloWorldActivityWorkflow, "Hello")
-	s.True(env.IsWorkflowCompleted())
-	s.NoError(env.GetWorkflowError())
+func (s *WorkflowUnitTest) Test_SingleActivityWorkflowNegativeScheduleToCloseTimeoutSecondsTimeoutError() {
+	ao := ActivityOptions{
+		ScheduleToStartTimeout: 10 * time.Second,
+		StartToCloseTimeout:    5 * time.Second,
+		ScheduleToCloseTimeout: -1 * time.Second,
+		HeartbeatTimeout:       2 * time.Second,
+		ActivityID:             "id1",
+		TaskList:               tasklist,
+	}
+	err := singleActivityWorkflowWithOptions(s, ao)
+	s.ErrorContains(err, "invalid negative ScheduleToCloseTimeoutSeconds")
 }
 
 func splitJoinActivityWorkflow(ctx Context, testPanic bool) (result string, err error) {

@@ -51,3 +51,12 @@ func TestReplayChildWorkflowBugBackport(t *testing.T) {
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "child_bug.json")
 	require.NoError(t, err)
 }
+
+func TestGreetingsWorkflow(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflow(greetingsWorkflow)
+	replayer.RegisterWorkflow(greetingsWorkflow2)
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
+	require.NoError(t, err)
+}

@@ -82,7 +82,7 @@ func TestGreetingsWorkflow3(t *testing.T) {
 func TestGreetingsWorkflow4(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 
-	replayer.RegisterWorkflowWithOptions(greetingsWorkflow3, workflow.RegisterOptions{Name: "greetings"})
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflow4, workflow.RegisterOptions{Name: "greetings"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.NoError(t, err)
 }

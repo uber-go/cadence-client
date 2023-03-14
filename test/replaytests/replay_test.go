@@ -55,8 +55,34 @@ func TestReplayChildWorkflowBugBackport(t *testing.T) {
 func TestGreetingsWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 
-	replayer.RegisterWorkflow(greetingsWorkflow)
-	replayer.RegisterWorkflow(greetingsWorkflow2)
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflow, workflow.RegisterOptions{Name: "greetings"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
+	require.NoError(t, err)
+}
+
+// Fails with a non deterministic error
+func TestGreetingsWorkflow2(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflow2, workflow.RegisterOptions{Name: "greetings"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
+	require.NoError(t, err)
+}
+
+// Fails with a non deterministic error
+func TestGreetingsWorkflow3(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflow3, workflow.RegisterOptions{Name: "greetings"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
+	require.NoError(t, err)
+}
+
+// Fails because the expected signature was different from history
+func TestGreetingsWorkflow4(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflow3, workflow.RegisterOptions{Name: "greetings"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.NoError(t, err)
 }

@@ -23,7 +23,6 @@ package replaytests
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"go.uber.org/cadence/activity"
@@ -131,100 +130,4 @@ func childWorkflowBug(ctx workflow.Context) error {
 func childWorkflow(ctx workflow.Context) error {
 	_ = workflow.Sleep(ctx, 10*time.Second)
 	return nil
-}
-
-// Putting the samples in this file for now. But if we need better structure I am open to moving these to different files as well.
-func greetingsWorkflow(ctx workflow.Context) error {
-	// Get Greeting.
-	ao := workflow.ActivityOptions{
-		ScheduleToStartTimeout: time.Minute,
-		StartToCloseTimeout:    time.Minute,
-		HeartbeatTimeout:       time.Second * 20,
-	}
-	ctx = workflow.WithActivityOptions(ctx, ao)
-
-	logger := workflow.GetLogger(ctx)
-	var greetResult string
-	err := workflow.ExecuteActivity(ctx, getGreetingActivity).Get(ctx, &greetResult)
-	if err != nil {
-		logger.Error("Get greeting failed.", zap.Error(err))
-		return err
-	}
-
-	// Get Name.
-	var nameResult string
-	err = workflow.ExecuteActivity(ctx, getNameActivity).Get(ctx, &nameResult)
-	if err != nil {
-		logger.Error("Get name failed.", zap.Error(err))
-		return err
-	}
-
-	// Say Greeting.
-	var sayResult string
-	err = workflow.ExecuteActivity(ctx, sayGreetingActivity, greetResult, nameResult).Get(ctx, &sayResult)
-	if err != nil {
-		logger.Error("Marshalling failed with error.", zap.Error(err))
-		return err
-	}
-
-	logger.Info("Workflow completed.", zap.String("Result", sayResult))
-	return nil
-}
-
-func greetingsWorkflow2(ctx workflow.Context) error {
-	// Get Greeting.
-	ao := workflow.ActivityOptions{
-		ScheduleToStartTimeout: time.Minute,
-		StartToCloseTimeout:    time.Minute,
-		HeartbeatTimeout:       time.Second * 20,
-	}
-	ctx = workflow.WithActivityOptions(ctx, ao)
-
-	logger := workflow.GetLogger(ctx)
-	var greetResult string
-	err := workflow.ExecuteActivity(ctx, getGreetingActivity).Get(ctx, &greetResult)
-	if err != nil {
-		logger.Error("Get greeting failed.", zap.Error(err))
-		return err
-	}
-
-	// Get Name.
-	var nameResult string
-	err = workflow.ExecuteActivity(ctx, getNameActivity2).Get(ctx, &nameResult)
-	if err != nil {
-		logger.Error("Get name failed.", zap.Error(err))
-		return err
-	}
-
-	// Say Greeting.
-	var sayResult string
-	err = workflow.ExecuteActivity(ctx, sayGreetingActivity, greetResult, nameResult).Get(ctx, &sayResult)
-	if err != nil {
-		logger.Error("Marshalling failed with error.", zap.Error(err))
-		return err
-	}
-
-	logger.Info("Workflow completed.", zap.String("Result", sayResult))
-	return nil
-}
-
-// Get Name Activity.
-func getNameActivity2() (string, int64, error) {
-	return "Cadence", 1, nil
-}
-
-// Get Name Activity.
-func getNameActivity() (string, error) {
-	return "Cadence", nil
-}
-
-// Get Greeting Activity.
-func getGreetingActivity() (string, error) {
-	return "Hello", nil
-}
-
-// Say Greeting Activity.
-func sayGreetingActivity(greeting string, name string) (string, error) {
-	result := fmt.Sprintf("Greeting: %s %s!\n", greeting, name)
-	return result, nil
 }

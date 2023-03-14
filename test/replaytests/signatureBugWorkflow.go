@@ -47,7 +47,7 @@ func greetingsWorkflow(ctx workflow.Context) error {
 }
 
 // greetingWorkflow demonstrates the case where an activity returns a response that contains the desired string but also returns unwanted objects.
-// Replayer is not able to catch this because the desired string is still being returned as recorded in History.
+// Replayer is able to catch it here but if the activity is registered via a Helper this change get missed as observed in cadence_samples.
 func greetingsWorkflow2(ctx workflow.Context) error {
 	// Get Greeting.
 	ao := workflow.ActivityOptions{
@@ -85,7 +85,7 @@ func greetingsWorkflow2(ctx workflow.Context) error {
 	return nil
 }
 
-// greetingWorkflow demonstrates the case where an activity returns a response that contains the desired string but also returns unwanted objects.
+// greetingWorkflow demonstrates the case where an activity returns a response that contains the nil along with an integer in response.
 // Replayer is not able to catch this because the desired string is still being returned as recorded in History.
 func greetingsWorkflow3(ctx workflow.Context) error {
 	// Get Greeting.
@@ -124,8 +124,7 @@ func greetingsWorkflow3(ctx workflow.Context) error {
 	return nil
 }
 
-// greetingWorkflow demonstrates the case where an activity returns a response that contains the desired string but also returns unwanted objects.
-// Replayer is not able to catch this because the desired string is still being returned as recorded in History.
+// greetingWorkflow demonstrates the case where an activity returns a response that contains the incompatible value as history. It is expected to fail.
 func greetingsWorkflow4(ctx workflow.Context) error {
 	// Get Greeting.
 	ao := workflow.ActivityOptions{

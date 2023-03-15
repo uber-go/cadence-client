@@ -23,6 +23,10 @@ package internal
 
 import (
 	"context"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/suite"
@@ -32,9 +36,6 @@ import (
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 // ActivityTaskHandler never returns response
@@ -345,7 +346,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 	)
 	worker.RegisterActivity(localActivitySleep)
 
-	startWorkerWaitForChannelAndTimeoutStopWorker(s, worker, &doneCh)
+	startWorkerAndWait(s, worker, &doneCh)
 
 	s.True(isWorkflowCompleted)
 	s.Equal(2, localActivityCalledCount)
@@ -523,7 +524,7 @@ func (s *WorkersTestSuite) TestQueryTask_WorkflowCacheEvicted() {
 		RegisterActivityOptions{Name: activityType},
 	)
 
-	startWorkerWaitForChannelAndTimeoutStopWorker(s, worker, &doneCh)
+	startWorkerAndWait(s, worker, &doneCh)
 }
 
 func (s *WorkersTestSuite) TestMultipleLocalActivities() {
@@ -643,7 +644,7 @@ func (s *WorkersTestSuite) TestMultipleLocalActivities() {
 	)
 	worker.RegisterActivity(localActivitySleep)
 
-	startWorkerWaitForChannelAndTimeoutStopWorker(s, worker, &doneCh)
+	startWorkerAndWait(s, worker, &doneCh)
 
 	s.True(isWorkflowCompleted)
 	s.Equal(2, localActivityCalledCount)
@@ -753,7 +754,7 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 	)
 	worker.RegisterActivityWithOptions(activitySleep, RegisterActivityOptions{Name: "activitySleep"})
 
-	startWorkerWaitForChannelAndTimeoutStopWorker(s, worker, &doneCh)
+	startWorkerAndWait(s, worker, &doneCh)
 
 	s.True(isActivityResponseCompleted)
 	s.Equal(1, activityCalledCount)
@@ -879,7 +880,7 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 }
 
 // wait for test to complete - timeout and fail after 10 seconds to not block execution of other tests
-func startWorkerWaitForChannelAndTimeoutStopWorker(s *WorkersTestSuite, worker *aggregatedWorker, doneCh *chan struct{}) {
+func startWorkerAndWait(s *WorkersTestSuite, worker *aggregatedWorker, doneCh *chan struct{}) {
 	s.T().Helper()
 	worker.Start()
 	// wait for test to complete

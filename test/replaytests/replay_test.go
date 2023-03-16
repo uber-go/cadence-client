@@ -53,7 +53,7 @@ func TestReplayChildWorkflowBugBackport(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// Gives a non-deterministic-error because the greetingsWorkflowActivity was not registered on the replayer.
+// Gives a non-deterministic-error because the getGreetingActivitytest was not registered on the replayer.
 func TestGreetingsWorkflowforActivity(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflowActivity, workflow.RegisterOptions{Name: "greetings"})

@@ -40,17 +40,19 @@ type (
 )
 
 // ErrResultPending is returned from activity's implementation to indicate the activity is not completed when
-// activity method returns.   The Activity needs to be completed by Client.CompleteActivity() separately.
+// activity method returns.  The Activity needs to be completed by [go.uber.org/cadence/client.Client.CompleteActivity]
+// separately.
 //
 // For example, if an activity requires human interaction (like approving an expense report), the activity could push
-// its task-token to an external system, and return ErrResultPending.  Later on, a human can approve it, and the system
-// can use the associated token with Client.CompleteActivity() to finish the still-"running" activity.
+// its [Info.TaskToken] to an external system, and return [ErrResultPending].  Later on, a human can approve it, and the
+// system can use the associated token with [go.uber.org/cadence/client.Client.CompleteActivity] to finish the
+// still-"running" activity.
 //
 // Caution: since using this frequently implies "long" timeouts, but there is no actually-running activity function
-// that can use RecordHeartbeat(), activity-worker losses prior to recording the Info.TaskToken in an external system
-// may not be noticed until the "long" timeout occurs. This can be resolved by having another system call
-// Client.RecordActivityHeartbeat() while that external action is running, but there is currently no way to mitigate
-// this issue without these heartbeats.
+// that can use [go.uber.org/cadence/client.Client.RecordActivityHeartbeat], activity-worker losses prior to recording
+// the [Info.TaskToken] in an external system may not be noticed until the "long" timeout occurs.  This can be resolved
+// by having another system call RecordActivityHeartbeat while that external action is running, but there is currently
+// no way to mitigate this issue without these heartbeats.
 //
 // If you cannot heartbeat and cannot tolerate this kind of delayed-activity-loss detection, consider emulating a long
 // activity via a signal channel instead: you can start a short-lived activity and wait for a "saved to external system"

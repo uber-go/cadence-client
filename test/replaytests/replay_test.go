@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/cadence/activity"
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap/zaptest"
@@ -49,5 +50,41 @@ func TestReplayChildWorkflowBugBackport(t *testing.T) {
 	replayer.RegisterWorkflowWithOptions(childWorkflowBug, workflow.RegisterOptions{Name: "parent"})
 
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "child_bug.json")
+	require.NoError(t, err)
+}
+
+func TestGreetingsWorkflow(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflow, workflow.RegisterOptions{Name: "greetings"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
+	require.NoError(t, err)
+}
+
+// Should have failed but passed. Maybe, because the result recorded in history still matches the return type of the workflow.
+func TestGreetingsWorkflow3(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	activity.RegisterWithOptions(getNameActivity3, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflow3, workflow.RegisterOptions{Name: "greetings"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
+	require.NoError(t, err)
+}
+
+// Fails because the expected signature was different from history.
+func TestGreetingsWorkflow4(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	activity.RegisterWithOptions(getNameActivity4, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflow4, workflow.RegisterOptions{Name: "greetings"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
+	require.NoError(t, err)
+}
+
+// Fails with a non deterministic error. This passes in cadence_samples because it's registered in Helper.
+// To test it on cadence_samples change the https://github.com/uber-common/cadence-samples/blob/master/cmd/samples/recipes/greetings/greetings_workflow.go
+// to include the extra return types in getNameActivity.
+func TestGreetingsWorkflow2(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	activity.RegisterWithOptions(getNameActivity2, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflow2, workflow.RegisterOptions{Name: "greetings"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.NoError(t, err)
 }

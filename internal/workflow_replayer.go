@@ -26,6 +26,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"math"
+
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
@@ -37,8 +40,6 @@ import (
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/serializer"
 	"go.uber.org/zap"
-	"io/ioutil"
-	"math"
 )
 
 const (
@@ -116,6 +117,16 @@ func (r *WorkflowReplayer) RegisterWorkflow(w interface{}) {
 // RegisterWorkflowWithOptions registers workflow function with custom workflow name to replay
 func (r *WorkflowReplayer) RegisterWorkflowWithOptions(w interface{}, options RegisterWorkflowOptions) {
 	r.registry.RegisterWorkflowWithOptions(w, options)
+}
+
+// RegisterActivity registers an activity function for this replayer
+func (r *WorkflowReplayer) RegisterActivity(a interface{}) {
+	r.registry.RegisterActivity(a)
+}
+
+// RegisterActivityWithOptions registers an activity function for this replayer with custom options, e.g. an explicit name.
+func (r *WorkflowReplayer) RegisterActivityWithOptions(a interface{}, options RegisterActivityOptions) {
+	r.registry.RegisterActivityWithOptions(a, options)
 }
 
 // ReplayWorkflowHistory executes a single decision task for the given history.

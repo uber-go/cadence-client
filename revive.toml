@@ -1,4 +1,7 @@
 # config for https://github.com/mgechev/revive
+#
+# largely the same reasoning as https://github.com/uber/cadence , but not intended to be identical.
+# libraries have different needs / goals than applications, so some drift is desirable.
 ignoreGeneratedHeader = false
 severity = "error"
 confidence = 0.8

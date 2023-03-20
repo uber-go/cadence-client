@@ -30,13 +30,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/uber-go/tally"
-
-	"go.uber.org/cadence/internal"
-
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber-go/tally"
 	"go.uber.org/goleak"
 	"go.uber.org/zap/zaptest"
 
@@ -44,6 +41,7 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/client"
 	"go.uber.org/cadence/interceptors"
+	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
 )

@@ -141,6 +141,7 @@ type (
 	// to ensure that new deployments are not going to break open workflows.
 	WorkflowReplayer interface {
 		WorkflowRegistry
+		ActivityRegistry
 
 		// ReplayWorkflowHistory executes a single decision task for the given json history file.
 		// Use for testing the backwards compatibility of code changes and troubleshooting workflows in a debugger.

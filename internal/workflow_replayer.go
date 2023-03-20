@@ -120,6 +120,16 @@ func (r *WorkflowReplayer) RegisterWorkflowWithOptions(w interface{}, options Re
 	r.registry.RegisterWorkflowWithOptions(w, options)
 }
 
+// RegisterActivity registers an activity function for this replayer
+func (r *WorkflowReplayer) RegisterActivity(a interface{}) {
+	r.registry.RegisterActivity(a)
+}
+
+// RegisterActivityWithOptions registers an activity function for this replayer with custom options, e.g. an explicit name.
+func (r *WorkflowReplayer) RegisterActivityWithOptions(a interface{}, options RegisterActivityOptions) {
+	r.registry.RegisterActivityWithOptions(a, options)
+}
+
 // ReplayWorkflowHistory executes a single decision task for the given history.
 // Use for testing backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.

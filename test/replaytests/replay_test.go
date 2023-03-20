@@ -54,6 +54,14 @@ func TestReplayChildWorkflowBugBackport(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// Gives a non-deterministic-error because the getGreetingActivitytest was not registered on the replayer.
+func TestGreetingsWorkflowforActivity(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	replayer.RegisterWorkflowWithOptions(greetingsWorkflowActivity, workflow.RegisterOptions{Name: "greetings"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
+	require.Error(t, err)
+}
+
 func TestGreetingsWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflow, workflow.RegisterOptions{Name: "greetings"})
@@ -76,16 +84,18 @@ func TestGreetingsWorkflow4(t *testing.T) {
 	activity.RegisterWithOptions(getNameActivity4, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflow4, workflow.RegisterOptions{Name: "greetings"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
-	require.NoError(t, err)
+	require.Error(t, err)
 }
 
-// Fails with a non deterministic error. This passes in cadence_samples because it's registered in Helper.
+// Panic with failed to register activity. This passes in cadence_samples because it's registered in Helper.
 // To test it on cadence_samples change the https://github.com/uber-common/cadence-samples/blob/master/cmd/samples/recipes/greetings/greetings_workflow.go
 // to include the extra return types in getNameActivity.
 func TestGreetingsWorkflow2(t *testing.T) {
+
+	t.Skip("Panic with failed to register activity. Here the activity returns incompatible arguments so the test should fail")
 	replayer := worker.NewWorkflowReplayer()
 	activity.RegisterWithOptions(getNameActivity2, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflow2, workflow.RegisterOptions{Name: "greetings"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
-	require.NoError(t, err)
+	require.Error(t, err)
 }

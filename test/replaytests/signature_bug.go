@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2021 Uber Technologies Inc.
+// Copyright (c) 2017 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,11 +22,9 @@ package replaytests
 
 import (
 	"fmt"
-	"time"
-
-	"go.uber.org/zap"
-
 	"go.uber.org/cadence/workflow"
+	"go.uber.org/zap"
+	"time"
 )
 
 // greetingWorkflow demonstrates the normal case where we are executing multiple acitivities and expect a certain result.

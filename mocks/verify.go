@@ -22,8 +22,25 @@ package mocks
 
 import (
 	"go.uber.org/cadence/client"
+	internal "go.uber.org/cadence/internal"
+	"go.uber.org/cadence/worker"
 )
+
+// Type ''go generate'' to rebuild needed mock.
+//go:generate go install -v github.com/vektra/mockery/v2@v2.23.0
+//go:generate mockery --dir=../client --name=Client
+//go:generate mockery --dir=../client --name=DomainClient
+//go:generate mockery --dir=../internal --name=HistoryEventIterator
+//go:generate mockery --dir=../internal --name=Value
+//go:generate mockery --dir=../internal --name=WorkflowRun
+//go:generate mockery --dir=../worker --name=Registry
+//go:generate mockery --dir=../worker --name=Worker
 
 // make sure mocks are in sync with interfaces
 var _ client.Client = (*Client)(nil)
 var _ client.DomainClient = (*DomainClient)(nil)
+var _ internal.HistoryEventIterator = (*HistoryEventIterator)(nil)
+var _ internal.Value = (*Value)(nil)
+var _ internal.WorkflowRun = (*WorkflowRun)(nil)
+var _ worker.Registry = (*Registry)(nil)
+var _ worker.Worker = (*Worker)(nil)

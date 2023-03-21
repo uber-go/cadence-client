@@ -98,3 +98,12 @@ func TestGreetingsWorkflow2(t *testing.T) {
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.Error(t, err)
 }
+
+func TestParallel(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(sampleParallelWorkflow, workflow.RegisterOptions{Name: "branch2"})
+
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch2.json")
+	require.NoError(t, err)
+}

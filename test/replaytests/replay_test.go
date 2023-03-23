@@ -107,3 +107,14 @@ func TestBranchWorkflow(t *testing.T) {
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch.json")
 	require.NoError(t, err)
 }
+
+// Fails with a non deterministic error because there was an additional unexpected branch. Decreasing the number of branches will
+// also fail the test because the history expects the same number of branches executing the activity.
+func TestBranchWorkflowWithExtraBranch(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(sampleBranchWorkflow2, workflow.RegisterOptions{Name: "branch"})
+
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch.json")
+	require.Error(t, err)
+}

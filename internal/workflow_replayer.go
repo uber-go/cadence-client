@@ -26,6 +26,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"math"
+	"os"
+
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
@@ -37,8 +41,6 @@ import (
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/serializer"
 	"go.uber.org/zap"
-	"io/ioutil"
-	"math"
 )
 
 const (
@@ -118,10 +120,42 @@ func (r *WorkflowReplayer) RegisterWorkflowWithOptions(w interface{}, options Re
 	r.registry.RegisterWorkflowWithOptions(w, options)
 }
 
+// RegisterActivity registers an activity function for this replayer
+func (r *WorkflowReplayer) RegisterActivity(a interface{}) {
+	r.registry.RegisterActivity(a)
+}
+
+// RegisterActivityWithOptions registers an activity function for this replayer with custom options, e.g. an explicit name.
+func (r *WorkflowReplayer) RegisterActivityWithOptions(a interface{}, options RegisterActivityOptions) {
+	r.registry.RegisterActivityWithOptions(a, options)
+}
+
 // ReplayWorkflowHistory executes a single decision task for the given history.
 // Use for testing backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.
 func (r *WorkflowReplayer) ReplayWorkflowHistory(logger *zap.Logger, history *shared.History) error {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
+	testReporter := logger.Sugar()
+	controller := gomock.NewController(testReporter)
+	service := workflowservicetest.NewMockClient(controller)
+
+	return r.replayWorkflowHistory(logger, service, replayDomainName, nil, history, nil)
+}
+
+func (r *WorkflowReplayer) ReplayWorkflowHistoryFromJSON(logger *zap.Logger, reader io.Reader) error {
+	return r.ReplayPartialWorkflowHistoryFromJSON(logger, reader, 0)
+}
+
+func (r *WorkflowReplayer) ReplayPartialWorkflowHistoryFromJSON(logger *zap.Logger, reader io.Reader, lastEventID int64) error {
+	history, err := extractHistoryFromReader(reader, lastEventID)
+
+	if err != nil {
+		return err
+	}
+
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -145,21 +179,14 @@ func (r *WorkflowReplayer) ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger,
 // Use for testing backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.
 func (r *WorkflowReplayer) ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string, lastEventID int64) error {
-	history, err := extractHistoryFromFile(jsonfileName, lastEventID)
-
+	file, err := os.Open(jsonfileName)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not open file: %w", err)
 	}
-
-	if logger == nil {
-		logger = zap.NewNop()
-	}
-
-	testReporter := logger.Sugar()
-	controller := gomock.NewController(testReporter)
-	service := workflowservicetest.NewMockClient(controller)
-
-	return r.replayWorkflowHistory(logger, service, replayDomainName, nil, history, nil)
+	defer func() {
+		_ = file.Close()
+	}()
+	return r.ReplayPartialWorkflowHistoryFromJSON(logger, file, lastEventID)
 }
 
 // ReplayWorkflowExecution replays workflow execution loading it from Cadence service.
@@ -336,17 +363,17 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 	return fmt.Errorf("replay workflow doesn't return the same result as the last event, resp: %v, last: %v", resp, last)
 }
 
-func extractHistoryFromFile(jsonfileName string, lastEventID int64) (*shared.History, error) {
-	raw, err := ioutil.ReadFile(jsonfileName)
+func extractHistoryFromReader(r io.Reader, lastEventID int64) (*shared.History, error) {
+	raw, err := io.ReadAll(r)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read data: %w", err)
 	}
 
 	var deserializedEvents []*shared.HistoryEvent
 	err = json.Unmarshal(raw, &deserializedEvents)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid json contents: %w", err)
 	}
 
 	if lastEventID <= 0 {

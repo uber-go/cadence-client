@@ -365,6 +365,16 @@ func (e *ContinueAsNewError) Args() []interface{} {
 	return e.args
 }
 
+// Input return serialized workflow argument
+func (e *ContinueAsNewError) Input() []byte {
+	return e.params.input
+}
+
+// Header return the header to start a workflow
+func (e *ContinueAsNewError) Header() *shared.Header {
+	return e.params.header
+}
+
 // newTerminatedError creates NewTerminatedError instance
 func newTerminatedError() *TerminatedError {
 	return &TerminatedError{}

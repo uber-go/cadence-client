@@ -98,3 +98,14 @@ func TestGreetingsWorkflow2(t *testing.T) {
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.Error(t, err)
 }
+
+// this test registers Cherry Activity as the activity but executes a random Activity in the workflow. Ideally replayer doesn't concerns itself with the change in the
+// activity content until it matches the expected output type.History has recorded the output of banana activity instead.
+func TestExclusiveChoiceWorkflow(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflow, workflow.RegisterOptions{Name: "choice"})
+	activity.RegisterWithOptions(orderCherryActivity, activity.RegisterOptions{Name: "testactivity", DisableAlreadyRegisteredCheck: true})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
+	require.NoError(t, err)
+}

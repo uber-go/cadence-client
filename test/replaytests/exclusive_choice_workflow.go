@@ -124,8 +124,3 @@ func orderCherryActivity(choice string) error {
 	fmt.Printf("Order choice: %v\n", choice)
 	return nil
 }
-
-func orderOrangeActivity(choice string) error {
-	fmt.Printf("Order choice: %v\n", choice)
-	return nil
-}

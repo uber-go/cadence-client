@@ -22,7 +22,6 @@ package replaytests
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 
 	"go.uber.org/cadence/workflow"
@@ -34,18 +33,12 @@ import (
  */
 
 const (
-	// ApplicationName is the task list for this sample
-	ApplicationName = "choiceGroup"
-
 	orderChoiceApple  = "apple"
 	orderChoiceBanana = "banana"
 	orderChoiceCherry = "cherry"
-	orderChoiceOrange = "orange"
 )
 
-var _orderChoices = []string{orderChoiceApple, orderChoiceBanana, orderChoiceCherry, orderChoiceOrange}
-
-// exclusiveChoiceWorkflow Workflow Decider.
+// exclusiveChoiceWorkflow Workflow Decider. This workflow executes Cherry order.
 func exclusiveChoiceWorkflow(ctx workflow.Context) error {
 	// Get order.
 	ao := workflow.ActivityOptions{
@@ -65,14 +58,40 @@ func exclusiveChoiceWorkflow(ctx workflow.Context) error {
 
 	// choose next activity based on order result
 	switch orderChoice {
-	case orderChoiceApple:
-		workflow.ExecuteActivity(ctx, orderAppleActivity, orderChoice)
 	case orderChoiceBanana:
 		workflow.ExecuteActivity(ctx, orderBananaActivity, orderChoice)
 	case orderChoiceCherry:
 		workflow.ExecuteActivity(ctx, orderCherryActivity, orderChoice)
-	case orderChoiceOrange:
-		workflow.ExecuteActivity(ctx, orderOrangeActivity, orderChoice)
+	default:
+		logger.Error("Unexpected order", zap.String("Choice", orderChoice))
+	}
+
+	logger.Info("Workflow completed.")
+	return nil
+}
+
+// This workflow explicitly executes Apple Activity received from the getorderActivity.
+func exclusiveChoiceWorkflow2(ctx workflow.Context) error {
+	// Get order.
+	ao := workflow.ActivityOptions{
+		ScheduleToStartTimeout: time.Minute,
+		StartToCloseTimeout:    time.Minute,
+		HeartbeatTimeout:       time.Second * 20,
+	}
+	ctx = workflow.WithActivityOptions(ctx, ao)
+
+	var orderChoice string
+	err := workflow.ExecuteActivity(ctx, getAppleOrderActivity).Get(ctx, &orderChoice)
+	if err != nil {
+		return err
+	}
+
+	logger := workflow.GetLogger(ctx)
+
+	// choose next activity based on order result
+	switch orderChoice {
+	case orderChoiceApple:
+		workflow.ExecuteActivity(ctx, orderAppleActivity, orderChoice)
 	default:
 		logger.Error("Unexpected order", zap.String("Choice", orderChoice))
 	}
@@ -82,10 +101,13 @@ func exclusiveChoiceWorkflow(ctx workflow.Context) error {
 }
 
 func getOrderActivity() (string, error) {
-	idx := rand.Intn(len(_orderChoices))
-	order := _orderChoices[idx]
-	fmt.Printf("Order is for %s\n", order)
-	return order, nil
+	fmt.Printf("Order is for Cherry")
+	return "cherry", nil
+}
+
+func getAppleOrderActivity() (string, error) {
+	fmt.Printf("Order is for Cherry")
+	return "apple", nil
 }
 
 func orderAppleActivity(choice string) error {

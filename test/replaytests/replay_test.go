@@ -98,3 +98,19 @@ func TestGreetingsWorkflow2(t *testing.T) {
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.Error(t, err)
 }
+
+func TestTimerWorkflow(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(sampleTimerWorkflow, workflow.RegisterOptions{Name: "timer"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "timer.json")
+	require.NoError(t, err)
+}
+
+func TestTimerValueChange(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	activity.RegisterWithOptions(orderProcessingActivity2, activity.RegisterOptions{Name: "main.orderProcessingActivity", DisableAlreadyRegisteredCheck: true})
+	replayer.RegisterWorkflowWithOptions(sampleTimerWorkflow2, workflow.RegisterOptions{Name: "timer"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "timer.json")
+	require.NoError(t, err)
+}

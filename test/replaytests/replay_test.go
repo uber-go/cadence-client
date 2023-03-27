@@ -117,6 +117,7 @@ func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch.json")
 	require.Error(t, err)
+}
 
 func TestParallel(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()

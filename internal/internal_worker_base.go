@@ -37,6 +37,7 @@ import (
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/cadence/internal/common/util"
+	"go.uber.org/cadence/internal/pahlimiter"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
@@ -137,6 +138,8 @@ type (
 		pollerAutoScaler   *pollerAutoScaler
 		taskQueueCh        chan interface{}
 		sessionTokenBucket *sessionTokenBucket
+
+		pollAndHistoryLimiter pahlimiter.PollAndHistoryLimiter
 	}
 
 	polledTask struct {
@@ -288,8 +291,9 @@ func (bw *baseWorker) pollTask() {
 		}
 	}
 
-	bw.retrier.Throttle()
+	bw.retrier.Throttle() // sleeps if retry policy determines it should sleep after failures
 	if bw.pollLimiter == nil || bw.pollLimiter.Wait(bw.limiterContext) == nil {
+		// TODO: block here on a shared semaphore with history-loading?
 		task, err = bw.options.taskWorker.PollTask()
 		if err != nil && enableVerboseLogging {
 			bw.logger.Debug("Failed to poll for task.", zap.Error(err))

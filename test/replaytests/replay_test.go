@@ -107,9 +107,15 @@ func TestTimerWorkflow(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// There is a timer in the workflow (timeNeededToProcess) that emulates processing time taken to complete an Activity.
+// If the timer threshold is reached an email gets triggered.
+// If it doesn't reach the threshold, Email Activity is cancelled.
+// In the original recorded history the cancel task activity has been recorded and email was not fired.
+// As a result changing the timeout value to extremely large value makes no difference to the replayer because of the cancel handler.
+// Ideally, this should have been flagged as the workflow's nature itself is different, but it doesn't.
 func TestTimerValueChange(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-	activity.RegisterWithOptions(orderProcessingActivity2, activity.RegisterOptions{Name: "main.orderProcessingActivity", DisableAlreadyRegisteredCheck: true})
+	replayer.RegisterActivityWithOptions(orderProcessingActivity2, activity.RegisterOptions{Name: "main.orderProcessingActivity", DisableAlreadyRegisteredCheck: true})
 	replayer.RegisterWorkflowWithOptions(sampleTimerWorkflow2, workflow.RegisterOptions{Name: "timer"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "timer.json")
 	require.NoError(t, err)

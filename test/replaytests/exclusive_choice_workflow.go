@@ -106,7 +106,7 @@ func getOrderActivity() (string, error) {
 }
 
 func getAppleOrderActivity() (string, error) {
-	fmt.Printf("Order is for Cherry")
+	fmt.Printf("Order is for Apple")
 	return "apple", nil
 }
 

@@ -21,6 +21,7 @@
 package replaytests
 
 import (
+	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 
@@ -116,7 +117,7 @@ func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 	replayer.RegisterWorkflowWithOptions(sampleBranchWorkflow2, workflow.RegisterOptions{Name: "branch"})
 
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch.json")
-	require.Error(t, err)
+	assert.Error(t, err, "non-deterministic-error")
 }
 
 func TestParallel(t *testing.T) {

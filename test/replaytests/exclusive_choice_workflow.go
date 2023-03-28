@@ -88,7 +88,7 @@ func exclusiveChoiceWorkflow2(ctx workflow.Context) error {
 
 	logger := workflow.GetLogger(ctx)
 
-	// choose next activity based on order result
+	// choose next activity based on order result. It's apple in this case.
 	switch orderChoice {
 	case orderChoiceApple:
 		workflow.ExecuteActivity(ctx, orderAppleActivity, orderChoice)

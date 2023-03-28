@@ -99,29 +99,27 @@ func TestGreetingsWorkflow2(t *testing.T) {
 	require.Error(t, err)
 }
 
-// This test registers Cherry Activity as the activity and executes the same activity in the workflow.
 // Ideally replayer doesn't concern itself with the change in the activity content until it matches the expected output type.
-// History has recorded the output of banana activity instead. Here, The workflow is not waiting for the activity so it doesn't notice
-// that activity id different from the one recorded in history.
+// History has recorded the output of banana activity instead. The replayer should have failed because we have not registered any activity here.
+// The replayer still runs whatever it found in the history and passes.
 func TestExclusiveChoiceWorkflowWithUnregisteredActivity(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 
 	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflow, workflow.RegisterOptions{Name: "choice"})
-	replayer.RegisterActivityWithOptions(orderCherryActivity, activity.RegisterOptions{Name: "testactivity", DisableAlreadyRegisteredCheck: true})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
 	require.NoError(t, err)
 }
 
-// This test registers Cherry Activity as the activity but executes Apple activity in the workflow. Infact, Cherry and Banana
+// This test registers Cherry Activity as the activity but calls Apple activity in the workflow. Infact, Cherry and Banana
 // activities are not even a part of the workflow in question.
-// History has recorded the output of banana activity instead. Here, The workflow is not waiting for the activity so it doesn't notice
-// that registered activity is different from executed activity. This should have failed by replayer.
+// History has recorded the output of banana activity. Here, The workflow is not waiting for the activity so it doesn't notice
+// that registered activity is different from executed activity and the activity name has changed in case of getAppleOrderActivity.
 func TestExclusiveChoiceWorkflowWithDifferentActvityCombo(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 
 	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflow2, workflow.RegisterOptions{Name: "choice"})
-	replayer.RegisterActivityWithOptions(getAppleOrderActivity, activity.RegisterOptions{Name: "main.getOrderActivity", DisableAlreadyRegisteredCheck: true})
-	replayer.RegisterActivityWithOptions(orderAppleActivity, activity.RegisterOptions{Name: "testactivity", DisableAlreadyRegisteredCheck: true})
+	replayer.RegisterActivityWithOptions(getAppleOrderActivity, activity.RegisterOptions{Name: "main.getOrderActivity"})
+	replayer.RegisterActivityWithOptions(orderAppleActivity, activity.RegisterOptions{Name: "testactivity"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
 	require.NoError(t, err)
 }

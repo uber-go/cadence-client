@@ -117,7 +117,7 @@ func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 	replayer.RegisterWorkflowWithOptions(sampleBranchWorkflow2, workflow.RegisterOptions{Name: "branch"})
 
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch.json")
-	assert.Error(t, err, "non-deterministic-error")
+	assert.ErrorContains(t, err, "nondeterministic workflow")
 }
 
 func TestParallel(t *testing.T) {

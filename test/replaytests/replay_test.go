@@ -115,7 +115,7 @@ func TestExclusiveChoiceWorkflowWithUnregisteredActivity(t *testing.T) {
 // This test registers Cherry Activity as the activity but calls Apple activity in the workflow code. Infact, Cherry and Banana
 // activities are not even a part of the workflow code in question.
 // History has recorded the output of banana activity. Here, The workflow is not waiting for the activity so it doesn't notice
-// that registered activity is different from executed activity and the activity name has changed in case of getAppleOrderActivity.
+// that registered activity is different from executed activity.
 // The replayer relies on whatever is recorded in the History so as long as the main activity name in the options matched partially
 // it doesn't raise errors.
 func TestExclusiveChoiceWorkflowWithDifferentActvityCombo(t *testing.T) {

@@ -23,19 +23,20 @@ package internal
 
 import (
 	"context"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	m "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
+	"go.uber.org/atomic"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+
+	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
+	m "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common"
 )
 
 // ActivityTaskHandler never returns response
@@ -663,16 +664,15 @@ func (s *WorkersTestSuite) createLocalActivityMarkerDataForTest(activityID strin
 }
 
 func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
-	activityCalledCount := 0
+	activityCalledCount := atomic.NewInt32(0) // must be accessed with atomics, worker uses goroutines to run activities
 	activitySleep := func(duration time.Duration) error {
 		time.Sleep(duration)
-		activityCalledCount++
+		activityCalledCount.Add(1)
 		return nil
 	}
 
 	doneCh := make(chan struct{})
 
-	isActivityResponseCompleted := false
 	workflowFn := func(ctx Context, input []byte) error {
 		ao := ActivityOptions{
 			ScheduleToCloseTimeout: 1 * time.Second,
@@ -736,10 +736,11 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 				TaskToken:                       []byte("test-token")}
 		return &m.RespondDecisionTaskCompletedResponse{ActivitiesToDispatchLocally: activitiesToDispatchLocally}, nil
 	}).Times(1)
+	isActivityResponseCompleted := atomic.NewBool(false)
 	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).DoAndReturn(func(ctx context.Context, request *m.RespondActivityTaskCompletedRequest, opts ...yarpc.CallOption,
 	) error {
 		defer close(doneCh)
-		isActivityResponseCompleted = true
+		isActivityResponseCompleted.Swap(true)
 		return nil
 	}).Times(1)
 
@@ -756,21 +757,21 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 
 	startWorkerAndWait(s, worker, &doneCh)
 
-	s.True(isActivityResponseCompleted)
-	s.Equal(1, activityCalledCount)
+	s.True(isActivityResponseCompleted.Load())
+	s.Equal(int32(1), activityCalledCount.Load())
 }
 
 func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
-	var activityCalledCount uint32 = 0
+	activityCalledCount := atomic.NewInt32(0)
 	activitySleep := func(duration time.Duration) error {
 		time.Sleep(duration)
-		atomic.AddUint32(&activityCalledCount, 1)
+		activityCalledCount.Add(1)
 		return nil
 	}
 
 	doneCh := make(chan struct{})
 
-	var activityCount uint32 = 5
+	var activityCount int32 = 5
 	workflowFn := func(ctx Context, input []byte) error {
 		ao := ActivityOptions{
 			ScheduleToCloseTimeout: 1 * time.Second,
@@ -778,10 +779,15 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 			StartToCloseTimeout:    1 * time.Second,
 		}
 		ctx = WithActivityOptions(ctx, ao)
-		for i := 1; i < int(activityCount); i++ {
-			ExecuteActivity(ctx, activitySleep, 500*time.Millisecond)
+
+		// start all activities in parallel, and wait for them all to complete.
+		var all []Future
+		for i := 0; i < int(activityCount); i++ {
+			all = append(all, ExecuteActivity(ctx, activitySleep, 500*time.Millisecond))
 		}
-		ExecuteActivity(ctx, activitySleep, 500*time.Millisecond).Get(ctx, nil)
+		for i, f := range all {
+			s.NoError(f.Get(ctx, nil), "activity %v should not have failed", i)
+		}
 		return nil
 	}
 
@@ -843,15 +849,13 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 		}
 		return &m.RespondDecisionTaskCompletedResponse{ActivitiesToDispatchLocally: activitiesToDispatchLocally}, nil
 	}).Times(1)
-	var activityResponseCompletedCount uint32 = 0
+	activityResponseCompletedCount := atomic.NewInt32(0)
 	s.service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).DoAndReturn(func(ctx context.Context, request *m.RespondActivityTaskCompletedRequest, opts ...yarpc.CallOption,
 	) error {
-		defer func() {
-			if atomic.LoadUint32(&activityResponseCompletedCount) == activityCount {
-				close(doneCh)
-			}
-		}()
-		atomic.AddUint32(&activityResponseCompletedCount, 1)
+		counted := activityResponseCompletedCount.Add(1)
+		if counted == activityCount {
+			close(doneCh)
+		}
 		return nil
 	}).MinTimes(1)
 
@@ -862,31 +866,33 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 	)
 	worker.RegisterActivityWithOptions(activitySleep, RegisterActivityOptions{Name: "activitySleep"})
 	s.NotNil(worker.locallyDispatchedActivityWorker)
-	worker.Start()
+	err := worker.Start()
+	s.NoError(err, "worker failed to start")
 
 	// wait for test to complete
 	// This test currently never completes, however after the timeout the asserts are true
 	// so the test passes, I believe this is an error.
 	select {
 	case <-doneCh:
-		break
+		s.T().Log("completed")
 	case <-time.After(1 * time.Second):
+		s.T().Log("timed out")
 	}
 	worker.Stop()
 
 	// for currently unbuffered channel at least one activity should be sent
-	s.True(activityResponseCompletedCount > 0)
-	s.True(activityCalledCount > 0)
+	s.True(activityResponseCompletedCount.Load() > 0)
+	s.True(activityCalledCount.Load() > 0)
 }
 
 // wait for test to complete - timeout and fail after 10 seconds to not block execution of other tests
 func startWorkerAndWait(s *WorkersTestSuite, worker *aggregatedWorker, doneCh *chan struct{}) {
 	s.T().Helper()
-	worker.Start()
+	err := worker.Start()
+	s.NoError(err, "worker failed to start")
 	// wait for test to complete
 	select {
 	case <-*doneCh:
-		return
 	case <-time.After(10 * time.Second):
 		s.Fail("Test timed out")
 	}

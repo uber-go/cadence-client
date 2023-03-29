@@ -23,9 +23,10 @@ package auth
 import (
 	"context"
 
+	"go.uber.org/yarpc"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/yarpc"
 )
 
 const (

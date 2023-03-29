@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	s "go.uber.org/cadence/.gen/go/shared"
 )
 

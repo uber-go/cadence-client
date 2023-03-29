@@ -33,10 +33,11 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+
+	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common"
 )
 
 type WorkflowTestSuiteUnitTest struct {
@@ -1991,9 +1992,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CancelChildWorkflow() {
 			err = f.Get(ctx, nil)
 		}).Select(ctx)
 
-		fmt.Println("####")
-		fmt.Println(err)
-		fmt.Println("####")
+		GetLogger(ctx).Info("child workflow returned error", zap.Error(err))
 		return err
 	}
 

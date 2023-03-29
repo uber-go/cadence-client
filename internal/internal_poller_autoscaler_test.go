@@ -28,9 +28,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/atomic"
+	"go.uber.org/zap/zaptest"
+
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/autoscaler"
-	"go.uber.org/zap/zaptest"
 )
 
 func Test_pollerAutoscaler(t *testing.T) {

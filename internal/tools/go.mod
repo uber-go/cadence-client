@@ -3,8 +3,8 @@ module go.uber.org/cadence/internal/tools
 go 1.19
 
 require (
-	github.com/mattn/goveralls v0.0.11
 	github.com/kisielk/errcheck v1.6.3
+	github.com/mattn/goveralls v0.0.11
 	github.com/mgechev/revive v1.2.5
 	go.uber.org/thriftrw v1.25.0
 	go.uber.org/yarpc v1.55.0

@@ -102,6 +102,34 @@ func TestGreetingsWorkflow2(t *testing.T) {
 	require.Error(t, err)
 }
 
+// Ideally replayer doesn't concern itself with the change in the activity content until it matches the expected output type.
+// History has recorded the output of banana activity instead. The replayer should have failed because we have not registered any
+// activity here in the test.
+// The replayer still runs whatever it found in the history and passes.
+func TestExclusiveChoiceWorkflowWithUnregisteredActivity(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflow, workflow.RegisterOptions{Name: "choice"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
+	require.NoError(t, err)
+}
+
+// This test registers Cherry Activity as the activity but calls Apple activity in the workflow code. Infact, Cherry and Banana
+// activities are not even a part of the workflow code in question.
+// History has recorded the output of banana activity. Here, The workflow is not waiting for the activity so it doesn't notice
+// that registered activity is different from executed activity.
+// The replayer relies on whatever is recorded in the History so as long as the main activity name in the options matched partially
+// it doesn't raise errors.
+func TestExclusiveChoiceWorkflowWithDifferentActvityCombo(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflow2, workflow.RegisterOptions{Name: "choice"})
+	replayer.RegisterActivityWithOptions(getAppleOrderActivity, activity.RegisterOptions{Name: "main.getOrderActivity"})
+	replayer.RegisterActivityWithOptions(orderAppleActivity, activity.RegisterOptions{Name: "testactivity"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
+	require.NoError(t, err)
+}
+
 func TestBranchWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 

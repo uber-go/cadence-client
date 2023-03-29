@@ -37,12 +37,13 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
 	"go.uber.org/goleak"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+
+	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
+	s "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common"
 )
 
 const (

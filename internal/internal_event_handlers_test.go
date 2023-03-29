@@ -26,10 +26,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
+
+	s "go.uber.org/cadence/.gen/go/shared"
 )
 
 func TestReplayAwareLogger(t *testing.T) {

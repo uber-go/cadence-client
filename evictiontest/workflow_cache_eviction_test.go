@@ -37,14 +37,15 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
+	"go.uber.org/yarpc"
+	"go.uber.org/zap/zaptest"
+	"golang.org/x/net/context"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	m "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/worker"
-	"go.uber.org/yarpc"
-	"go.uber.org/zap/zaptest"
-	"golang.org/x/net/context"
 )
 
 // copied from internal/test_helpers_test.go

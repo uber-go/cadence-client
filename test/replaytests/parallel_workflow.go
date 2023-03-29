@@ -25,8 +25,9 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
+
+	"go.uber.org/cadence/workflow"
 )
 
 /**

@@ -23,12 +23,14 @@ package compatibility
 import (
 	"context"
 
-	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
+	"go.uber.org/yarpc"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/compatibility/proto"
 	"go.uber.org/cadence/internal/compatibility/thrift"
-	"go.uber.org/yarpc"
+
+	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 )
 
 type thrift2protoAdapter struct {

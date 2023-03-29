@@ -1991,9 +1991,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_CancelChildWorkflow() {
 			err = f.Get(ctx, nil)
 		}).Select(ctx)
 
-		fmt.Println("####")
-		fmt.Println(err)
-		fmt.Println("####")
+		GetLogger(ctx).Info("child workflow returned error", zap.Error(err))
 		return err
 	}
 

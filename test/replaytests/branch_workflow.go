@@ -22,8 +22,9 @@ package replaytests
 
 import (
 	"fmt"
-	"go.uber.org/cadence/workflow"
 	"time"
+
+	"go.uber.org/cadence/workflow"
 )
 
 /**

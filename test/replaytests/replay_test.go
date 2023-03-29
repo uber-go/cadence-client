@@ -21,6 +21,7 @@
 package replaytests
 
 import (
+	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 
@@ -98,4 +99,44 @@ func TestGreetingsWorkflow2(t *testing.T) {
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflow2, workflow.RegisterOptions{Name: "greetings"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.Error(t, err)
+}
+
+func TestBranchWorkflow(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(sampleBranchWorkflow, workflow.RegisterOptions{Name: "branch"})
+
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch.json")
+	require.NoError(t, err)
+}
+
+// Fails with a non deterministic error because there was an additional unexpected branch. Decreasing the number of branches will
+// also fail the test because the history expects the same number of branches executing the activity.
+func TestBranchWorkflowWithExtraBranch(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(sampleBranchWorkflow2, workflow.RegisterOptions{Name: "branch"})
+
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch.json")
+	assert.ErrorContains(t, err, "nondeterministic workflow")
+}
+
+func TestParallel(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(sampleParallelWorkflow, workflow.RegisterOptions{Name: "branch2"})
+
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch2.json")
+	require.NoError(t, err)
+}
+
+// Should have failed since the first go routine has only one branch whereas the history has two branches.
+// The replayer totally misses this change.
+func TestParallel2(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(sampleParallelWorkflow2, workflow.RegisterOptions{Name: "branch2"})
+
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch2.json")
+	require.NoError(t, err)
 }

@@ -347,14 +347,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 	)
 	worker.RegisterActivity(localActivitySleep)
 
-	worker.Start()
-	// wait for test to complete
-	select {
-	case <-doneCh:
-		break
-	case <-time.After(time.Second * 4):
-	}
-	worker.Stop()
+	startWorkerAndWait(s, worker, &doneCh)
 
 	s.True(isWorkflowCompleted)
 	s.Equal(2, localActivityCalledCount)
@@ -532,9 +525,7 @@ func (s *WorkersTestSuite) TestQueryTask_WorkflowCacheEvicted() {
 		RegisterActivityOptions{Name: activityType},
 	)
 
-	worker.Start()
-	<-doneCh
-	worker.Stop()
+	startWorkerAndWait(s, worker, &doneCh)
 }
 
 func (s *WorkersTestSuite) TestMultipleLocalActivities() {
@@ -654,14 +645,7 @@ func (s *WorkersTestSuite) TestMultipleLocalActivities() {
 	)
 	worker.RegisterActivity(localActivitySleep)
 
-	worker.Start()
-	// wait for test to complete
-	select {
-	case <-doneCh:
-		break
-	case <-time.After(time.Second * 5):
-	}
-	worker.Stop()
+	startWorkerAndWait(s, worker, &doneCh)
 
 	s.True(isWorkflowCompleted)
 	s.Equal(2, localActivityCalledCount)
@@ -771,14 +755,7 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 	)
 	worker.RegisterActivityWithOptions(activitySleep, RegisterActivityOptions{Name: "activitySleep"})
 
-	worker.Start()
-	// wait for test to complete
-	select {
-	case <-doneCh:
-		break
-	case <-time.After(1 * time.Second):
-	}
-	worker.Stop()
+	startWorkerAndWait(s, worker, &doneCh)
 
 	s.True(isActivityResponseCompleted)
 	s.Equal(1, activityCalledCount)
@@ -889,6 +866,8 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 	worker.Start()
 
 	// wait for test to complete
+	// This test currently never completes, however after the timeout the asserts are true
+	// so the test passes, I believe this is an error.
 	select {
 	case <-doneCh:
 		break
@@ -899,4 +878,18 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 	// for currently unbuffered channel at least one activity should be sent
 	s.True(activityResponseCompletedCount > 0)
 	s.True(activityCalledCount > 0)
+}
+
+// wait for test to complete - timeout and fail after 10 seconds to not block execution of other tests
+func startWorkerAndWait(s *WorkersTestSuite, worker *aggregatedWorker, doneCh *chan struct{}) {
+	s.T().Helper()
+	worker.Start()
+	// wait for test to complete
+	select {
+	case <-*doneCh:
+		return
+	case <-time.After(10 * time.Second):
+		s.Fail("Test timed out")
+	}
+	worker.Stop()
 }

@@ -22,9 +22,11 @@ package replaytests
 
 import (
 	"fmt"
-	"go.uber.org/cadence/workflow"
-	"go.uber.org/zap"
 	"time"
+
+	"go.uber.org/zap"
+
+	"go.uber.org/cadence/workflow"
 )
 
 // greetingWorkflow demonstrates the normal case where we are executing multiple acitivities and expect a certain result.

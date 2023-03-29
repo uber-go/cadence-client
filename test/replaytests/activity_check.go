@@ -21,9 +21,11 @@
 package replaytests
 
 import (
-	"go.uber.org/cadence/workflow"
-	"go.uber.org/zap"
 	"time"
+
+	"go.uber.org/zap"
+
+	"go.uber.org/cadence/workflow"
 )
 
 // greetingsWorkflowActivity demonstrates the case in replayer where if an activity name is changed in a workflow or if a new activity is introdced in a workflow then the shdower fails.

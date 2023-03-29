@@ -142,8 +142,11 @@ $(BIN)/thriftrw: internal/tools/go.mod
 $(BIN)/thriftrw-plugin-yarpc: internal/tools/go.mod
 	$(call go_build_tool,go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc)
 
-$(BIN)/golint: internal/tools/go.mod
-	$(call go_build_tool,golang.org/x/lint/golint)
+$(BIN)/goimports: internal/tools/go.mod
+	$(call go_build_tool,golang.org/x/tools/cmd/goimports)
+
+$(BIN)/revive: internal/tools/go.mod
+	$(call go_build_tool,github.com/mgechev/revive)
 
 $(BIN)/staticcheck: internal/tools/go.mod
 	$(call go_build_tool,honnef.co/go/tools/cmd/staticcheck)
@@ -217,27 +220,11 @@ $(THRIFT_GEN): $(THRIFT_FILES) $(BIN)/thriftrw $(BIN)/thriftrw-plugin-yarpc
 # other intermediates
 # ====================================
 
-# golint fails to report many lint failures if it is only given a single file
-# to work on at a time, and it can't handle multiple packages at once, *and*
-# we can't exclude files from its checks, so for best results we need to give
-# it a whitelist of every file in every package that we want linted, per package.
-#
-# so lint + this golint func works like:
-# - iterate over all lintable dirs (outputs "./folder/")
-# - find .go files in a dir (via wildcard, so not recursively)
-# - filter to only files in LINT_SRC
-# - if it's not empty, run golint against the list
-define lint_if_present
-test -n "$1" && $(BIN)/golint -set_exit_status $1
-endef
-
-# TODO: replace this with revive, like the server.
-# keep in sync with `lint`
-$(BUILD)/lint: $(BIN)/golint $(ALL_SRC)
-	$Q $(foreach pkg, \
-		$(sort $(dir $(LINT_SRC))), \
-		$(call lint_if_present,$(filter $(wildcard $(pkg)*.go),$(LINT_SRC))) || ERR=1; \
-	) test -z "$$ERR"; touch $@; exit $$ERR
+# note that LINT_SRC is fairly fake as a prerequisite.
+# it's a coarse "you probably don't need to re-lint" filter, nothing more.
+$(BUILD)/lint: $(LINT_SRC) $(BIN)/revive | $(BUILD)
+	$Q $(BIN)/revive -config revive.toml -exclude './vendor/...' -exclude './.gen/...' -formatter stylish ./...
+	$Q touch $@
 
 # fmt and copyright are mutually cyclic with their inputs, so if a copyright header is modified:
 # - copyright -> makes changes
@@ -253,11 +240,10 @@ $(BUILD)/lint: $(BIN)/golint $(ALL_SRC)
 MAYBE_TOUCH_COPYRIGHT=
 
 # TODO: switch to goimports, so we can pin the version
-$(BUILD)/fmt: $(ALL_SRC)
-	$Q echo "gofmt..."
+$(BUILD)/fmt: $(ALL_SRC) $(BIN)/goimports
+	$Q echo "goimports..."
 	$Q # use FRESH_ALL_SRC so it won't miss any generated files produced earlier
-	$Q gofmt -w $(ALL_SRC)
-	$Q # ideally, mimic server: $(BIN)/goimports -local "go.uber.org/cadence" -w $(FRESH_ALL_SRC)
+	$Q $(BIN)/goimports -local "go.uber.org/cadence" -w $(FRESH_ALL_SRC)
 	$Q touch $@
 	$Q $(MAYBE_TOUCH_COPYRIGHT)
 
@@ -274,22 +260,25 @@ $(BUILD)/copyright: $(ALL_SRC) $(BIN)/copyright
 # this way the effort is shared with future `make` runs.
 # ====================================
 
+# "re-make" a target by deleting and re-building book-keeping target(s).
+# the + is necessary for parallelism flags to be propagated
+define remake
+$Q rm -f $(addprefix $(BUILD)/,$(1))
+$Q +$(MAKE) --no-print-directory $(addprefix $(BUILD)/,$(1))
+endef
+
 .PHONY: build
 build: $(BUILD)/dummy ## ensure all packages build
 
 .PHONY: lint
-# useful to actually re-run to get output again, as the intermediate will not be run unless necessary.
-# dummy is used only because it occurs before $(BUILD)/lint, fmt would likely be sufficient too.
-# keep in sync with `$(BUILD)/lint`
-lint: $(BUILD)/dummy $(BIN)/golint ## (re)run golint
-	$Q $(foreach pkg, \
-		$(sort $(dir $(LINT_SRC))), \
-		$(call lint_if_present,$(filter $(wildcard $(pkg)*.go),$(LINT_SRC))) || ERR=1; \
-	) test -z "$$ERR"; touch $(BUILD)/lint; exit $$ERR
+# useful to actually re-run to get output again.
+# reuse the intermediates for simplicity and consistency.
+lint: ## (re)run the linter
+	$(call remake,lint)
 
 .PHONY: fmt
-# intentionally not re-making, gofmt is slow and it's clear when it's unnecessary
-fmt: $(BUILD)/fmt ## run gofmt
+# intentionally not re-making, it's clear when it's unnecessary
+fmt: $(BUILD)/fmt ## run goimports
 
 .PHONY: copyright
 # not identical to the intermediate target, but does provide the same codegen (or more).

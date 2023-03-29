@@ -21,10 +21,12 @@
 package internal
 
 import (
+	"time"
+
 	"github.com/cristalhq/jwt/v3"
+
 	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/util"
-	"time"
 )
 
 type JWTAuthProvider struct {

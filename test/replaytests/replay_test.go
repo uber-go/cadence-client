@@ -21,6 +21,7 @@
 package replaytests
 
 import (
+	"go.uber.org/cadence/activity"
 	"strings"
 	"testing"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 
-	"go.uber.org/cadence/activity"
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
 )

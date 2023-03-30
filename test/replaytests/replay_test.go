@@ -21,6 +21,7 @@
 package replaytests
 
 import (
+	"go.uber.org/cadence/activity"
 	"strings"
 	"testing"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 
-	"go.uber.org/cadence/activity"
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
 )
@@ -74,7 +74,7 @@ func TestGreetingsWorkflow(t *testing.T) {
 // Should have failed but passed. Maybe, because the result recorded in history still matches the return type of the workflow.
 func TestGreetingsWorkflow3(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-	activity.RegisterWithOptions(getNameActivity3, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
+	replayer.RegisterActivityWithOptions(getNameActivity3, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflow3, workflow.RegisterOptions{Name: "greetings"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.NoError(t, err)
@@ -83,7 +83,7 @@ func TestGreetingsWorkflow3(t *testing.T) {
 // Fails because the expected signature was different from history.
 func TestGreetingsWorkflow4(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-	activity.RegisterWithOptions(getNameActivity4, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
+	replayer.RegisterActivityWithOptions(getNameActivity4, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflow4, workflow.RegisterOptions{Name: "greetings"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.Error(t, err)
@@ -96,7 +96,7 @@ func TestGreetingsWorkflow2(t *testing.T) {
 
 	t.Skip("Panic with failed to register activity. Here the activity returns incompatible arguments so the test should fail")
 	replayer := worker.NewWorkflowReplayer()
-	activity.RegisterWithOptions(getNameActivity2, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
+	replayer.RegisterActivityWithOptions(getNameActivity2, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflow2, workflow.RegisterOptions{Name: "greetings"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
 	require.Error(t, err)

@@ -1182,40 +1182,6 @@ func (w *workflowExecutionContextImpl) GetDecisionTimeout() time.Duration {
 	return time.Second * time.Duration(w.workflowInfo.TaskStartToCloseTimeoutSeconds)
 }
 
-func skipDeterministicCheckForDecision(d *s.Decision) bool {
-	if d.GetDecisionType() == s.DecisionTypeRecordMarker {
-		markerName := d.RecordMarkerDecisionAttributes.GetMarkerName()
-		if markerName == versionMarkerName || markerName == mutableSideEffectMarkerName {
-			return true
-		}
-	}
-	return false
-}
-
-func skipDeterministicCheckForEvent(e *s.HistoryEvent) bool {
-	if e.GetEventType() == s.EventTypeMarkerRecorded {
-		markerName := e.MarkerRecordedEventAttributes.GetMarkerName()
-		if markerName == versionMarkerName || markerName == mutableSideEffectMarkerName {
-			return true
-		}
-	}
-	return false
-}
-
-// special check for upsert change version event
-func skipDeterministicCheckForUpsertChangeVersion(events []*s.HistoryEvent, idx int) bool {
-	e := events[idx]
-	if e.GetEventType() == s.EventTypeMarkerRecorded &&
-		e.MarkerRecordedEventAttributes.GetMarkerName() == versionMarkerName &&
-		idx < len(events)-1 &&
-		events[idx+1].GetEventType() == s.EventTypeUpsertWorkflowSearchAttributes {
-		if _, ok := events[idx+1].UpsertWorkflowSearchAttributesEventAttributes.SearchAttributes.IndexedFields[CadenceChangeVersion]; ok {
-			return true
-		}
-	}
-	return false
-}
-
 func isDecisionMatchEvent(d *s.Decision, e *s.HistoryEvent, strictMode bool) bool {
 	switch d.GetDecisionType() {
 	case s.DecisionTypeScheduleActivityTask:

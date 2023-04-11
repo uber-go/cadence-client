@@ -35,6 +35,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"

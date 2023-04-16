@@ -24,8 +24,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/uber-go/tally"
-	"go.uber.org/cadence/internal"
 	"net"
 	"strings"
 	"sync"
@@ -35,14 +33,17 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber-go/tally"
+	"go.uber.org/goleak"
+	"go.uber.org/zap/zaptest"
+
 	"go.uber.org/cadence"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/client"
 	"go.uber.org/cadence/interceptors"
+	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
-	"go.uber.org/goleak"
-	"go.uber.org/zap/zaptest"
 )
 
 type IntegrationTestSuite struct {

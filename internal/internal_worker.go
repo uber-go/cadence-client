@@ -42,14 +42,15 @@ import (
 	otbridge "go.opentelemetry.io/otel/bridge/opentracing"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/cadence/internal/common/util"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var startVersionMetric sync.Once

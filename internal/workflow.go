@@ -29,10 +29,11 @@ import (
 	"time"
 
 	"github.com/uber-go/tally"
+	"go.uber.org/zap"
+
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
 	"go.uber.org/cadence/internal/common/backoff"
-	"go.uber.org/zap"
 )
 
 var (
@@ -743,8 +744,7 @@ func (wc *workflowEnvironmentInterceptor) ExecuteActivity(ctx Context, typeName 
 		return future
 	}
 	// Validate context options.
-	options := getActivityOptions(ctx)
-	options, err = getValidatedActivityOptions(ctx)
+	options, err := getValidatedActivityOptions(ctx)
 	if err != nil {
 		settable.Set(nil, err)
 		return future

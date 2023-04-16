@@ -36,6 +36,8 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
+	"go.uber.org/zap"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
@@ -43,7 +45,6 @@ import (
 	"go.uber.org/cadence/internal/common/cache"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/cadence/internal/common/util"
-	"go.uber.org/zap"
 )
 
 const (
@@ -1946,6 +1947,11 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 
 	dlCancelFunc()
 	if <-ctx.Done(); ctx.Err() == context.DeadlineExceeded {
+		ath.logger.Warn("Activity timeout.",
+			zap.String(tagWorkflowID, t.WorkflowExecution.GetWorkflowId()),
+			zap.String(tagRunID, t.WorkflowExecution.GetRunId()),
+			zap.String(tagActivityType, activityType),
+		)
 		return nil, ctx.Err()
 	}
 	if err != nil && err != ErrActivityResultPending {

@@ -29,8 +29,9 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/zap"
+
+	"go.uber.org/cadence/.gen/go/shared"
 )
 
 type (

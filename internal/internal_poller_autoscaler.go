@@ -23,12 +23,14 @@ package internal
 import (
 	"context"
 	"errors"
-	"github.com/marusama/semaphore/v2"
-	"go.uber.org/atomic"
-	"go.uber.org/cadence/internal/common/autoscaler"
-	"go.uber.org/zap"
 	"sync"
 	"time"
+
+	"github.com/marusama/semaphore/v2"
+	"go.uber.org/atomic"
+	"go.uber.org/zap"
+
+	"go.uber.org/cadence/internal/common/autoscaler"
 )
 
 // defaultPollerScalerCooldownInSeconds

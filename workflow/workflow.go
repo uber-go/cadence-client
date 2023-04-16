@@ -22,9 +22,10 @@ package workflow
 
 import (
 	"github.com/uber-go/tally"
+	"go.uber.org/zap"
+
 	"go.uber.org/cadence/encoded"
 	"go.uber.org/cadence/internal"
-	"go.uber.org/zap"
 )
 
 type (

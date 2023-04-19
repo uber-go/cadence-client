@@ -950,7 +950,7 @@ ProcessEvents:
 				} else {
 					// Since we know there is an error, we do the replay check to give more context in the log
 					replayErr := matchReplayWithHistory(replayDecisions, respondEvents)
-					w.wth.logger.Warn("Ignored workflow panic error",
+					w.wth.logger.Error("Ignored workflow panic error",
 						zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 						zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
 						zap.String(tagRunID, task.WorkflowExecution.GetRunId()),

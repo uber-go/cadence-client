@@ -26,6 +26,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"reflect"
 	"strings"
 	"sync"
@@ -824,6 +826,69 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicDetection() {
 	request, err = taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
 	t.NoError(err)
 	t.NotNil(request)
+}
+
+func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicLogNonexistingID() {
+	taskList := "taskList"
+	testEvents := []*s.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(3),
+		createTestEventDecisionTaskCompleted(4, &s.DecisionTaskCompletedEventAttributes{ScheduledEventId: common.Int64Ptr(2)}),
+		createTestEventActivityTaskScheduled(5, &s.ActivityTaskScheduledEventAttributes{
+			// Insert an ID which does not exist
+			ActivityId:   common.StringPtr("NotAnActivityID"),
+			ActivityType: &s.ActivityType{Name: common.StringPtr("pkg.Greeter_Activity")},
+			TaskList:     &s.TaskList{Name: &taskList},
+		}),
+	}
+
+	obs, logs := observer.New(zap.ErrorLevel)
+	logger := zap.New(obs)
+
+	task := createWorkflowTask(testEvents, 3, "HelloWorld_Workflow")
+	stopC := make(chan struct{})
+	params := workerExecutionParameters{
+		TaskList: taskList,
+		WorkerOptions: WorkerOptions{
+			Identity: "test-id-1",
+			Logger:   logger,
+		},
+		WorkerStopChannel: stopC,
+	}
+
+	taskHandler := newWorkflowTaskHandler(testDomain, params, nil, t.registry)
+	request, err := taskHandler.ProcessWorkflowTask(&workflowTask{task: task}, nil)
+
+	t.NotNil(request)
+	response := request.(*s.RespondDecisionTaskFailedRequest)
+
+	// NOTE: we might acctually want to return an error
+	// but since previously we checked the wrong error type, it may break existing customers workflow
+	// The issue is that we change the error type and that we change the error message, the customers
+	// are checking the error string - we plan to wrap all errors to avoid this issue in client v2
+	t.NoError(err)
+	t.NotNil(response)
+
+	// Check that the error was logged
+	ignoredWorkflowLogs := logs.FilterMessage("Ignored workflow panic error")
+	require.Len(t.T(), ignoredWorkflowLogs.All(), 1)
+
+	// Find the ReplayError field
+	withField := ignoredWorkflowLogs.All()[0]
+	var replayErrorField *zapcore.Field
+	for _, field := range withField.Context {
+		if field.Key == "ReplayError" {
+			replayErrorField = &field
+		}
+	}
+	require.NotNil(t.T(), replayErrorField)
+	require.Equal(t.T(), zapcore.ErrorType, replayErrorField.Type)
+	require.ErrorContains(t.T(), replayErrorField.Interface.(error),
+		"nondeterministic workflow: "+
+			"history event is ActivityTaskScheduled: (ActivityId:NotAnActivityID, ActivityType:(Name:pkg.Greeter_Activity), TaskList:(Name:taskList), Input:[]), "+
+			"replay decision is ScheduleActivityTask: (ActivityId:0, ActivityType:(Name:Greeter_Activity), TaskList:(Name:taskList)")
+
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowReturnsPanicError() {

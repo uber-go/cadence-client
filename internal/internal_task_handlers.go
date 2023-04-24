@@ -944,13 +944,18 @@ ProcessEvents:
 				if isReplayTest {
 					// NOTE: we should do this regardless if it's in replay test or not
 					// but since previously we checked the wrong error type, it may break existing customers workflow
+					// the issue is that we change the error type and that we change the error message, the customers
+					// are checking the error string - we plan to wrap all errors to avoid this issue in client v2
 					nonDeterministicErr = panicErr
 				} else {
-					w.wth.logger.Warn("Ignored workflow panic error",
+					// Since we know there is an error, we do the replay check to give more context in the log
+					replayErr := matchReplayWithHistory(replayDecisions, respondEvents)
+					w.wth.logger.Error("Ignored workflow panic error",
 						zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 						zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
 						zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
 						zap.Error(nonDeterministicErr),
+						zap.NamedError("ReplayError", replayErr),
 					)
 				}
 			}

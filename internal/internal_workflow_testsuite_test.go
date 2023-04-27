@@ -31,7 +31,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
@@ -3168,4 +3170,36 @@ func (s *WorkflowTestSuiteUnitTest) Test_Regression_ExecuteChildWorkflowWithCanc
 		// the bugport provides this old behavior to ease migration, at least until we feel the need to remove it.
 		check(0, true, "no err")
 	})
+}
+
+func TestRegression_LocalActivityErrorEncoding(t *testing.T) {
+	// previously not encoded correctly
+	s := WorkflowTestSuite{}
+	s.SetLogger(zaptest.NewLogger(t))
+	env := s.NewTestWorkflowEnvironment()
+	sentinel := errors.New("sentinel error value")
+	env.RegisterWorkflowWithOptions(func(ctx Context) error {
+		ctx = WithLocalActivityOptions(ctx, LocalActivityOptions{ScheduleToCloseTimeout: time.Second})
+		err := ExecuteLocalActivity(ctx, func(ctx context.Context) error {
+			return sentinel
+		}).Get(ctx, nil)
+		if errors.Is(err, sentinel) {
+			// incorrect path, taken through v0.19.1
+			return fmt.Errorf("local activity errors need to be encoded, and must not be `.Is` a specific value: %w", err)
+		}
+		// correct path
+		return sentinel
+	}, RegisterWorkflowOptions{Name: "errorsis"})
+	env.ExecuteWorkflow("errorsis")
+	err := env.GetWorkflowError()
+
+	// make sure that the right path was chosen, and that the GetWorkflowError returns the same encoded value.
+	// GetWorkflowError could... *possibly* return a wrapped original error value, but this seems unnecessarily
+	// difficult to maintain long-term, doesn't reflect actual non-test behavior, and might lead to misunderstandings.
+	require.Error(t, err) // stop early to avoid confusing NPEs
+	var generr *GenericError
+	assert.ErrorAs(t, err, &generr, "should be an encoded generic error")
+	assert.NotErrorIs(t, err, sentinel, "should not contain a specific value, as this cannot be replayed")
+	assert.Contains(t, err.Error(), "sentinel error value", "should contain the user error text")
+	assert.NotContains(t, err.Error(), "need to be encoded", "should not contain the wrong-err-type branch message")
 }

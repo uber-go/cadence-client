@@ -60,7 +60,7 @@ type (
 	laResultHandler func(lar *localActivityResultWrapper)
 
 	localActivityResultWrapper struct {
-		err     error
+		err     error // internal error type, possibly containing encoded user-error data
 		result  []byte
 		attempt int32
 		backoff time.Duration

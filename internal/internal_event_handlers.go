@@ -1159,10 +1159,10 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessLocalActivityResult(lar *lo
 	if lar.err != nil {
 		errReason, errDetails := getErrorDetails(lar.err, weh.GetDataConverter())
 		lamd.ErrReason = errReason
-		lamd.ErrJSON = string(errDetails)
+		lamd.ErrJSON = string(errDetails) // TODO: this is not json, nor is it necessarily a valid string
 		lamd.Backoff = lar.backoff
 	} else {
-		lamd.ResultJSON = string(lar.result)
+		lamd.ResultJSON = string(lar.result) // TODO: same, not json nor a string
 	}
 
 	// encode marker data

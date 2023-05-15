@@ -1301,7 +1301,16 @@ func (env *testWorkflowEnvironmentImpl) handleLocalActivityResult(result *localA
 	}
 
 	delete(env.localActivities, activityID)
-	lar := &localActivityResultWrapper{err: result.err, result: result.result, backoff: noRetryBackoff}
+	var encodedErr error
+	if result.err != nil {
+		errReason, errDetails := getErrorDetails(result.err, env.GetDataConverter())
+		encodedErr = constructError(errReason, errDetails, env.GetDataConverter())
+	}
+	lar := &localActivityResultWrapper{
+		err:     encodedErr,
+		result:  result.result,
+		backoff: noRetryBackoff,
+	}
 	if result.task.retryPolicy != nil && result.err != nil {
 		lar.backoff = getRetryBackoff(result, env.Now())
 		lar.attempt = task.attempt

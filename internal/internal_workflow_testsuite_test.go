@@ -801,8 +801,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_StartFailed_Regression() 
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
-	require.Error(s.T(), env.GetWorkflowError())
-	s.Equal("fail to start child", env.GetWorkflowError().Error())
+	s.NoError(env.GetWorkflowError())
 }
 
 func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Listener() {

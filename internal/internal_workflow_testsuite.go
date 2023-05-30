@@ -1425,6 +1425,17 @@ func (w *workflowExecutorWrapper) Execute(ctx Context, input []byte) (result []b
 	// Use existing interceptors from env.
 	envInterceptor := &workflowEnvironmentInterceptor{env: env}
 	ctxCopy := newWorkflowContext(w.env, envInterceptor, envInterceptor)
+
+	childWE := env.workflowInfo.WorkflowExecution
+	if env.isChildWorkflow() && env.startedHandler != nil /* startedHandler could be nil for retry */ {
+		// notify parent that child workflow is started.
+		// child workflow currently always successfully start - we need another method to allow changing this,
+		// as it is not always true in production / a failure to start can be detected in workflows.
+		env.parentEnv.postCallback(func() {
+			env.startedHandler(childWE, nil)
+		}, true)
+	}
+
 	go func() {
 		// getMockReturn could block if mock is configured to wait. The returned mockRet is what has been configured
 		// for the mock by using MockCallWrapper.Return(). The mockRet could be mock values or mock function. We process
@@ -1444,25 +1455,9 @@ func (w *workflowExecutorWrapper) Execute(ctx Context, input []byte) (result []b
 	// ExecuteUntilAllBlocked() returns).
 	env.runningCount--
 
-	childWE := env.workflowInfo.WorkflowExecution
-	var startedErr error
 	if mockRet != nil {
 		// workflow was mocked.
-		result, err = m.executeMock(ctx, input, mockRet)
-		if env.isChildWorkflow() && err == ErrMockStartChildWorkflowFailed {
-			childWE, startedErr = WorkflowExecution{}, err
-		}
-	}
-
-	if env.isChildWorkflow() && env.startedHandler != nil /* startedHandler could be nil for retry */ {
-		// notify parent that child workflow is started
-		env.parentEnv.postCallback(func() {
-			env.startedHandler(childWE, startedErr)
-		}, true)
-	}
-
-	if mockRet != nil {
-		return result, err
+		return m.executeMock(ctx, input, mockRet)
 	}
 
 	// no mock, so call the actual workflow

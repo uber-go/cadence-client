@@ -776,7 +776,13 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_Mock_Panic_GetChildWorkfl
 		workflowError.Error())
 }
 
-func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_StartFailed() {
+func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_StartFailed_Regression() {
+	// Up through v0.19.1 this workflow would fail, due to how the test suite ran callbacks in an incorrect order.
+	// This allowed the test suite to return mocked errors as start errors... but it had no way to differentiate
+	// between failing the *start* and failing the *completion*.
+	//
+	// Since starts make more sense to succeed, and only a few categories of errors are possible anyway (e.g. general
+	// error returns do not make sense): starts now always succeed, and OnWorkflow mocks affect only the completion.
 	workflowFn := func(ctx Context) (string, error) {
 		cwo := ChildWorkflowOptions{ExecutionStartToCloseTimeout: time.Minute}
 		ctx = WithChildWorkflowOptions(ctx, cwo)
@@ -785,7 +791,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_StartFailed() {
 			return "", errors.New("fail to start child")
 		}
 
-		return "should-not-go-here", nil
+		return "started", nil
 	}
 
 	env := s.NewTestWorkflowEnvironment()
@@ -795,7 +801,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_ChildWorkflow_StartFailed() {
 	env.ExecuteWorkflow(workflowFn)
 
 	s.True(env.IsWorkflowCompleted())
-	s.Error(env.GetWorkflowError())
+	require.Error(s.T(), env.GetWorkflowError())
 	s.Equal("fail to start child", env.GetWorkflowError().Error())
 }
 

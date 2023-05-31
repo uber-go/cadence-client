@@ -358,6 +358,7 @@ type (
 	ClientOptions struct {
 		MetricsScope       tally.Scope
 		Identity           string
+		IsolationGroup     string
 		DataConverter      DataConverter
 		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
@@ -576,7 +577,7 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 		tracer = opentracing.NoopTracer{}
 	}
 	if options != nil && options.Authorization != nil {
-		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization, options.IsolationGroup)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &workflowClient{
@@ -606,7 +607,7 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 	}
 	metricScope = tagScope(metricScope, tagDomain, "domain-client", clientImplHeaderName, clientImplHeaderValue)
 	if options != nil && options.Authorization != nil {
-		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization, options.IsolationGroup)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &domainClient{

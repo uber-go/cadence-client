@@ -516,7 +516,7 @@ func (w *workflowServiceIdentityAndAuthWrapper) RefreshWorkflowTasks(ctx context
 	return err
 }
 
-func (w *workflowServiceAuthWrapper) RestartWorkflowExecution(ctx context.Context, request *shared.RestartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.RestartWorkflowExecutionResponse, error) {
+func (w *workflowServiceIdentityAndAuthWrapper) RestartWorkflowExecution(ctx context.Context, request *shared.RestartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.RestartWorkflowExecutionResponse, error) {
 	tokenHeader, err := w.getYarpcJWTHeader()
 	if err != nil {
 		return nil, err

@@ -29,6 +29,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/common/isolationgroup"
 	"io"
 	"os"
 	"reflect"
@@ -990,8 +991,9 @@ func newAggregatedWorker(
 	)
 	logger := workerParams.Logger
 	if options.Authorization != nil {
-		service = auth.NewWorkflowServiceWrapper(service, options.Authorization, options.IsolationGroup)
+		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
+	service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
 	service = metrics.NewWorkflowServiceWrapper(service, workerParams.MetricsScope)
 	processTestTags(&wOptions, &workerParams)
 

@@ -78,7 +78,7 @@ func (s *serviceWrapperSuite) TearDownTest() {
 
 func (s *serviceWrapperSuite) TestDeprecateDomainValidToken() {
 	s.Service.EXPECT().DeprecateDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.DeprecateDomain(ctx, &shared.DeprecateDomainRequest{})
 	s.NoError(err)
@@ -86,7 +86,7 @@ func (s *serviceWrapperSuite) TestDeprecateDomainValidToken() {
 
 func (s *serviceWrapperSuite) TestDeprecateDomainInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.DeprecateDomain(ctx, &shared.DeprecateDomainRequest{})
 	s.EqualError(err, "error")
@@ -94,7 +94,7 @@ func (s *serviceWrapperSuite) TestDeprecateDomainInvalidToken() {
 
 func (s *serviceWrapperSuite) TestListDomainsValidToken() {
 	s.Service.EXPECT().ListDomains(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListDomains(ctx, &shared.ListDomainsRequest{})
 	s.NoError(err)
@@ -102,7 +102,7 @@ func (s *serviceWrapperSuite) TestListDomainsValidToken() {
 
 func (s *serviceWrapperSuite) TestListDomainsInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListDomains(ctx, &shared.ListDomainsRequest{})
 	s.EqualError(err, "error")
@@ -110,7 +110,7 @@ func (s *serviceWrapperSuite) TestListDomainsInvalidToken() {
 
 func (s *serviceWrapperSuite) TestDescribeDomainValidToken() {
 	s.Service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.DescribeDomain(ctx, &shared.DescribeDomainRequest{})
 	s.NoError(err)
@@ -118,7 +118,7 @@ func (s *serviceWrapperSuite) TestDescribeDomainValidToken() {
 
 func (s *serviceWrapperSuite) TestDescribeDomainInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.DescribeDomain(ctx, &shared.DescribeDomainRequest{})
 	s.EqualError(err, "error")
@@ -126,7 +126,7 @@ func (s *serviceWrapperSuite) TestDescribeDomainInvalidToken() {
 
 func (s *serviceWrapperSuite) TestDescribeWorkflowExecutionValidToken() {
 	s.Service.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.DescribeWorkflowExecution(ctx, &shared.DescribeWorkflowExecutionRequest{})
 	s.NoError(err)
@@ -134,7 +134,7 @@ func (s *serviceWrapperSuite) TestDescribeWorkflowExecutionValidToken() {
 
 func (s *serviceWrapperSuite) TestDescribeWorkflowExecutionInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.DescribeWorkflowExecution(ctx, &shared.DescribeWorkflowExecutionRequest{})
 	s.EqualError(err, "error")
@@ -142,7 +142,7 @@ func (s *serviceWrapperSuite) TestDescribeWorkflowExecutionInvalidToken() {
 
 func (s *serviceWrapperSuite) TestGetWorkflowExecutionHistoryValidToken() {
 	s.Service.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.GetWorkflowExecutionHistory(ctx, &shared.GetWorkflowExecutionHistoryRequest{})
 	s.NoError(err)
@@ -150,7 +150,7 @@ func (s *serviceWrapperSuite) TestGetWorkflowExecutionHistoryValidToken() {
 
 func (s *serviceWrapperSuite) TestGetWorkflowExecutionHistoryInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.GetWorkflowExecutionHistory(ctx, &shared.GetWorkflowExecutionHistoryRequest{})
 	s.EqualError(err, "error")
@@ -158,7 +158,7 @@ func (s *serviceWrapperSuite) TestGetWorkflowExecutionHistoryInvalidToken() {
 
 func (s *serviceWrapperSuite) TestListClosedWorkflowExecutionsValidToken() {
 	s.Service.EXPECT().ListClosedWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListClosedWorkflowExecutions(ctx, &shared.ListClosedWorkflowExecutionsRequest{})
 	s.NoError(err)
@@ -166,7 +166,7 @@ func (s *serviceWrapperSuite) TestListClosedWorkflowExecutionsValidToken() {
 
 func (s *serviceWrapperSuite) TestListClosedWorkflowExecutionsInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListClosedWorkflowExecutions(ctx, &shared.ListClosedWorkflowExecutionsRequest{})
 	s.EqualError(err, "error")
@@ -174,7 +174,7 @@ func (s *serviceWrapperSuite) TestListClosedWorkflowExecutionsInvalidToken() {
 
 func (s *serviceWrapperSuite) TestListOpenWorkflowExecutionsValidToken() {
 	s.Service.EXPECT().ListOpenWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListOpenWorkflowExecutions(ctx, &shared.ListOpenWorkflowExecutionsRequest{})
 	s.NoError(err)
@@ -182,7 +182,7 @@ func (s *serviceWrapperSuite) TestListOpenWorkflowExecutionsValidToken() {
 
 func (s *serviceWrapperSuite) TestListOpenWorkflowExecutionsInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListOpenWorkflowExecutions(ctx, &shared.ListOpenWorkflowExecutionsRequest{})
 	s.EqualError(err, "error")
@@ -190,7 +190,7 @@ func (s *serviceWrapperSuite) TestListOpenWorkflowExecutionsInvalidToken() {
 
 func (s *serviceWrapperSuite) TestListWorkflowExecutionsValidToken() {
 	s.Service.EXPECT().ListWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListWorkflowExecutions(ctx, &shared.ListWorkflowExecutionsRequest{})
 	s.NoError(err)
@@ -198,7 +198,7 @@ func (s *serviceWrapperSuite) TestListWorkflowExecutionsValidToken() {
 
 func (s *serviceWrapperSuite) TestListWorkflowExecutionsInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListWorkflowExecutions(ctx, &shared.ListWorkflowExecutionsRequest{})
 	s.EqualError(err, "error")
@@ -206,7 +206,7 @@ func (s *serviceWrapperSuite) TestListWorkflowExecutionsInvalidToken() {
 
 func (s *serviceWrapperSuite) TestListArchivedWorkflowExecutionsValidToken() {
 	s.Service.EXPECT().ListArchivedWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListArchivedWorkflowExecutions(ctx, &shared.ListArchivedWorkflowExecutionsRequest{})
 	s.NoError(err)
@@ -214,7 +214,7 @@ func (s *serviceWrapperSuite) TestListArchivedWorkflowExecutionsValidToken() {
 
 func (s *serviceWrapperSuite) TestListArchivedWorkflowExecutionsInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListArchivedWorkflowExecutions(ctx, &shared.ListArchivedWorkflowExecutionsRequest{})
 	s.EqualError(err, "error")
@@ -222,7 +222,7 @@ func (s *serviceWrapperSuite) TestListArchivedWorkflowExecutionsInvalidToken() {
 
 func (s *serviceWrapperSuite) TestScanWorkflowExecutionsValidToken() {
 	s.Service.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ScanWorkflowExecutions(ctx, &shared.ListWorkflowExecutionsRequest{})
 	s.NoError(err)
@@ -230,7 +230,7 @@ func (s *serviceWrapperSuite) TestScanWorkflowExecutionsValidToken() {
 
 func (s *serviceWrapperSuite) TestScanWorkflowExecutionsInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ScanWorkflowExecutions(ctx, &shared.ListWorkflowExecutionsRequest{})
 	s.EqualError(err, "error")
@@ -238,7 +238,7 @@ func (s *serviceWrapperSuite) TestScanWorkflowExecutionsInvalidToken() {
 
 func (s *serviceWrapperSuite) TestCountWorkflowExecutionsValidToken() {
 	s.Service.EXPECT().CountWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.CountWorkflowExecutions(ctx, &shared.CountWorkflowExecutionsRequest{})
 	s.NoError(err)
@@ -246,7 +246,7 @@ func (s *serviceWrapperSuite) TestCountWorkflowExecutionsValidToken() {
 
 func (s *serviceWrapperSuite) TestCountWorkflowExecutionsInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.CountWorkflowExecutions(ctx, &shared.CountWorkflowExecutionsRequest{})
 	s.EqualError(err, "error")
@@ -254,7 +254,7 @@ func (s *serviceWrapperSuite) TestCountWorkflowExecutionsInvalidToken() {
 
 func (s *serviceWrapperSuite) TestPollForActivityTaskValidToken() {
 	s.Service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.PollForActivityTask(ctx, &shared.PollForActivityTaskRequest{})
 	s.NoError(err)
@@ -262,7 +262,7 @@ func (s *serviceWrapperSuite) TestPollForActivityTaskValidToken() {
 
 func (s *serviceWrapperSuite) TestPollForActivityTaskInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.PollForActivityTask(ctx, &shared.PollForActivityTaskRequest{})
 	s.EqualError(err, "error")
@@ -270,7 +270,7 @@ func (s *serviceWrapperSuite) TestPollForActivityTaskInvalidToken() {
 
 func (s *serviceWrapperSuite) TestPollForDecisionTaskValidToken() {
 	s.Service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.PollForDecisionTask(ctx, &shared.PollForDecisionTaskRequest{})
 	s.NoError(err)
@@ -278,7 +278,7 @@ func (s *serviceWrapperSuite) TestPollForDecisionTaskValidToken() {
 
 func (s *serviceWrapperSuite) TestPollForDecisionTaskInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.PollForDecisionTask(ctx, &shared.PollForDecisionTaskRequest{})
 	s.EqualError(err, "error")
@@ -286,7 +286,7 @@ func (s *serviceWrapperSuite) TestPollForDecisionTaskInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatValidToken() {
 	s.Service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.RecordActivityTaskHeartbeat(ctx, &shared.RecordActivityTaskHeartbeatRequest{})
 	s.NoError(err)
@@ -294,7 +294,7 @@ func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatValidToken() {
 
 func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.RecordActivityTaskHeartbeat(ctx, &shared.RecordActivityTaskHeartbeatRequest{})
 	s.EqualError(err, "error")
@@ -302,7 +302,7 @@ func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatByIDValidToken() {
 	s.Service.EXPECT().RecordActivityTaskHeartbeatByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.RecordActivityTaskHeartbeatByID(ctx, &shared.RecordActivityTaskHeartbeatByIDRequest{})
 	s.NoError(err)
@@ -310,7 +310,7 @@ func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatByIDValidToken() {
 
 func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatByIDInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.RecordActivityTaskHeartbeatByID(ctx, &shared.RecordActivityTaskHeartbeatByIDRequest{})
 	s.EqualError(err, "error")
@@ -318,7 +318,7 @@ func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatByIDInvalidToken() 
 
 func (s *serviceWrapperSuite) TestRegisterDomainValidToken() {
 	s.Service.EXPECT().RegisterDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RegisterDomain(ctx, &shared.RegisterDomainRequest{})
 	s.NoError(err)
@@ -326,7 +326,7 @@ func (s *serviceWrapperSuite) TestRegisterDomainValidToken() {
 
 func (s *serviceWrapperSuite) TestRegisterDomainInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RegisterDomain(ctx, &shared.RegisterDomainRequest{})
 	s.EqualError(err, "error")
@@ -334,7 +334,7 @@ func (s *serviceWrapperSuite) TestRegisterDomainInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRequestCancelWorkflowExecutionValidToken() {
 	s.Service.EXPECT().RequestCancelWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RequestCancelWorkflowExecution(ctx, &shared.RequestCancelWorkflowExecutionRequest{})
 	s.NoError(err)
@@ -342,7 +342,7 @@ func (s *serviceWrapperSuite) TestRequestCancelWorkflowExecutionValidToken() {
 
 func (s *serviceWrapperSuite) TestRequestCancelWorkflowExecutionInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RequestCancelWorkflowExecution(ctx, &shared.RequestCancelWorkflowExecutionRequest{})
 	s.EqualError(err, "error")
@@ -350,7 +350,7 @@ func (s *serviceWrapperSuite) TestRequestCancelWorkflowExecutionInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledValidToken() {
 	s.Service.EXPECT().RespondActivityTaskCanceled(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskCanceled(ctx, &shared.RespondActivityTaskCanceledRequest{})
 	s.NoError(err)
@@ -358,7 +358,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledValidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskCanceled(ctx, &shared.RespondActivityTaskCanceledRequest{})
 	s.EqualError(err, "error")
@@ -366,7 +366,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedValidToken() {
 	s.Service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskCompleted(ctx, &shared.RespondActivityTaskCompletedRequest{})
 	s.NoError(err)
@@ -374,7 +374,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedValidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskCompleted(ctx, &shared.RespondActivityTaskCompletedRequest{})
 	s.EqualError(err, "error")
@@ -382,7 +382,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskFailedValidToken() {
 	s.Service.EXPECT().RespondActivityTaskFailed(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskFailed(ctx, &shared.RespondActivityTaskFailedRequest{})
 	s.NoError(err)
@@ -390,7 +390,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskFailedValidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskFailedInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskFailed(ctx, &shared.RespondActivityTaskFailedRequest{})
 	s.EqualError(err, "error")
@@ -398,7 +398,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskFailedInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledByIDValidToken() {
 	s.Service.EXPECT().RespondActivityTaskCanceledByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskCanceledByID(ctx, &shared.RespondActivityTaskCanceledByIDRequest{})
 	s.NoError(err)
@@ -406,7 +406,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledByIDValidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledByIDInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskCanceledByID(ctx, &shared.RespondActivityTaskCanceledByIDRequest{})
 	s.EqualError(err, "error")
@@ -414,7 +414,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledByIDInvalidToken() 
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedByIDValidToken() {
 	s.Service.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskCompletedByID(ctx, &shared.RespondActivityTaskCompletedByIDRequest{})
 	s.NoError(err)
@@ -422,7 +422,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedByIDValidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedByIDInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskCompletedByID(ctx, &shared.RespondActivityTaskCompletedByIDRequest{})
 	s.EqualError(err, "error")
@@ -430,7 +430,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedByIDInvalidToken()
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskFailedByIDValidToken() {
 	s.Service.EXPECT().RespondActivityTaskFailedByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskFailedByID(ctx, &shared.RespondActivityTaskFailedByIDRequest{})
 	s.NoError(err)
@@ -438,7 +438,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskFailedByIDValidToken() {
 
 func (s *serviceWrapperSuite) TestRespondActivityTaskFailedByIDInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondActivityTaskFailedByID(ctx, &shared.RespondActivityTaskFailedByIDRequest{})
 	s.EqualError(err, "error")
@@ -446,7 +446,7 @@ func (s *serviceWrapperSuite) TestRespondActivityTaskFailedByIDInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRespondDecisionTaskCompletedValidToken() {
 	s.Service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.RespondDecisionTaskCompleted(ctx, &shared.RespondDecisionTaskCompletedRequest{})
 	s.NoError(err)
@@ -454,7 +454,7 @@ func (s *serviceWrapperSuite) TestRespondDecisionTaskCompletedValidToken() {
 
 func (s *serviceWrapperSuite) TestRespondDecisionTaskCompletedInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.RespondDecisionTaskCompleted(ctx, &shared.RespondDecisionTaskCompletedRequest{})
 	s.EqualError(err, "error")
@@ -462,7 +462,7 @@ func (s *serviceWrapperSuite) TestRespondDecisionTaskCompletedInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRespondDecisionTaskFailedValidToken() {
 	s.Service.EXPECT().RespondDecisionTaskFailed(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondDecisionTaskFailed(ctx, &shared.RespondDecisionTaskFailedRequest{})
 	s.NoError(err)
@@ -470,7 +470,7 @@ func (s *serviceWrapperSuite) TestRespondDecisionTaskFailedValidToken() {
 
 func (s *serviceWrapperSuite) TestRespondDecisionTaskFailedInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondDecisionTaskFailed(ctx, &shared.RespondDecisionTaskFailedRequest{})
 	s.EqualError(err, "error")
@@ -478,7 +478,7 @@ func (s *serviceWrapperSuite) TestRespondDecisionTaskFailedInvalidToken() {
 
 func (s *serviceWrapperSuite) TestSignalWorkflowExecutionValidToken() {
 	s.Service.EXPECT().SignalWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.SignalWorkflowExecution(ctx, &shared.SignalWorkflowExecutionRequest{})
 	s.NoError(err)
@@ -486,7 +486,7 @@ func (s *serviceWrapperSuite) TestSignalWorkflowExecutionValidToken() {
 
 func (s *serviceWrapperSuite) TestSignalWorkflowExecutionInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.SignalWorkflowExecution(ctx, &shared.SignalWorkflowExecutionRequest{})
 	s.EqualError(err, "error")
@@ -494,7 +494,7 @@ func (s *serviceWrapperSuite) TestSignalWorkflowExecutionInvalidToken() {
 
 func (s *serviceWrapperSuite) TestSignalWithStartWorkflowExecutionToken() {
 	s.Service.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.SignalWithStartWorkflowExecution(ctx, &shared.SignalWithStartWorkflowExecutionRequest{})
 	s.NoError(err)
@@ -502,7 +502,7 @@ func (s *serviceWrapperSuite) TestSignalWithStartWorkflowExecutionToken() {
 
 func (s *serviceWrapperSuite) TestSignalWithStartWorkflowExecutionInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.SignalWithStartWorkflowExecution(ctx, &shared.SignalWithStartWorkflowExecutionRequest{})
 	s.EqualError(err, "error")
@@ -510,7 +510,7 @@ func (s *serviceWrapperSuite) TestSignalWithStartWorkflowExecutionInvalidToken()
 
 func (s *serviceWrapperSuite) TestStartWorkflowExecutionToken() {
 	s.Service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.StartWorkflowExecution(ctx, &shared.StartWorkflowExecutionRequest{})
 	s.NoError(err)
@@ -518,7 +518,7 @@ func (s *serviceWrapperSuite) TestStartWorkflowExecutionToken() {
 
 func (s *serviceWrapperSuite) TestStartWorkflowExecutionInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.StartWorkflowExecution(ctx, &shared.StartWorkflowExecutionRequest{})
 	s.EqualError(err, "error")
@@ -526,7 +526,7 @@ func (s *serviceWrapperSuite) TestStartWorkflowExecutionInvalidToken() {
 
 func (s *serviceWrapperSuite) TestTerminateWorkflowExecutionToken() {
 	s.Service.EXPECT().TerminateWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.TerminateWorkflowExecution(ctx, &shared.TerminateWorkflowExecutionRequest{})
 	s.NoError(err)
@@ -534,7 +534,7 @@ func (s *serviceWrapperSuite) TestTerminateWorkflowExecutionToken() {
 
 func (s *serviceWrapperSuite) TestTerminateWorkflowExecutionInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.TerminateWorkflowExecution(ctx, &shared.TerminateWorkflowExecutionRequest{})
 	s.EqualError(err, "error")
@@ -542,7 +542,7 @@ func (s *serviceWrapperSuite) TestTerminateWorkflowExecutionInvalidToken() {
 
 func (s *serviceWrapperSuite) TestResetWorkflowExecutionValidToken() {
 	s.Service.EXPECT().ResetWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ResetWorkflowExecution(ctx, &shared.ResetWorkflowExecutionRequest{})
 	s.NoError(err)
@@ -550,7 +550,7 @@ func (s *serviceWrapperSuite) TestResetWorkflowExecutionValidToken() {
 
 func (s *serviceWrapperSuite) TestResetWorkflowExecutionInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ResetWorkflowExecution(ctx, &shared.ResetWorkflowExecutionRequest{})
 	s.EqualError(err, "error")
@@ -558,7 +558,7 @@ func (s *serviceWrapperSuite) TestResetWorkflowExecutionInvalidToken() {
 
 func (s *serviceWrapperSuite) TestUpdateDomainValidToken() {
 	s.Service.EXPECT().UpdateDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.UpdateDomain(ctx, &shared.UpdateDomainRequest{})
 	s.NoError(err)
@@ -566,7 +566,7 @@ func (s *serviceWrapperSuite) TestUpdateDomainValidToken() {
 
 func (s *serviceWrapperSuite) TestUpdateDomainInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.UpdateDomain(ctx, &shared.UpdateDomainRequest{})
 	s.EqualError(err, "error")
@@ -574,7 +574,7 @@ func (s *serviceWrapperSuite) TestUpdateDomainInvalidToken() {
 
 func (s *serviceWrapperSuite) TestQueryWorkflowValidToken() {
 	s.Service.EXPECT().QueryWorkflow(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.QueryWorkflow(ctx, &shared.QueryWorkflowRequest{})
 	s.NoError(err)
@@ -582,7 +582,7 @@ func (s *serviceWrapperSuite) TestQueryWorkflowValidToken() {
 
 func (s *serviceWrapperSuite) TestQueryWorkflowInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.QueryWorkflow(ctx, &shared.QueryWorkflowRequest{})
 	s.EqualError(err, "error")
@@ -590,7 +590,7 @@ func (s *serviceWrapperSuite) TestQueryWorkflowInvalidToken() {
 
 func (s *serviceWrapperSuite) TestResetStickyTaskListValidToken() {
 	s.Service.EXPECT().ResetStickyTaskList(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ResetStickyTaskList(ctx, &shared.ResetStickyTaskListRequest{})
 	s.NoError(err)
@@ -598,7 +598,7 @@ func (s *serviceWrapperSuite) TestResetStickyTaskListValidToken() {
 
 func (s *serviceWrapperSuite) TestResetStickyTaskListInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ResetStickyTaskList(ctx, &shared.ResetStickyTaskListRequest{})
 	s.EqualError(err, "error")
@@ -606,7 +606,7 @@ func (s *serviceWrapperSuite) TestResetStickyTaskListInvalidToken() {
 
 func (s *serviceWrapperSuite) TestDescribeTaskListValidToken() {
 	s.Service.EXPECT().DescribeTaskList(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.DescribeTaskList(ctx, &shared.DescribeTaskListRequest{})
 	s.NoError(err)
@@ -614,7 +614,7 @@ func (s *serviceWrapperSuite) TestDescribeTaskListValidToken() {
 
 func (s *serviceWrapperSuite) TestDescribeTaskListInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.DescribeTaskList(ctx, &shared.DescribeTaskListRequest{})
 	s.EqualError(err, "error")
@@ -622,7 +622,7 @@ func (s *serviceWrapperSuite) TestDescribeTaskListInvalidToken() {
 
 func (s *serviceWrapperSuite) TestRespondQueryTaskCompletedValidToken() {
 	s.Service.EXPECT().RespondQueryTaskCompleted(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondQueryTaskCompleted(ctx, &shared.RespondQueryTaskCompletedRequest{})
 	s.NoError(err)
@@ -630,7 +630,7 @@ func (s *serviceWrapperSuite) TestRespondQueryTaskCompletedValidToken() {
 
 func (s *serviceWrapperSuite) TestRespondQueryTaskCompletedInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	err := sw.RespondQueryTaskCompleted(ctx, &shared.RespondQueryTaskCompletedRequest{})
 	s.EqualError(err, "error")
@@ -638,7 +638,7 @@ func (s *serviceWrapperSuite) TestRespondQueryTaskCompletedInvalidToken() {
 
 func (s *serviceWrapperSuite) TestGetSearchAttributesValidToken() {
 	s.Service.EXPECT().GetSearchAttributes(gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.GetSearchAttributes(ctx)
 	s.NoError(err)
@@ -646,7 +646,7 @@ func (s *serviceWrapperSuite) TestGetSearchAttributesValidToken() {
 
 func (s *serviceWrapperSuite) TestGetSearchAttributesInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.GetSearchAttributes(ctx)
 	s.EqualError(err, "error")
@@ -654,7 +654,7 @@ func (s *serviceWrapperSuite) TestGetSearchAttributesInvalidToken() {
 
 func (s *serviceWrapperSuite) TestListTaskListPartitionsValidToken() {
 	s.Service.EXPECT().ListTaskListPartitions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListTaskListPartitions(ctx, &shared.ListTaskListPartitionsRequest{})
 	s.NoError(err)
@@ -662,7 +662,7 @@ func (s *serviceWrapperSuite) TestListTaskListPartitionsValidToken() {
 
 func (s *serviceWrapperSuite) TestListTaskListPartitionsInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.ListTaskListPartitions(ctx, &shared.ListTaskListPartitionsRequest{})
 	s.EqualError(err, "error")
@@ -670,7 +670,7 @@ func (s *serviceWrapperSuite) TestListTaskListPartitionsInvalidToken() {
 
 func (s *serviceWrapperSuite) TestGetClusterInfoValidToken() {
 	s.Service.EXPECT().GetClusterInfo(gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.GetClusterInfo(ctx)
 	s.NoError(err)
@@ -678,7 +678,7 @@ func (s *serviceWrapperSuite) TestGetClusterInfoValidToken() {
 
 func (s *serviceWrapperSuite) TestGetClusterInfoInvalidToken() {
 	s.AuthProvider = newJWTAuthIncorrect()
-	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider, "")
+	sw := NewWorkflowServiceWrapper(s.Service, s.AuthProvider)
 	ctx, _ := thrift.NewContext(time.Minute)
 	_, err := sw.GetClusterInfo(ctx)
 	s.EqualError(err, "error")

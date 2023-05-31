@@ -47,10 +47,6 @@ func (j *jwtAuthIncorrect) GetAuthToken() ([]byte, error) {
 	return []byte{}, fmt.Errorf("error")
 }
 
-func newJWTAuthIncorrect() AuthorizationProvider {
-	return &jwtAuthIncorrect{}
-}
-
 func TestServiceWrapperSuite(t *testing.T) {
 	suite.Run(t, new(serviceWrapperSuite))
 }

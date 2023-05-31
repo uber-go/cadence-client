@@ -24,8 +24,9 @@ package internal
 import (
 	"context"
 	"fmt"
-	"go.uber.org/cadence/internal/common/isolationgroup"
 	"time"
+
+	"go.uber.org/cadence/internal/common/isolationgroup"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
@@ -611,7 +612,6 @@ func NewDomainClient(service workflowserviceclient.Interface, options *ClientOpt
 	if options != nil && options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
-	service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &domainClient{
 		workflowService: service,

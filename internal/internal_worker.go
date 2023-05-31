@@ -29,7 +29,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/isolationgroup"
 	"io"
 	"os"
 	"reflect"
@@ -38,6 +37,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/cadence/internal/common/isolationgroup"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"

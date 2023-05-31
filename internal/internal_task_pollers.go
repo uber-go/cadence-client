@@ -140,7 +140,7 @@ type (
 
 	localActivityResult struct {
 		result  []byte
-		err     error
+		err     error // original error type, possibly an un-encoded user error
 		task    *localActivityTask
 		backoff time.Duration
 	}

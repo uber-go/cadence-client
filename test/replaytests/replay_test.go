@@ -21,9 +21,10 @@
 package replaytests
 
 import (
-	"go.uber.org/cadence/activity"
 	"strings"
 	"testing"
+
+	"go.uber.org/cadence/activity"
 
 	"github.com/stretchr/testify/assert"
 

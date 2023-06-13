@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	isolationGroupHeader = "isolation-group"
+	isolationGroupHeader = "cadence-client-zone"
 )
 
 type workflowServiceIsolationGroupWrapper struct {
@@ -260,6 +260,7 @@ func (w *workflowServiceIsolationGroupWrapper) RespondQueryTaskCompleted(ctx con
 }
 
 func (w *workflowServiceIsolationGroupWrapper) GetSearchAttributes(ctx context.Context, opts ...yarpc.CallOption) (*shared.GetSearchAttributesResponse, error) {
+	opts = append(opts, w.getIsolationGroupIdentifier())
 	result, err := w.service.GetSearchAttributes(ctx, opts...)
 	return result, err
 }

@@ -994,7 +994,9 @@ func newAggregatedWorker(
 	if options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
-	service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
+	if options.IsolationGroup != "" {
+		service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
+	}
 	service = metrics.NewWorkflowServiceWrapper(service, workerParams.MetricsScope)
 	processTestTags(&wOptions, &workerParams)
 

@@ -581,7 +581,9 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	if options != nil && options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
-	service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
+	if options.IsolationGroup != "" {
+		service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
+	}
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &workflowClient{
 		workflowService:    service,

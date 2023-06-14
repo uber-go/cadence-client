@@ -271,7 +271,7 @@ func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
 
 	for _, tc := range testCases {
 		service := workflowservicetest.NewMockClient(mockCtrl)
-		service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptionsWithIsolationGroupHeader()...).Return(nil, tc.domainErr).Do(
+		service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, tc.domainErr).Do(
 			func(ctx context.Context, request *shared.DescribeDomainRequest, opts ...yarpc.CallOption) {
 				// log
 			}).Times(2)
@@ -367,7 +367,7 @@ func createWorkerWithThrottle(
 		},
 	}
 	// mocks
-	service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptionsWithIsolationGroupHeader()...).Return(domainDesc, nil).Do(
+	service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(domainDesc, nil).Do(
 		func(ctx context.Context, request *shared.DescribeDomainRequest, opts ...yarpc.CallOption) {
 			// log
 		}).AnyTimes()
@@ -378,13 +378,13 @@ func createWorkerWithThrottle(
 		expectedActivitiesPerSecond = defaultTaskListActivitiesPerSecond
 	}
 	service.EXPECT().PollForActivityTask(
-		gomock.Any(), ofPollForActivityTaskRequest(expectedActivitiesPerSecond), callOptionsWithIsolationGroupHeader()...,
+		gomock.Any(), ofPollForActivityTaskRequest(expectedActivitiesPerSecond), callOptions()...,
 	).Return(activityTask, nil).AnyTimes()
-	service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptionsWithIsolationGroupHeader()...).Return(nil).AnyTimes()
+	service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).AnyTimes()
 
 	decisionTask := &shared.PollForDecisionTaskResponse{}
-	service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptionsWithIsolationGroupHeader()...).Return(decisionTask, nil).AnyTimes()
-	service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptionsWithIsolationGroupHeader()...).Return(nil, nil).AnyTimes()
+	service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions()...).Return(decisionTask, nil).AnyTimes()
+	service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, nil).AnyTimes()
 
 	// Configure worker options.
 	workerOptions.WorkerActivitiesPerSecond = 20

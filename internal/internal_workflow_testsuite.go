@@ -362,6 +362,7 @@ func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(param
 	childEnv.startedHandler = startedHandler
 	childEnv.testWorkflowEnvironmentShared = env.testWorkflowEnvironmentShared
 	childEnv.workerOptions = env.workerOptions
+	childEnv.workflowInterceptors = env.workflowInterceptors
 	childEnv.workerOptions.DataConverter = params.dataConverter
 	childEnv.registry = env.registry
 

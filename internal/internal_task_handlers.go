@@ -51,6 +51,10 @@ const (
 	defaultStickyCacheSize = 10000
 
 	noRetryBackoff = time.Duration(-1)
+
+	defaultShortLivedWorkflowTimeoutUpperLimitInSec = 1 * 3600
+
+	defaultMediumLivedWorkflowTimeoutUpperLimitInSec = 12 * 3600
 )
 
 type (
@@ -656,8 +660,11 @@ func (wth *workflowTaskHandlerImpl) createWorkflowContext(task *s.PollForDecisio
 func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	task *s.PollForDecisionTaskResponse,
 	historyIterator HistoryIterator,
+	executeTimeoutInSec int32,
 ) (workflowContext *workflowExecutionContextImpl, err error) {
-	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
+	workflowLengthType := workflowCategorizedByTimeout(executeTimeoutInSec)
+	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName()).
+		Tagged(map[string]string{"workflow_runtime_length": workflowLengthType})
 	defer func() {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
 			workflowContext.laTunnel = wth.laTunnel
@@ -762,6 +769,8 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 
 	runID := task.WorkflowExecution.GetRunId()
 	workflowID := task.WorkflowExecution.GetWorkflowId()
+	receceivedLaResult := <-workflowTask.laResultCh
+	workflowExecutionTimeout := receceivedLaResult.task.params.WorkflowInfo.ExecutionStartToCloseTimeoutSeconds
 	traceLog(func() {
 		wth.logger.Debug("Processing new workflow task.",
 			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
@@ -770,7 +779,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 			zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 	})
 
-	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
+	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator, workflowExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -1800,5 +1809,15 @@ func recordActivityHeartbeatByID(
 func traceLog(fn func()) {
 	if enableVerboseLogging {
 		fn()
+	}
+}
+
+func workflowCategorizedByTimeout(executionTimeout int32) string {
+	if executionTimeout <= defaultShortLivedWorkflowTimeoutUpperLimitInSec {
+		return "short"
+	} else if executionTimeout <= defaultMediumLivedWorkflowTimeoutUpperLimitInSec {
+		return "medium"
+	} else {
+		return "long"
 	}
 }

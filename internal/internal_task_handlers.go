@@ -663,7 +663,7 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	executeTimeoutInSec int32,
 ) (workflowContext *workflowExecutionContextImpl, err error) {
 	workflowLengthType := workflowCategorizedByTimeout(executeTimeoutInSec)
-	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName(), tagworkflowruntimelength, workflowLengthType)
+	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, workflowLengthType)
 	defer func() {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
 			workflowContext.laTunnel = wth.laTunnel

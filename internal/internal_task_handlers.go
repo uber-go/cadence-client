@@ -660,10 +660,8 @@ func (wth *workflowTaskHandlerImpl) createWorkflowContext(task *s.PollForDecisio
 func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	task *s.PollForDecisionTaskResponse,
 	historyIterator HistoryIterator,
-	executeTimeoutInSec int32,
 ) (workflowContext *workflowExecutionContextImpl, err error) {
-	workflowLengthType := workflowCategorizedByTimeout(executeTimeoutInSec)
-	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, workflowLengthType)
+	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
 	defer func() {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
 			workflowContext.laTunnel = wth.laTunnel
@@ -683,6 +681,9 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 
 	if workflowContext != nil {
 		workflowContext.Lock()
+		// create metrics scope with workflow runtime length category
+		executionRuntimeType := workflowCategorizedByTimeout(workflowContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds)
+		metricsScope = metricsScope.Tagged(map[string]string{tagworkflowruntimelength: executionRuntimeType})
 		if task.Query != nil && !isFullHistory {
 			// query task and we have a valid cached state
 			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)
@@ -768,8 +769,6 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 
 	runID := task.WorkflowExecution.GetRunId()
 	workflowID := task.WorkflowExecution.GetWorkflowId()
-	receceivedLaResult := <-workflowTask.laResultCh
-	workflowExecutionTimeout := receceivedLaResult.task.params.WorkflowInfo.ExecutionStartToCloseTimeoutSeconds
 	traceLog(func() {
 		wth.logger.Debug("Processing new workflow task.",
 			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
@@ -778,7 +777,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 			zap.Int64("PreviousStartedEventId", task.GetPreviousStartedEventId()))
 	})
 
-	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator, workflowExecutionTimeout)
+	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
 	if err != nil {
 		return nil, err
 	}
@@ -1815,7 +1814,7 @@ func workflowCategorizedByTimeout(executionTimeout int32) string {
 	if executionTimeout <= defaultShortLivedWorkflowTimeoutUpperLimitInSec {
 		return "short"
 	} else if executionTimeout <= defaultMediumLivedWorkflowTimeoutUpperLimitInSec {
-		return "medium"
+		return "intermediate"
 	} else {
 		return "long"
 	}

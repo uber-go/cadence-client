@@ -683,13 +683,16 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 		workflowContext.Lock()
 		// create metrics scope with workflow runtime length category
 		executionRuntimeType := workflowCategorizedByTimeout(workflowContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds)
-		metricsScope = metricsScope.Tagged(map[string]string{tagworkflowruntimelength: executionRuntimeType})
+		wth.logger.Info(fmt.Sprintf("The timeout seconds is %d with type of %s", workflowContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds, executionRuntimeType))
+		metricsScope2 := wth.metricsScope.GetTaggedScope(tagworkflowruntimelength, executionRuntimeType, tagWorkflowType, task.WorkflowType.GetName())
 		if task.Query != nil && !isFullHistory {
 			// query task and we have a valid cached state
 			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)
+			metricsScope2.Counter(metrics.StickyCacheHit).Inc(1)
 		} else if history.Events[0].GetEventId() == workflowContext.previousStartedEventID+1 {
 			// non query task and we have a valid cached state
 			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)
+			metricsScope2.Counter(metrics.StickyCacheHit).Inc(1)
 		} else {
 			// non query task and cached state is missing events, we need to discard the cached state and rebuild one.
 			workflowContext.ResetIfStale(task, historyIterator)

@@ -686,7 +686,7 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 		workflowContext.Lock()
 		// add new tag on metrics scope with workflow runtime length category
 		executionRuntimeType := workflowCategorizedByTimeout(workflowContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds)
-		metricsScope = wth.metricsScope.GetTaggedScope(tagworkflowruntimelength, executionRuntimeType)
+		metricsScope = metricsScope.Tagged(map[string]string{tagworkflowruntimelength: executionRuntimeType})
 		if task.Query != nil && !isFullHistory {
 			// query task and we have a valid cached state
 			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)

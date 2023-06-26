@@ -297,6 +297,15 @@ func createTestEventTimerFired(eventID int64, id int) *s.HistoryEvent {
 		TimerFiredEventAttributes: attr}
 }
 
+func findLogField(entry observer.LoggedEntry, fieldName string) *zapcore.Field {
+	for _, field := range entry.Context {
+		if field.Key == fieldName {
+			return &field
+		}
+	}
+	return nil
+}
+
 var testWorkflowTaskTasklist = "tl1"
 
 func (t *TaskHandlersTestSuite) testWorkflowTaskWorkflowExecutionStartedHelper(params workerExecutionParameters) {
@@ -874,14 +883,7 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicLogNonexistingI
 	ignoredWorkflowLogs := logs.FilterMessage("Ignored workflow panic error")
 	require.Len(t.T(), ignoredWorkflowLogs.All(), 1)
 
-	// Find the ReplayError field
-	withField := ignoredWorkflowLogs.All()[0]
-	var replayErrorField *zapcore.Field
-	for _, field := range withField.Context {
-		if field.Key == "ReplayError" {
-			replayErrorField = &field
-		}
-	}
+	replayErrorField := findLogField(ignoredWorkflowLogs.All()[0], "ReplayError")
 	require.NotNil(t.T(), replayErrorField)
 	require.Equal(t.T(), zapcore.ErrorType, replayErrorField.Type)
 	require.ErrorContains(t.T(), replayErrorField.Interface.(error),
@@ -928,12 +930,16 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowPanics() {
 		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
 		createTestEventDecisionTaskStarted(3),
 	}
+
+	obs, logs := observer.New(zap.ErrorLevel)
+	logger := zap.New(obs)
+
 	task := createWorkflowTask(testEvents, 3, "PanicWorkflow")
 	params := workerExecutionParameters{
 		TaskList: taskList,
 		WorkerOptions: WorkerOptions{
 			Identity:                       "test-id-1",
-			Logger:                         zap.NewNop(),
+			Logger:                         logger,
 			NonDeterministicWorkflowPolicy: NonDeterministicWorkflowPolicyBlockWorkflow,
 		},
 	}
@@ -946,6 +952,14 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowPanics() {
 	t.True(ok)
 	t.EqualValues("WORKFLOW_WORKER_UNHANDLED_FAILURE", r.Cause.String())
 	t.EqualValues("panicError", string(r.Details))
+
+	// Check that the error was logged
+	panicLogs := logs.FilterMessage("Workflow panic.")
+	require.Len(t.T(), panicLogs.All(), 1)
+
+	wfTypeField := findLogField(panicLogs.All()[0], tagWorkflowType)
+	require.NotNil(t.T(), wfTypeField)
+	require.Equal(t.T(), "PanicWorkflow", wfTypeField.String)
 }
 
 func (t *TaskHandlersTestSuite) TestGetWorkflowInfo() {

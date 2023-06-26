@@ -545,8 +545,6 @@ func newLocalActivityPoller(params workerExecutionParameters, laTunnel *localAct
 }
 
 func (latp *localActivityTaskPoller) PollTask() (interface{}, error) {
-	// emit hardware
-	emitHardwareMetricsTallyScope(latp.metricsScope)
 	return latp.laTunnel.getTask(), nil
 }
 
@@ -1380,33 +1378,19 @@ func convertActivityResultToRespondRequestByID(identity, domain, workflowID, run
 }
 
 func emitHardwareMetricsTaggedScope(scope *metrics.TaggedScope) {
-	cpuPercent, _ := cpu.Percent(0, false)
-	cpuCores, _ := cpu.Counts(false)
+	if scope != nil {
+		cpuPercent, _ := cpu.Percent(0, false)
+		cpuCores, _ := cpu.Counts(false)
 
-	scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
-	scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
+		scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
+		scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
 
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
+		var memStats runtime.MemStats
+		runtime.ReadMemStats(&memStats)
 
-	scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
-	scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
-	scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
-	scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
-}
-
-func emitHardwareMetricsTallyScope(scope tally.Scope) {
-	cpuPercent, _ := cpu.Percent(0, false)
-	cpuCores, _ := cpu.Counts(false)
-
-	scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
-	scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
-
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-
-	scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
-	scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
-	scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
-	scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
+		scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
+		scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
+		scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
+		scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
+	}
 }

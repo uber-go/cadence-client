@@ -27,6 +27,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/shirou/gopsutil/cpu"
+	"runtime"
 	"sync"
 	"time"
 
@@ -297,6 +299,9 @@ func newWorkflowTaskPoller(
 
 // PollTask polls a new task
 func (wtp *workflowTaskPoller) PollTask() (interface{}, error) {
+	// emit hardware
+	emitHardwareMetricsTaggedScope(wtp.metricsScope)
+
 	// Get the task.
 	workflowTask, err := wtp.doPoll(wtp.featureFlags, wtp.poll)
 	if err != nil {
@@ -540,6 +545,8 @@ func newLocalActivityPoller(params workerExecutionParameters, laTunnel *localAct
 }
 
 func (latp *localActivityTaskPoller) PollTask() (interface{}, error) {
+	// emit hardware
+	emitHardwareMetricsTallyScope(latp.metricsScope)
 	return latp.laTunnel.getTask(), nil
 }
 
@@ -1084,6 +1091,7 @@ func (atp *activityTaskPoller) pollWithMetrics(ctx context.Context,
 
 // PollTask polls a new task
 func (atp *activityTaskPoller) PollTask() (interface{}, error) {
+	emitHardwareMetricsTaggedScope(atp.metricsScope)
 	// Get the task.
 	activityTask, err := atp.doPoll(atp.featureFlags, atp.pollWithMetricsFunc(atp.poll))
 	if err != nil {
@@ -1155,6 +1163,7 @@ func newLocallyDispatchedActivityTaskPoller(taskHandler ActivityTaskHandler, ser
 
 // PollTask polls a new task
 func (atp *locallyDispatchedActivityTaskPoller) PollTask() (interface{}, error) {
+	emitHardwareMetricsTaggedScope(atp.metricsScope)
 	// Get the task.
 	activityTask, err := atp.doPoll(atp.featureFlags, atp.pollWithMetricsFunc(atp.pollLocallyDispatchedActivity))
 	if err != nil {
@@ -1368,4 +1377,36 @@ func convertActivityResultToRespondRequestByID(identity, domain, workflowID, run
 		Reason:     common.StringPtr(reason),
 		Details:    details,
 		Identity:   common.StringPtr(identity)}
+}
+
+func emitHardwareMetricsTaggedScope(scope *metrics.TaggedScope) {
+	cpuPercent, _ := cpu.Percent(0, false)
+	cpuCores, _ := cpu.Counts(false)
+
+	scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
+	scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumCPU()))
+	scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
+	scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
+	scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
+}
+
+func emitHardwareMetricsTallyScope(scope tally.Scope) {
+	cpuPercent, _ := cpu.Percent(0, false)
+	cpuCores, _ := cpu.Counts(false)
+
+	scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
+	scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
+	scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
+	scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
+	scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
 }

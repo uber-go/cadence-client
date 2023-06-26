@@ -1389,7 +1389,7 @@ func emitHardwareMetricsTaggedScope(scope *metrics.TaggedScope) {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
-	scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumCPU()))
+	scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
 	scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
 	scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
 	scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))

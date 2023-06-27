@@ -309,6 +309,9 @@ func newWorkflowTaskWorkerInternal(
 	// 3) the result pushed to laTunnel will be send as task to workflow worker to process.
 	worker.taskQueueCh = laTunnel.resultCh
 
+	worker.options.host = params.Host
+	localActivityWorker.options.host = params.Host
+
 	return &workflowWorker{
 		executionParameters: params,
 		workflowService:     service,
@@ -480,6 +483,7 @@ func newActivityTaskWorker(
 		workerParams.MetricsScope,
 		sessionTokenBucket,
 	)
+	base.options.host = workerParams.Host
 
 	return &activityWorker{
 		executionParameters: workerParams,

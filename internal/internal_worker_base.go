@@ -118,6 +118,7 @@ type (
 		workerType        string
 		shutdownTimeout   time.Duration
 		userContextCancel context.CancelFunc
+		host              string
 	}
 
 	// baseWorker that wraps worker activities.

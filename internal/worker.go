@@ -259,6 +259,10 @@ type (
 		// Optional: Authorization interface to get the Auth Token
 		// default: No provider
 		Authorization auth.AuthorizationProvider
+
+		// Optional: Host is just string on the machine running the client
+		// default: empty string
+		Host string
 	}
 )
 

@@ -227,6 +227,16 @@ func (s *internalWorkerTestSuite) TestCreateWorker_WithAutoScaler() {
 	worker.Stop()
 }
 
+func (s *internalWorkerTestSuite) TestCreateWorker_WithHost() {
+	worker := createWorkerWithHost(s.T(), s.service)
+	err := worker.Start()
+	require.NoError(s.T(), err)
+	time.Sleep(time.Millisecond * 200)
+	assert.Equal(s.T(), "test_host", worker.activityWorker.worker.options.host)
+	assert.Equal(s.T(), "test_host", worker.workflowWorker.worker.options.host)
+	worker.Stop()
+}
+
 func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
 	// Create service endpoint
 	mockCtrl := gomock.NewController(s.T())
@@ -413,6 +423,13 @@ func createWorkerWithAutoscaler(
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
 	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
+}
+
+func createWorkerWithHost(
+	t *testing.T,
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{Host: "test_host"})
 }
 
 func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions) {

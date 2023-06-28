@@ -27,7 +27,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/shirou/gopsutil/cpu"
 	"os"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -46,6 +48,7 @@ import (
 const (
 	retryPollOperationInitialInterval = 20 * time.Millisecond
 	retryPollOperationMaxInterval     = 10 * time.Second
+	hardwareEmitInterval              = 30 * time.Second
 )
 
 var (
@@ -134,6 +137,7 @@ type (
 		retrier              *backoff.ConcurrentRetrier // Service errors back off retrier
 		logger               *zap.Logger
 		metricsScope         tally.Scope
+		ticker               *time.Ticker
 
 		pollerRequestCh    chan struct{}
 		pollerAutoScaler   *pollerAutoScaler
@@ -209,6 +213,10 @@ func (bw *baseWorker) Start() {
 
 	bw.shutdownWG.Add(1)
 	go bw.runTaskDispatcher()
+
+	bw.ticker = time.NewTicker(hardwareEmitInterval)
+	bw.shutdownWG.Add(1)
+	go bw.EmitHardwareUsage(bw.ticker)
 
 	bw.isWorkerStarted = true
 	traceLog(func() {
@@ -386,6 +394,7 @@ func (bw *baseWorker) Stop() {
 	}
 	close(bw.shutdownCh)
 	bw.limiterContextCancel()
+	bw.ticker.Stop()
 	if bw.pollerAutoScaler != nil {
 		bw.pollerAutoScaler.Stop()
 	}
@@ -401,4 +410,32 @@ func (bw *baseWorker) Stop() {
 		bw.options.userContextCancel()
 	}
 	return
+}
+
+func (bw *baseWorker) EmitHardwareUsage(ticker *time.Ticker) {
+	defer bw.shutdownWG.Done()
+
+	for {
+		select {
+		case <-bw.shutdownCh:
+			return
+		case <-ticker.C:
+			host := bw.options.host
+			scope := bw.metricsScope.Tagged(map[string]string{"host": host})
+
+			cpuPercent, _ := cpu.Percent(0, false)
+			cpuCores, _ := cpu.Counts(false)
+
+			scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
+			scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
+
+			var memStats runtime.MemStats
+			runtime.ReadMemStats(&memStats)
+
+			scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
+			scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
+			scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
+			scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
+		}
+	}
 }

@@ -196,7 +196,6 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 
 // Start starts a fixed set of routines to do the work.
 func (bw *baseWorker) Start() {
-	var once sync.Once
 	if bw.isWorkerStarted {
 		return
 	}

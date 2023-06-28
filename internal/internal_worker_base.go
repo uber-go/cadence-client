@@ -57,6 +57,8 @@ var (
 
 var errShutdown = errors.New("worker shutting down")
 
+var emitOnce sync.Once
+
 type (
 	// resultHandler that returns result
 	resultHandler   func(result []byte, err error)
@@ -217,7 +219,7 @@ func (bw *baseWorker) Start() {
 	bw.ticker = time.NewTicker(hardwareEmitInterval)
 	bw.shutdownWG.Add(1)
 	go func() {
-		once.Do(bw.EmitHardwareUsage)
+		emitOnce.Do(bw.EmitHardwareUsage)
 	}()
 
 	bw.isWorkerStarted = true

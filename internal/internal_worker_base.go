@@ -196,6 +196,7 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 
 // Start starts a fixed set of routines to do the work.
 func (bw *baseWorker) Start() {
+	var once sync.Once
 	if bw.isWorkerStarted {
 		return
 	}
@@ -216,7 +217,9 @@ func (bw *baseWorker) Start() {
 
 	bw.ticker = time.NewTicker(hardwareEmitInterval)
 	bw.shutdownWG.Add(1)
-	go bw.EmitHardwareUsage(bw.ticker)
+	go func() {
+		once.Do(bw.EmitHardwareUsage)
+	}()
 
 	bw.isWorkerStarted = true
 	traceLog(func() {
@@ -412,14 +415,14 @@ func (bw *baseWorker) Stop() {
 	return
 }
 
-func (bw *baseWorker) EmitHardwareUsage(ticker *time.Ticker) {
+func (bw *baseWorker) EmitHardwareUsage() {
 	defer bw.shutdownWG.Done()
 
 	for {
 		select {
 		case <-bw.shutdownCh:
 			return
-		case <-ticker.C:
+		case <-bw.ticker.C:
 			host := bw.options.host
 			scope := bw.metricsScope.Tagged(map[string]string{"host": host})
 

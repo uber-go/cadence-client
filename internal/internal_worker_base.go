@@ -216,7 +216,7 @@ func (bw *baseWorker) Start() {
 	go bw.runTaskDispatcher()
 
 	bw.shutdownWG.Add(1)
-	go bw.EmitHardwareUsage()
+	bw.EmitHardwareUsage()
 
 	bw.isWorkerStarted = true
 	traceLog(func() {

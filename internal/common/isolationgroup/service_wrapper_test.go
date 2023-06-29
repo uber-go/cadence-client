@@ -21,7 +21,9 @@
 package isolationgroup
 
 import (
-	"fmt"
+	"context"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"testing"
 	"time"
 
@@ -41,325 +43,363 @@ type (
 	}
 )
 
-type jwtAuthIncorrect struct{}
+func TestAPICalls(t *testing.T) {
 
-func (j *jwtAuthIncorrect) GetAuthToken() ([]byte, error) {
-	return []byte{}, fmt.Errorf("error")
-}
+	tests := map[string]struct {
+		action           func(ctx context.Context, p workflowserviceclient.Interface) (interface{}, error)
+		affordance       func(m *workflowservicetest.MockClient)
+		expectedResponse interface{}
+		expectedErr      error
+	}{
+		"DeprecateDomain": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.DeprecateDomain(ctx, &shared.DeprecateDomainRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().DeprecateDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+			},
+		},
+		"ListDomains": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.ListDomains(ctx, &shared.ListDomainsRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().ListDomains(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&shared.ListDomainsResponse{}, nil)
+			},
+			expectedResponse: &shared.ListDomainsResponse{},
+		},
+		"DescribeDomain": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.DescribeDomain(ctx, &shared.DescribeDomainRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&shared.DescribeDomainResponse{}, nil)
+			},
+			expectedResponse: &shared.DescribeDomainResponse{},
+		},
+		"DescribeWorkflowExecution": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.DescribeWorkflowExecution(ctx, &shared.DescribeWorkflowExecutionRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&shared.DescribeWorkflowExecutionResponse{}, nil)
+			},
+			expectedResponse: &shared.DescribeWorkflowExecutionResponse{},
+		},
+		"ListOpenWorkflowExecutions": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.ListOpenWorkflowExecutions(ctx, &shared.ListOpenWorkflowExecutionsRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().ListOpenWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&shared.ListOpenWorkflowExecutionsResponse{}, nil)
+			},
+			expectedResponse: &shared.ListOpenWorkflowExecutionsResponse{},
+		},
+		"ListClosedWorkflowExecutions": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.ListClosedWorkflowExecutions(ctx, &shared.ListClosedWorkflowExecutionsRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().ListClosedWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&shared.ListClosedWorkflowExecutionsResponse{}, nil)
+			},
+			expectedResponse: &shared.ListClosedWorkflowExecutionsResponse{},
+		},
+		"ListWorkflowExecutions": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.ListWorkflowExecutions(ctx, &shared.ListWorkflowExecutionsRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().ListWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&shared.ListWorkflowExecutionsResponse{}, nil)
+			},
+			expectedResponse: &shared.ListWorkflowExecutionsResponse{},
+		},
+		"ListArchivedWorkflowExecutions": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.ListArchivedWorkflowExecutions(ctx, &shared.ListArchivedWorkflowExecutionsRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().ListArchivedWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&shared.ListArchivedWorkflowExecutionsResponse{}, nil)
+			},
+			expectedResponse: &shared.ListArchivedWorkflowExecutionsResponse{},
+		},
+		"ScanWorkflowExecutions": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.ScanWorkflowExecutions(ctx, &shared.ListWorkflowExecutionsRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().ScanWorkflowExecutions(gomock.Any(), &shared.ListWorkflowExecutionsRequest{}, gomock.Any()).Times(1).Return(&shared.ListWorkflowExecutionsResponse{}, nil)
+			},
+			expectedResponse: &shared.ListWorkflowExecutionsResponse{},
+		},
+		"CountWorkflowExecutions": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.CountWorkflowExecutions(ctx, &shared.CountWorkflowExecutionsRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().CountWorkflowExecutions(gomock.Any(), &shared.CountWorkflowExecutionsRequest{}, gomock.Any()).Times(1).Return(&shared.CountWorkflowExecutionsResponse{}, nil)
+			},
+			expectedResponse: &shared.CountWorkflowExecutionsResponse{},
+		},
+		"PollForActivityTask": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.PollForActivityTask(ctx, &shared.PollForActivityTaskRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().PollForActivityTask(gomock.Any(), &shared.PollForActivityTaskRequest{}, gomock.Any()).Times(1).Return(&shared.PollForActivityTaskResponse{}, nil)
+			},
+			expectedResponse: &shared.PollForActivityTaskResponse{},
+		},
+		"PollForDecisionTask": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.PollForDecisionTask(ctx, &shared.PollForDecisionTaskRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().PollForDecisionTask(gomock.Any(), &shared.PollForDecisionTaskRequest{}, gomock.Any()).Times(1).Return(&shared.PollForDecisionTaskResponse{}, nil)
+			},
+			expectedResponse: &shared.PollForDecisionTaskResponse{},
+		},
+		"PollForRecordHeartbeatTask": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.RecordActivityTaskHeartbeat(ctx, &shared.RecordActivityTaskHeartbeatRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), &shared.RecordActivityTaskHeartbeatRequest{}, gomock.Any()).Times(1).Return(&shared.RecordActivityTaskHeartbeatResponse{}, nil)
+			},
+			expectedResponse: &shared.RecordActivityTaskHeartbeatResponse{},
+		},
+		"PollForRecordHeartbeatTaskByID": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.RecordActivityTaskHeartbeatByID(ctx, &shared.RecordActivityTaskHeartbeatByIDRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RecordActivityTaskHeartbeatByID(gomock.Any(), &shared.RecordActivityTaskHeartbeatByIDRequest{}, gomock.Any()).Times(1).Return(&shared.RecordActivityTaskHeartbeatResponse{}, nil)
+			},
+			expectedResponse: &shared.RecordActivityTaskHeartbeatResponse{},
+		},
+		"RegisterDomain": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RegisterDomain(ctx, &shared.RegisterDomainRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RegisterDomain(gomock.Any(), &shared.RegisterDomainRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
+		"RequestCancelWorkflowExecution": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RequestCancelWorkflowExecution(ctx, &shared.RequestCancelWorkflowExecutionRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RequestCancelWorkflowExecution(gomock.Any(), &shared.RequestCancelWorkflowExecutionRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
+		"RespondActivityTaskCanceled": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RespondActivityTaskCanceled(ctx, &shared.RespondActivityTaskCanceledRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RespondActivityTaskCanceled(gomock.Any(), &shared.RespondActivityTaskCanceledRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
 
-func TestServiceWrapperSuite(t *testing.T) {
-	suite.Run(t, new(serviceWrapperSuite))
-}
+		"RespondActivityTaskCompleted": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RespondActivityTaskCompleted(ctx, &shared.RespondActivityTaskCompletedRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RespondActivityTaskCompleted(gomock.Any(), &shared.RespondActivityTaskCompletedRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
 
-func (s *serviceWrapperSuite) SetupTest() {
-	s.controller = gomock.NewController(s.T())
-	s.Service = workflowservicetest.NewMockClient(s.controller)
-}
+		"RespondActivityTaskFailed": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RespondActivityTaskFailed(ctx, &shared.RespondActivityTaskFailedRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RespondActivityTaskFailed(gomock.Any(), &shared.RespondActivityTaskFailedRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
 
-func (s *serviceWrapperSuite) TearDownTest() {
-	s.controller.Finish()
-}
+		"RespondActivityTaskCompletedByID": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RespondActivityTaskCompletedByID(ctx, &shared.RespondActivityTaskCompletedByIDRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), &shared.RespondActivityTaskCompletedByIDRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
 
-func (s *serviceWrapperSuite) TestDeprecateDomainValidToken() {
-	s.Service.EXPECT().DeprecateDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.DeprecateDomain(ctx, &shared.DeprecateDomainRequest{})
-	s.NoError(err)
-}
+		"RespondActivityTaskCanceledByID": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RespondActivityTaskCanceledByID(ctx, &shared.RespondActivityTaskCanceledByIDRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RespondActivityTaskCanceledByID(gomock.Any(), &shared.RespondActivityTaskCanceledByIDRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
 
-func (s *serviceWrapperSuite) TestListDomainsValidToken() {
-	s.Service.EXPECT().ListDomains(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.ListDomains(ctx, &shared.ListDomainsRequest{})
-	s.NoError(err)
-}
+		"RespondActivityTaskFailedByID": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RespondActivityTaskFailedByID(ctx, &shared.RespondActivityTaskFailedByIDRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RespondActivityTaskFailedByID(gomock.Any(), &shared.RespondActivityTaskFailedByIDRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
 
-func (s *serviceWrapperSuite) TestDescribeDomainValidToken() {
-	s.Service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.DescribeDomain(ctx, &shared.DescribeDomainRequest{})
-	s.NoError(err)
-}
+		"RespondDecisionTaskCompleted": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.RespondDecisionTaskCompleted(ctx, &shared.RespondDecisionTaskCompletedRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), &shared.RespondDecisionTaskCompletedRequest{}, gomock.Any()).Times(1).Return(&shared.RespondDecisionTaskCompletedResponse{}, nil)
+			},
+			expectedResponse: &shared.RespondDecisionTaskCompletedResponse{},
+		},
 
-func (s *serviceWrapperSuite) TestDescribeWorkflowExecutionValidToken() {
-	s.Service.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.DescribeWorkflowExecution(ctx, &shared.DescribeWorkflowExecutionRequest{})
-	s.NoError(err)
-}
+		"RespondDecisionTaskFailed": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RespondDecisionTaskFailed(ctx, &shared.RespondDecisionTaskFailedRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RespondDecisionTaskFailed(gomock.Any(), &shared.RespondDecisionTaskFailedRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
+		"SignalWorkflowExecution": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.SignalWorkflowExecution(ctx, &shared.SignalWorkflowExecutionRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().SignalWorkflowExecution(gomock.Any(), &shared.SignalWorkflowExecutionRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
 
-func (s *serviceWrapperSuite) TestGetWorkflowExecutionHistoryValidToken() {
-	s.Service.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.GetWorkflowExecutionHistory(ctx, &shared.GetWorkflowExecutionHistoryRequest{})
-	s.NoError(err)
-}
+		"SignalWithStartWorkflowExecution": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.SignalWithStartWorkflowExecution(ctx, &shared.SignalWithStartWorkflowExecutionRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), &shared.SignalWithStartWorkflowExecutionRequest{}, gomock.Any()).Times(1).Return(&shared.StartWorkflowExecutionResponse{}, nil)
+			},
+			expectedResponse: &shared.StartWorkflowExecutionResponse{},
+		},
 
-func (s *serviceWrapperSuite) TestListClosedWorkflowExecutionsValidToken() {
-	s.Service.EXPECT().ListClosedWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.ListClosedWorkflowExecutions(ctx, &shared.ListClosedWorkflowExecutionsRequest{})
-	s.NoError(err)
-}
+		"StartWorkflowExecution": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.StartWorkflowExecution(ctx, &shared.StartWorkflowExecutionRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().StartWorkflowExecution(gomock.Any(), &shared.StartWorkflowExecutionRequest{}, gomock.Any()).Times(1).Return(&shared.StartWorkflowExecutionResponse{}, nil)
+			},
+			expectedResponse: &shared.StartWorkflowExecutionResponse{},
+		},
 
-func (s *serviceWrapperSuite) TestListOpenWorkflowExecutionsValidToken() {
-	s.Service.EXPECT().ListOpenWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.ListOpenWorkflowExecutions(ctx, &shared.ListOpenWorkflowExecutionsRequest{})
-	s.NoError(err)
-}
+		"TerminateWorkflowExecution": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.TerminateWorkflowExecution(ctx, &shared.TerminateWorkflowExecutionRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().TerminateWorkflowExecution(gomock.Any(), &shared.TerminateWorkflowExecutionRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
 
-func (s *serviceWrapperSuite) TestListWorkflowExecutionsValidToken() {
-	s.Service.EXPECT().ListWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.ListWorkflowExecutions(ctx, &shared.ListWorkflowExecutionsRequest{})
-	s.NoError(err)
-}
+		"ResetWorkflowExecution": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.ResetWorkflowExecution(ctx, &shared.ResetWorkflowExecutionRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().ResetWorkflowExecution(gomock.Any(), &shared.ResetWorkflowExecutionRequest{}, gomock.Any()).Times(1).Return(&shared.ResetWorkflowExecutionResponse{}, nil)
+			},
+			expectedResponse: &shared.ResetWorkflowExecutionResponse{},
+		},
+		"UpdateDomain": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.UpdateDomain(ctx, &shared.UpdateDomainRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().UpdateDomain(gomock.Any(), &shared.UpdateDomainRequest{}, gomock.Any()).Times(1).Return(&shared.UpdateDomainResponse{}, nil)
+			},
+			expectedResponse: &shared.UpdateDomainResponse{},
+		},
 
-func (s *serviceWrapperSuite) TestListArchivedWorkflowExecutionsValidToken() {
-	s.Service.EXPECT().ListArchivedWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.ListArchivedWorkflowExecutions(ctx, &shared.ListArchivedWorkflowExecutionsRequest{})
-	s.NoError(err)
-}
+		"QueryWorkflow": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.QueryWorkflow(ctx, &shared.QueryWorkflowRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().QueryWorkflow(gomock.Any(), &shared.QueryWorkflowRequest{}, gomock.Any()).Times(1).Return(&shared.QueryWorkflowResponse{}, nil)
+			},
+			expectedResponse: &shared.QueryWorkflowResponse{},
+		},
+		"ResetStickyTaskList": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.ResetStickyTaskList(ctx, &shared.ResetStickyTaskListRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().ResetStickyTaskList(gomock.Any(), &shared.ResetStickyTaskListRequest{}, gomock.Any()).Times(1).Return(&shared.ResetStickyTaskListResponse{}, nil)
+			},
+			expectedResponse: &shared.ResetStickyTaskListResponse{},
+		},
 
-func (s *serviceWrapperSuite) TestScanWorkflowExecutionsValidToken() {
-	s.Service.EXPECT().ScanWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.ScanWorkflowExecutions(ctx, &shared.ListWorkflowExecutionsRequest{})
-	s.NoError(err)
-}
+		"DescribeTaskList": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.DescribeTaskList(ctx, &shared.DescribeTaskListRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().DescribeTaskList(gomock.Any(), &shared.DescribeTaskListRequest{}, gomock.Any()).Times(1).Return(&shared.DescribeTaskListResponse{}, nil)
+			},
+			expectedResponse: &shared.DescribeTaskListResponse{},
+		},
 
-func (s *serviceWrapperSuite) TestCountWorkflowExecutionsValidToken() {
-	s.Service.EXPECT().CountWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.CountWorkflowExecutions(ctx, &shared.CountWorkflowExecutionsRequest{})
-	s.NoError(err)
-}
+		"RespondQueryTaskCompleted": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return nil, sw.RespondQueryTaskCompleted(ctx, &shared.RespondQueryTaskCompletedRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().RespondQueryTaskCompleted(gomock.Any(), &shared.RespondQueryTaskCompletedRequest{}, gomock.Any()).Times(1).Return(nil)
+			},
+		},
 
-func (s *serviceWrapperSuite) TestPollForActivityTaskValidToken() {
-	s.Service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.PollForActivityTask(ctx, &shared.PollForActivityTaskRequest{})
-	s.NoError(err)
-}
+		"GetSearchAttributes": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.GetSearchAttributes(ctx)
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().GetSearchAttributes(gomock.Any(), gomock.Any()).Times(1).Return(&shared.GetSearchAttributesResponse{}, nil)
+			},
+			expectedResponse: &shared.GetSearchAttributesResponse{},
+		},
 
-func (s *serviceWrapperSuite) TestPollForDecisionTaskValidToken() {
-	s.Service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.PollForDecisionTask(ctx, &shared.PollForDecisionTaskRequest{})
-	s.NoError(err)
-}
+		"ListTaskListPartitions": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.ListTaskListPartitions(ctx, &shared.ListTaskListPartitionsRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().ListTaskListPartitions(gomock.Any(), &shared.ListTaskListPartitionsRequest{}, gomock.Any()).Times(1).Return(&shared.ListTaskListPartitionsResponse{}, nil)
+			},
+			expectedResponse: &shared.ListTaskListPartitionsResponse{},
+		},
 
-func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatValidToken() {
-	s.Service.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.RecordActivityTaskHeartbeat(ctx, &shared.RecordActivityTaskHeartbeatRequest{})
-	s.NoError(err)
-}
+		"GetClusterInfo": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.GetClusterInfo(ctx)
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().GetClusterInfo(gomock.Any(), gomock.Any()).Times(1).Return(&shared.ClusterInfo{}, nil)
+			},
+			expectedResponse: &shared.ClusterInfo{},
+		},
+	}
 
-func (s *serviceWrapperSuite) TestRecordActivityTaskHeartbeatByIDValidToken() {
-	s.Service.EXPECT().RecordActivityTaskHeartbeatByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.RecordActivityTaskHeartbeatByID(ctx, &shared.RecordActivityTaskHeartbeatByIDRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRegisterDomainValidToken() {
-	s.Service.EXPECT().RegisterDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RegisterDomain(ctx, &shared.RegisterDomainRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRequestCancelWorkflowExecutionValidToken() {
-	s.Service.EXPECT().RequestCancelWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RequestCancelWorkflowExecution(ctx, &shared.RequestCancelWorkflowExecutionRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledValidToken() {
-	s.Service.EXPECT().RespondActivityTaskCanceled(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RespondActivityTaskCanceled(ctx, &shared.RespondActivityTaskCanceledRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedValidToken() {
-	s.Service.EXPECT().RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RespondActivityTaskCompleted(ctx, &shared.RespondActivityTaskCompletedRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRespondActivityTaskFailedValidToken() {
-	s.Service.EXPECT().RespondActivityTaskFailed(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RespondActivityTaskFailed(ctx, &shared.RespondActivityTaskFailedRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRespondActivityTaskCanceledByIDValidToken() {
-	s.Service.EXPECT().RespondActivityTaskCanceledByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RespondActivityTaskCanceledByID(ctx, &shared.RespondActivityTaskCanceledByIDRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRespondActivityTaskCompletedByIDValidToken() {
-	s.Service.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RespondActivityTaskCompletedByID(ctx, &shared.RespondActivityTaskCompletedByIDRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRespondActivityTaskFailedByIDValidToken() {
-	s.Service.EXPECT().RespondActivityTaskFailedByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RespondActivityTaskFailedByID(ctx, &shared.RespondActivityTaskFailedByIDRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRespondDecisionTaskCompletedValidToken() {
-	s.Service.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.RespondDecisionTaskCompleted(ctx, &shared.RespondDecisionTaskCompletedRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRespondDecisionTaskFailedValidToken() {
-	s.Service.EXPECT().RespondDecisionTaskFailed(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RespondDecisionTaskFailed(ctx, &shared.RespondDecisionTaskFailedRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestSignalWorkflowExecutionValidToken() {
-	s.Service.EXPECT().SignalWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.SignalWorkflowExecution(ctx, &shared.SignalWorkflowExecutionRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestSignalWithStartWorkflowExecutionToken() {
-	s.Service.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.SignalWithStartWorkflowExecution(ctx, &shared.SignalWithStartWorkflowExecutionRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestStartWorkflowExecutionToken() {
-	s.Service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.StartWorkflowExecution(ctx, &shared.StartWorkflowExecutionRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestTerminateWorkflowExecutionToken() {
-	s.Service.EXPECT().TerminateWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.TerminateWorkflowExecution(ctx, &shared.TerminateWorkflowExecutionRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestResetWorkflowExecutionValidToken() {
-	s.Service.EXPECT().ResetWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.ResetWorkflowExecution(ctx, &shared.ResetWorkflowExecutionRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestUpdateDomainValidToken() {
-	s.Service.EXPECT().UpdateDomain(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.UpdateDomain(ctx, &shared.UpdateDomainRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestQueryWorkflowValidToken() {
-	s.Service.EXPECT().QueryWorkflow(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.QueryWorkflow(ctx, &shared.QueryWorkflowRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestResetStickyTaskListValidToken() {
-	s.Service.EXPECT().ResetStickyTaskList(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.ResetStickyTaskList(ctx, &shared.ResetStickyTaskListRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestDescribeTaskListValidToken() {
-	s.Service.EXPECT().DescribeTaskList(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.DescribeTaskList(ctx, &shared.DescribeTaskListRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestRespondQueryTaskCompletedValidToken() {
-	s.Service.EXPECT().RespondQueryTaskCompleted(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	err := sw.RespondQueryTaskCompleted(ctx, &shared.RespondQueryTaskCompletedRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestGetSearchAttributesValidToken() {
-	s.Service.EXPECT().GetSearchAttributes(gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.GetSearchAttributes(ctx)
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestListTaskListPartitionsValidToken() {
-	s.Service.EXPECT().ListTaskListPartitions(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.ListTaskListPartitions(ctx, &shared.ListTaskListPartitionsRequest{})
-	s.NoError(err)
-}
-
-func (s *serviceWrapperSuite) TestGetClusterInfoValidToken() {
-	s.Service.EXPECT().GetClusterInfo(gomock.Any(), gomock.Any()).Times(1)
-	sw := NewWorkflowServiceWrapper(s.Service, "zone-1")
-	ctx, _ := thrift.NewContext(time.Minute)
-	_, err := sw.GetClusterInfo(ctx)
-	s.NoError(err)
+	for name, td := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockClient := workflowservicetest.NewMockClient(ctrl)
+			td.affordance(mockClient)
+			sw := NewWorkflowServiceWrapper(mockClient, "zone-1")
+			ctx, _ := thrift.NewContext(time.Minute)
+			res, err := td.action(ctx, sw)
+			assert.Equal(t, td.expectedResponse, res)
+			assert.Equal(t, td.expectedErr, err)
+		})
+	}
 }

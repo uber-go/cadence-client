@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	isolationGroupHeader = "cadence-client-zone"
+	isolationGroupHeader = "cadence-client-isolation-group"
 )
 
 type workflowServiceIsolationGroupWrapper struct {

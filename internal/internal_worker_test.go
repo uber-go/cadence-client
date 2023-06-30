@@ -445,7 +445,7 @@ func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions)
 }
 
 func (s *internalWorkerTestSuite) TestCompleteActivity() {
-	s.testCompleteActivityHelper(&ClientOptions{IsolationGroup: ""})
+	s.testCompleteActivityHelper(nil)
 }
 
 func (s *internalWorkerTestSuite) TestCompleteActivity_WithDataConverter() {
@@ -457,7 +457,7 @@ func (s *internalWorkerTestSuite) TestCompleteActivityById() {
 	t := s.T()
 	mockService := s.service
 	domain := "testDomain"
-	wfClient := NewClient(mockService, domain, &ClientOptions{})
+	wfClient := NewClient(mockService, domain, nil)
 	var completedRequest, canceledRequest, failedRequest interface{}
 	mockService.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), gomock.Any(), callOptions()...).Return(nil).Do(
 		func(ctx context.Context, request *shared.RespondActivityTaskCompletedByIDRequest, opts ...yarpc.CallOption) {
@@ -488,7 +488,7 @@ func (s *internalWorkerTestSuite) TestCompleteActivityById() {
 
 func (s *internalWorkerTestSuite) TestRecordActivityHeartbeat() {
 	domain := "testDomain"
-	wfClient := NewClient(s.service, domain, &ClientOptions{})
+	wfClient := NewClient(s.service, domain, nil)
 	var heartbeatRequest *shared.RecordActivityTaskHeartbeatRequest
 	cancelRequested := false
 	heartbeatResponse := shared.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}
@@ -528,7 +528,7 @@ func (s *internalWorkerTestSuite) TestRecordActivityHeartbeat_WithDataConverter(
 
 func (s *internalWorkerTestSuite) TestRecordActivityHeartbeatByID() {
 	domain := "testDomain"
-	wfClient := NewClient(s.service, domain, &ClientOptions{})
+	wfClient := NewClient(s.service, domain, nil)
 	var heartbeatRequest *shared.RecordActivityTaskHeartbeatByIDRequest
 	cancelRequested := false
 	heartbeatResponse := shared.RecordActivityTaskHeartbeatResponse{CancelRequested: &cancelRequested}

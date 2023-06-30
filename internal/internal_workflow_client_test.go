@@ -1025,7 +1025,7 @@ func (s *workflowClientTestSuite) SetupSuite() {
 func (s *workflowClientTestSuite) SetupTest() {
 	s.mockCtrl = gomock.NewController(s.T())
 	s.service = workflowservicetest.NewMockClient(s.mockCtrl)
-	s.client = NewClient(s.service, domain, &ClientOptions{})
+	s.client = NewClient(s.service, domain, nil)
 }
 
 func (s *workflowClientTestSuite) TearDownTest() {

@@ -216,7 +216,11 @@ func (bw *baseWorker) Start() {
 	go bw.runTaskDispatcher()
 
 	bw.shutdownWG.Add(1)
-	bw.EmitHardwareUsage()
+
+	// We want the emit function run once per host instead of run once per worker
+	emitOnce.Do(func() {
+		go bw.EmitHardwareUsage()
+	})
 
 	bw.isWorkerStarted = true
 	traceLog(func() {
@@ -413,35 +417,41 @@ func (bw *baseWorker) Stop() {
 
 func (bw *baseWorker) EmitHardwareUsage() {
 	defer bw.shutdownWG.Done()
+	ticker := time.NewTicker(hardwareEmitInterval)
+	defer func() {
+		if p := recover(); p != nil {
+			bw.metricsScope.Counter(metrics.WorkerPanicCounter).Inc(1)
+			topLine := fmt.Sprintf("base worker for %s [panic]:", bw.options.workerType)
+			st := getStackTraceRaw(topLine, 7, 0)
+			bw.logger.Error("Unhandled panic in hardware emitting.",
+				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+				zap.String(tagPanicStack, st))
+		}
+		// stopping the ticker in defer so that is always stop
+		ticker.Stop()
+	}()
+	for {
+		select {
+		case <-bw.shutdownCh:
+			return
+		case <-ticker.C:
+			host := bw.options.host
+			scope := bw.metricsScope.Tagged(map[string]string{"host": host})
 
-	emitOnce.Do(func() {
-		go func() {
-			ticker := time.NewTicker(hardwareEmitInterval)
-			for {
-				select {
-				case <-bw.shutdownCh:
-					ticker.Stop()
-					return
-				case <-ticker.C:
-					host := bw.options.host
-					scope := bw.metricsScope.Tagged(map[string]string{"host": host})
+			cpuPercent, _ := cpu.Percent(0, false)
+			cpuCores, _ := cpu.Counts(false)
 
-					cpuPercent, _ := cpu.Percent(0, false)
-					cpuCores, _ := cpu.Counts(false)
+			scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
+			scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
 
-					scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
-					scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
+			var memStats runtime.MemStats
+			runtime.ReadMemStats(&memStats)
 
-					var memStats runtime.MemStats
-					runtime.ReadMemStats(&memStats)
-
-					scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
-					scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
-					scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
-					scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
-				}
-			}
-		}()
-	})
+			scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
+			scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
+			scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
+			scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
+		}
+	}
 
 }

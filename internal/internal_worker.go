@@ -38,6 +38,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/cadence/internal/common/isolationgroup"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
@@ -995,6 +997,9 @@ func newAggregatedWorker(
 	logger := workerParams.Logger
 	if options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
+	if options.IsolationGroup != "" {
+		service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, workerParams.MetricsScope)
 	processTestTags(&wOptions, &workerParams)

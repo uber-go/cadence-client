@@ -48,7 +48,7 @@ import (
 const (
 	retryPollOperationInitialInterval = 20 * time.Millisecond
 	retryPollOperationMaxInterval     = 10 * time.Second
-	hardwareEmitInterval              = 30 * time.Second
+	hardwareMetricsCollectInterval    = 30 * time.Second
 )
 
 var (
@@ -215,9 +215,10 @@ func (bw *baseWorker) Start() {
 	bw.shutdownWG.Add(1)
 	go bw.runTaskDispatcher()
 
+	// We want the emit function run once per host instead of run once per worker
 	emitOnce.Do(func() {
 		bw.shutdownWG.Add(1)
-		go bw.EmitHardwareUsage()
+		go bw.emitHardwareUsage()
 	})
 
 	bw.isWorkerStarted = true
@@ -413,10 +414,7 @@ func (bw *baseWorker) Stop() {
 	return
 }
 
-func (bw *baseWorker) EmitHardwareUsage() {
-	defer bw.shutdownWG.Done()
-	// We want the emit function run once per host instead of run once per worker
-	ticker := time.NewTicker(hardwareEmitInterval)
+func (bw *baseWorker) emitHardwareUsage() {
 	defer func() {
 		if p := recover(); p != nil {
 			bw.metricsScope.Counter(metrics.WorkerPanicCounter).Inc(1)
@@ -427,6 +425,8 @@ func (bw *baseWorker) EmitHardwareUsage() {
 				zap.String(tagPanicStack, st))
 		}
 	}()
+	defer bw.shutdownWG.Done()
+	ticker := time.NewTicker(hardwareMetricsCollectInterval)
 	for {
 		select {
 		case <-bw.shutdownCh:
@@ -434,7 +434,7 @@ func (bw *baseWorker) EmitHardwareUsage() {
 			return
 		case <-ticker.C:
 			host := bw.options.host
-			scope := bw.metricsScope.Tagged(map[string]string{"host": host})
+			scope := bw.metricsScope.Tagged(map[string]string{clientHostTag: host})
 
 			cpuPercent, _ := cpu.Percent(0, false)
 			cpuCores, _ := cpu.Counts(false)

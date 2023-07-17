@@ -297,7 +297,6 @@ func newWorkflowTaskPoller(
 
 // PollTask polls a new task
 func (wtp *workflowTaskPoller) PollTask() (interface{}, error) {
-
 	// Get the task.
 	workflowTask, err := wtp.doPoll(wtp.featureFlags, wtp.poll)
 	if err != nil {

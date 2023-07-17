@@ -80,6 +80,7 @@ const (
 	testTagsContextKey = "cadence-testTags"
 	clientVersionTag   = "cadence_client_version"
 	clientGauge        = "client_version_metric"
+	clientHostTag      = "cadence_client_host"
 )
 
 type (

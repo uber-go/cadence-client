@@ -57,7 +57,7 @@ var (
 
 var errShutdown = errors.New("worker shutting down")
 
-var emitOnce sync.Once
+var collectHardwareUsageOnce sync.Once
 
 type (
 	// resultHandler that returns result
@@ -216,10 +216,13 @@ func (bw *baseWorker) Start() {
 	go bw.runTaskDispatcher()
 
 	// We want the emit function run once per host instead of run once per worker
-	emitOnce.Do(func() {
-		bw.shutdownWG.Add(1)
-		go bw.emitHardwareUsage()
-	})
+	//collectHardwareUsageOnce.Do(func() {
+	//	bw.shutdownWG.Add(1)
+	//	go bw.emitHardwareUsage()
+	//})
+
+	bw.shutdownWG.Add(1)
+	go bw.emitHardwareUsage()
 
 	bw.isWorkerStarted = true
 	traceLog(func() {
@@ -426,29 +429,40 @@ func (bw *baseWorker) emitHardwareUsage() {
 		}
 	}()
 	defer bw.shutdownWG.Done()
-	ticker := time.NewTicker(hardwareMetricsCollectInterval)
-	for {
-		select {
-		case <-bw.shutdownCh:
-			ticker.Stop()
-			return
-		case <-ticker.C:
-			host := bw.options.host
-			scope := bw.metricsScope.Tagged(map[string]string{clientHostTag: host})
+	collectHardwareUsageOnce.Do(
+		func() {
+			ticker := time.NewTicker(hardwareMetricsCollectInterval)
+			for {
+				select {
+				case <-bw.shutdownCh:
+					ticker.Stop()
+					return
+				case <-ticker.C:
+					host := bw.options.host
+					scope := bw.metricsScope.Tagged(map[string]string{clientHostTag: host})
 
-			cpuPercent, _ := cpu.Percent(0, false)
-			cpuCores, _ := cpu.Counts(false)
+					cpuPercent, err := cpu.Percent(0, false)
+					if err != nil {
+						bw.logger.Warn("Failed to get cpu percent", zap.Error(err))
+						return
+					}
+					cpuCores, err := cpu.Counts(false)
+					if err != nil {
+						bw.logger.Warn("Failed to get number of cpu cores", zap.Error(err))
+						return
+					}
+					scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
+					scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
 
-			scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
-			scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
+					var memStats runtime.MemStats
+					runtime.ReadMemStats(&memStats)
 
-			var memStats runtime.MemStats
-			runtime.ReadMemStats(&memStats)
+					scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
+					scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
+					scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
+					scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
+				}
+			}
+		})
 
-			scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
-			scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
-			scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
-			scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
-		}
-	}
 }

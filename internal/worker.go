@@ -128,6 +128,9 @@ type (
 		// default: default identity that include hostname, groupName and process ID.
 		Identity string
 
+		// Optional: Defines the 'zone' or the failure group that the worker belongs to
+		IsolationGroup string
+
 		// Optional: Metrics to be reported. Metrics emitted by the cadence client are not prometheus compatible by
 		// default. To ensure metrics are compatible with prometheus make sure to create tally scope with sanitizer
 		// options set.
@@ -259,6 +262,10 @@ type (
 		// Optional: Authorization interface to get the Auth Token
 		// default: No provider
 		Authorization auth.AuthorizationProvider
+
+		// Optional: Host is just string on the machine running the client
+		// default: empty string
+		Host string
 	}
 )
 

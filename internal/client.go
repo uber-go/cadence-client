@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"go.uber.org/cadence/internal/common/isolationgroup"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
@@ -358,6 +359,7 @@ type (
 	ClientOptions struct {
 		MetricsScope       tally.Scope
 		Identity           string
+		IsolationGroup     string
 		DataConverter      DataConverter
 		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
@@ -577,6 +579,9 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	}
 	if options != nil && options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
+	if options != nil && options.IsolationGroup != "" {
+		service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &workflowClient{

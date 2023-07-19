@@ -38,6 +38,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/cadence/internal/common/isolationgroup"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
@@ -78,6 +80,7 @@ const (
 	testTagsContextKey = "cadence-testTags"
 	clientVersionTag   = "cadence_client_version"
 	clientGauge        = "client_version_metric"
+	clientHostTag      = "cadence_client_host"
 )
 
 type (
@@ -309,6 +312,9 @@ func newWorkflowTaskWorkerInternal(
 	// 3) the result pushed to laTunnel will be send as task to workflow worker to process.
 	worker.taskQueueCh = laTunnel.resultCh
 
+	worker.options.host = params.Host
+	localActivityWorker.options.host = params.Host
+
 	return &workflowWorker{
 		executionParameters: params,
 		workflowService:     service,
@@ -480,6 +486,7 @@ func newActivityTaskWorker(
 		workerParams.MetricsScope,
 		sessionTokenBucket,
 	)
+	base.options.host = workerParams.Host
 
 	return &activityWorker{
 		executionParameters: workerParams,
@@ -991,6 +998,9 @@ func newAggregatedWorker(
 	logger := workerParams.Logger
 	if options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
+	if options.IsolationGroup != "" {
+		service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, workerParams.MetricsScope)
 	processTestTags(&wOptions, &workerParams)

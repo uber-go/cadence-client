@@ -1384,6 +1384,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_Interleaved() {
 func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 	mockCtrl := gomock.NewController(t.T())
 	mockService := workflowservicetest.NewMockClient(mockCtrl)
+	logger := zaptest.NewLogger(t.T())
 
 	entityNotExistsError := &s.EntityNotExistsError{}
 	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, entityNotExistsError)
@@ -1396,6 +1397,9 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 		0,
 		make(chan struct{}),
 		FeatureFlags{},
+		logger,
+		testWorkflowType,
+		testActivityType,
 	)
 
 	heartbeatErr := cadenceInvoker.BatchHeartbeat(nil)
@@ -1407,6 +1411,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveError() {
 	mockCtrl := gomock.NewController(t.T())
 	mockService := workflowservicetest.NewMockClient(mockCtrl)
+	logger := zaptest.NewLogger(t.T())
 
 	domainNotActiveError := &s.DomainNotActiveError{}
 	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, domainNotActiveError)
@@ -1422,6 +1427,9 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveErro
 		0,
 		make(chan struct{}),
 		FeatureFlags{},
+		logger,
+		testWorkflowType,
+		testActivityType,
 	)
 
 	heartbeatErr := cadenceInvoker.BatchHeartbeat(nil)

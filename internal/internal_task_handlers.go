@@ -52,9 +52,11 @@ const (
 
 	noRetryBackoff = time.Duration(-1)
 
-	defaultShortLivedWorkflowTimeoutUpperLimitInSec = 1 * 3600
+	defaultInstantLivedWorkflowTimeoutUpperLimitInSec = 1
 
-	defaultMediumLivedWorkflowTimeoutUpperLimitInSec = 12 * 3600
+	defaultShortLivedWorkflowTimeoutUpperLimitInSec = 1 * 1800
+
+	defaultMediumLivedWorkflowTimeoutUpperLimitInSec = 8 * 3600
 )
 
 type (
@@ -1814,7 +1816,9 @@ func traceLog(fn func()) {
 }
 
 func workflowCategorizedByTimeout(executionTimeout int32) string {
-	if executionTimeout <= defaultShortLivedWorkflowTimeoutUpperLimitInSec {
+	if executionTimeout <= defaultInstantLivedWorkflowTimeoutUpperLimitInSec {
+		return "instant"
+	} else if executionTimeout <= defaultShortLivedWorkflowTimeoutUpperLimitInSec {
 		return "short"
 	} else if executionTimeout <= defaultMediumLivedWorkflowTimeoutUpperLimitInSec {
 		return "intermediate"

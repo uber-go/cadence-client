@@ -217,6 +217,16 @@ func GetMetricsScope(ctx Context) tally.Scope {
 	return internal.GetMetricsScope(ctx)
 }
 
+// GetHistorySize returns the current history size of that workflow
+func GetHistorySize(ctx Context) int64 {
+	return internal.GetHistorySize(ctx)
+}
+
+// GetHistoryCount returns the current number of history event of that workflow
+func GetHistoryCount(ctx Context) int64 {
+	return internal.GetHistoryCount(ctx)
+}
+
 // RequestCancelExternalWorkflow can be used to request cancellation of an external workflow.
 // Input workflowID is the workflow ID of target workflow.
 // Input runID indicates the instance of a workflow. Input runID is optional (default is ""). When runID is not specified,

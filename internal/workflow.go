@@ -1158,6 +1158,16 @@ func (wc *workflowEnvironmentInterceptor) GetMetricsScope(ctx Context) tally.Sco
 	return wc.env.GetMetricsScope()
 }
 
+// GetHistorySize returns the current history size of that workflow
+func GetHistorySize(ctx Context) int64 {
+	return 0
+}
+
+// GetHistoryCount returns the current number of events of that workflow
+func GetHistoryCount(ctx Context) int64 {
+	return 0
+}
+
 // Now returns the current time in UTC. It corresponds to the time when the decision task is started or replayed.
 // Workflow needs to use this method to get the wall clock time instead of the one from the golang library.
 func Now(ctx Context) time.Time {

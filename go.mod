@@ -66,3 +66,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.3.2 // indirect
 )
+
+replace github.com/uber/cadence-idl => github.com/timl3136/cadence-idl v0.0.0-20230811235258-a2fc7af34b3e

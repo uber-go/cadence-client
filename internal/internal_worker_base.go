@@ -216,11 +216,7 @@ func (bw *baseWorker) Start() {
 	go bw.runTaskDispatcher()
 
 	// We want the emit function run once per host instead of run once per worker
-	//collectHardwareUsageOnce.Do(func() {
-	//	bw.shutdownWG.Add(1)
-	//	go bw.emitHardwareUsage()
-	//})
-
+	// since the emit function is host level metric.
 	bw.shutdownWG.Add(1)
 	go bw.emitHardwareUsage()
 

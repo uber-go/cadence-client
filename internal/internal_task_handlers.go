@@ -824,9 +824,12 @@ process_Workflow_Loop:
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflowTask) (interface{}, error) {
 	task := workflowTask.task
 	historyIterator := workflowTask.historyIterator
+	w.workflowInfo.TotalHistoryBytes = task.GetTotalHistoryBytes()
+	w.workflowInfo.HistoryCount = task.GetNextEventId() - 1
 	if err := w.ResetIfStale(task, historyIterator); err != nil {
 		return nil, err
 	}
+
 	w.SetCurrentTask(task)
 
 	eventHandler := w.getEventHandler()

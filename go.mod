@@ -15,7 +15,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/stretchr/testify v1.8.1
 	github.com/uber-go/tally v3.3.15+incompatible
-	github.com/uber/cadence-idl v0.0.0-20230131090243-b690237fffaa
+	github.com/uber/cadence-idl v0.0.0-20230829165610-d4f516f3afb0
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/tchannel-go v1.32.1
 	go.uber.org/atomic v1.9.0
@@ -66,5 +66,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.3.2 // indirect
 )
-
-replace github.com/uber/cadence-idl => github.com/timl3136/cadence-idl v0.0.0-20230811235258-a2fc7af34b3e

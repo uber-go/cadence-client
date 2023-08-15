@@ -23,10 +23,11 @@ package internal
 import (
 	"bytes"
 	"fmt"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common/util"
 	"reflect"
 	"strings"
+
+	s "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/util"
 )
 
 func matchReplayWithHistory(replayDecisions []*s.Decision, historyEvents []*s.HistoryEvent) error {

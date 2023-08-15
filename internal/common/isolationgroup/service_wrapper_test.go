@@ -22,10 +22,12 @@ package isolationgroup
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"

@@ -1400,6 +1400,9 @@ type cadenceInvoker struct {
 	closeCh               chan struct{}
 	workerStopChannel     <-chan struct{}
 	featureFlags          FeatureFlags
+	logger                *zap.Logger
+	workflowType          string
+	activityType          string
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
@@ -1485,10 +1488,16 @@ func (i *cadenceInvoker) heartbeatAndScheduleNextRun(details []byte) error {
 			i.hbBatchEndTimer.Stop()
 			i.hbBatchEndTimer = nil
 
+			var err error
 			if detailsToReport != nil {
-				i.heartbeatAndScheduleNextRun(*detailsToReport)
+				err = i.heartbeatAndScheduleNextRun(*detailsToReport)
 			}
 			i.Unlock()
+
+			// Log the error outside the lock.
+			if err != nil {
+				i.logger.Error("Failed to send heartbeat", zap.Error(err), zap.String(tagWorkflowType, i.workflowType), zap.String(tagActivityType, i.activityType))
+			}
 		}()
 	}
 
@@ -1550,6 +1559,9 @@ func newServiceInvoker(
 	heartBeatTimeoutInSec int32,
 	workerStopChannel <-chan struct{},
 	featureFlags FeatureFlags,
+	logger *zap.Logger,
+	workflowType string,
+	activityType string,
 ) ServiceInvoker {
 	return &cadenceInvoker{
 		taskToken:             taskToken,
@@ -1560,6 +1572,9 @@ func newServiceInvoker(
 		closeCh:               make(chan struct{}),
 		workerStopChannel:     workerStopChannel,
 		featureFlags:          featureFlags,
+		logger:                logger,
+		workflowType:          workflowType,
+		activityType:          activityType,
 	}
 }
 
@@ -1579,14 +1594,14 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	canCtx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
 
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh, ath.featureFlags)
+	workflowType := t.WorkflowType.GetName()
+	activityType := t.ActivityType.GetName()
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh, ath.featureFlags, ath.logger, workflowType, activityType)
 	defer func() {
 		_, activityCompleted := result.(*s.RespondActivityTaskCompletedRequest)
 		invoker.Close(!activityCompleted) // flush buffered heartbeat if activity was not successfully completed.
 	}()
 
-	workflowType := t.WorkflowType.GetName()
-	activityType := t.ActivityType.GetName()
 	metricsScope := getMetricsScopeForActivity(ath.metricsScope, workflowType, activityType)
 	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, ath.workerStopCh, ath.contextPropagators, ath.tracer)
 

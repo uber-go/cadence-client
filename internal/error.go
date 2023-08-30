@@ -129,8 +129,8 @@ type (
 	// NonDeterministicError contains some structured data related to a non-deterministic
 	// replay failure, and is primarily intended for allowing richer error reporting.
 	//
-	// WorkflowType, WorkflowID, RunID, and DomainName will likely be long-term stable and
-	// included in some form in future library versions, but the rest of these fields may
+	// WorkflowType, WorkflowID, RunID, TaskList, and DomainName will likely be long-term stable
+	// and included in some form in future library versions, but the rest of these fields may
 	// change at any time, or be removed in a future major version change.
 	NonDeterministicError struct {
 		/*
@@ -155,6 +155,7 @@ type (
 		WorkflowType string
 		WorkflowID   string
 		RunID        string
+		TaskList     string
 		DomainName   string
 
 		// intentionally avoiding "history event" and "decision" names
@@ -487,6 +488,7 @@ func NewNonDeterminsticError(reason string, info *WorkflowInfo, history *shared.
 		WorkflowType: info.WorkflowType.Name,
 		WorkflowID:   info.WorkflowExecution.ID,
 		RunID:        info.WorkflowExecution.RunID,
+		TaskList:     info.TaskListName,
 		DomainName:   info.Domain,
 
 		HistoryEventText: historyText,

@@ -22,14 +22,13 @@ package internal
 
 import (
 	"bytes"
-	"fmt"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common/util"
 	"reflect"
 	"strings"
+
+	s "go.uber.org/cadence/.gen/go/shared"
 )
 
-func matchReplayWithHistory(replayDecisions []*s.Decision, historyEvents []*s.HistoryEvent) error {
+func matchReplayWithHistory(info *WorkflowInfo, replayDecisions []*s.Decision, historyEvents []*s.HistoryEvent) error {
 	di := 0
 	hi := 0
 	hSize := len(historyEvents)
@@ -59,16 +58,15 @@ matchLoop:
 		}
 
 		if d == nil {
-			return fmt.Errorf("nondeterministic workflow: missing replay decision for %s", util.HistoryEventToString(e))
+			return NewNonDeterminsticError("missing replay decision", info, e, nil)
 		}
 
 		if e == nil {
-			return fmt.Errorf("nondeterministic workflow: extra replay decision for %s", util.DecisionToString(d))
+			return NewNonDeterminsticError("extra replay decision", info, nil, d)
 		}
 
 		if !isDecisionMatchEvent(d, e, false) {
-			return fmt.Errorf("nondeterministic workflow: history event is %s, replay decision is %s",
-				util.HistoryEventToString(e), util.DecisionToString(d))
+			return NewNonDeterminsticError("mismatch", info, e, d)
 		}
 
 		di++

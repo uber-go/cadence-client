@@ -133,23 +133,22 @@ type (
 	// and included in some form in future library versions, but the rest of these fields may
 	// change at any time, or be removed in a future major version change.
 	NonDeterministicError struct {
-		/*
-			Reason is a relatively free-form description of what kind of non-determinism
-			was detected.
 
-			You are *strongly* encouraged to not rely on these strings for behavior, only
-			explanation, for a few reasons.  More will likely appear in the future, they may
-			change, and there is little that can be safely decided on in an automated way.
-
-			Currently, values roughly match the historical error strings, and are:
-			  - "missing replay decision" (The error will contain HistoryEventText, as there
-			    is at least one history event that has no matching replayed decision)
-			  - "extra replay decision" (The error will contain DecisionText, as there is
-			    at least one decision from replay that has no matching history event)
-			  - "mismatch" (Both HistoryEventText and DecisionText will exist, as there
-			    are issues with both.  This was previously shown as "history event is ...,
-			    replay decision is ..." error text.)
-		*/
+		// Reason is a relatively free-form description of what kind of non-determinism
+		// was detected.
+		//
+		// You are *strongly* encouraged to not rely on these strings for behavior, only
+		// explanation, for a few reasons.  More will likely appear in the future, they may
+		// change, and there is little that can be safely decided on in an automated way.
+		//
+		// Currently, values roughly match the historical error strings, and are:
+		//  - "missing replay decision" (The error will contain HistoryEventText, as there
+		//    is at least one history event that has no matching replayed decision)
+		//  - "extra replay decision" (The error will contain DecisionText, as there is
+		//    at least one decision from replay that has no matching history event)
+		//  - "mismatch" (Both HistoryEventText and DecisionText will exist, as there
+		//    are issues with both.  This was previously shown as "history event is ...,
+		//    replay decision is ..." error text.)
 		Reason string
 
 		WorkflowType string

@@ -935,7 +935,7 @@ ProcessEvents:
 	var nonDeterministicErr error
 	if !skipReplayCheck && !w.isWorkflowCompleted || isReplayTest {
 		// check if decisions from reply matches to the history events
-		if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
+		if err := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents); err != nil {
 			nonDeterministicErr = err
 		}
 	}
@@ -950,7 +950,7 @@ ProcessEvents:
 					nonDeterministicErr = panicErr
 				} else {
 					// Since we know there is an error, we do the replay check to give more context in the log
-					replayErr := matchReplayWithHistory(replayDecisions, respondEvents)
+					replayErr := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents)
 					w.wth.logger.Error("Ignored workflow panic error",
 						zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 						zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),

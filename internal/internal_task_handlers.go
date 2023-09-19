@@ -367,7 +367,24 @@ OrderEvents:
 	eh.loadedEvents = eh.loadedEvents[eh.currentIndex:]
 	eh.currentIndex = 0
 
+	// calculate estimated size of all events, for workflow info
+	historySize := estimatedSize(nextEvents) + estimatedSize(markers)
+
 	return nextEvents, markers, nil
+}
+
+func estimatedSize(events []s.HistoryEvent) int {
+	sum := 0
+	for _, e := range events {
+		switch *e.EventType {
+		case s.EventTypeWorkflowExecutionStarted:
+			sum += len(e.WorkflowExecutionStartedEventAttributes.Input)
+		// ...
+		case s.EventTypeWorkflowExecutionSignaled:
+			sum += len(e.WorkflowExecutionSignaledEventAttributes.Input)
+		}
+	}
+	return sum
 }
 
 func isPreloadMarkerEvent(event *s.HistoryEvent) bool {
@@ -846,6 +863,7 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	// Process events
 ProcessEvents:
 	for {
+		var historySize int
 		reorderedEvents, markers, binaryChecksum, err := reorderedHistory.NextDecisionEvents()
 		if err != nil {
 			return nil, err
@@ -859,6 +877,7 @@ ProcessEvents:
 		} else {
 			w.workflowInfo.BinaryChecksum = binaryChecksum
 		}
+
 		// Markers are from the events that are produced from the current decision
 		for _, m := range markers {
 			if m.MarkerRecordedEventAttributes.GetMarkerName() != localActivityMarkerName {
@@ -889,6 +908,21 @@ ProcessEvents:
 			err := w.wth.executeAnyPressurePoints(event, isInReplay)
 			if err != nil {
 				return nil, err
+			}
+
+			// TODO: update history size here, when isLast (implies decision-task started event is current, may execute new code)
+			if isLast {
+				// finished processing history prior to a decision -> update for that decision's execution
+				// because it may depend on the value
+				w.workflowInfo.HistorySize += historySize
+				/*
+					TODO: can't expose this unless the history is currently executing on a "new library version" that is history-size aware,
+						else you can get inconsistent replay behavior when it suddenly jumps from 0 (nonexistent data in the past) to N (calculated now during replay).
+						so this needs a new piece of metadata in decision task complete (possibly activity would be useful too for troubleshooting?) that reports the
+						library "feature version" for backwards compat reasons like this.
+
+					alternatively: could just record a new marker to say "upgraded to version N", but that means a new marker in every workflow.  seems like wasteful storage?
+				*/
 			}
 
 			err = eventHandler.ProcessEvent(event, isInReplay, isLast)

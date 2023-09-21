@@ -1495,15 +1495,21 @@ func (i *cadenceInvoker) heartbeatAndScheduleNextRun(details []byte) error {
 			i.Unlock()
 
 			// Log the error outside the lock.
-			// If the error is a canceled error do not log, as this is expected.
-			var canceledErr *CanceledError
-			if canceledErr != nil && !errors.As(err, &canceledErr) {
-				i.logger.Error("Failed to send heartbeat", zap.Error(err), zap.String(tagWorkflowType, i.workflowType), zap.String(tagActivityType, i.activityType))
-			}
+			i.logFailedHeartBeat(err)
 		}()
 	}
 
 	return err
+}
+
+func (i *cadenceInvoker) logFailedHeartBeat(err error) {
+	// If the error is a canceled error do not log, as this is expected.
+	var canceledErr *CanceledError
+
+	// We need to check for nil as errors.As returns false for nil. Which would cause us to log on nil.
+	if err != nil && !errors.As(err, &canceledErr) {
+		i.logger.Error("Failed to send heartbeat", zap.Error(err), zap.String(tagWorkflowType, i.workflowType), zap.String(tagActivityType, i.activityType))
+	}
 }
 
 func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {

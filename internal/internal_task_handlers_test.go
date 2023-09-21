@@ -1381,6 +1381,51 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_Interleaved() {
 	time.Sleep(1 * time.Second)
 }
 
+func (t *TaskHandlersTestSuite) TestHeartBeatLogNil() {
+	core, obs := observer.New(zap.ErrorLevel)
+	logger := zap.New(core)
+
+	cadenceInv := &cadenceInvoker{
+		identity: "Test_Cadence_Invoker",
+		logger:   logger,
+	}
+
+	cadenceInv.logFailedHeartBeat(nil)
+
+	t.Empty(obs.All())
+}
+
+func (t *TaskHandlersTestSuite) TestHeartBeatLogCanceledError() {
+	core, obs := observer.New(zap.ErrorLevel)
+	logger := zap.New(core)
+
+	cadenceInv := &cadenceInvoker{
+		identity: "Test_Cadence_Invoker",
+		logger:   logger,
+	}
+
+	var workflowCompleatedErr CanceledError
+	cadenceInv.logFailedHeartBeat(&workflowCompleatedErr)
+
+	t.Empty(obs.All())
+}
+
+func (t *TaskHandlersTestSuite) TestHeartBeatLogNotCanceled() {
+	core, obs := observer.New(zap.ErrorLevel)
+	logger := zap.New(core)
+
+	cadenceInv := &cadenceInvoker{
+		identity: "Test_Cadence_Invoker",
+		logger:   logger,
+	}
+
+	var workflowCompleatedErr s.WorkflowExecutionAlreadyCompletedError
+	cadenceInv.logFailedHeartBeat(&workflowCompleatedErr)
+
+	t.Len(obs.All(), 1)
+	t.Equal("Failed to send heartbeat", obs.All()[0].Message)
+}
+
 func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 	mockCtrl := gomock.NewController(t.T())
 	mockService := workflowservicetest.NewMockClient(mockCtrl)

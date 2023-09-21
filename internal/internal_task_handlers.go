@@ -1497,7 +1497,7 @@ func (i *cadenceInvoker) heartbeatAndScheduleNextRun(details []byte) error {
 			// Log the error outside the lock.
 			// If the error is a canceled error do not log, as this is expected.
 			var canceledErr *CanceledError
-			if !errors.As(err, &canceledErr) {
+			if canceledErr != nil && !errors.As(err, &canceledErr) {
 				i.logger.Error("Failed to send heartbeat", zap.Error(err), zap.String(tagWorkflowType, i.workflowType), zap.String(tagActivityType, i.activityType))
 			}
 		}()

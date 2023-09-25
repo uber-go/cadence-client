@@ -6,6 +6,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.2] - 2023-09-25
+### Added 
+- Add a structured error for non-determinism failures
+
+### Changed 
+- Do not log when automatic heart beating fails due to cancellations 
+
+## [v1.0.1] - 2023-08-14
+### Added
+- Emit cadence worker's hardware utilization inside worker once per host by @timl3136 in #1260
+### Changed 
+- Updated supported Go version to 1.19
+- Log when the automatic heartbeating fails
+- Updated golang.org/x/net and github.com/prometheus/client_golang
+
+## [v1.0.0] - 2023-07-12
+- add refresh tasks API to client by @mkolodezny in #1162
+- Exclude idls subfolder from licencegen tool by @vytautas-karpavicius in #1163
+- Upgrade x/sys and quantile to work with Go 1.18 by @Groxx in #1164
+- Stop retrying get-workflow-history with an impossibly-short timeout by @Groxx in #1171
+- Rewrite an irrational test which changes behavior based on compiler inlining by @Groxx in #1172
+- Deduplicate retry tests a bit by @Groxx in #1173
+- Prevent local-activity panics from taking down the worker process by @Groxx in #1169
+- Moving retryable-err checks to errors.As, moving some to not-retryable by @Groxx in #1167
+- Apparently copyright isn't checked by CI by @Groxx in #1175
+- Another missed license header by @Groxx in #1176
+- Add JitterStart support to client by @ZackLK in #1178
+- Simplify worker options configuration value propagation by @shijiesheng in #1179
+- Sharing one of my favorite "scopes" in intellij, and making it easier to add more by @Groxx in #1182
+- Add poller autoscaler by @shijiesheng in #1184
+- add poller autoscaling in activity and decision workers by @shijiesheng in #1186
+- Fix bug with workflow shadower: ALL is documented as an allowed Status; test and fix. by @ZackLK in #1187
+- upgrade thrift to v0.16.0 and tchannel-go to v1.32.1 by @shijiesheng in #1189
+- [poller autoscaler] fix logic to identify empty tasks by @shijiesheng in #1192
+- Maintain a stable order of children context, resolves a non-determinism around cancels by @Groxx in #1183
+- upgrade fossa cli to latest and remove unused fossa.yml by @shijiesheng in #1196
+- Retry service-busy errors after a delay by @Groxx in #1174
+- changing dynamic poller scaling strategy. by @mindaugasbarcauskas in #1197
+- Fix flaky test by @mindaugasbarcauskas in #1201
+- updating go client dependencies. by @mindaugasbarcauskas in #1200
+- version metrics by @allenchen2244 in #1199
+- Export GetRegisteredWorkflowTypes so I can use in shadowtest. by @ZackLK in #1202
+- Add GetUnhandledSignalNames by @longquanzheng in #1203
+- Adding go version check when building locally. by @mindaugasbarcauskas in #1209
+- update CI go version. by @mindaugasbarcauskas in #1210
+- ran "make fmt" by @mindaugasbarcauskas in #1206
+- Updating IDL version for go client. by @mindaugasbarcauskas in #1211
+- Adding ability to provide cancellation reason to cancelWorkflow API by @mindaugasbarcauskas in #1213
+- Expose WithCancelReason and related types publicly, as originally intended by @Groxx in #1214
+- Add missing activity logger fields for local activities by @Groxx in #1216
+- Modernize makefile like server, split tools into their own module by @Groxx in #1215
+- adding serviceBusy tag for transient-poller-failure counter metric. by @mindaugasbarcauskas in #1212
+- surface more information in ContinueAsNewError by @shijiesheng in #1218
+- Corrected error messages in getValidatedActivityOptions by @jakobht in #1224
+- Fix TestActivityWorkerStop: it times out with go 1.20 by @dkrotx in #1223
+- Fixed the spelling of replay_test file. by @agautam478 in #1226
+- Add more detail to how workflow.Now behaves by @Groxx in #1228
+- Part1: Record the data type change scenario for shadower/replayer test suite by @agautam478 in #1227
+- Document ErrResultPending's behavioral gap explicitly by @Groxx in #1229
+- Added the Activity Registration required failure scenario to replayer test suite by @agautam478 in #1231
+- Shift replayer to prefer io.Reader rather than filenames by @Groxx in #1234
+- Expose activity registry on workflow replayer by @Groxx in #1232
+- Merged the timeout logic for the tests in internal_workers_test.go by @jakobht in #1225
+- [error] surface more fields in ContinueAsNew error by @shijiesheng in #1235
+- Add and emulate the issues found in the workflows involving coroutines into the replayersuite. by @agautam478 in #1237
+- Add the change in branch number case(test) to replayersuite by @agautam478 in #1236
+- Locally-dispatched activity test flakiness hopefully resolved by @Groxx in #1240
+- Switched to revive, goimports, re-formatted everything by @Groxx in #1233
+- Add the case where changing the activities (addition/subtraction/modification in current behavior) in the switch case has no effect on replayer. by @agautam478 in #1238
+- Replaced Activity.RegisterWithOptions with replayers own acitivty register by @agautam478 in #1242
+- [activity/logging] produce a log when activities time out by @sankari165 in #1243
+- Better logging when getting some nondeterministic behaviours by @jakobht in #1245
+- make fmt fix by @Groxx in #1246
+- Test-suite bugfix: local activity errors were not encoded correctly by @Groxx in #1247
+- Extracting the replayer specific utilities into a separate file for readability. by @agautam478 in #1244
+- Adding WorkflowType to "Workflow panic" log-message by @dkrotx in #1259
+- Adding in additional header to determine a more stable isolation-group by @davidporter-id-au in #1252
+- Bump version strings for 1.0 release by @Groxx in #1261
+
 ## [v0.19.0] - 2022-01-05
 ### Added
 - Added JWT Authorization Provider. This change includes a dependency that uses v2+ go modules. They no longer match import paths, meaning that we have to **drop support for dep & glide** in order to use this. [#1116](https://github.com/uber-go/cadence-client/pull/1116)

@@ -371,12 +371,14 @@ OrderEvents:
 	eh.currentIndex = 0
 
 	// estimate history size for nextEvents and markers
-	historySizeEstimation = estimateHistorySize(nextEvents) + estimateHistorySize(markers)
+	historySizeEstimation += estimateHistorySize(nextEvents)
+	historySizeEstimation += estimateHistorySize(markers)
 
 	return nextEvents, markers, historySizeEstimation, nil
 }
 
-func estimateHistorySize(events []*s.HistoryEvent) (sum int) {
+func estimateHistorySize(events []*s.HistoryEvent) int {
+	sum := 0
 	for _, e := range events {
 		switch e.GetEventType() {
 		case s.EventTypeWorkflowExecutionStarted:
@@ -474,10 +476,13 @@ func estimateHistorySize(events []*s.HistoryEvent) (sum int) {
 				sum += len(e.SignalExternalWorkflowExecutionInitiatedEventAttributes.Control)
 				sum += len(e.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input)
 			}
+		default:
+			// ignore other events
+
 		}
 	}
 	sum += historySizeEstimationOffset
-	return
+	return sum
 }
 
 func isPreloadMarkerEvent(event *s.HistoryEvent) bool {
@@ -959,7 +964,6 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	// Process events
 ProcessEvents:
 	for {
-		var historySizeEstimation int
 		reorderedEvents, markers, binaryChecksum, historySizeEstimation, err := reorderedHistory.NextDecisionEvents()
 		if err != nil {
 			return nil, err

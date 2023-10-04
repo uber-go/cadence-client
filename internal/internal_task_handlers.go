@@ -51,6 +51,8 @@ const (
 	defaultStickyCacheSize = 10000
 
 	noRetryBackoff = time.Duration(-1)
+
+	historySizeEstimationOffset = 100 * 1024
 )
 
 type (
@@ -256,20 +258,21 @@ func isDecisionEvent(eventType s.EventType) bool {
 
 // NextDecisionEvents returns events that there processed as new by the next decision.
 // TODO(maxim): Refactor to return a struct instead of multiple parameters
-func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent, binaryChecksum *string, err error) {
+func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent, binaryChecksum *string, historySize int, err error) {
 	if eh.next == nil {
-		eh.next, _, err = eh.nextDecisionEvents()
+		eh.next, _, historySize, err = eh.nextDecisionEvents()
 		if err != nil {
-			return result, markers, eh.binaryChecksum, err
+			return result, markers, eh.binaryChecksum, historySize, err
 		}
 	}
 
 	result = eh.next
 	checksum := eh.binaryChecksum
 	if len(result) > 0 {
-		eh.next, markers, err = eh.nextDecisionEvents()
+		eh.next, markers, historySize, err = eh.nextDecisionEvents()
 	}
-	return result, markers, checksum, err
+
+	return result, markers, checksum, historySize, err
 }
 
 func (eh *history) HasNextDecisionEvents() bool {
@@ -301,12 +304,12 @@ func (eh *history) verifyAllEventsProcessed() error {
 	return nil
 }
 
-func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, err error) {
+func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, historySizeEstimation int, err error) {
 	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMoreEvents() {
 		if err := eh.verifyAllEventsProcessed(); err != nil {
-			return nil, nil, err
+			return nil, nil, 0, err
 		}
-		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, nil
+		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, 0, nil
 	}
 
 	// Process events
@@ -367,7 +370,114 @@ OrderEvents:
 	eh.loadedEvents = eh.loadedEvents[eh.currentIndex:]
 	eh.currentIndex = 0
 
-	return nextEvents, markers, nil
+	// estimate history size for nextEvents and markers
+	historySizeEstimation = estimateHistorySize(nextEvents) + estimateHistorySize(markers)
+
+	return nextEvents, markers, historySizeEstimation, nil
+}
+
+func estimateHistorySize(events []*s.HistoryEvent) (sum int) {
+	for _, e := range events {
+		switch e.GetEventType() {
+		case s.EventTypeWorkflowExecutionStarted:
+			if e.WorkflowExecutionStartedEventAttributes != nil {
+				sum += len(e.WorkflowExecutionStartedEventAttributes.Input)
+				sum += len(e.WorkflowExecutionStartedEventAttributes.ContinuedFailureDetails)
+				sum += len(e.WorkflowExecutionStartedEventAttributes.LastCompletionResult)
+				sum += len(e.WorkflowExecutionStartedEventAttributes.Memo.GetFields())
+			}
+		case s.EventTypeWorkflowExecutionSignaled:
+			if e.WorkflowExecutionSignaledEventAttributes != nil {
+				sum += len(e.WorkflowExecutionSignaledEventAttributes.Input)
+			}
+		case s.EventTypeWorkflowExecutionFailed:
+			if e.WorkflowExecutionFailedEventAttributes != nil {
+				sum += len(e.WorkflowExecutionFailedEventAttributes.Details)
+			}
+		case s.EventTypeDecisionTaskCompleted:
+			if e.DecisionTaskCompletedEventAttributes != nil {
+				sum += len(e.DecisionTaskCompletedEventAttributes.ExecutionContext)
+			}
+		case s.EventTypeDecisionTaskFailed:
+			if e.DecisionTaskFailedEventAttributes != nil {
+				sum += len(e.DecisionTaskFailedEventAttributes.Details)
+			}
+		case s.EventTypeActivityTaskScheduled:
+			if e.ActivityTaskScheduledEventAttributes != nil {
+				sum += len(e.ActivityTaskScheduledEventAttributes.Input)
+				sum += len(e.ActivityTaskScheduledEventAttributes.Header.GetFields())
+			}
+		case s.EventTypeActivityTaskStarted:
+			if e.ActivityTaskStartedEventAttributes != nil {
+				sum += len(e.ActivityTaskStartedEventAttributes.LastFailureDetails)
+			}
+		case s.EventTypeActivityTaskCompleted:
+			if e.ActivityTaskCompletedEventAttributes != nil {
+				sum += len(e.ActivityTaskCompletedEventAttributes.Result)
+			}
+		case s.EventTypeActivityTaskFailed:
+			if e.ActivityTaskFailedEventAttributes != nil {
+				sum += len(e.ActivityTaskFailedEventAttributes.Details)
+			}
+		case s.EventTypeActivityTaskTimedOut:
+			if e.ActivityTaskTimedOutEventAttributes != nil {
+				sum += len(e.ActivityTaskTimedOutEventAttributes.Details)
+				sum += len(e.ActivityTaskTimedOutEventAttributes.LastFailureDetails)
+			}
+		case s.EventTypeActivityTaskCanceled:
+			if e.ActivityTaskCanceledEventAttributes != nil {
+				sum += len(e.ActivityTaskCanceledEventAttributes.Details)
+			}
+		case s.EventTypeMarkerRecorded:
+			if e.MarkerRecordedEventAttributes != nil {
+				sum += len(e.MarkerRecordedEventAttributes.Details)
+			}
+		case s.EventTypeWorkflowExecutionTerminated:
+			if e.WorkflowExecutionTerminatedEventAttributes != nil {
+				sum += len(e.WorkflowExecutionTerminatedEventAttributes.Details)
+			}
+		case s.EventTypeWorkflowExecutionCanceled:
+			if e.WorkflowExecutionCanceledEventAttributes != nil {
+				sum += len(e.WorkflowExecutionCanceledEventAttributes.Details)
+			}
+		case s.EventTypeWorkflowExecutionContinuedAsNew:
+			if e.WorkflowExecutionContinuedAsNewEventAttributes != nil {
+				sum += len(e.WorkflowExecutionContinuedAsNewEventAttributes.Input)
+				sum += len(e.WorkflowExecutionContinuedAsNewEventAttributes.FailureDetails)
+				sum += len(e.WorkflowExecutionContinuedAsNewEventAttributes.LastCompletionResult)
+				sum += len(e.WorkflowExecutionContinuedAsNewEventAttributes.Memo.GetFields())
+				sum += len(e.WorkflowExecutionContinuedAsNewEventAttributes.Header.GetFields())
+				sum += len(e.WorkflowExecutionContinuedAsNewEventAttributes.SearchAttributes.GetIndexedFields())
+			}
+		case s.EventTypeStartChildWorkflowExecutionInitiated:
+			if e.StartChildWorkflowExecutionInitiatedEventAttributes != nil {
+				sum += len(e.StartChildWorkflowExecutionInitiatedEventAttributes.Input)
+				sum += len(e.StartChildWorkflowExecutionInitiatedEventAttributes.Control)
+				sum += len(e.StartChildWorkflowExecutionInitiatedEventAttributes.Memo.GetFields())
+				sum += len(e.StartChildWorkflowExecutionInitiatedEventAttributes.Header.GetFields())
+				sum += len(e.StartChildWorkflowExecutionInitiatedEventAttributes.SearchAttributes.GetIndexedFields())
+			}
+		case s.EventTypeChildWorkflowExecutionCompleted:
+			if e.ChildWorkflowExecutionCompletedEventAttributes != nil {
+				sum += len(e.ChildWorkflowExecutionCompletedEventAttributes.Result)
+			}
+		case s.EventTypeChildWorkflowExecutionFailed:
+			if e.ChildWorkflowExecutionFailedEventAttributes != nil {
+				sum += len(e.ChildWorkflowExecutionFailedEventAttributes.Details)
+			}
+		case s.EventTypeChildWorkflowExecutionCanceled:
+			if e.ChildWorkflowExecutionCanceledEventAttributes != nil {
+				sum += len(e.ChildWorkflowExecutionCanceledEventAttributes.Details)
+			}
+		case s.EventTypeSignalExternalWorkflowExecutionInitiated:
+			if e.SignalExternalWorkflowExecutionInitiatedEventAttributes != nil {
+				sum += len(e.SignalExternalWorkflowExecutionInitiatedEventAttributes.Control)
+				sum += len(e.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input)
+			}
+		}
+	}
+	sum += historySizeEstimationOffset
+	return
 }
 
 func isPreloadMarkerEvent(event *s.HistoryEvent) bool {
@@ -824,7 +934,7 @@ process_Workflow_Loop:
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflowTask) (interface{}, error) {
 	task := workflowTask.task
 	historyIterator := workflowTask.historyIterator
-	w.workflowInfo.TotalHistoryBytes = task.GetTotalHistoryBytes()
+	w.workflowInfo.HistoryBytesServer = task.GetTotalHistoryBytes()
 	w.workflowInfo.HistoryCount = task.GetNextEventId() - 1
 	if err := w.ResetIfStale(task, historyIterator); err != nil {
 		return nil, err
@@ -849,7 +959,8 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	// Process events
 ProcessEvents:
 	for {
-		reorderedEvents, markers, binaryChecksum, err := reorderedHistory.NextDecisionEvents()
+		var historySizeEstimation int
+		reorderedEvents, markers, binaryChecksum, historySizeEstimation, err := reorderedHistory.NextDecisionEvents()
 		if err != nil {
 			return nil, err
 		}
@@ -870,6 +981,7 @@ ProcessEvents:
 				if err != nil {
 					return nil, err
 				}
+
 				if w.isWorkflowCompleted {
 					break ProcessEvents
 				}
@@ -892,6 +1004,14 @@ ProcessEvents:
 			err := w.wth.executeAnyPressurePoints(event, isInReplay)
 			if err != nil {
 				return nil, err
+			}
+
+			if isLast {
+				w.workflowInfo.TotalHistoryBytes += int64(historySizeEstimation)
+				w.wth.logger.Info("DIfferences between history size estimation and actual size",
+					zap.Int64("HistorySizeEstimation", w.workflowInfo.TotalHistoryBytes),
+					zap.Int64("ActualHistorySize", w.workflowInfo.HistoryBytesServer),
+					zap.Int64("HistorySizeDiff", w.workflowInfo.TotalHistoryBytes-w.workflowInfo.HistoryBytesServer))
 			}
 
 			err = eventHandler.ProcessEvent(event, isInReplay, isLast)

@@ -1112,6 +1112,7 @@ type WorkflowInfo struct {
 	DecisionStartedEventID              int64               // the eventID of DecisionStarted that is making the current decision(can be used for reset API)
 	RetryPolicy                         *s.RetryPolicy
 	TotalHistoryBytes                   int64
+	HistoryBytesServer                  int64
 	HistoryCount                        int64
 }
 

@@ -306,6 +306,7 @@ func (eh *history) verifyAllEventsProcessed() error {
 
 func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, historySizeEstimation int, err error) {
 	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMoreEvents() {
+		eh.eventsHandler.logger.Info("Returning 0 for historySizeEstimation")
 		if err := eh.verifyAllEventsProcessed(); err != nil {
 			return nil, nil, 0, err
 		}
@@ -965,6 +966,7 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 ProcessEvents:
 	for {
 		reorderedEvents, markers, binaryChecksum, historySizeEstimation, err := reorderedHistory.NextDecisionEvents()
+		w.wth.logger.Info(fmt.Sprintf("The size estimation of history events for workflow task: %v,", historySizeEstimation))
 		if err != nil {
 			return nil, err
 		}
@@ -1013,6 +1015,7 @@ ProcessEvents:
 			if isLast {
 				w.workflowInfo.TotalHistoryBytes += int64(historySizeEstimation)
 				w.wth.logger.Info("DIfferences between history size estimation and actual size",
+					zap.Int("HistoryEstimation", historySizeEstimation),
 					zap.Int64("HistorySizeEstimation", w.workflowInfo.TotalHistoryBytes),
 					zap.Int64("ActualHistorySize", w.workflowInfo.HistoryBytesServer),
 					zap.Int64("HistorySizeDiff", w.workflowInfo.TotalHistoryBytes-w.workflowInfo.HistoryBytesServer))

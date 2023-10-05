@@ -52,7 +52,7 @@ const (
 
 	noRetryBackoff = time.Duration(-1)
 
-	historySizeEstimationOffset = 100 * 1024
+	historySizeEstimationOffset = 1 * 1024
 )
 
 type (
@@ -305,12 +305,13 @@ func (eh *history) verifyAllEventsProcessed() error {
 }
 
 func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, historySizeEstimation int, err error) {
+	historySizeEstimation = estimateHistorySize(eh.loadedEvents)
 	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMoreEvents() {
 		eh.eventsHandler.logger.Info("Returning 0 for historySizeEstimation")
 		if err := eh.verifyAllEventsProcessed(); err != nil {
-			return nil, nil, 0, err
+			return nil, nil, historySizeEstimation, err
 		}
-		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, 0, nil
+		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, historySizeEstimation, nil
 	}
 
 	// Process events
@@ -374,6 +375,8 @@ OrderEvents:
 	// estimate history size for nextEvents and markers
 	historySizeEstimation += estimateHistorySize(nextEvents)
 	historySizeEstimation += estimateHistorySize(markers)
+
+	eh.eventsHandler.logger.Info(fmt.Sprintf("Returning historySizeEstimation not zero of %d", historySizeEstimation))
 
 	return nextEvents, markers, historySizeEstimation, nil
 }
@@ -477,9 +480,6 @@ func estimateHistorySize(events []*s.HistoryEvent) int {
 				sum += len(e.SignalExternalWorkflowExecutionInitiatedEventAttributes.Control)
 				sum += len(e.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input)
 			}
-		default:
-			// ignore other events
-
 		}
 	}
 	sum += historySizeEstimationOffset
@@ -1012,14 +1012,12 @@ ProcessEvents:
 				return nil, err
 			}
 
-			if isLast {
-				w.workflowInfo.TotalHistoryBytes += int64(historySizeEstimation)
-				w.wth.logger.Info("DIfferences between history size estimation and actual size",
-					zap.Int("HistoryEstimation", historySizeEstimation),
-					zap.Int64("HistorySizeEstimation", w.workflowInfo.TotalHistoryBytes),
-					zap.Int64("ActualHistorySize", w.workflowInfo.HistoryBytesServer),
-					zap.Int64("HistorySizeDiff", w.workflowInfo.TotalHistoryBytes-w.workflowInfo.HistoryBytesServer))
-			}
+			w.workflowInfo.TotalHistoryBytes += int64(historySizeEstimation)
+			w.wth.logger.Info("DIfferences between history size estimation and actual size",
+				zap.Int("HistoryEstimation", historySizeEstimation),
+				zap.Int64("HistorySizeEstimation", w.workflowInfo.TotalHistoryBytes),
+				zap.Int64("ActualHistorySize", w.workflowInfo.HistoryBytesServer),
+				zap.Int64("HistorySizeDiff", w.workflowInfo.TotalHistoryBytes-w.workflowInfo.HistoryBytesServer))
 
 			err = eventHandler.ProcessEvent(event, isInReplay, isLast)
 			if err != nil {

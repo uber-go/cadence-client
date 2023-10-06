@@ -114,4 +114,6 @@ const (
 	MemoryUsedHeap  = CadenceMetricsPrefix + "memory-used-heap"
 	MemoryUsedStack = CadenceMetricsPrefix + "memory-used-stack"
 	NumGoRoutines   = CadenceMetricsPrefix + "num-go-routines"
+
+	PollerRemainingBuffer = CadenceMetricsPrefix + "poller-remaining-buffer"
 )

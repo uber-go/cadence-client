@@ -149,14 +149,6 @@ type (
 	polledTask struct {
 		task interface{}
 	}
-
-	// index tells us where is the poll request coming from
-	// if index == -1, means it came from previous empty poll response
-	// if index >= 0, means it came from task dispatcher with that index
-	// if index == -2, means it came from previous completed task
-	pollRequestWithIdx struct {
-		index int
-	}
 )
 
 func createPollRetryPolicy() backoff.RetryPolicy {

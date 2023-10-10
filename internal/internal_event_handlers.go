@@ -940,6 +940,11 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		return err
 	}
 
+	//historySizeErr := weh.estimateHistorySize(event)
+	//if historySizeErr != nil {
+	//	weh.logger.Error("Failed to estimate history size", zap.Error(historySizeErr))
+	//}
+
 	// When replaying histories to get stack trace or current state the last event might be not
 	// decision started. So always call OnDecisionTaskStarted on the last event.
 	// Don't call for EventType_DecisionTaskStarted as it was already called when handling it.
@@ -1377,5 +1382,110 @@ func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecut
 
 	signal.handle(nil, err)
 
+	return nil
+}
+
+func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.HistoryEvent) error {
+	sum := 0
+	switch event.GetEventType() {
+	case m.EventTypeWorkflowExecutionStarted:
+		if event.WorkflowExecutionStartedEventAttributes != nil {
+			sum += len(event.WorkflowExecutionStartedEventAttributes.Input)
+			sum += len(event.WorkflowExecutionStartedEventAttributes.ContinuedFailureDetails)
+			sum += len(event.WorkflowExecutionStartedEventAttributes.LastCompletionResult)
+			sum += len(event.WorkflowExecutionStartedEventAttributes.Memo.GetFields())
+		}
+	case m.EventTypeWorkflowExecutionSignaled:
+		if event.WorkflowExecutionSignaledEventAttributes != nil {
+			sum += len(event.WorkflowExecutionSignaledEventAttributes.Input)
+		}
+	case m.EventTypeWorkflowExecutionFailed:
+		if event.WorkflowExecutionFailedEventAttributes != nil {
+			sum += len(event.WorkflowExecutionFailedEventAttributes.Details)
+		}
+	case m.EventTypeDecisionTaskCompleted:
+		if event.DecisionTaskCompletedEventAttributes != nil {
+			sum += len(event.DecisionTaskCompletedEventAttributes.ExecutionContext)
+		}
+	case m.EventTypeDecisionTaskFailed:
+		if event.DecisionTaskFailedEventAttributes != nil {
+			sum += len(event.DecisionTaskFailedEventAttributes.Details)
+		}
+	case m.EventTypeActivityTaskScheduled:
+		if event.ActivityTaskScheduledEventAttributes != nil {
+			sum += len(event.ActivityTaskScheduledEventAttributes.Input)
+			sum += len(event.ActivityTaskScheduledEventAttributes.Header.GetFields())
+		}
+	case m.EventTypeActivityTaskStarted:
+		if event.ActivityTaskStartedEventAttributes != nil {
+			sum += len(event.ActivityTaskStartedEventAttributes.LastFailureDetails)
+		}
+	case m.EventTypeActivityTaskCompleted:
+		if event.ActivityTaskCompletedEventAttributes != nil {
+			sum += len(event.ActivityTaskCompletedEventAttributes.Result)
+		}
+	case m.EventTypeActivityTaskFailed:
+		if event.ActivityTaskFailedEventAttributes != nil {
+			sum += len(event.ActivityTaskFailedEventAttributes.Details)
+		}
+	case m.EventTypeActivityTaskTimedOut:
+		if event.ActivityTaskTimedOutEventAttributes != nil {
+			sum += len(event.ActivityTaskTimedOutEventAttributes.Details)
+			sum += len(event.ActivityTaskTimedOutEventAttributes.LastFailureDetails)
+		}
+	case m.EventTypeActivityTaskCanceled:
+		if event.ActivityTaskCanceledEventAttributes != nil {
+			sum += len(event.ActivityTaskCanceledEventAttributes.Details)
+		}
+	case m.EventTypeMarkerRecorded:
+		if event.MarkerRecordedEventAttributes != nil {
+			sum += len(event.MarkerRecordedEventAttributes.Details)
+		}
+	case m.EventTypeWorkflowExecutionTerminated:
+		if event.WorkflowExecutionTerminatedEventAttributes != nil {
+			sum += len(event.WorkflowExecutionTerminatedEventAttributes.Details)
+		}
+	case m.EventTypeWorkflowExecutionCanceled:
+		if event.WorkflowExecutionCanceledEventAttributes != nil {
+			sum += len(event.WorkflowExecutionCanceledEventAttributes.Details)
+		}
+	case m.EventTypeWorkflowExecutionContinuedAsNew:
+		if event.WorkflowExecutionContinuedAsNewEventAttributes != nil {
+			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.Input)
+			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.FailureDetails)
+			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.LastCompletionResult)
+			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.Memo.GetFields())
+			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.Header.GetFields())
+			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.SearchAttributes.GetIndexedFields())
+		}
+	case m.EventTypeStartChildWorkflowExecutionInitiated:
+		if event.StartChildWorkflowExecutionInitiatedEventAttributes != nil {
+			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.Input)
+			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.Control)
+			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.Memo.GetFields())
+			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.Header.GetFields())
+			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.SearchAttributes.GetIndexedFields())
+		}
+	case m.EventTypeChildWorkflowExecutionCompleted:
+		if event.ChildWorkflowExecutionCompletedEventAttributes != nil {
+			sum += len(event.ChildWorkflowExecutionCompletedEventAttributes.Result)
+		}
+	case m.EventTypeChildWorkflowExecutionFailed:
+		if event.ChildWorkflowExecutionFailedEventAttributes != nil {
+			sum += len(event.ChildWorkflowExecutionFailedEventAttributes.Details)
+		}
+	case m.EventTypeChildWorkflowExecutionCanceled:
+		if event.ChildWorkflowExecutionCanceledEventAttributes != nil {
+			sum += len(event.ChildWorkflowExecutionCanceledEventAttributes.Details)
+		}
+	case m.EventTypeSignalExternalWorkflowExecutionInitiated:
+		if event.SignalExternalWorkflowExecutionInitiatedEventAttributes != nil {
+			sum += len(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Control)
+			sum += len(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input)
+		}
+	default:
+		return fmt.Errorf("unknown event type")
+	}
+	weh.workflowInfo.TotalHistoryBytes += int64(sum)
 	return nil
 }

@@ -52,7 +52,7 @@ const (
 
 	noRetryBackoff = time.Duration(-1)
 
-	historySizeEstimationOffset = 1 * 100
+	historySizeEstimationOffset = 1 * 1024
 )
 
 type (
@@ -305,13 +305,12 @@ func (eh *history) verifyAllEventsProcessed() error {
 }
 
 func (eh *history) nextDecisionEvents() (nextEvents []*s.HistoryEvent, markers []*s.HistoryEvent, historySizeEstimation int, err error) {
-	historySizeEstimation = estimateHistorySize(eh.loadedEvents)
 	if eh.currentIndex == len(eh.loadedEvents) && !eh.hasMoreEvents() {
-		eh.eventsHandler.logger.Info("Returning 0 for historySizeEstimation")
+		eh.eventsHandler.logger.Info("Returning 0 for historySizeEstimation since none will be processed")
 		if err := eh.verifyAllEventsProcessed(); err != nil {
-			return nil, nil, historySizeEstimation, err
+			return nil, nil, 0, err
 		}
-		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, historySizeEstimation, nil
+		return []*s.HistoryEvent{}, []*s.HistoryEvent{}, 0, nil
 	}
 
 	// Process events
@@ -971,7 +970,8 @@ ProcessEvents:
 			zap.Int("HistoryEstimation", historySizeEstimation),
 			zap.Int64("HistorySizeEstimation", w.workflowInfo.TotalHistoryBytes),
 			zap.Int64("ActualHistorySize", w.workflowInfo.HistoryBytesServer),
-			zap.Int64("HistorySizeDiff", w.workflowInfo.TotalHistoryBytes-w.workflowInfo.HistoryBytesServer))
+			zap.Int64("HistorySizeDiff", w.workflowInfo.TotalHistoryBytes-w.workflowInfo.HistoryBytesServer),
+			zap.String("workflowType", w.workflowInfo.WorkflowType.Name))
 		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge("cadence-server-historysize").Update(float64(w.workflowInfo.HistoryBytesServer))
 		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge("cadence-client-historysize").Update(float64(historySizeEstimation))
 		if err != nil {

@@ -52,7 +52,7 @@ const (
 
 	noRetryBackoff = time.Duration(-1)
 
-	historySizeEstimationOffset = 1 * 1024
+	historySizeEstimationOffset = 1 * 100
 )
 
 type (
@@ -966,7 +966,14 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 ProcessEvents:
 	for {
 		reorderedEvents, markers, binaryChecksum, historySizeEstimation, err := reorderedHistory.NextDecisionEvents()
-		w.wth.logger.Info(fmt.Sprintf("The size estimation of history events for workflow task: %v,", historySizeEstimation))
+		w.workflowInfo.TotalHistoryBytes += int64(historySizeEstimation)
+		w.wth.logger.Info("Differences between history size estimation and actual size",
+			zap.Int("HistoryEstimation", historySizeEstimation),
+			zap.Int64("HistorySizeEstimation", w.workflowInfo.TotalHistoryBytes),
+			zap.Int64("ActualHistorySize", w.workflowInfo.HistoryBytesServer),
+			zap.Int64("HistorySizeDiff", w.workflowInfo.TotalHistoryBytes-w.workflowInfo.HistoryBytesServer))
+		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge("cadence-server-historysize").Update(float64(w.workflowInfo.HistoryBytesServer))
+		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge("cadence-client-historysize").Update(float64(historySizeEstimation))
 		if err != nil {
 			return nil, err
 		}
@@ -1011,13 +1018,6 @@ ProcessEvents:
 			if err != nil {
 				return nil, err
 			}
-
-			w.workflowInfo.TotalHistoryBytes += int64(historySizeEstimation)
-			w.wth.logger.Info("DIfferences between history size estimation and actual size",
-				zap.Int("HistoryEstimation", historySizeEstimation),
-				zap.Int64("HistorySizeEstimation", w.workflowInfo.TotalHistoryBytes),
-				zap.Int64("ActualHistorySize", w.workflowInfo.HistoryBytesServer),
-				zap.Int64("HistorySizeDiff", w.workflowInfo.TotalHistoryBytes-w.workflowInfo.HistoryBytesServer))
 
 			err = eventHandler.ProcessEvent(event, isInReplay, isLast)
 			if err != nil {

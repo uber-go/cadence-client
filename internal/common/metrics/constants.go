@@ -115,5 +115,6 @@ const (
 	MemoryUsedStack = CadenceMetricsPrefix + "memory-used-stack"
 	NumGoRoutines   = CadenceMetricsPrefix + "num-go-routines"
 
-	PollerRemainingBuffer = CadenceMetricsPrefix + "poller-remaining-buffer"
+	ConcurrentTaskQuota   = CadenceMetricsPrefix + "concurrent-task-quota"
+	ConcurrentTaskRunning = CadenceMetricsPrefix + "concurrent-task-running"
 )

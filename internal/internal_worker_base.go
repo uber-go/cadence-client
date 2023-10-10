@@ -252,7 +252,8 @@ func (bw *baseWorker) runPoller() {
 		case <-bw.shutdownCh:
 			return
 		case <-bw.pollerRequestCh:
-			bw.metricsScope.Gauge(metrics.PollerRemainingBuffer).Update(float64(len(bw.pollerRequestCh)))
+			bw.metricsScope.Gauge(metrics.ConcurrentTaskQuota).Update(float64(cap(bw.pollerRequestCh)))
+			bw.metricsScope.Gauge(metrics.ConcurrentTaskRunning).Update(float64(cap(bw.pollerRequestCh) - len(bw.pollerRequestCh)))
 			if bw.sessionTokenBucket != nil {
 				bw.sessionTokenBucket.waitForAvailableToken()
 			}

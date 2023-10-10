@@ -944,7 +944,7 @@ ProcessEvents:
 	var nonDeterministicErr error
 	if !skipReplayCheck && !w.isWorkflowCompleted || isReplayTest {
 		// check if decisions from reply matches to the history events
-		if err := matchReplayWithHistory(replayDecisions, respondEvents); err != nil {
+		if err := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents); err != nil {
 			nonDeterministicErr = err
 		}
 	}
@@ -959,7 +959,7 @@ ProcessEvents:
 					nonDeterministicErr = panicErr
 				} else {
 					// Since we know there is an error, we do the replay check to give more context in the log
-					replayErr := matchReplayWithHistory(replayDecisions, respondEvents)
+					replayErr := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents)
 					w.wth.logger.Error("Ignored workflow panic error",
 						zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 						zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
@@ -1412,6 +1412,9 @@ type cadenceInvoker struct {
 	closeCh               chan struct{}
 	workerStopChannel     <-chan struct{}
 	featureFlags          FeatureFlags
+	logger                *zap.Logger
+	workflowType          string
+	activityType          string
 }
 
 func (i *cadenceInvoker) Heartbeat(details []byte) error {
@@ -1497,14 +1500,28 @@ func (i *cadenceInvoker) heartbeatAndScheduleNextRun(details []byte) error {
 			i.hbBatchEndTimer.Stop()
 			i.hbBatchEndTimer = nil
 
+			var err error
 			if detailsToReport != nil {
-				i.heartbeatAndScheduleNextRun(*detailsToReport)
+				err = i.heartbeatAndScheduleNextRun(*detailsToReport)
 			}
 			i.Unlock()
+
+			// Log the error outside the lock.
+			i.logFailedHeartBeat(err)
 		}()
 	}
 
 	return err
+}
+
+func (i *cadenceInvoker) logFailedHeartBeat(err error) {
+	// If the error is a canceled error do not log, as this is expected.
+	var canceledErr *CanceledError
+
+	// We need to check for nil as errors.As returns false for nil. Which would cause us to log on nil.
+	if err != nil && !errors.As(err, &canceledErr) {
+		i.logger.Error("Failed to send heartbeat", zap.Error(err), zap.String(tagWorkflowType, i.workflowType), zap.String(tagActivityType, i.activityType))
+	}
 }
 
 func (i *cadenceInvoker) internalHeartBeat(details []byte) (bool, error) {
@@ -1562,6 +1579,9 @@ func newServiceInvoker(
 	heartBeatTimeoutInSec int32,
 	workerStopChannel <-chan struct{},
 	featureFlags FeatureFlags,
+	logger *zap.Logger,
+	workflowType string,
+	activityType string,
 ) ServiceInvoker {
 	return &cadenceInvoker{
 		taskToken:             taskToken,
@@ -1572,6 +1592,9 @@ func newServiceInvoker(
 		closeCh:               make(chan struct{}),
 		workerStopChannel:     workerStopChannel,
 		featureFlags:          featureFlags,
+		logger:                logger,
+		workflowType:          workflowType,
+		activityType:          activityType,
 	}
 }
 
@@ -1591,14 +1614,14 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 	canCtx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
 
-	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh, ath.featureFlags)
+	workflowType := t.WorkflowType.GetName()
+	activityType := t.ActivityType.GetName()
+	invoker := newServiceInvoker(t.TaskToken, ath.identity, ath.service, cancel, t.GetHeartbeatTimeoutSeconds(), ath.workerStopCh, ath.featureFlags, ath.logger, workflowType, activityType)
 	defer func() {
 		_, activityCompleted := result.(*s.RespondActivityTaskCompletedRequest)
 		invoker.Close(!activityCompleted) // flush buffered heartbeat if activity was not successfully completed.
 	}()
 
-	workflowType := t.WorkflowType.GetName()
-	activityType := t.ActivityType.GetName()
 	metricsScope := getMetricsScopeForActivity(ath.metricsScope, workflowType, activityType)
 	ctx := WithActivityTask(canCtx, t, taskList, invoker, ath.logger, metricsScope, ath.dataConverter, ath.workerStopCh, ath.contextPropagators, ath.tracer)
 

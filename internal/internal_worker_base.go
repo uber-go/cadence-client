@@ -28,10 +28,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/shirou/gopsutil/cpu"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -46,6 +48,7 @@ import (
 const (
 	retryPollOperationInitialInterval = 20 * time.Millisecond
 	retryPollOperationMaxInterval     = 10 * time.Second
+	hardwareMetricsCollectInterval    = 30 * time.Second
 )
 
 var (
@@ -53,6 +56,8 @@ var (
 )
 
 var errShutdown = errors.New("worker shutting down")
+
+var collectHardwareUsageOnce sync.Once
 
 type (
 	// resultHandler that returns result
@@ -118,6 +123,7 @@ type (
 		workerType        string
 		shutdownTimeout   time.Duration
 		userContextCancel context.CancelFunc
+		host              string
 	}
 
 	// baseWorker that wraps worker activities.
@@ -208,6 +214,15 @@ func (bw *baseWorker) Start() {
 
 	bw.shutdownWG.Add(1)
 	go bw.runTaskDispatcher()
+
+	// We want the emit function run once per host instead of run once per worker
+	//collectHardwareUsageOnce.Do(func() {
+	//	bw.shutdownWG.Add(1)
+	//	go bw.emitHardwareUsage()
+	//})
+
+	bw.shutdownWG.Add(1)
+	go bw.emitHardwareUsage()
 
 	bw.isWorkerStarted = true
 	traceLog(func() {
@@ -400,4 +415,54 @@ func (bw *baseWorker) Stop() {
 		bw.options.userContextCancel()
 	}
 	return
+}
+
+func (bw *baseWorker) emitHardwareUsage() {
+	defer func() {
+		if p := recover(); p != nil {
+			bw.metricsScope.Counter(metrics.WorkerPanicCounter).Inc(1)
+			topLine := fmt.Sprintf("base worker for %s [panic]:", bw.options.workerType)
+			st := getStackTraceRaw(topLine, 7, 0)
+			bw.logger.Error("Unhandled panic in hardware emitting.",
+				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+				zap.String(tagPanicStack, st))
+		}
+	}()
+	defer bw.shutdownWG.Done()
+	collectHardwareUsageOnce.Do(
+		func() {
+			ticker := time.NewTicker(hardwareMetricsCollectInterval)
+			for {
+				select {
+				case <-bw.shutdownCh:
+					ticker.Stop()
+					return
+				case <-ticker.C:
+					host := bw.options.host
+					scope := bw.metricsScope.Tagged(map[string]string{clientHostTag: host})
+
+					cpuPercent, err := cpu.Percent(0, false)
+					if err != nil {
+						bw.logger.Warn("Failed to get cpu percent", zap.Error(err))
+						return
+					}
+					cpuCores, err := cpu.Counts(false)
+					if err != nil {
+						bw.logger.Warn("Failed to get number of cpu cores", zap.Error(err))
+						return
+					}
+					scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
+					scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
+
+					var memStats runtime.MemStats
+					runtime.ReadMemStats(&memStats)
+
+					scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
+					scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
+					scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
+					scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
+				}
+			}
+		})
+
 }

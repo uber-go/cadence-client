@@ -994,6 +994,7 @@ ProcessEvents:
 			zap.Int64("HistorySizeEstimation", w.workflowInfo.TotalHistoryBytes),
 			zap.Int64("ActualHistorySize", w.workflowInfo.HistoryBytesServer),
 			zap.Int64("HistorySizeDiff", w.workflowInfo.TotalHistoryBytes-w.workflowInfo.HistoryBytesServer),
+			zap.Float64("DiffRatio", float64(w.workflowInfo.TotalHistoryBytes)/float64(w.workflowInfo.HistoryBytesServer)),
 			zap.String("workflowType", w.workflowInfo.WorkflowType.Name))
 		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge("cadence-server-historysize").Update(float64(w.workflowInfo.HistoryBytesServer))
 		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge("cadence-client-historysize").Update(float64(historySizeEstimation))

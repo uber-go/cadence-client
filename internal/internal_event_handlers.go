@@ -44,7 +44,7 @@ import (
 
 const (
 	queryResultSizeLimit        = 2000000 // 2MB
-	historySizeEstimationBuffer = 1 * 128 // 128B
+	historySizeEstimationBuffer = 3 * 128 // 128B
 )
 
 // Make sure that interfaces are implemented

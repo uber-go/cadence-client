@@ -43,7 +43,8 @@ import (
 )
 
 const (
-	queryResultSizeLimit = 2000000 // 2MB
+	queryResultSizeLimit        = 2000000 // 2MB
+	historySizeEstimationBuffer = 1 * 128 // 128B
 )
 
 // Make sure that interfaces are implemented
@@ -940,9 +941,11 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		return err
 	}
 
-	historySizeErr := weh.estimateHistorySize(event)
-	if historySizeErr != nil {
-		weh.logger.Error("Failed to estimate history size", zap.Error(historySizeErr))
+	if !isReplay {
+		historySizeErr := weh.estimateHistorySize(event)
+		if historySizeErr != nil {
+			weh.logger.Error("Failed to estimate history size", zap.Error(historySizeErr))
+		}
 	}
 
 	// When replaying histories to get stack trace or current state the last event might be not
@@ -1386,7 +1389,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecut
 }
 
 func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.HistoryEvent) error {
-	sum := 0
+	sum := historySizeEstimationBuffer
 	switch event.GetEventType() {
 	case m.EventTypeWorkflowExecutionStarted:
 		if event.WorkflowExecutionStartedEventAttributes != nil {

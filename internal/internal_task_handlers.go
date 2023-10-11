@@ -372,10 +372,10 @@ OrderEvents:
 	eh.currentIndex = 0
 
 	// estimate history size for nextEvents and markers
-	historySizeEstimation += eh.estimateHistorySize(nextEvents)
-	historySizeEstimation += eh.estimateHistorySize(markers)
-
-	eh.eventsHandler.logger.Info(fmt.Sprintf("Returning historySizeEstimation not zero of %d", historySizeEstimation))
+	//historySizeEstimation += eh.estimateHistorySize(nextEvents)
+	//historySizeEstimation += eh.estimateHistorySize(markers)
+	//
+	//eh.eventsHandler.logger.Info(fmt.Sprintf("Returning historySizeEstimation not zero of %d", historySizeEstimation))
 
 	return nextEvents, markers, historySizeEstimation, nil
 }
@@ -988,7 +988,7 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 ProcessEvents:
 	for {
 		reorderedEvents, markers, binaryChecksum, historySizeEstimation, err := reorderedHistory.NextDecisionEvents()
-		w.workflowInfo.TotalHistoryBytes += int64(historySizeEstimation)
+		//w.workflowInfo.TotalHistoryBytes += int64(historySizeEstimation)
 		w.wth.logger.Info("Differences between history size estimation and actual size",
 			zap.Int("HistoryEstimation", historySizeEstimation),
 			zap.Int64("HistorySizeEstimation", w.workflowInfo.TotalHistoryBytes),

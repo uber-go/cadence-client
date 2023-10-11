@@ -940,10 +940,10 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		return err
 	}
 
-	//historySizeErr := weh.estimateHistorySize(event)
-	//if historySizeErr != nil {
-	//	weh.logger.Error("Failed to estimate history size", zap.Error(historySizeErr))
-	//}
+	historySizeErr := weh.estimateHistorySize(event)
+	if historySizeErr != nil {
+		weh.logger.Error("Failed to estimate history size", zap.Error(historySizeErr))
+	}
 
 	// When replaying histories to get stack trace or current state the last event might be not
 	// decision started. So always call OnDecisionTaskStarted on the last event.
@@ -1487,5 +1487,6 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 		return fmt.Errorf("unknown event type")
 	}
 	weh.workflowInfo.TotalHistoryBytes += int64(sum)
+	weh.logger.Info("EstimateHistorySize", zap.Int("historyBytes", sum), zap.Int64("totalHistoryBytes", weh.workflowInfo.TotalHistoryBytes))
 	return nil
 }

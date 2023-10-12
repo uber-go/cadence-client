@@ -44,7 +44,7 @@ import (
 
 const (
 	queryResultSizeLimit        = 2000000 // 2MB
-	historySizeEstimationBuffer = 3 * 128 // 128B
+	historySizeEstimationBuffer = 512     // 512B
 )
 
 // Make sure that interfaces are implemented
@@ -941,12 +941,9 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		return err
 	}
 
-	if !isReplay {
-		historySizeErr := weh.estimateHistorySize(event)
-		if historySizeErr != nil {
-			weh.logger.Error("Failed to estimate history size", zap.Error(historySizeErr))
-		}
-	}
+	historySum := weh.estimateHistorySize(event)
+	weh.workflowInfo.TotalHistoryBytes += int64(historySum)
+	weh.logger.Info("EstimateHistorySize", zap.Int("historyBytes", historySum), zap.Int64("totalHistoryBytes", weh.workflowInfo.TotalHistoryBytes))
 
 	// When replaying histories to get stack trace or current state the last event might be not
 	// decision started. So always call OnDecisionTaskStarted on the last event.
@@ -1388,7 +1385,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecut
 	return nil
 }
 
-func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.HistoryEvent) error {
+func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.HistoryEvent) int {
 	sum := historySizeEstimationBuffer
 	switch event.GetEventType() {
 	case m.EventTypeWorkflowExecutionStarted:
@@ -1487,9 +1484,8 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 			sum += len(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input)
 		}
 	default:
-		return fmt.Errorf("unknown event type")
+		weh.logger.Warn("unknown event type", zap.String("Event Type", event.GetEventType().String()))
 	}
-	weh.workflowInfo.TotalHistoryBytes += int64(sum)
-	weh.logger.Info("EstimateHistorySize", zap.Int("historyBytes", sum), zap.Int64("totalHistoryBytes", weh.workflowInfo.TotalHistoryBytes))
-	return nil
+
+	return sum
 }

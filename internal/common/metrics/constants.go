@@ -114,4 +114,7 @@ const (
 	MemoryUsedHeap  = CadenceMetricsPrefix + "memory-used-heap"
 	MemoryUsedStack = CadenceMetricsPrefix + "memory-used-stack"
 	NumGoRoutines   = CadenceMetricsPrefix + "num-go-routines"
+
+	ConcurrentTaskQuota   = CadenceMetricsPrefix + "concurrent-task-quota"
+	ConcurrentTaskRunning = CadenceMetricsPrefix + "concurrent-task-running"
 )

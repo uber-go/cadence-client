@@ -889,11 +889,6 @@ func initBinaryChecksum() error {
 	binaryChecksumLock.Lock()
 	defer binaryChecksumLock.Unlock()
 
-	return initBinaryChecksumLocked()
-}
-
-// callers MUST hold binaryChecksumLock before calling
-func initBinaryChecksumLocked() error {
 	if len(binaryChecksum) > 0 {
 		return nil
 	}
@@ -924,18 +919,14 @@ func initBinaryChecksumLocked() error {
 
 func getBinaryChecksum() string {
 	binaryChecksumLock.RLock()
-	if len(binaryChecksum) != 0 {
-		// already initialized. release the Read lock and return it.
-		binaryChecksumLock.RUnlock()
-		return binaryChecksum
+	val := binaryChecksum
+	binaryChecksumLock.RUnlock()
+
+	if len(val) != 0 { // already initialized.
+		return val
 	}
 
-	// not initialized yet so release the Read lock and acquire Write lock
-	binaryChecksumLock.RUnlock()
-	binaryChecksumLock.Lock()
-	defer binaryChecksumLock.Unlock()
-
-	if err := initBinaryChecksumLocked(); err != nil {
+	if err := initBinaryChecksum(); err != nil {
 		panic(err)
 	}
 

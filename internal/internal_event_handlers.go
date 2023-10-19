@@ -44,7 +44,7 @@ import (
 
 const (
 	queryResultSizeLimit        = 2000000 // 2MB
-	historySizeEstimationBuffer = 384     // 384B
+	historySizeEstimationBuffer = 400     // 400B for common fields in history event
 )
 
 // Make sure that interfaces are implemented
@@ -1394,6 +1394,12 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 			sum += len(event.WorkflowExecutionStartedEventAttributes.ContinuedFailureDetails)
 			sum += len(event.WorkflowExecutionStartedEventAttributes.LastCompletionResult)
 			sum += len(event.WorkflowExecutionStartedEventAttributes.Memo.GetFields())
+			sum += len(event.WorkflowExecutionStartedEventAttributes.Header.GetFields())
+			sum += len(event.WorkflowExecutionStartedEventAttributes.SearchAttributes.GetIndexedFields())
+		}
+	case m.EventTypeWorkflowExecutionCompleted:
+		if event.WorkflowExecutionCompletedEventAttributes != nil {
+			sum += len(event.WorkflowExecutionCompletedEventAttributes.Result)
 		}
 	case m.EventTypeWorkflowExecutionSignaled:
 		if event.WorkflowExecutionSignaledEventAttributes != nil {

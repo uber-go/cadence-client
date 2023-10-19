@@ -51,6 +51,12 @@ const (
 	defaultStickyCacheSize = 10000
 
 	noRetryBackoff = time.Duration(-1)
+
+	defaultInstantLivedWorkflowTimeoutUpperLimitInSec = 1
+
+	defaultShortLivedWorkflowTimeoutUpperLimitInSec = 1 * 1800
+
+	defaultMediumLivedWorkflowTimeoutUpperLimitInSec = 8 * 3600
 )
 
 type (
@@ -677,6 +683,9 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 
 	if workflowContext != nil {
 		workflowContext.Lock()
+		// add new tag on metrics scope with workflow runtime length category
+		executionRuntimeType := workflowCategorizedByTimeout(workflowContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds)
+		metricsScope = metricsScope.Tagged(map[string]string{tagworkflowruntimelength: executionRuntimeType})
 		if task.Query != nil && !isFullHistory {
 			// query task and we have a valid cached state
 			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)
@@ -1826,5 +1835,17 @@ func recordActivityHeartbeatByID(
 func traceLog(fn func()) {
 	if enableVerboseLogging {
 		fn()
+	}
+}
+
+func workflowCategorizedByTimeout(executionTimeout int32) string {
+	if executionTimeout <= defaultInstantLivedWorkflowTimeoutUpperLimitInSec {
+		return "instant"
+	} else if executionTimeout <= defaultShortLivedWorkflowTimeoutUpperLimitInSec {
+		return "short"
+	} else if executionTimeout <= defaultMediumLivedWorkflowTimeoutUpperLimitInSec {
+		return "intermediate"
+	} else {
+		return "long"
 	}
 }

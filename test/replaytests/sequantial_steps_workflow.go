@@ -28,12 +28,11 @@ import (
 )
 
 /**
- * This sample workflow executes multiple branches in parallel. The number of branches is controlled by passed in parameter.
+ * This sample workflow executes sample activity 3 times sequentially.
  */
 
 // sampleBranchWorkflow workflow decider
-func sampleBranchWorkflow(ctx workflow.Context) error {
-	var futures []workflow.Future
+func sequantialStepsWorkflow(ctx workflow.Context) error {
 	// starts activities in parallel
 	ao := workflow.ActivityOptions{
 		ScheduleToStartTimeout: time.Minute,
@@ -43,49 +42,13 @@ func sampleBranchWorkflow(ctx workflow.Context) error {
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
 	for i := 1; i <= 3; i++ {
-		activityInput := fmt.Sprintf("branch %d of 3", i)
-		future := workflow.ExecuteActivity(ctx, sampleActivity, activityInput)
-		futures = append(futures, future)
-	}
-
-	// wait until all futures are done
-	for _, future := range futures {
-		if err := future.Get(ctx, nil); err != nil {
-			return err
+		activityInput := fmt.Sprintf("step %d", i)
+		err := workflow.ExecuteActivity(ctx, sampleActivity, activityInput).Get(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("Failed to execute sampleActivity %dth time, err: $v", err)
 		}
 	}
 
 	workflow.GetLogger(ctx).Info("Workflow completed.")
-
-	return nil
-}
-
-// SampleBranchWorkflow2 run a workflow with different number of branch.
-// If the number of expected branches is changed the replayer should catch it as a non deterministic error.
-func sampleBranchWorkflow2(ctx workflow.Context) error {
-	var futures []workflow.Future
-	// starts activities in parallel
-	ao := workflow.ActivityOptions{
-		ScheduleToStartTimeout: time.Minute,
-		StartToCloseTimeout:    time.Minute,
-		HeartbeatTimeout:       time.Second * 20,
-	}
-	ctx = workflow.WithActivityOptions(ctx, ao)
-
-	for i := 1; i <= 2; i++ {
-		activityInput := fmt.Sprintf("branch %d of 4", i)
-		future := workflow.ExecuteActivity(ctx, sampleActivity, activityInput)
-		futures = append(futures, future)
-	}
-
-	// wait until all futures are done
-	for _, future := range futures {
-		if err := future.Get(ctx, nil); err != nil {
-			return err
-		}
-	}
-
-	workflow.GetLogger(ctx).Info("Workflow completed.")
-
 	return nil
 }

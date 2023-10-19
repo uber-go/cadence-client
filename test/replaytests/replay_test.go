@@ -151,6 +151,17 @@ func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 	assert.ErrorContains(t, err, "nondeterministic workflow")
 }
 
+// ####### my test
+func TestSequentialStepsWorkflow(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(sequantialStepsWorkflow, workflow.RegisterOptions{Name: "sequentialStepsWorkflow"})
+
+	// branch.json file contains history of a run with 3 activity calls
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "sequential.json")
+	assert.ErrorContains(t, err, "nondeterministic workflow")
+}
+
 func TestParallel(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 

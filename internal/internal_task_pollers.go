@@ -110,16 +110,15 @@ type (
 	}
 
 	historyIteratorImpl struct {
-		iteratorFunc      func(nextPageToken []byte) (*s.History, []byte, error)
-		execution         *s.WorkflowExecution
-		nextPageToken     []byte
-		domain            string
-		service           workflowserviceclient.Interface
-		metricsScope      tally.Scope
-		startedEventID    int64
-		maxEventID        int64 // Equivalent to History Count
-		featureFlags      FeatureFlags
-		totalHistoryBytes int64
+		iteratorFunc   func(nextPageToken []byte) (*s.History, []byte, error)
+		execution      *s.WorkflowExecution
+		nextPageToken  []byte
+		domain         string
+		service        workflowserviceclient.Interface
+		metricsScope   tally.Scope
+		startedEventID int64
+		maxEventID     int64 // Equivalent to History Count
+		featureFlags   FeatureFlags
 	}
 
 	localActivityTaskPoller struct {
@@ -331,7 +330,6 @@ func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
 		})
 		return nil
 	}
-	// TODO: get workflowinfo
 	doneCh := make(chan struct{})
 	laResultCh := make(chan *localActivityResult)
 	// close doneCh so local activity worker won't get blocked forever when trying to send back result to laResultCh.
@@ -856,15 +854,14 @@ func (wtp *workflowTaskPoller) toWorkflowTask(response *s.PollForDecisionTaskRes
 		}
 	}
 	historyIterator := &historyIteratorImpl{
-		nextPageToken:     response.NextPageToken,
-		execution:         response.WorkflowExecution,
-		domain:            wtp.domain,
-		service:           wtp.service,
-		metricsScope:      wtp.metricsScope,
-		startedEventID:    startEventID,
-		maxEventID:        nextEventID - 1,
-		featureFlags:      wtp.featureFlags,
-		totalHistoryBytes: response.GetTotalHistoryBytes(),
+		nextPageToken:  response.NextPageToken,
+		execution:      response.WorkflowExecution,
+		domain:         wtp.domain,
+		service:        wtp.service,
+		metricsScope:   wtp.metricsScope,
+		startedEventID: startEventID,
+		maxEventID:     nextEventID - 1,
+		featureFlags:   wtp.featureFlags,
 	}
 	task := &workflowTask{
 		task:            response,
@@ -900,11 +897,6 @@ func (h *historyIteratorImpl) Reset() {
 
 func (h *historyIteratorImpl) HasNextPage() bool {
 	return h.nextPageToken != nil
-}
-
-// GetTotalHistoryBytes returns History Size of current history
-func (h *historyIteratorImpl) GetTotalHistoryBytes() int64 {
-	return h.totalHistoryBytes
 }
 
 // GetHistoryCount returns History Event Count of current history (aka maxEventID)

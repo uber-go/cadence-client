@@ -219,7 +219,7 @@ func GetMetricsScope(ctx Context) tally.Scope {
 
 // GetTotalHistoryBytes returns the current history size of that workflow
 func GetTotalHistoryBytes(ctx Context) int64 {
-	return internal.GetTotalHistoryBytes(ctx)
+	return internal.GetTotalEstimatedHistoryBytes(ctx)
 }
 
 // GetHistoryCount returns the current number of history event of that workflow

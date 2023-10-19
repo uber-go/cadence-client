@@ -51,8 +51,6 @@ const (
 	defaultStickyCacheSize = 10000
 
 	noRetryBackoff = time.Duration(-1)
-
-	historySizeEstimationOffset = 1 * 100
 )
 
 type (
@@ -271,7 +269,6 @@ func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.
 	if len(result) > 0 {
 		eh.next, markers, err = eh.nextDecisionEvents()
 	}
-
 	return result, markers, checksum, err
 }
 
@@ -832,7 +829,6 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	if err := w.ResetIfStale(task, historyIterator); err != nil {
 		return nil, err
 	}
-
 	w.SetCurrentTask(task)
 
 	eventHandler := w.getEventHandler()
@@ -874,7 +870,6 @@ ProcessEvents:
 				if err != nil {
 					return nil, err
 				}
-
 				if w.isWorkflowCompleted {
 					break ProcessEvents
 				}

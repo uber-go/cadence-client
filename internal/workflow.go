@@ -1161,13 +1161,13 @@ func (wc *workflowEnvironmentInterceptor) GetMetricsScope(ctx Context) tally.Sco
 	return wc.env.GetMetricsScope()
 }
 
-// GetTotalHistoryBytes returns the current history size of that workflow
-func GetTotalHistoryBytes(ctx Context) int64 {
+// GetTotalEstimatedHistoryBytes returns the current history size of that workflow
+func GetTotalEstimatedHistoryBytes(ctx Context) int64 {
 	i := getWorkflowInterceptor(ctx)
 	return i.GetWorkflowInfo(ctx).TotalHistoryBytes
 }
 
-// GetHistoryCount returns the current number of events of that workflow
+// GetHistoryCount returns the current number of history events of that workflow
 func GetHistoryCount(ctx Context) int64 {
 	i := getWorkflowInterceptor(ctx)
 	return i.GetWorkflowInfo(ctx).HistoryCount

@@ -943,7 +943,6 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 
 	historySum := weh.estimateHistorySize(event)
 	weh.workflowInfo.TotalHistoryBytes += int64(historySum)
-	weh.logger.Info("EstimateHistorySize", zap.Int("historyBytes", historySum), zap.Int64("totalHistoryBytes", weh.workflowInfo.TotalHistoryBytes))
 
 	// When replaying histories to get stack trace or current state the last event might be not
 	// decision started. So always call OnDecisionTaskStarted on the last event.

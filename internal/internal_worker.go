@@ -875,7 +875,7 @@ func (aw *aggregatedWorker) Start() error {
 }
 
 var binaryChecksum string
-var binaryChecksumLock sync.Mutex
+var binaryChecksumLock sync.RWMutex
 
 // SetBinaryChecksum set binary checksum
 func SetBinaryChecksum(checksum string) {
@@ -923,14 +923,20 @@ func initBinaryChecksumLocked() error {
 }
 
 func getBinaryChecksum() string {
+	binaryChecksumLock.RLock()
+	if len(binaryChecksum) != 0 {
+		// already initialized. release the Read lock and return it.
+		binaryChecksumLock.RUnlock()
+		return binaryChecksum
+	}
+
+	// not initialized yet so release the Read lock and acquire Write lock
+	binaryChecksumLock.RUnlock()
 	binaryChecksumLock.Lock()
 	defer binaryChecksumLock.Unlock()
 
-	if len(binaryChecksum) == 0 {
-		err := initBinaryChecksumLocked()
-		if err != nil {
-			panic(err)
-		}
+	if err := initBinaryChecksumLocked(); err != nil {
+		panic(err)
 	}
 
 	return binaryChecksum

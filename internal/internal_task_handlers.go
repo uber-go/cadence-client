@@ -663,10 +663,7 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	task *s.PollForDecisionTaskResponse,
 	historyIterator HistoryIterator,
 ) (workflowContext *workflowExecutionContextImpl, err error) {
-	// We probably need to have the tasklist name in tags as well,
-	// considering workflow with same workflow name/timeout can be run in different tasklist
-	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName(),
-		tagTaskList, task.GetWorkflowExecutionTaskList().GetName())
+	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
 	defer func() {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
 			workflowContext.laTunnel = wth.laTunnel

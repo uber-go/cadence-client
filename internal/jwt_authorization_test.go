@@ -25,7 +25,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/cristalhq/jwt/v3"
+	"github.com/cristalhq/jwt/v5"
 	"github.com/stretchr/testify/suite"
 
 	"go.uber.org/cadence/internal/common/auth"
@@ -64,10 +64,10 @@ func (s *jwtAuthSuite) TestCorrectTokenCreation() {
 	s.NoError(err)
 	verifier, err := jwt.NewVerifierRS(jwt.RS256, publicKey)
 	s.NoError(err)
-	token, err := jwt.ParseAndVerifyString(string(authToken), verifier)
+	token, err := jwt.Parse(authToken, verifier)
 	s.NoError(err)
 	var claims auth.JWTClaims
-	_ = json.Unmarshal(token.RawClaims(), &claims)
+	_ = json.Unmarshal(token.Claims(), &claims)
 	s.Equal(claims.Admin, true)
 	s.Equal(claims.Groups, "")
 	s.Equal(claims.TTL, int64(60*10))

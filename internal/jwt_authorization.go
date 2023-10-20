@@ -23,7 +23,7 @@ package internal
 import (
 	"time"
 
-	"github.com/cristalhq/jwt/v3"
+	"github.com/cristalhq/jwt/v5"
 
 	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/util"
@@ -59,5 +59,5 @@ func (j *JWTAuthProvider) GetAuthToken() ([]byte, error) {
 		return nil, err
 	}
 
-	return token.Raw(), nil
+	return token.Bytes(), nil
 }

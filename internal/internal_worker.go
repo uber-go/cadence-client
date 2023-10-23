@@ -876,6 +876,7 @@ func (aw *aggregatedWorker) Start() error {
 }
 
 var binaryChecksum atomic.Value
+var binaryChecksumLock sync.Mutex
 
 // SetBinaryChecksum set binary checksum
 func SetBinaryChecksum(checksum string) {
@@ -883,6 +884,16 @@ func SetBinaryChecksum(checksum string) {
 }
 
 func initBinaryChecksum() (string, error) {
+	// initBinaryChecksum may be called multiple times concurrently during worker startup.
+	// To avoid reading and hashing the contents of the binary multiple times acquire mutex here.
+	binaryChecksumLock.Lock()
+	defer binaryChecksumLock.Unlock()
+
+	// check if binaryChecksum already set/initialized.
+	if bcsVal, ok := binaryChecksum.Load().(string); ok {
+		return bcsVal, nil
+	}
+
 	exec, err := os.Executable()
 	if err != nil {
 		return "", err

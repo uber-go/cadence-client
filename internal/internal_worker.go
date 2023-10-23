@@ -36,6 +36,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/cadence/internal/common/isolationgroup"
@@ -792,7 +793,7 @@ func (aw *aggregatedWorker) RegisterActivityWithOptions(a interface{}, options R
 }
 
 func (aw *aggregatedWorker) Start() error {
-	if err := initBinaryChecksum(); err != nil {
+	if _, err := initBinaryChecksum(); err != nil {
 		return fmt.Errorf("failed to get executable checksum: %v", err)
 	}
 
@@ -874,33 +875,22 @@ func (aw *aggregatedWorker) Start() error {
 	return nil
 }
 
-var binaryChecksum string
-var binaryChecksumLock sync.RWMutex
+var binaryChecksum atomic.Value
 
 // SetBinaryChecksum set binary checksum
 func SetBinaryChecksum(checksum string) {
-	binaryChecksumLock.Lock()
-	defer binaryChecksumLock.Unlock()
-
-	binaryChecksum = checksum
+	binaryChecksum.Store(checksum)
 }
 
-func initBinaryChecksum() error {
-	binaryChecksumLock.Lock()
-	defer binaryChecksumLock.Unlock()
-
-	if len(binaryChecksum) > 0 {
-		return nil
-	}
-
+func initBinaryChecksum() (string, error) {
 	exec, err := os.Executable()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	f, err := os.Open(exec)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func() {
 		_ = f.Close() // error is unimportant as it is read-only
@@ -908,29 +898,28 @@ func initBinaryChecksum() error {
 
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return err
+		return "", err
 	}
 
 	checksum := h.Sum(nil)
-	binaryChecksum = hex.EncodeToString(checksum[:])
+	bcsVal := hex.EncodeToString(checksum[:])
+	binaryChecksum.Store(bcsVal)
 
-	return nil
+	return bcsVal, err
 }
 
 func getBinaryChecksum() string {
-	binaryChecksumLock.RLock()
-	val := binaryChecksum
-	binaryChecksumLock.RUnlock()
-
-	if len(val) != 0 { // already initialized.
-		return val
+	bcsVal, ok := binaryChecksum.Load().(string)
+	if ok {
+		return bcsVal
 	}
 
-	if err := initBinaryChecksum(); err != nil {
+	bcsVal, err := initBinaryChecksum()
+	if err != nil {
 		panic(err)
 	}
 
-	return binaryChecksum
+	return bcsVal
 }
 
 func (aw *aggregatedWorker) Run() error {

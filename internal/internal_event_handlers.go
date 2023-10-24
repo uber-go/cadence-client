@@ -1411,13 +1411,13 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 		}
 	case m.EventTypeDecisionTaskStarted:
 		if event.DecisionTaskStartedEventAttributes != nil {
-			sum += len(*event.DecisionTaskStartedEventAttributes.Identity)
+			sum += getLengthOfStringPointer(event.DecisionTaskStartedEventAttributes.Identity)
 		}
 	case m.EventTypeDecisionTaskCompleted:
 		if event.DecisionTaskCompletedEventAttributes != nil {
 			sum += len(event.DecisionTaskCompletedEventAttributes.ExecutionContext)
-			sum += len(*event.DecisionTaskCompletedEventAttributes.Identity)
-			sum += len(*event.DecisionTaskCompletedEventAttributes.BinaryChecksum)
+			sum += getLengthOfStringPointer(event.DecisionTaskCompletedEventAttributes.Identity)
+			sum += getLengthOfStringPointer(event.DecisionTaskCompletedEventAttributes.BinaryChecksum)
 		}
 	case m.EventTypeDecisionTaskFailed:
 		if event.DecisionTaskFailedEventAttributes != nil {
@@ -1435,7 +1435,7 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 	case m.EventTypeActivityTaskCompleted:
 		if event.ActivityTaskCompletedEventAttributes != nil {
 			sum += len(event.ActivityTaskCompletedEventAttributes.Result)
-			sum += len(*event.ActivityTaskCompletedEventAttributes.Identity)
+			sum += getLengthOfStringPointer(event.ActivityTaskCompletedEventAttributes.Identity)
 		}
 	case m.EventTypeActivityTaskFailed:
 		if event.ActivityTaskFailedEventAttributes != nil {
@@ -1486,7 +1486,7 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 	case m.EventTypeChildWorkflowExecutionFailed:
 		if event.ChildWorkflowExecutionFailedEventAttributes != nil {
 			sum += len(event.ChildWorkflowExecutionFailedEventAttributes.Details)
-			sum += len(*event.ChildWorkflowExecutionFailedEventAttributes.Reason)
+			sum += getLengthOfStringPointer(event.ChildWorkflowExecutionFailedEventAttributes.Reason)
 		}
 	case m.EventTypeChildWorkflowExecutionCanceled:
 		if event.ChildWorkflowExecutionCanceledEventAttributes != nil {
@@ -1512,4 +1512,11 @@ func sizeOf(o map[string][]byte) int {
 		sum += len(k) + len(v)
 	}
 	return sum
+}
+
+func getLengthOfStringPointer(s *string) int {
+	if s == nil {
+		return 0
+	}
+	return len(*s)
 }

@@ -858,7 +858,8 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 ProcessEvents:
 	for {
 		reorderedEvents, markers, binaryChecksum, err := reorderedHistory.NextDecisionEvents()
-		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge("cadence-historysize-ratio").Update(float64(w.workflowInfo.TotalHistoryBytes) / float64(w.workflowInfo.HistoryBytesServer))
+		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge(metrics.EstimatedHistorySize).Update(float64(w.workflowInfo.TotalHistoryBytes))
+		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge(metrics.ServerSideHistorySize).Update(float64(w.workflowInfo.HistoryBytesServer))
 		if err != nil {
 			return nil, err
 		}

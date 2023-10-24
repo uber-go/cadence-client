@@ -117,4 +117,7 @@ const (
 
 	ConcurrentTaskQuota   = CadenceMetricsPrefix + "concurrent-task-quota"
 	ConcurrentTaskRunning = CadenceMetricsPrefix + "concurrent-task-running"
+
+	EstimatedHistorySize  = CadenceMetricsPrefix + "estimated-history-size"
+	ServerSideHistorySize = CadenceMetricsPrefix + "server-side-history-size"
 )

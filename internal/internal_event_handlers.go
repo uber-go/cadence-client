@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -942,7 +943,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	}
 
 	historySum := weh.estimateHistorySize(event)
-	weh.workflowInfo.TotalHistoryBytes += int64(historySum)
+	atomic.AddInt64(&weh.workflowInfo.TotalHistoryBytes, int64(historySum))
 
 	// When replaying histories to get stack trace or current state the last event might be not
 	// decision started. So always call OnDecisionTaskStarted on the last event.
@@ -1392,9 +1393,9 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 			sum += len(event.WorkflowExecutionStartedEventAttributes.Input)
 			sum += len(event.WorkflowExecutionStartedEventAttributes.ContinuedFailureDetails)
 			sum += len(event.WorkflowExecutionStartedEventAttributes.LastCompletionResult)
-			sum += len(event.WorkflowExecutionStartedEventAttributes.Memo.GetFields())
-			sum += len(event.WorkflowExecutionStartedEventAttributes.Header.GetFields())
-			sum += len(event.WorkflowExecutionStartedEventAttributes.SearchAttributes.GetIndexedFields())
+			sum += sizeOf(event.WorkflowExecutionStartedEventAttributes.Memo.GetFields())
+			sum += sizeOf(event.WorkflowExecutionStartedEventAttributes.Header.GetFields())
+			sum += sizeOf(event.WorkflowExecutionStartedEventAttributes.SearchAttributes.GetIndexedFields())
 		}
 	case m.EventTypeWorkflowExecutionCompleted:
 		if event.WorkflowExecutionCompletedEventAttributes != nil {
@@ -1408,9 +1409,15 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 		if event.WorkflowExecutionFailedEventAttributes != nil {
 			sum += len(event.WorkflowExecutionFailedEventAttributes.Details)
 		}
+	case m.EventTypeDecisionTaskStarted:
+		if event.DecisionTaskStartedEventAttributes != nil {
+			sum += len(*event.DecisionTaskStartedEventAttributes.Identity)
+		}
 	case m.EventTypeDecisionTaskCompleted:
 		if event.DecisionTaskCompletedEventAttributes != nil {
 			sum += len(event.DecisionTaskCompletedEventAttributes.ExecutionContext)
+			sum += len(*event.DecisionTaskCompletedEventAttributes.Identity)
+			sum += len(*event.DecisionTaskCompletedEventAttributes.BinaryChecksum)
 		}
 	case m.EventTypeDecisionTaskFailed:
 		if event.DecisionTaskFailedEventAttributes != nil {
@@ -1419,7 +1426,7 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 	case m.EventTypeActivityTaskScheduled:
 		if event.ActivityTaskScheduledEventAttributes != nil {
 			sum += len(event.ActivityTaskScheduledEventAttributes.Input)
-			sum += len(event.ActivityTaskScheduledEventAttributes.Header.GetFields())
+			sum += sizeOf(event.ActivityTaskScheduledEventAttributes.Header.GetFields())
 		}
 	case m.EventTypeActivityTaskStarted:
 		if event.ActivityTaskStartedEventAttributes != nil {
@@ -1428,6 +1435,7 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 	case m.EventTypeActivityTaskCompleted:
 		if event.ActivityTaskCompletedEventAttributes != nil {
 			sum += len(event.ActivityTaskCompletedEventAttributes.Result)
+			sum += len(*event.ActivityTaskCompletedEventAttributes.Identity)
 		}
 	case m.EventTypeActivityTaskFailed:
 		if event.ActivityTaskFailedEventAttributes != nil {
@@ -1459,17 +1467,17 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.Input)
 			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.FailureDetails)
 			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.LastCompletionResult)
-			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.Memo.GetFields())
-			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.Header.GetFields())
-			sum += len(event.WorkflowExecutionContinuedAsNewEventAttributes.SearchAttributes.GetIndexedFields())
+			sum += sizeOf(event.WorkflowExecutionContinuedAsNewEventAttributes.Memo.GetFields())
+			sum += sizeOf(event.WorkflowExecutionContinuedAsNewEventAttributes.Header.GetFields())
+			sum += sizeOf(event.WorkflowExecutionContinuedAsNewEventAttributes.SearchAttributes.GetIndexedFields())
 		}
 	case m.EventTypeStartChildWorkflowExecutionInitiated:
 		if event.StartChildWorkflowExecutionInitiatedEventAttributes != nil {
 			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.Input)
 			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.Control)
-			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.Memo.GetFields())
-			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.Header.GetFields())
-			sum += len(event.StartChildWorkflowExecutionInitiatedEventAttributes.SearchAttributes.GetIndexedFields())
+			sum += sizeOf(event.StartChildWorkflowExecutionInitiatedEventAttributes.Memo.GetFields())
+			sum += sizeOf(event.StartChildWorkflowExecutionInitiatedEventAttributes.Header.GetFields())
+			sum += sizeOf(event.StartChildWorkflowExecutionInitiatedEventAttributes.SearchAttributes.GetIndexedFields())
 		}
 	case m.EventTypeChildWorkflowExecutionCompleted:
 		if event.ChildWorkflowExecutionCompletedEventAttributes != nil {
@@ -1478,6 +1486,7 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 	case m.EventTypeChildWorkflowExecutionFailed:
 		if event.ChildWorkflowExecutionFailedEventAttributes != nil {
 			sum += len(event.ChildWorkflowExecutionFailedEventAttributes.Details)
+			sum += len(*event.ChildWorkflowExecutionFailedEventAttributes.Reason)
 		}
 	case m.EventTypeChildWorkflowExecutionCanceled:
 		if event.ChildWorkflowExecutionCanceledEventAttributes != nil {
@@ -1488,9 +1497,19 @@ func (weh *workflowExecutionEventHandlerImpl) estimateHistorySize(event *m.Histo
 			sum += len(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Control)
 			sum += len(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input)
 		}
+
 	default:
 		weh.logger.Warn("unknown event type", zap.String("Event Type", event.GetEventType().String()))
 	}
 
+	return sum
+}
+
+// simple function to estimate the size of a map[string][]byte
+func sizeOf(o map[string][]byte) int {
+	sum := 0
+	for k, v := range o {
+		sum += len(k) + len(v)
+	}
 	return sum
 }

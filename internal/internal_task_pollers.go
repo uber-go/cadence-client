@@ -809,8 +809,6 @@ func (wtp *workflowTaskPoller) poll(ctx context.Context) (interface{}, error) {
 
 	wtp.updateBacklog(request.TaskList.GetKind(), response.GetBacklogCountHint())
 
-	wtp.logger.Info(fmt.Sprintf("Tasklist backlog count is %d", response.GetBacklogCountHint()))
-
 	task := wtp.toWorkflowTask(response)
 	traceLog(func() {
 		var firstEventID int64 = -1

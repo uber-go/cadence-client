@@ -73,6 +73,7 @@ func TestGreetingsWorkflow(t *testing.T) {
 }
 
 // Should have failed but passed. Maybe, because the result recorded in history still matches the return type of the workflow.
+// TODO(remove comment): Passes now
 func TestGreetingsWorkflow3(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterActivityWithOptions(getNameActivity3, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
@@ -121,6 +122,7 @@ func TestExclusiveChoiceWorkflowWithUnregisteredActivity(t *testing.T) {
 // that registered activity is different from executed activity.
 // The replayer relies on whatever is recorded in the History so as long as the main activity name in the options matched partially
 // it doesn't raise errors.
+// TODO(remove comment): Replayer now catches this
 func TestExclusiveChoiceWorkflowWithDifferentActvityCombo(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 
@@ -128,7 +130,7 @@ func TestExclusiveChoiceWorkflowWithDifferentActvityCombo(t *testing.T) {
 	replayer.RegisterActivityWithOptions(getAppleOrderActivity, activity.RegisterOptions{Name: "main.getOrderActivity"})
 	replayer.RegisterActivityWithOptions(orderAppleActivity, activity.RegisterOptions{Name: "testactivity"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
-	require.NoError(t, err)
+	assert.ErrorContains(t, err, "nondeterministic workflow")
 }
 
 func TestBranchWorkflow(t *testing.T) {
@@ -155,9 +157,10 @@ func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 func TestSequentialStepsWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 
-	replayer.RegisterWorkflowWithOptions(sequantialStepsWorkflow, workflow.RegisterOptions{Name: "sequentialStepsWorkflow"})
+	replayer.RegisterWorkflowWithOptions(replayerHelloWorldWorkflow, workflow.RegisterOptions{Name: "fx.ReplayerHelloWorldWorkflow"})
+	replayer.RegisterActivityWithOptions(replayerHelloWorldActivity, activity.RegisterOptions{Name: "replayerhello"})
 
-	// branch.json file contains history of a run with 3 activity calls
+	// sequential.json file contains history of a run with 2 activity calls sequentially
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "sequential.json")
 	assert.ErrorContains(t, err, "nondeterministic workflow")
 }
@@ -173,11 +176,12 @@ func TestParallel(t *testing.T) {
 
 // Should have failed since the first go routine has only one branch whereas the history has two branches.
 // The replayer totally misses this change.
+// TODO(remove comment): Replayer now catches this
 func TestParallel2(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 
 	replayer.RegisterWorkflowWithOptions(sampleParallelWorkflow2, workflow.RegisterOptions{Name: "branch2"})
 
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch2.json")
-	require.NoError(t, err)
+	assert.ErrorContains(t, err, "nondeterministic workflow")
 }

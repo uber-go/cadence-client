@@ -73,7 +73,7 @@ func TestGreetingsWorkflow(t *testing.T) {
 }
 
 // Should have failed but passed. Maybe, because the result recorded in history still matches the return type of the workflow.
-// TODO(remove comment): Passes now
+// TODO(remove comment): Debug why is this still missed
 func TestGreetingsWorkflow3(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterActivityWithOptions(getNameActivity3, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
@@ -153,7 +153,8 @@ func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 	assert.ErrorContains(t, err, "nondeterministic workflow")
 }
 
-// ####### my test
+// TestSequentialStepsWorkflow replays a history with 2 sequential activity calls and runs it against new version of the workflow code which only calls 1 activity.
+// This should be considered as non-determinism error.
 func TestSequentialStepsWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 

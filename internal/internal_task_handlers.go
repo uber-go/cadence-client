@@ -979,7 +979,11 @@ ProcessEvents:
 			}
 		}
 		isReplay := len(reorderedEvents) > 0 && reorderedHistory.IsReplayEvent(reorderedEvents[len(reorderedEvents)-1])
-		if isReplay {
+		// incomplete decisions (e.g. start without a complete) at the end of history will still have decisions in decisionsHelper
+		// but there won't be corresponding respond events. This breaks the non-determinism check therefore we ignore such final partial decisions.
+		// Example scenario is covered by TestReplayWorkflowHistory_Partial_NoDecisionEvents
+		lastDecisionEventsForReplayTest := isReplayTest && !reorderedHistory.HasNextDecisionEvents()
+		if isReplay && !lastDecisionEventsForReplayTest {
 			eventDecisions := eventHandler.decisionsHelper.getDecisions(true)
 			if len(eventDecisions) > 0 && !skipReplayCheck {
 				replayDecisions = append(replayDecisions, eventDecisions...)

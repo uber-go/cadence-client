@@ -151,7 +151,8 @@ func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 	assert.ErrorContains(t, err, "nondeterministic workflow")
 }
 
-// ####### my test
+// TestSequentialStepsWorkflow replays a history with 2 sequential activity calls and runs it against new version of the workflow code which only calls 1 activity.
+// This should be considered as non-determinism error.
 func TestSequentialStepsWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 

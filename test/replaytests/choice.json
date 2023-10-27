@@ -176,7 +176,34 @@
   },
   {
     "eventId": 12,
-    "timestamp": 1679427717321911295,
+    "timestamp": 1679427717321780254,
+    "eventType": "ActivityTaskStarted",
+    "version": 0,
+    "taskId": 5243011,
+    "activityTaskStartedEventAttributes": {
+      "scheduledEventId": 11,
+      "identity": "82203@agautam-NV709R969P@choiceGroup@41d230ae-253a-4d01-9079-322ef05c09fb",
+      "requestId": "ae2aad96-6588-4359-807b-a39a16f0896a",
+      "attempt": 0,
+      "lastFailureReason": ""
+    }
+  },
+  {
+    "eventId": 13,
+    "timestamp": 1679427717321780255,
+    "eventType": "ActivityTaskCompleted",
+    "version": 0,
+    "taskId": 5243000,
+    "activityTaskCompletedEventAttributes": {
+      "result": "ImJhbmFuYSIK",
+      "scheduledEventId": 11,
+      "startedEventId": 12,
+      "identity": "82203@agautam-NV709R969P@choiceGroup@41d230ae-253a-4d01-9079-322ef05c09fb"
+    }
+  },
+  {
+    "eventId": 14,
+    "timestamp": 1679427717321780256,
     "eventType": "WorkflowExecutionCompleted",
     "version": 0,
     "taskId": 5243011,

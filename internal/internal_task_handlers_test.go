@@ -880,9 +880,9 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicLogNonexistingI
 	require.NotNil(t.T(), replayErrorField)
 	require.Equal(t.T(), zapcore.ErrorType, replayErrorField.Type)
 	require.ErrorContains(t.T(), replayErrorField.Interface.(error),
-		"nondeterministic workflow: "+
+		"nondeterministic workflow: mismatching history event and replay decision found. "+
 			"history event is ActivityTaskScheduled: (ActivityId:NotAnActivityID, ActivityType:(Name:pkg.Greeter_Activity), TaskList:(Name:taskList), Input:[]), "+
-			"replay decision is ScheduleActivityTask: (ActivityId:0, ActivityType:(Name:Greeter_Activity), TaskList:(Name:taskList)")
+			"replay decision is ScheduleActivityTask: (ActivityId:0, ActivityType:(Name:Greeter_Activity), TaskList:(Name:taskList), Input:[], ScheduleToCloseTimeoutSeconds:120, ScheduleToStartTimeoutSeconds:60, StartToCloseTimeoutSeconds:60, HeartbeatTimeoutSeconds:20, Header:(Fields:map[]))")
 }
 
 func (t *TaskHandlersTestSuite) TestWorkflowTask_WorkflowReturnsPanicError() {

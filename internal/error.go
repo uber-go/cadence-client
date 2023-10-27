@@ -508,6 +508,7 @@ func (e *NonDeterministicError) Error() string {
 	case "mismatch":
 		// historical text
 		return "nondeterministic workflow: " +
+			"mismatching history event and replay decision found. " +
 			"history event is " + e.HistoryEventText + ", " +
 			"replay decision is " + e.DecisionText
 	default:

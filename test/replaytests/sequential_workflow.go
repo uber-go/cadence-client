@@ -20,7 +20,7 @@ type replayerSampleMessage struct {
 // Corresponding unit test covers the scenario that new workflow's history records is subset of previous version's history.
 //
 //	v1: wf started -> call activity -> call activity -> wf complete
-//	v2:  wf started -> call activity -> wf complete
+//	v2: wf started -> call activity -> wf complete
 //
 // The v2 clearly has determinism issues and should be considered as non-determism error for replay tests.
 func replayerHelloWorldWorkflow(ctx workflow.Context, inputMsg *replayerSampleMessage) error {

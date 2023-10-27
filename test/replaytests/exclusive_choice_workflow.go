@@ -39,7 +39,7 @@ const (
 	orderChoiceCherry = "cherry"
 )
 
-// exclusiveChoiceWorkflow Workflow Decider. This workflow executes Cherry order.
+// exclusiveChoiceWorkflow executes main.getOrderActivity and executes either cherry or banana activity depends on what main.getOrderActivity returns
 func exclusiveChoiceWorkflow(ctx workflow.Context) error {
 	// Get order.
 	ao := workflow.ActivityOptions{
@@ -50,7 +50,7 @@ func exclusiveChoiceWorkflow(ctx workflow.Context) error {
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
 	var orderChoice string
-	err := workflow.ExecuteActivity(ctx, getOrderActivity).Get(ctx, &orderChoice)
+	err := workflow.ExecuteActivity(ctx, "main.getOrderActivity").Get(ctx, &orderChoice)
 	if err != nil {
 		return err
 	}
@@ -60,9 +60,9 @@ func exclusiveChoiceWorkflow(ctx workflow.Context) error {
 	// choose next activity based on order result
 	switch orderChoice {
 	case orderChoiceBanana:
-		workflow.ExecuteActivity(ctx, orderBananaActivity, orderChoice)
+		workflow.ExecuteActivity(ctx, "main.orderBananaActivity", orderChoice)
 	case orderChoiceCherry:
-		workflow.ExecuteActivity(ctx, orderCherryActivity, orderChoice)
+		workflow.ExecuteActivity(ctx, "main.orderCherryActivity", orderChoice)
 	default:
 		logger.Error("Unexpected order", zap.String("Choice", orderChoice))
 	}
@@ -71,8 +71,8 @@ func exclusiveChoiceWorkflow(ctx workflow.Context) error {
 	return nil
 }
 
-// This workflow explicitly executes Apple Activity received from the getorderActivity.
-func exclusiveChoiceWorkflow2(ctx workflow.Context) error {
+// exclusiveChoiceWorkflow executes main.getOrderActivity and executes either cherry or banana activity depends on what main.getOrderActivity returns
+func exclusiveChoiceWorkflowAlwaysCherry(ctx workflow.Context) error {
 	// Get order.
 	ao := workflow.ActivityOptions{
 		ScheduleToStartTimeout: time.Minute,
@@ -82,38 +82,23 @@ func exclusiveChoiceWorkflow2(ctx workflow.Context) error {
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
 	var orderChoice string
-	err := workflow.ExecuteActivity(ctx, getAppleOrderActivity).Get(ctx, &orderChoice)
+	err := workflow.ExecuteActivity(ctx, "main.getOrderActivity").Get(ctx, &orderChoice)
 	if err != nil {
 		return err
 	}
 
 	logger := workflow.GetLogger(ctx)
+	logger.Sugar().Infof("Got order for %s but will ignore and order cherry!!", orderChoice)
 
-	// choose next activity based on order result. It's apple in this case.
-	switch orderChoice {
-	case orderChoiceApple:
-		workflow.ExecuteActivity(ctx, orderAppleActivity, orderChoice)
-	default:
-		logger.Error("Unexpected order", zap.String("Choice", orderChoice))
-	}
+	workflow.ExecuteActivity(ctx, "main.orderCherryActivity", orderChoice)
 
 	logger.Info("Workflow completed.")
 	return nil
 }
 
-func getOrderActivity() (string, error) {
-	fmt.Printf("Order is for Cherry")
-	return "cherry", nil
-}
-
-func getAppleOrderActivity() (string, error) {
+func getBananaOrderActivity() (string, error) {
 	fmt.Printf("Order is for Apple")
 	return "apple", nil
-}
-
-func orderAppleActivity(choice string) error {
-	fmt.Printf("Order choice: %v\n", choice)
-	return nil
 }
 
 func orderBananaActivity(choice string) error {

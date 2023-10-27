@@ -340,7 +340,7 @@ func TestHistoryEstimationforSmallEvents(t *testing.T) {
 	w.logger = logger
 	historySizeSum := 0
 	for _, event := range testEvents {
-		sum := w.estimateHistorySize(event)
+		sum := estimateHistorySize(logger, event)
 		historySizeSum += sum
 	}
 	trueSize := len(testEvents) * historySizeEstimationBuffer
@@ -376,7 +376,7 @@ func TestHistoryEstimationforPackedEvents(t *testing.T) {
 	w.logger = logger
 	historySizeSum := 0
 	for _, event := range testEvents {
-		sum := w.estimateHistorySize(event)
+		sum := estimateHistorySize(logger, event)
 		historySizeSum += sum
 	}
 	trueSize := len(testEvents)*historySizeEstimationBuffer + len(byteArray)*2*len(testEvents)

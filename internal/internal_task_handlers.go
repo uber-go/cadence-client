@@ -963,7 +963,7 @@ ProcessEvents:
 
 			// Break the event processing loop if the workflow is completed except in replay mode.
 			// In replay mode we check for nondeterminism cases and
-			// breaking the loop causes missing events in respondEvents which can cause false positives or false negatives.
+			// breaking the loop causes missing events in respondEvents which then causes false positives or false negatives.
 			if w.isWorkflowCompleted && !isInReplay {
 				break ProcessEvents
 			}

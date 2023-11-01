@@ -58,6 +58,11 @@ func WithTaskList(ctx Context, name string) Context {
 	return internal.WithTaskList(ctx, name)
 }
 
+// WithTaskListApply makes a copy of current context and update the tasklist with apply function.
+func WithTaskListApply(ctx Context, apply func(string) string) Context {
+	return internal.WithTaskListApply(ctx, apply)
+}
+
 // WithScheduleToCloseTimeout makes a copy of the current context and update
 // the ScheduleToCloseTimeout field in its activity options. An empty activity
 // options will be created if it does not exist in the original context.

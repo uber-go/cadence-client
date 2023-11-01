@@ -1413,6 +1413,13 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 	return ctx1
 }
 
+// WithWorkflowTaskListApply returns a copy of context and changes workflow tasklist with apply function.
+func WithWorkflowTaskListApply(ctx Context, apply func(*string) *string) Context {
+	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
+	getWorkflowEnvOptions(ctx1).taskListName = apply(getWorkflowEnvOptions(ctx1).taskListName)
+	return ctx1
+}
+
 // WithWorkflowID adds a workflowID to the context.
 func WithWorkflowID(ctx Context, workflowID string) Context {
 	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
@@ -1797,6 +1804,13 @@ func WithLocalActivityOptions(ctx Context, options LocalActivityOptions) Context
 func WithTaskList(ctx Context, name string) Context {
 	ctx1 := setActivityParametersIfNotExist(ctx)
 	getActivityOptions(ctx1).TaskListName = name
+	return ctx1
+}
+
+// WithTaskListApply changes tasklist to the copy of the context
+func WithTaskListApply(ctx Context, apply func(string) string) Context {
+	ctx1 := setActivityParametersIfNotExist(ctx)
+	getActivityOptions(ctx1).TaskListName = apply(getActivityOptions(ctx1).TaskListName)
 	return ctx1
 }
 

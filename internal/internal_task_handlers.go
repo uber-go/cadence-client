@@ -954,33 +954,21 @@ ProcessEvents:
 		if err := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents); err != nil {
 			nonDeterministicErr = err
 		}
-	}
-	if nonDeterministicErr == nil && w.err != nil {
-		if panicErr, ok := w.err.(*workflowPanicError); ok && panicErr.value != nil {
-			if _, isStateMachinePanic := panicErr.value.(stateMachineIllegalStatePanic); isStateMachinePanic {
-				if isReplayTest {
-					// NOTE: we should do this regardless if it's in replay test or not
-					// but since previously we checked the wrong error type, it may break existing customers workflow
-					// the issue is that we change the error type and that we change the error message, the customers
-					// are checking the error string - we plan to wrap all errors to avoid this issue in client v2
-					nonDeterministicErr = panicErr
-				} else {
-					// Since we know there is an error, we do the replay check to give more context in the log
-					replayErr := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents)
-					w.wth.logger.Error("Ignored workflow panic error",
-						zap.String(tagWorkflowType, task.WorkflowType.GetName()),
-						zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
-						zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
-						zap.Error(nonDeterministicErr),
-						zap.NamedError("ReplayError", replayErr),
-					)
-				}
-			}
-		}
+	} else if panicErr, ok := w.getWorkflowPanicIfIllegaleStatePanic(); ok {
+		// This is a nondeterministic execution which ended up panicing
+		nonDeterministicErr = panicErr
+		// Since we know there is an error, we do the replay check to give more context in the log
+		replayErr := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents)
+		w.wth.logger.Error("Illegal state caused panic",
+			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
+			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
+			zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
+			zap.Error(nonDeterministicErr),
+			zap.NamedError("ReplayError", replayErr),
+		)
 	}
 
 	if nonDeterministicErr != nil {
-
 		w.wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName()).Counter(metrics.NonDeterministicError).Inc(1)
 		w.wth.logger.Error("non-deterministic-error",
 			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
@@ -998,11 +986,29 @@ ProcessEvents:
 			// workflow timeout.
 			return nil, nonDeterministicErr
 		default:
-			panic(fmt.Sprintf("unknown mismatched workflow history policy."))
+			panic("unknown mismatched workflow history policy.")
 		}
 	}
 
 	return w.CompleteDecisionTask(workflowTask, true), nil
+}
+
+func (w *workflowExecutionContextImpl) getWorkflowPanicIfIllegaleStatePanic() (*workflowPanicError, bool) {
+	if !w.isWorkflowCompleted || w.err == nil {
+		return nil, false
+	}
+
+	panicErr, ok := w.err.(*workflowPanicError)
+	if !ok || panicErr.value == nil {
+		return nil, false
+	}
+
+	_, ok = panicErr.value.(stateMachineIllegalStatePanic)
+	if !ok {
+		return nil, false
+	}
+
+	return panicErr, true
 }
 
 func (w *workflowExecutionContextImpl) ProcessLocalActivityResult(workflowTask *workflowTask, lar *localActivityResult) (interface{}, error) {

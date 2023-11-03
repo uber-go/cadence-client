@@ -969,6 +969,8 @@ ProcessEvents:
 	}
 
 	if nonDeterministicErr != nil {
+		// TODO: add a NonDeterminismDetectionType tag based on which branch set the nonDeterministicErr above.
+		// Q: What is our approach for such tag changes of existing metrics as it is not allowed by some timeseries dbs (prometheus)
 		w.wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName()).Counter(metrics.NonDeterministicError).Inc(1)
 		w.wth.logger.Error("non-deterministic-error",
 			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
@@ -991,24 +993,6 @@ ProcessEvents:
 	}
 
 	return w.CompleteDecisionTask(workflowTask, true), nil
-}
-
-func (w *workflowExecutionContextImpl) getWorkflowPanicIfIllegaleStatePanic() (*workflowPanicError, bool) {
-	if !w.isWorkflowCompleted || w.err == nil {
-		return nil, false
-	}
-
-	panicErr, ok := w.err.(*workflowPanicError)
-	if !ok || panicErr.value == nil {
-		return nil, false
-	}
-
-	_, ok = panicErr.value.(stateMachineIllegalStatePanic)
-	if !ok {
-		return nil, false
-	}
-
-	return panicErr, true
 }
 
 func (w *workflowExecutionContextImpl) ProcessLocalActivityResult(workflowTask *workflowTask, lar *localActivityResult) (interface{}, error) {
@@ -1209,6 +1193,24 @@ func (w *workflowExecutionContextImpl) ResetIfStale(task *s.PollForDecisionTaskR
 
 func (w *workflowExecutionContextImpl) GetDecisionTimeout() time.Duration {
 	return time.Second * time.Duration(w.workflowInfo.TaskStartToCloseTimeoutSeconds)
+}
+
+func (w *workflowExecutionContextImpl) getWorkflowPanicIfIllegaleStatePanic() (*workflowPanicError, bool) {
+	if !w.isWorkflowCompleted || w.err == nil {
+		return nil, false
+	}
+
+	panicErr, ok := w.err.(*workflowPanicError)
+	if !ok || panicErr.value == nil {
+		return nil, false
+	}
+
+	_, ok = panicErr.value.(stateMachineIllegalStatePanic)
+	if !ok {
+		return nil, false
+	}
+
+	return panicErr, true
 }
 
 func (wth *workflowTaskHandlerImpl) completeWorkflow(

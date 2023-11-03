@@ -131,6 +131,7 @@ type (
 		contextPropagators             []ContextPropagator
 		tracer                         opentracing.Tracer
 		workflowInterceptorFactories   []WorkflowInterceptorFactory
+		enableStrictNonDeterminism     bool
 	}
 
 	activityProvider func(name string) activity
@@ -388,7 +389,7 @@ func newWorkflowTaskHandler(
 	registry *registry,
 ) WorkflowTaskHandler {
 	ensureRequiredParams(&params)
-	return &workflowTaskHandlerImpl{
+	wth := &workflowTaskHandlerImpl{
 		domain:                         domain,
 		logger:                         params.Logger,
 		ppMgr:                          ppMgr,
@@ -402,7 +403,16 @@ func newWorkflowTaskHandler(
 		contextPropagators:             params.ContextPropagators,
 		tracer:                         params.Tracer,
 		workflowInterceptorFactories:   params.WorkflowInterceptorChainFactories,
+		enableStrictNonDeterminism:     params.WorkerBugPorts.EnableStrictNonDeterminismCheck,
 	}
+
+	traceLog(func() {
+		wth.logger.Debug("Workflow task handler is created.",
+			zap.String(tagDomain, wth.domain),
+			zap.Bool("EnableStrictNonDeterminism", wth.enableStrictNonDeterminism))
+	})
+
+	return wth
 }
 
 // TODO: need a better eviction policy based on memory usage

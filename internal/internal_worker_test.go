@@ -227,6 +227,14 @@ func (s *internalWorkerTestSuite) TestCreateWorker_WithAutoScaler() {
 	worker.Stop()
 }
 
+func (s *internalWorkerTestSuite) TestCreateWorker_WithStrictNonDeterminism() {
+	worker := createWorkerWithStrictNonDeterminismOption(s.T(), s.service)
+	err := worker.Start()
+	require.NoError(s.T(), err)
+	time.Sleep(time.Millisecond * 200)
+	worker.Stop()
+}
+
 func (s *internalWorkerTestSuite) TestCreateWorker_WithHost() {
 	worker := createWorkerWithHost(s.T(), s.service)
 	err := worker.Start()
@@ -423,6 +431,13 @@ func createWorkerWithAutoscaler(
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
 	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
+}
+
+func createWorkerWithStrictNonDeterminismOption(
+	t *testing.T,
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{WorkerBugPorts: WorkerBugPorts{EnableStrictNonDeterminismCheck: true}})
 }
 
 func createWorkerWithHost(

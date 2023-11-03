@@ -1413,10 +1413,15 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 	return ctx1
 }
 
-// WithWorkflowTaskListApply returns a copy of context and changes workflow tasklist with apply function.
-func WithWorkflowTaskListApply(ctx Context, apply func(*string) *string) Context {
+// WithWorkflowTaskListMapper returns a copy of context and changes workflow tasklist with mapper function.
+func WithWorkflowTaskListMapper(ctx Context, mapper func(string) string) Context {
 	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
-	getWorkflowEnvOptions(ctx1).taskListName = apply(getWorkflowEnvOptions(ctx1).taskListName)
+	var taskList string
+	if getWorkflowEnvOptions(ctx1).taskListName != nil {
+		taskList = *getWorkflowEnvOptions(ctx1).taskListName
+	}
+	newTaskList := mapper(taskList)
+	getWorkflowEnvOptions(ctx1).taskListName = &newTaskList
 	return ctx1
 }
 
@@ -1801,16 +1806,18 @@ func WithLocalActivityOptions(ctx Context, options LocalActivityOptions) Context
 }
 
 // WithTaskList adds a task list to the copy of the context.
+// Note this shall not confuse with WithWorkflowTaskList. This is the tasklist for activities
 func WithTaskList(ctx Context, name string) Context {
 	ctx1 := setActivityParametersIfNotExist(ctx)
 	getActivityOptions(ctx1).TaskListName = name
 	return ctx1
 }
 
-// WithTaskListApply changes tasklist to the copy of the context
-func WithTaskListApply(ctx Context, apply func(string) string) Context {
+// WithTaskListMapper makes a copy of the context and apply the tasklist mapper function
+// Note this shall not confuse with WithWorkflowTaskListMapper. This is the tasklist for activities.
+func WithTaskListMapper(ctx Context, mapper func(string) string) Context {
 	ctx1 := setActivityParametersIfNotExist(ctx)
-	getActivityOptions(ctx1).TaskListName = apply(getActivityOptions(ctx1).TaskListName)
+	getActivityOptions(ctx1).TaskListName = mapper(getActivityOptions(ctx1).TaskListName)
 	return ctx1
 }
 

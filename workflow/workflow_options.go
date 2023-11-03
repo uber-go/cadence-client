@@ -42,6 +42,11 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 	return internal.WithWorkflowTaskList(ctx, name)
 }
 
+// WithWorkflowTaskListMapper returns a copy of Context with changed tasklist
+func WithWorkflowTaskListMapper(ctx Context, mapper func(name string) string) Context {
+	return internal.WithWorkflowTaskListMapper(ctx, mapper)
+}
+
 // WithWorkflowID adds a workflowID to the context.
 func WithWorkflowID(ctx Context, workflowID string) Context {
 	return internal.WithWorkflowID(ctx, workflowID)

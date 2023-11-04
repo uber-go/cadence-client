@@ -268,6 +268,8 @@ type (
 		Host string
 
 		// Optional: See WorkerBugPorts for more details
+		//
+		// Deprecated: This field is deprecated and will be removed in the future.
 		WorkerBugPorts WorkerBugPorts
 	}
 
@@ -279,13 +281,16 @@ type (
 	// Bugports are always deprecated and may be removed in future versions.
 	// Generally speaking they will *likely* remain in place for one minor version, and then they may be removed to
 	// allow cleaning up the additional code complexity that they cause.
+	// Deprecated: This is deprecated and will be removed in the future.
+	//
 	WorkerBugPorts struct {
 		// Optional: Enable strict non-determinism checks for workflow.
 		// There are some non-determinism cases which are missed by original implementation and a fix is on the way.
 		// The fix will be activated by this option which basicakky accuracy of the non-determinism checks.
 		// Exposing this as bugport for now to avoid breaking existing workflows which are actually non-deterministic but users depend on this.
 		// Once we identify such cases and notify users, we can enable this by default.
-		// default: false
+		//
+		// Deprecated: This field is deprecated and will be removed in the future.
 		EnableStrictNonDeterminismCheck bool
 	}
 )

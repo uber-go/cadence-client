@@ -949,14 +949,17 @@ ProcessEvents:
 	// the replay of that event will panic on the decision state machine and the workflow will be marked as completed
 	// with the panic error.
 	var nonDeterministicErr error
+	var nonDeterminismType nonDeterminismDetectionType
 	if !skipReplayCheck && !w.isWorkflowCompleted || isReplayTest {
 		// check if decisions from reply matches to the history events
 		if err := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents); err != nil {
 			nonDeterministicErr = err
+			nonDeterminismType = nonDeterminismDetectionTypeReplayComparison
 		}
 	} else if panicErr, ok := w.getWorkflowPanicIfIllegaleStatePanic(); ok {
 		// This is a nondeterministic execution which ended up panicing
 		nonDeterministicErr = panicErr
+		nonDeterminismType = nonDeterminismDetectionTypeIllegalStatePanic
 		// Since we know there is an error, we do the replay check to give more context in the log
 		replayErr := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents)
 		w.wth.logger.Error("Illegal state caused panic",
@@ -969,9 +972,8 @@ ProcessEvents:
 	}
 
 	if nonDeterministicErr != nil {
-		// TODO: add a NonDeterminismDetectionType tag based on which branch set the nonDeterministicErr above.
-		// Q: What is our approach for such tag changes of existing metrics as it is not allowed by some timeseries dbs (prometheus)
-		w.wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName()).Counter(metrics.NonDeterministicError).Inc(1)
+		scope := w.wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName(), tagNonDeterminismDetectionType, string(nonDeterminismType))
+		scope.Counter(metrics.NonDeterministicError).Inc(1)
 		w.wth.logger.Error("non-deterministic-error",
 			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
@@ -1320,7 +1322,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 
 	if closeDecision != nil {
 		decisions = append(decisions, closeDecision)
-		elapsed := time.Now().Sub(workflowContext.workflowStartTime)
+		elapsed := time.Since(workflowContext.workflowStartTime)
 		metricsScope.Timer(metrics.WorkflowEndToEndLatency).Record(elapsed)
 		forceNewDecision = false
 	}

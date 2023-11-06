@@ -691,11 +691,11 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 		workflowContext = getWorkflowContext(runID)
 	}
 
+	executionRuntimeType := workflowCategorizedByTimeout(workflowContext)
+	metricsScope = metricsScope.Tagged(map[string]string{tagWorkflowRuntimeLength: executionRuntimeType})
+
 	if workflowContext != nil {
 		workflowContext.Lock()
-		// add new tag on metrics scope with workflow runtime length category
-		executionRuntimeType := workflowCategorizedByTimeout(workflowContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds)
-		metricsScope = metricsScope.Tagged(map[string]string{tagworkflowruntimelength: executionRuntimeType})
 		if task.Query != nil && !isFullHistory {
 			// query task and we have a valid cached state
 			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)
@@ -1855,7 +1855,11 @@ func traceLog(fn func()) {
 	}
 }
 
-func workflowCategorizedByTimeout(executionTimeout int32) string {
+func workflowCategorizedByTimeout(wfContext *workflowExecutionContextImpl) string {
+	if wfContext == nil || wfContext.workflowInfo == nil {
+		return "unknown"
+	}
+	executionTimeout := wfContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds
 	if executionTimeout <= defaultInstantLivedWorkflowTimeoutUpperLimitInSec {
 		return "instant"
 	} else if executionTimeout <= defaultShortLivedWorkflowTimeoutUpperLimitInSec {

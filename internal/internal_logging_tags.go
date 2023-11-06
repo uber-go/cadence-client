@@ -42,7 +42,7 @@ const (
 	tagPanicError                  = "PanicError"
 	tagPanicStack                  = "PanicStack"
 	causeTag                       = "pollerrorcause"
-	tagworkflowruntimelength       = "workflowruntimelength"
+	tagWorkflowRuntimeLength       = "workflowruntimelength"
 	tagNonDeterminismDetectionType = "NonDeterminismDetectionType"
 )
 

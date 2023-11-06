@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v1.1.0] - 2023-11-06
 ### Added
-- Added new poller thread pool usage metrics #1275
+- Added new poller thread pool usage metrics #1275 #1291
 - Added metrics tag workflowruntimelength in workflow context #1277
 - Added WithTaskListMapper and WithWorkflowTasklistMapper utils #1286
 

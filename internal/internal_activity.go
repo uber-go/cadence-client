@@ -432,10 +432,9 @@ func deSerializeFunctionResult(f interface{}, result []byte, to interface{}, dat
 	}
 
 	// For everything we return result.
-	// TODO(remove comment):
-	// Code reaches here for 2 cases
-	// 1. activity is executed by name (not the func pointer) and it wasn't registered
-	// 2. activity is executed by func pointer and the signature indicates it doesn't/can't return data.
+	// Code reaches here for 2 cases:
+	// 	1. activity is executed by name (not the func pointer) and it wasn't registered
+	// 	2. activity is executed by func pointer and the signature indicates it doesn't/can't return data.
 	//		for example it only has one return parameter (which can only be be error).
 	return decodeArg(dataConverter, result, to)
 }

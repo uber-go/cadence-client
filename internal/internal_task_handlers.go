@@ -936,7 +936,8 @@ ProcessEvents:
 			isLast := !isInReplay && i == len(reorderedEvents)-1
 			if !skipReplayCheck {
 				isDecisionEventFn := isDecisionEvent
-				if isInReplay {
+				// when strict nondeterminism is enabled we use a different function to check for decision events during replay
+				if !w.wth.disableStrictNonDeterminism && isInReplay {
 					isDecisionEventFn = isDecisionEventForReplay
 				}
 
@@ -961,10 +962,15 @@ ProcessEvents:
 				return nil, err
 			}
 
-			// Break the event processing loop if the workflow is completed except in replay mode.
-			// In replay mode we check for nondeterminism cases and
-			// breaking the loop causes missing events in respondEvents which then causes false positives or false negatives.
-			if w.isWorkflowCompleted && !isInReplay {
+			// Break the event processing loop if either
+			//  - Workflow is completed AND strict nondeterminism checks disabled.
+			//  - Workflow is completed AND strict nondeterminism checks enabled AND NOT in replay mode.
+			// 		With strict nondeterminism checks enabled, breaking the loop early causes missing events
+			// 		in respondEvents which then causes false positives or false negatives.
+			stopProcessing := (w.isWorkflowCompleted && w.wth.disableStrictNonDeterminism) ||
+				(w.isWorkflowCompleted && !w.wth.disableStrictNonDeterminism && !isInReplay)
+
+			if stopProcessing {
 				break ProcessEvents
 			}
 		}

@@ -1416,10 +1416,11 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 // GetWorkflowTaskList retrieves current workflow tasklist from context
 func GetWorkflowTaskList(ctx Context) *string {
 	wo := getWorkflowEnvOptions(ctx)
-	if wo == nil {
+	if wo == nil || wo.taskListName == nil {
 		return nil
 	}
-	return wo.taskListName
+	tl := *wo.taskListName // copy
+	return common.StringPtr(tl)
 }
 
 // WithWorkflowID adds a workflowID to the context.
@@ -1816,7 +1817,7 @@ func GetActivityTaskList(ctx Context) *string {
 	if ao == nil {
 		return nil
 	}
-	tl := ao.TaskListName
+	tl := ao.TaskListName // copy
 	return &tl
 }
 

@@ -42,9 +42,13 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 	return internal.WithWorkflowTaskList(ctx, name)
 }
 
-// WithWorkflowTaskListMapper returns a copy of Context with changed tasklist
-func WithWorkflowTaskListMapper(ctx Context, mapper func(name string) string) Context {
-	return internal.WithWorkflowTaskListMapper(ctx, mapper)
+// GetWorkflowTaskList returns a copy of Context with changed tasklist
+// 1. Activity context returns the current workflow tasklist
+// 2. Child workflow context returns the child workflow tasklist
+// 3. Workflow context will return current workflow tasklist
+// 4. If Context is not a workflow context or activity context, it will return nil
+func GetWorkflowTaskList(ctx Context) *string {
+	return internal.GetWorkflowTaskList(ctx)
 }
 
 // WithWorkflowID adds a workflowID to the context.

@@ -283,14 +283,13 @@ type (
 	// allow cleaning up the additional code complexity that they cause.
 	// Deprecated: All bugports are always deprecated and may be removed at any time
 	WorkerBugPorts struct {
-		// Optional: Enable strict non-determinism checks for workflow.
+		// Optional: Disable strict non-determinism checks for workflow.
 		// There are some non-determinism cases which are missed by original implementation and a fix is on the way.
-		// The fix will be activated by this option which basicakky accuracy of the non-determinism checks.
-		// Exposing this as bugport for now to avoid breaking existing workflows which are actually non-deterministic but users depend on this.
-		// Once we identify such cases and notify users, we can enable this by default.
+		// The fix will be toggleable by this parameter.
+		// Default: false, which means strict non-determinism checks are enabled.
 		//
 		// Deprecated: All bugports are always deprecated and may be removed at any time
-		EnableStrictNonDeterminismCheck bool
+		DisableStrictNonDeterminismCheck bool
 	}
 )
 

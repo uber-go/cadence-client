@@ -131,7 +131,7 @@ type (
 		contextPropagators             []ContextPropagator
 		tracer                         opentracing.Tracer
 		workflowInterceptorFactories   []WorkflowInterceptorFactory
-		enableStrictNonDeterminism     bool
+		disableStrictNonDeterminism    bool
 	}
 
 	activityProvider func(name string) activity
@@ -403,13 +403,13 @@ func newWorkflowTaskHandler(
 		contextPropagators:             params.ContextPropagators,
 		tracer:                         params.Tracer,
 		workflowInterceptorFactories:   params.WorkflowInterceptorChainFactories,
-		enableStrictNonDeterminism:     params.WorkerBugPorts.EnableStrictNonDeterminismCheck,
+		disableStrictNonDeterminism:    params.WorkerBugPorts.DisableStrictNonDeterminismCheck,
 	}
 
 	traceLog(func() {
 		wth.logger.Debug("Workflow task handler is created.",
 			zap.String(tagDomain, wth.domain),
-			zap.Bool("EnableStrictNonDeterminism", wth.enableStrictNonDeterminism))
+			zap.Bool("disableStrictNonDeterminism", wth.disableStrictNonDeterminism))
 	})
 
 	return wth

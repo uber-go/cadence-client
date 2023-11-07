@@ -481,7 +481,7 @@ type (
 		// Generally speaking they will *likely* remain in place for one minor version, and then they may be removed to
 		// allow cleaning up the additional code complexity that they cause.
 		//
-		// deprecated
+		// Deprecated: All bugports are always deprecated and may be removed at any time.
 		Bugports Bugports
 	}
 
@@ -500,7 +500,7 @@ type (
 	// Generally speaking they will *likely* remain in place for one minor version, and then they may be removed to
 	// allow cleaning up the additional code complexity that they cause.
 	//
-	// deprecated
+	// DEPRECATED: All bugports are always deprecated and may be removed at any time.
 	Bugports struct {
 		// StartChildWorkflowsOnCanceledContext allows emulating older, buggy behavior that existed prior to v0.18.4.
 		//
@@ -530,7 +530,7 @@ type (
 		//
 		// Added in 0.18.4, this may be removed in or after v0.19.0, so please migrate off of it ASAP.
 		//
-		// deprecated
+		// Deprecated: All bugports are always deprecated and may be removed at any time.
 		StartChildWorkflowsOnCanceledContext bool
 	}
 )

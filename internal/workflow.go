@@ -1420,7 +1420,7 @@ func GetWorkflowTaskList(ctx Context) *string {
 		return nil
 	}
 	tl := *wo.taskListName // copy
-	return common.StringPtr(tl)
+	return &tl
 }
 
 // WithWorkflowID adds a workflowID to the context.

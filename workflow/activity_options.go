@@ -58,10 +58,14 @@ func WithTaskList(ctx Context, name string) Context {
 	return internal.WithTaskList(ctx, name)
 }
 
-// WithTaskListMapper makes a copy of current context and update the tasklist with mapper function.
-// Note this is the tasklist for activity tasklist. For workflow tasklist, use WithWorkflowTaskListMapper
-func WithTaskListMapper(ctx Context, mapper func(string) string) Context {
-	return internal.WithTaskListMapper(ctx, mapper)
+// GetActivityTaskList returns tasklist in the Context's current ActivityOptions,
+// or workflow.GetInfo(ctx).TaskListName if not set or empty
+func GetActivityTaskList(ctx Context) string {
+	tl := internal.GetActivityTaskList(ctx)
+	if tl != nil && *tl != "" {
+		return *tl
+	}
+	return GetInfo(ctx).TaskListName
 }
 
 // WithScheduleToCloseTimeout makes a copy of the current context and update

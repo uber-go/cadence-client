@@ -1413,16 +1413,14 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 	return ctx1
 }
 
-// WithWorkflowTaskListMapper returns a copy of context and changes workflow tasklist with mapper function.
-func WithWorkflowTaskListMapper(ctx Context, mapper func(string) string) Context {
-	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
-	var taskList string
-	if getWorkflowEnvOptions(ctx1).taskListName != nil {
-		taskList = *getWorkflowEnvOptions(ctx1).taskListName
+// GetWorkflowTaskList retrieves current workflow tasklist from context
+func GetWorkflowTaskList(ctx Context) *string {
+	wo := getWorkflowEnvOptions(ctx)
+	if wo == nil || wo.taskListName == nil {
+		return nil
 	}
-	newTaskList := mapper(taskList)
-	getWorkflowEnvOptions(ctx1).taskListName = &newTaskList
-	return ctx1
+	tl := *wo.taskListName // copy
+	return &tl
 }
 
 // WithWorkflowID adds a workflowID to the context.
@@ -1813,12 +1811,14 @@ func WithTaskList(ctx Context, name string) Context {
 	return ctx1
 }
 
-// WithTaskListMapper makes a copy of the context and apply the tasklist mapper function
-// Note this shall not confuse with WithWorkflowTaskListMapper. This is the tasklist for activities.
-func WithTaskListMapper(ctx Context, mapper func(string) string) Context {
-	ctx1 := setActivityParametersIfNotExist(ctx)
-	getActivityOptions(ctx1).TaskListName = mapper(getActivityOptions(ctx1).TaskListName)
-	return ctx1
+// GetActivityTaskList retrieves tasklist info from context
+func GetActivityTaskList(ctx Context) *string {
+	ao := getActivityOptions(ctx)
+	if ao == nil {
+		return nil
+	}
+	tl := ao.TaskListName // copy
+	return &tl
 }
 
 // WithScheduleToCloseTimeout adds a timeout to the copy of the context.

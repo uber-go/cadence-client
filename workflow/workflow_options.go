@@ -42,9 +42,14 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 	return internal.WithWorkflowTaskList(ctx, name)
 }
 
-// WithWorkflowTaskListMapper returns a copy of Context with changed tasklist
-func WithWorkflowTaskListMapper(ctx Context, mapper func(name string) string) Context {
-	return internal.WithWorkflowTaskListMapper(ctx, mapper)
+// GetWorkflowTaskList returns tasklist in the Context's current ChildWorkflowOptions
+// or workflow.GetInfo(ctx).TaskListName if not set or empty.
+func GetWorkflowTaskList(ctx Context) string {
+	tl := internal.GetWorkflowTaskList(ctx)
+	if tl != nil && *tl != "" {
+		return *tl
+	}
+	return GetInfo(ctx).TaskListName
 }
 
 // WithWorkflowID adds a workflowID to the context.

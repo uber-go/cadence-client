@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added new poller thread pool usage metrics #1275 #1291
 - Added metrics tag workflowruntimelength in workflow context #1277
-- Added WithTaskListMapper and WithWorkflowTasklistMapper utils #1286
+- Added DisableStrictNonDeterminismCheck worker option #1288
+- Added GetWorkflowTaskList and GetActivityTaskList APIs #1292
 
 ### Changed
 - Updated idl version

@@ -42,13 +42,14 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 	return internal.WithWorkflowTaskList(ctx, name)
 }
 
-// GetWorkflowTaskList returns a copy of Context with changed tasklist.
-//  1. Activity context returns the current workflow tasklist
-//  2. Child workflow context returns the child workflow tasklist
-//  3. Workflow context will return current workflow tasklist
-//  4. If Context is not a workflow context, it will return nil
-func GetWorkflowTaskList(ctx Context) *string {
-	return internal.GetWorkflowTaskList(ctx)
+// GetWorkflowTaskList returns tasklist in the Context's current ChildWorkflowOptions
+// or GetInfo(ctx).TaskListName if not set or empty.
+func GetWorkflowTaskList(ctx Context) string {
+	tl := internal.GetWorkflowTaskList(ctx)
+	if tl != nil && len(*tl) > 0 {
+		return *tl
+	}
+	return GetInfo(ctx).TaskListName
 }
 
 // WithWorkflowID adds a workflowID to the context.

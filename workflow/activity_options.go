@@ -62,7 +62,7 @@ func WithTaskList(ctx Context, name string) Context {
 // or workflow.GetInfo(ctx).TaskListName if not set or empty
 func GetActivityTaskList(ctx Context) string {
 	tl := internal.GetActivityTaskList(ctx)
-	if tl != nil && len(*tl) > 0 {
+	if tl != nil && *tl != "" {
 		return *tl
 	}
 	return GetInfo(ctx).TaskListName

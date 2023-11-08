@@ -43,10 +43,10 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 }
 
 // GetWorkflowTaskList returns tasklist in the Context's current ChildWorkflowOptions
-// or GetInfo(ctx).TaskListName if not set or empty.
+// or workflow.GetInfo(ctx).TaskListName if not set or empty.
 func GetWorkflowTaskList(ctx Context) string {
 	tl := internal.GetWorkflowTaskList(ctx)
-	if tl != nil && len(*tl) > 0 {
+	if tl != nil && *tl != "" {
 		return *tl
 	}
 	return GetInfo(ctx).TaskListName

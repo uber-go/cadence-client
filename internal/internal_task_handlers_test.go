@@ -873,10 +873,10 @@ func (t *TaskHandlersTestSuite) TestWorkflowTask_NondeterministicLogNonexistingI
 	t.ErrorContains(err, "nondeterministic workflow")
 
 	// Check that the error was logged
-	ignoredWorkflowLogs := logs.FilterMessage("Illegal state caused panic")
-	require.Len(t.T(), ignoredWorkflowLogs.All(), 1)
+	illegalPanicLogs := logs.FilterMessage("Illegal state caused panic")
+	require.Len(t.T(), illegalPanicLogs.All(), 1)
 
-	replayErrorField := findLogField(ignoredWorkflowLogs.All()[0], "ReplayError")
+	replayErrorField := findLogField(illegalPanicLogs.All()[0], "ReplayError")
 	require.NotNil(t.T(), replayErrorField)
 	require.Equal(t.T(), zapcore.ErrorType, replayErrorField.Type)
 	require.ErrorContains(t.T(), replayErrorField.Interface.(error),

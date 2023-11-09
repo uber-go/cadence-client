@@ -23,6 +23,7 @@ package test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -434,7 +435,6 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
-
 }
 
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
@@ -443,7 +443,7 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 	ts.NoError(err)
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
-	ts.Truef(resp.WorkflowExecutionInfo.GetCloseTime() == 0, "Expected close time to be zero, got %d. Describe response: %+v", resp.WorkflowExecutionInfo.GetCloseTime(), resp)
+	ts.Zerof(resp.WorkflowExecutionInfo.GetCloseTime(), "Expected close time to be zero, got %d. Describe response: %#v", resp.WorkflowExecutionInfo.GetCloseTime(), resp)
 }
 
 func (ts *IntegrationTestSuite) TestChildWFCancel() {
@@ -520,7 +520,8 @@ func (ts *IntegrationTestSuite) TestDomainUpdate() {
 
 func (ts *IntegrationTestSuite) TestNonDeterministicWorkflowFailPolicy() {
 	err := ts.executeWorkflow("test-nondeterminism-failpolicy", ts.workflows.NonDeterminismSimulatorWorkflow, nil)
-	customErr, ok := err.(*internal.CustomError)
+	var customErr *internal.CustomError
+	ok := errors.As(err, &customErr)
 	ts.Truef(ok, "expected CustomError but got %T", err)
 	ts.Equal("NonDeterministicWorkflowPolicyFailWorkflow", customErr.Reason())
 }

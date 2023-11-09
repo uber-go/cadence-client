@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
+	"github.com/uber-go/tally"
 	"go.uber.org/zap"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
@@ -674,12 +675,12 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	historyIterator HistoryIterator,
 ) (workflowContext *workflowExecutionContextImpl, err error) {
 	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
-	defer func() {
+	defer func(scope tally.Scope) {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
 			workflowContext.laTunnel = wth.laTunnel
 		}
-		metricsScope.Gauge(metrics.StickyCacheSize).Update(float64(getWorkflowCache().Size()))
-	}()
+		scope.Gauge(metrics.StickyCacheSize).Update(float64(getWorkflowCache().Size()))
+	}(metricsScope)
 
 	runID := task.WorkflowExecution.GetRunId()
 
@@ -691,17 +692,16 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 		workflowContext = getWorkflowContext(runID)
 	}
 
-	executionRuntimeType := workflowCategorizedByTimeout(workflowContext)
-	metricsScope = metricsScope.Tagged(map[string]string{tagWorkflowRuntimeLength: executionRuntimeType})
-
 	if workflowContext != nil {
 		workflowContext.Lock()
+		// add new tag on metrics scope with workflow runtime length category
+		scope := metricsScope.Tagged(map[string]string{tagWorkflowRuntimeLength: workflowCategorizedByTimeout(workflowContext)})
 		if task.Query != nil && !isFullHistory {
 			// query task and we have a valid cached state
-			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)
+			scope.Counter(metrics.StickyCacheHit).Inc(1)
 		} else if history.Events[0].GetEventId() == workflowContext.previousStartedEventID+1 {
 			// non query task and we have a valid cached state
-			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)
+			scope.Counter(metrics.StickyCacheHit).Inc(1)
 		} else {
 			// non query task and cached state is missing events, we need to discard the cached state and rebuild one.
 			workflowContext.ResetIfStale(task, historyIterator)
@@ -1856,9 +1856,6 @@ func traceLog(fn func()) {
 }
 
 func workflowCategorizedByTimeout(wfContext *workflowExecutionContextImpl) string {
-	if wfContext == nil || wfContext.workflowInfo == nil {
-		return "unknown"
-	}
 	executionTimeout := wfContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds
 	if executionTimeout <= defaultInstantLivedWorkflowTimeoutUpperLimitInSec {
 		return "instant"

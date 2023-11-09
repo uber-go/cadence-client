@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added new poller thread pool usage metrics #1275 #1291
 - Added metrics tag workflowruntimelength in workflow context #1277
-- Added DisableStrictNonDeterminismCheck worker option #1288
 - Added GetWorkflowTaskList and GetActivityTaskList APIs #1292
 
 ### Changed
@@ -19,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed error log #1284
-- Fixed workflow interceptor is not propagated correctly for child workflows #1289
+- Fixed in TestEnv workflow interceptor is not propagated correctly for child workflows #1289
 
 ## [v1.0.2] - 2023-09-25
 ### Added 

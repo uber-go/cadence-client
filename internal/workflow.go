@@ -481,7 +481,7 @@ type (
 		// Generally speaking they will *likely* remain in place for one minor version, and then they may be removed to
 		// allow cleaning up the additional code complexity that they cause.
 		//
-		// deprecated
+		// Deprecated: All bugports are always deprecated and may be removed at any time.
 		Bugports Bugports
 	}
 
@@ -500,7 +500,7 @@ type (
 	// Generally speaking they will *likely* remain in place for one minor version, and then they may be removed to
 	// allow cleaning up the additional code complexity that they cause.
 	//
-	// deprecated
+	// DEPRECATED: All bugports are always deprecated and may be removed at any time.
 	Bugports struct {
 		// StartChildWorkflowsOnCanceledContext allows emulating older, buggy behavior that existed prior to v0.18.4.
 		//
@@ -530,7 +530,7 @@ type (
 		//
 		// Added in 0.18.4, this may be removed in or after v0.19.0, so please migrate off of it ASAP.
 		//
-		// deprecated
+		// Deprecated: All bugports are always deprecated and may be removed at any time.
 		StartChildWorkflowsOnCanceledContext bool
 	}
 )
@@ -1428,6 +1428,16 @@ func WithWorkflowTaskList(ctx Context, name string) Context {
 	return ctx1
 }
 
+// GetWorkflowTaskList retrieves current workflow tasklist from context
+func GetWorkflowTaskList(ctx Context) *string {
+	wo := getWorkflowEnvOptions(ctx)
+	if wo == nil || wo.taskListName == nil {
+		return nil
+	}
+	tl := *wo.taskListName // copy
+	return &tl
+}
+
 // WithWorkflowID adds a workflowID to the context.
 func WithWorkflowID(ctx Context, workflowID string) Context {
 	ctx1 := setWorkflowEnvOptionsIfNotExist(ctx)
@@ -1809,10 +1819,21 @@ func WithLocalActivityOptions(ctx Context, options LocalActivityOptions) Context
 }
 
 // WithTaskList adds a task list to the copy of the context.
+// Note this shall not confuse with WithWorkflowTaskList. This is the tasklist for activities
 func WithTaskList(ctx Context, name string) Context {
 	ctx1 := setActivityParametersIfNotExist(ctx)
 	getActivityOptions(ctx1).TaskListName = name
 	return ctx1
+}
+
+// GetActivityTaskList retrieves tasklist info from context
+func GetActivityTaskList(ctx Context) *string {
+	ao := getActivityOptions(ctx)
+	if ao == nil {
+		return nil
+	}
+	tl := ao.TaskListName // copy
+	return &tl
 }
 
 // WithScheduleToCloseTimeout adds a timeout to the copy of the context.

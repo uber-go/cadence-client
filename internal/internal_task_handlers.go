@@ -675,11 +675,11 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	historyIterator HistoryIterator,
 ) (workflowContext *workflowExecutionContextImpl, err error) {
 	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
-	defer func(scope tally.Scope) {
+	defer func(metricsScope tally.Scope) {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
 			workflowContext.laTunnel = wth.laTunnel
 		}
-		scope.Gauge(metrics.StickyCacheSize).Update(float64(getWorkflowCache().Size()))
+		metricsScope.Gauge(metrics.StickyCacheSize).Update(float64(getWorkflowCache().Size()))
 	}(metricsScope)
 
 	runID := task.WorkflowExecution.GetRunId()
@@ -957,7 +957,7 @@ ProcessEvents:
 			nonDeterminismType = nonDeterminismDetectionTypeReplayComparison
 		}
 	} else if panicErr, ok := w.getWorkflowPanicIfIllegaleStatePanic(); ok {
-		// This is a nondeterministic execution which ended up panicing
+		// This is a nondeterministic execution which ended up panicking
 		nonDeterministicErr = panicErr
 		nonDeterminismType = nonDeterminismDetectionTypeIllegalStatePanic
 		// Since we know there is an error, we do the replay check to give more context in the log

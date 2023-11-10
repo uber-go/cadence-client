@@ -277,7 +277,7 @@ func (ts *IntegrationTestSuite) TestStackTraceQuery() {
 	ts.NoError(err)
 	ts.NotNil(value)
 	var trace string
-	ts.Nil(value.Get(&trace))
+	ts.NoError(value.Get(&trace))
 	ts.True(strings.Contains(trace, "go.uber.org/cadence/test.(*Workflows).Basic"))
 }
 
@@ -310,7 +310,7 @@ func (ts *IntegrationTestSuite) TestConsistentQuery() {
 	ts.NotNil(value.QueryResult)
 	ts.Nil(value.QueryRejected)
 	var queryResult string
-	ts.Nil(value.QueryResult.Get(&queryResult))
+	ts.NoError(value.QueryResult.Get(&queryResult))
 	ts.Equal("signal-input", queryResult)
 }
 
@@ -532,7 +532,8 @@ func (ts *IntegrationTestSuite) TestNonDeterministicWorkflowQuery() {
 	run, err := ts.libClient.ExecuteWorkflow(ctx, ts.startWorkflowOptions("test-nondeterministic-query"), ts.workflows.NonDeterminismSimulatorWorkflow)
 	ts.Nil(err)
 	err = run.Get(ctx, nil)
-	customErr, ok := err.(*internal.CustomError)
+	var customErr *internal.CustomError
+	ok := errors.As(err, &customErr)
 	ts.Truef(ok, "expected CustomError but got %T", err)
 	ts.Equal("NonDeterministicWorkflowPolicyFailWorkflow", customErr.Reason())
 
@@ -541,7 +542,7 @@ func (ts *IntegrationTestSuite) TestNonDeterministicWorkflowQuery() {
 	ts.NoError(err)
 	ts.NotNil(value)
 	var trace string
-	ts.Nil(value.Get(&trace))
+	ts.NoError(value.Get(&trace))
 }
 
 func (ts *IntegrationTestSuite) registerDomain() {

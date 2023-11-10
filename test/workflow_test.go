@@ -576,14 +576,14 @@ func (w *Workflows) WorkflowWithLocalActivityCtxPropagation(ctx workflow.Context
 }
 
 func (w *Workflows) NonDeterminismSimulatorWorkflow(ctx workflow.Context) ([]string, error) {
-	logger := workflow.GetLogger(ctx).Sugar()
+	logger := workflow.GetLogger(ctx)
 	ctx = workflow.WithActivityOptions(ctx, w.defaultActivityOptions())
 
 	workflow.SetQueryHandler(ctx, "custom_query", func() (int, error) {
 		return w.nonDeterminismSimulatorWorkflowCallCount, nil
 	})
 
-	res := []string{}
+	var res []string
 
 	// Mimic non-deterministic behavior with alternating calls to activity here.
 	// Workflow functon is invoked multiple times at every decision point and each time it will behave differently due to this optional activity call.
@@ -601,7 +601,7 @@ func (w *Workflows) NonDeterminismSimulatorWorkflow(ctx workflow.Context) ([]str
 	selector := workflow.NewSelector(ctx)
 	timer := workflow.NewTimer(ctx, 5*time.Second)
 	selector.AddFuture(timer, func(workflow.Future) {
-		logger.Infof("Timer future is called")
+		logger.Info("Timer future is called")
 	})
 
 	logger.Info("Workflow will wait on timer")

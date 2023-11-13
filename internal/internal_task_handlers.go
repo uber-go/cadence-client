@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
+	"github.com/uber-go/tally"
 	"go.uber.org/zap"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
@@ -674,12 +675,12 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	historyIterator HistoryIterator,
 ) (workflowContext *workflowExecutionContextImpl, err error) {
 	metricsScope := wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
-	defer func() {
+	defer func(metricsScope tally.Scope) {
 		if err == nil && workflowContext != nil && workflowContext.laTunnel == nil {
 			workflowContext.laTunnel = wth.laTunnel
 		}
 		metricsScope.Gauge(metrics.StickyCacheSize).Update(float64(getWorkflowCache().Size()))
-	}()
+	}(metricsScope)
 
 	runID := task.WorkflowExecution.GetRunId()
 
@@ -694,14 +695,13 @@ func (wth *workflowTaskHandlerImpl) getOrCreateWorkflowContext(
 	if workflowContext != nil {
 		workflowContext.Lock()
 		// add new tag on metrics scope with workflow runtime length category
-		executionRuntimeType := workflowCategorizedByTimeout(workflowContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds)
-		metricsScope = metricsScope.Tagged(map[string]string{tagworkflowruntimelength: executionRuntimeType})
+		scope := metricsScope.Tagged(map[string]string{tagWorkflowRuntimeLength: workflowCategorizedByTimeout(workflowContext)})
 		if task.Query != nil && !isFullHistory {
 			// query task and we have a valid cached state
-			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)
+			scope.Counter(metrics.StickyCacheHit).Inc(1)
 		} else if history.Events[0].GetEventId() == workflowContext.previousStartedEventID+1 {
 			// non query task and we have a valid cached state
-			metricsScope.Counter(metrics.StickyCacheHit).Inc(1)
+			scope.Counter(metrics.StickyCacheHit).Inc(1)
 		} else {
 			// non query task and cached state is missing events, we need to discard the cached state and rebuild one.
 			workflowContext.ResetIfStale(task, historyIterator)
@@ -949,39 +949,31 @@ ProcessEvents:
 	// the replay of that event will panic on the decision state machine and the workflow will be marked as completed
 	// with the panic error.
 	var nonDeterministicErr error
+	var nonDeterminismType nonDeterminismDetectionType
 	if !skipReplayCheck && !w.isWorkflowCompleted || isReplayTest {
 		// check if decisions from reply matches to the history events
 		if err := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents); err != nil {
 			nonDeterministicErr = err
+			nonDeterminismType = nonDeterminismDetectionTypeReplayComparison
 		}
-	}
-	if nonDeterministicErr == nil && w.err != nil {
-		if panicErr, ok := w.err.(*workflowPanicError); ok && panicErr.value != nil {
-			if _, isStateMachinePanic := panicErr.value.(stateMachineIllegalStatePanic); isStateMachinePanic {
-				if isReplayTest {
-					// NOTE: we should do this regardless if it's in replay test or not
-					// but since previously we checked the wrong error type, it may break existing customers workflow
-					// the issue is that we change the error type and that we change the error message, the customers
-					// are checking the error string - we plan to wrap all errors to avoid this issue in client v2
-					nonDeterministicErr = panicErr
-				} else {
-					// Since we know there is an error, we do the replay check to give more context in the log
-					replayErr := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents)
-					w.wth.logger.Error("Ignored workflow panic error",
-						zap.String(tagWorkflowType, task.WorkflowType.GetName()),
-						zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
-						zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
-						zap.Error(nonDeterministicErr),
-						zap.NamedError("ReplayError", replayErr),
-					)
-				}
-			}
-		}
+	} else if panicErr, ok := w.getWorkflowPanicIfIllegaleStatePanic(); ok {
+		// This is a nondeterministic execution which ended up panicking
+		nonDeterministicErr = panicErr
+		nonDeterminismType = nonDeterminismDetectionTypeIllegalStatePanic
+		// Since we know there is an error, we do the replay check to give more context in the log
+		replayErr := matchReplayWithHistory(w.workflowInfo, replayDecisions, respondEvents)
+		w.wth.logger.Error("Illegal state caused panic",
+			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
+			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
+			zap.String(tagRunID, task.WorkflowExecution.GetRunId()),
+			zap.Error(nonDeterministicErr),
+			zap.NamedError("ReplayError", replayErr),
+		)
 	}
 
 	if nonDeterministicErr != nil {
-
-		w.wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName()).Counter(metrics.NonDeterministicError).Inc(1)
+		scope := w.wth.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName(), tagNonDeterminismDetectionType, string(nonDeterminismType))
+		scope.Counter(metrics.NonDeterministicError).Inc(1)
 		w.wth.logger.Error("non-deterministic-error",
 			zap.String(tagWorkflowType, task.WorkflowType.GetName()),
 			zap.String(tagWorkflowID, task.WorkflowExecution.GetWorkflowId()),
@@ -998,7 +990,7 @@ ProcessEvents:
 			// workflow timeout.
 			return nil, nonDeterministicErr
 		default:
-			panic(fmt.Sprintf("unknown mismatched workflow history policy."))
+			panic("unknown mismatched workflow history policy.")
 		}
 	}
 
@@ -1205,6 +1197,24 @@ func (w *workflowExecutionContextImpl) GetDecisionTimeout() time.Duration {
 	return time.Second * time.Duration(w.workflowInfo.TaskStartToCloseTimeoutSeconds)
 }
 
+func (w *workflowExecutionContextImpl) getWorkflowPanicIfIllegaleStatePanic() (*workflowPanicError, bool) {
+	if !w.isWorkflowCompleted || w.err == nil {
+		return nil, false
+	}
+
+	panicErr, ok := w.err.(*workflowPanicError)
+	if !ok || panicErr.value == nil {
+		return nil, false
+	}
+
+	_, ok = panicErr.value.(stateMachineIllegalStatePanic)
+	if !ok {
+		return nil, false
+	}
+
+	return panicErr, true
+}
+
 func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	eventHandler *workflowExecutionEventHandlerImpl,
 	task *s.PollForDecisionTaskResponse,
@@ -1312,7 +1322,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 
 	if closeDecision != nil {
 		decisions = append(decisions, closeDecision)
-		elapsed := time.Now().Sub(workflowContext.workflowStartTime)
+		elapsed := time.Since(workflowContext.workflowStartTime)
 		metricsScope.Timer(metrics.WorkflowEndToEndLatency).Record(elapsed)
 		forceNewDecision = false
 	}
@@ -1845,7 +1855,8 @@ func traceLog(fn func()) {
 	}
 }
 
-func workflowCategorizedByTimeout(executionTimeout int32) string {
+func workflowCategorizedByTimeout(wfContext *workflowExecutionContextImpl) string {
+	executionTimeout := wfContext.workflowInfo.ExecutionStartToCloseTimeoutSeconds
 	if executionTimeout <= defaultInstantLivedWorkflowTimeoutUpperLimitInSec {
 		return "instant"
 	} else if executionTimeout <= defaultShortLivedWorkflowTimeoutUpperLimitInSec {

@@ -23,6 +23,7 @@ package test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -148,18 +149,24 @@ func (ts *IntegrationTestSuite) SetupTest() {
 	ts.seq++
 	ts.activities.clearInvoked()
 	ts.taskListName = fmt.Sprintf("tl-%v", ts.seq)
-	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, worker.Options{
-		DisableStickyExecution: ts.config.IsStickyOff,
-		Logger:                 zaptest.NewLogger(ts.T()),
-		ContextPropagators:     []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
-	})
 	ts.tracer = newtracingInterceptorFactory()
+}
+
+func (ts *IntegrationTestSuite) BeforeTest(suiteName, testName string) {
 	options := worker.Options{
 		DisableStickyExecution:            ts.config.IsStickyOff,
 		Logger:                            zaptest.NewLogger(ts.T()),
 		WorkflowInterceptorChainFactories: []interceptors.WorkflowInterceptorFactory{ts.tracer},
 		ContextPropagators:                []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
 	}
+
+	if testName == "TestNonDeterministicWorkflowQuery" || testName == "TestNonDeterministicWorkflowFailPolicy" {
+		options.NonDeterministicWorkflowPolicy = worker.NonDeterministicWorkflowPolicyFailWorkflow
+
+		// disable sticky executon so each workflow yield will require rerunning it from beginning
+		options.DisableStickyExecution = true
+	}
+
 	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, options)
 	ts.registerWorkflowsAndActivities(ts.worker)
 	ts.Nil(ts.worker.Start())
@@ -270,7 +277,7 @@ func (ts *IntegrationTestSuite) TestStackTraceQuery() {
 	ts.NoError(err)
 	ts.NotNil(value)
 	var trace string
-	ts.Nil(value.Get(&trace))
+	ts.NoError(value.Get(&trace))
 	ts.True(strings.Contains(trace, "go.uber.org/cadence/test.(*Workflows).Basic"))
 }
 
@@ -303,7 +310,7 @@ func (ts *IntegrationTestSuite) TestConsistentQuery() {
 	ts.NotNil(value.QueryResult)
 	ts.Nil(value.QueryRejected)
 	var queryResult string
-	ts.Nil(value.QueryResult.Get(&queryResult))
+	ts.NoError(value.QueryResult.Get(&queryResult))
 	ts.Equal("signal-input", queryResult)
 }
 
@@ -428,7 +435,6 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
-
 }
 
 func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
@@ -437,7 +443,7 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 	ts.NoError(err)
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
-	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() == 0)
+	ts.Zerof(resp.WorkflowExecutionInfo.GetCloseTime(), "Expected close time to be zero, got %d. Describe response: %#v", resp.WorkflowExecutionInfo.GetCloseTime(), resp)
 }
 
 func (ts *IntegrationTestSuite) TestChildWFCancel() {
@@ -510,6 +516,33 @@ func (ts *IntegrationTestSuite) TestDomainUpdate() {
 	domain, err := ts.domainClient.Describe(ctx, name)
 	ts.NoError(err)
 	ts.Equal(description, *domain.DomainInfo.Description)
+}
+
+func (ts *IntegrationTestSuite) TestNonDeterministicWorkflowFailPolicy() {
+	err := ts.executeWorkflow("test-nondeterminism-failpolicy", ts.workflows.NonDeterminismSimulatorWorkflow, nil)
+	var customErr *internal.CustomError
+	ok := errors.As(err, &customErr)
+	ts.Truef(ok, "expected CustomError but got %T", err)
+	ts.Equal("NonDeterministicWorkflowPolicyFailWorkflow", customErr.Reason())
+}
+
+func (ts *IntegrationTestSuite) TestNonDeterministicWorkflowQuery() {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	run, err := ts.libClient.ExecuteWorkflow(ctx, ts.startWorkflowOptions("test-nondeterministic-query"), ts.workflows.NonDeterminismSimulatorWorkflow)
+	ts.Nil(err)
+	err = run.Get(ctx, nil)
+	var customErr *internal.CustomError
+	ok := errors.As(err, &customErr)
+	ts.Truef(ok, "expected CustomError but got %T", err)
+	ts.Equal("NonDeterministicWorkflowPolicyFailWorkflow", customErr.Reason())
+
+	// query failed workflow should still work
+	value, err := ts.libClient.QueryWorkflow(ctx, "test-nondeterministic-query", run.GetRunID(), "__stack_trace")
+	ts.NoError(err)
+	ts.NotNil(value)
+	var trace string
+	ts.NoError(value.Get(&trace))
 }
 
 func (ts *IntegrationTestSuite) registerDomain() {

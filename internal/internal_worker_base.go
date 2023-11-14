@@ -28,12 +28,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/shirou/gopsutil/cpu"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -140,10 +138,11 @@ type (
 		logger               *zap.Logger
 		metricsScope         tally.Scope
 
-		pollerRequestCh    chan struct{}
-		pollerAutoScaler   *pollerAutoScaler
-		taskQueueCh        chan interface{}
-		sessionTokenBucket *sessionTokenBucket
+		pollerRequestCh      chan struct{}
+		pollerAutoScaler     *pollerAutoScaler
+		workerUsageCollector *workerUsageCollector
+		taskQueueCh          chan interface{}
+		sessionTokenBucket   *sessionTokenBucket
 	}
 
 	polledTask struct {
@@ -173,17 +172,29 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 			logger,
 		)
 	}
+	// for now it's default to be enabled
+	var workerUC *workerUsageCollector
+	workerUC = newWorkerUsageCollector(
+		workerUsageCollectorOptions{
+			Enabled:      true,
+			Cooldown:     30 * time.Second,
+			Host:         options.host,
+			MetricsScope: metricsScope,
+		},
+		logger,
+	)
 
 	bw := &baseWorker{
-		options:          options,
-		shutdownCh:       make(chan struct{}),
-		taskLimiter:      rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
-		retrier:          backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
-		logger:           logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
-		metricsScope:     tagScope(metricsScope, tagWorkerType, options.workerType),
-		pollerRequestCh:  make(chan struct{}, options.maxConcurrentTask),
-		pollerAutoScaler: pollerAS,
-		taskQueueCh:      make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
+		options:              options,
+		shutdownCh:           make(chan struct{}),
+		taskLimiter:          rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
+		retrier:              backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
+		logger:               logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
+		metricsScope:         tagScope(metricsScope, tagWorkerType, options.workerType),
+		pollerRequestCh:      make(chan struct{}, options.maxConcurrentTask),
+		pollerAutoScaler:     pollerAS,
+		workerUsageCollector: workerUC,
+		taskQueueCh:          make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
 
 		limiterContext:       ctx,
 		limiterContextCancel: cancel,
@@ -207,6 +218,10 @@ func (bw *baseWorker) Start() {
 		bw.pollerAutoScaler.Start()
 	}
 
+	if bw.workerUsageCollector != nil {
+		bw.workerUsageCollector.Start()
+	}
+
 	for i := 0; i < bw.options.pollerCount; i++ {
 		bw.shutdownWG.Add(1)
 		go bw.runPoller()
@@ -214,15 +229,6 @@ func (bw *baseWorker) Start() {
 
 	bw.shutdownWG.Add(1)
 	go bw.runTaskDispatcher()
-
-	// We want the emit function run once per host instead of run once per worker
-	//collectHardwareUsageOnce.Do(func() {
-	//	bw.shutdownWG.Add(1)
-	//	go bw.emitHardwareUsage()
-	//})
-
-	bw.shutdownWG.Add(1)
-	go bw.emitHardwareUsage()
 
 	bw.isWorkerStarted = true
 	traceLog(func() {
@@ -407,6 +413,9 @@ func (bw *baseWorker) Stop() {
 	if bw.pollerAutoScaler != nil {
 		bw.pollerAutoScaler.Stop()
 	}
+	if bw.workerUsageCollector != nil {
+		bw.workerUsageCollector.Stop()
+	}
 
 	if success := util.AwaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {
 		traceLog(func() {
@@ -419,54 +428,4 @@ func (bw *baseWorker) Stop() {
 		bw.options.userContextCancel()
 	}
 	return
-}
-
-func (bw *baseWorker) emitHardwareUsage() {
-	defer func() {
-		if p := recover(); p != nil {
-			bw.metricsScope.Counter(metrics.WorkerPanicCounter).Inc(1)
-			topLine := fmt.Sprintf("base worker for %s [panic]:", bw.options.workerType)
-			st := getStackTraceRaw(topLine, 7, 0)
-			bw.logger.Error("Unhandled panic in hardware emitting.",
-				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
-				zap.String(tagPanicStack, st))
-		}
-	}()
-	defer bw.shutdownWG.Done()
-	collectHardwareUsageOnce.Do(
-		func() {
-			ticker := time.NewTicker(hardwareMetricsCollectInterval)
-			for {
-				select {
-				case <-bw.shutdownCh:
-					ticker.Stop()
-					return
-				case <-ticker.C:
-					host := bw.options.host
-					scope := bw.metricsScope.Tagged(map[string]string{clientHostTag: host})
-
-					cpuPercent, err := cpu.Percent(0, false)
-					if err != nil {
-						bw.logger.Warn("Failed to get cpu percent", zap.Error(err))
-						return
-					}
-					cpuCores, err := cpu.Counts(false)
-					if err != nil {
-						bw.logger.Warn("Failed to get number of cpu cores", zap.Error(err))
-						return
-					}
-					scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
-					scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
-
-					var memStats runtime.MemStats
-					runtime.ReadMemStats(&memStats)
-
-					scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
-					scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
-					scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
-					scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
-				}
-			}
-		})
-
 }

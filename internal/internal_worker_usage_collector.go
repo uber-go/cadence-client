@@ -64,6 +64,7 @@ func (w *workerUsageCollector) Start() {
 		defer func() {
 			if p := recover(); p != nil {
 				w.logger.Error("Unhandled panic in workerUsageCollector.")
+				w.logger.Error(p.(error).Error())
 			}
 		}()
 		defer w.wg.Done()
@@ -76,8 +77,9 @@ func (w *workerUsageCollector) Start() {
 						return
 					case <-ticker.C:
 						hardwareUsageData := w.collectHardwareUsage()
-						w.emitHardwareUsage(hardwareUsageData)
-
+						if w.metricsScope != nil {
+							w.emitHardwareUsage(hardwareUsageData)
+						}
 					}
 				}
 			})

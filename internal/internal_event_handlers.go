@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -43,7 +44,8 @@ import (
 )
 
 const (
-	queryResultSizeLimit = 2000000 // 2MB
+	queryResultSizeLimit        = 2000000 // 2MB
+	historySizeEstimationBuffer = 400     // 400B for common fields in history event
 )
 
 // Make sure that interfaces are implemented
@@ -939,6 +941,9 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	if err != nil {
 		return err
 	}
+
+	historySum := estimateHistorySize(weh.logger, event)
+	atomic.AddInt64(&weh.workflowInfo.TotalHistoryBytes, int64(historySum))
 
 	// When replaying histories to get stack trace or current state the last event might be not
 	// decision started. So always call OnDecisionTaskStarted on the last event.

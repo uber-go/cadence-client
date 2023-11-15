@@ -843,6 +843,8 @@ process_Workflow_Loop:
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflowTask) (interface{}, error) {
 	task := workflowTask.task
 	historyIterator := workflowTask.historyIterator
+	w.workflowInfo.HistoryBytesServer = task.GetTotalHistoryBytes()
+	w.workflowInfo.HistoryCount = task.GetNextEventId() - 1
 	if err := w.ResetIfStale(task, historyIterator); err != nil {
 		return nil, err
 	}
@@ -866,6 +868,8 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 ProcessEvents:
 	for {
 		reorderedEvents, markers, binaryChecksum, err := reorderedHistory.NextDecisionEvents()
+		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge(metrics.EstimatedHistorySize).Update(float64(w.workflowInfo.TotalHistoryBytes))
+		w.wth.metricsScope.GetTaggedScope("workflowtype", w.workflowInfo.WorkflowType.Name).Gauge(metrics.ServerSideHistorySize).Update(float64(w.workflowInfo.HistoryBytesServer))
 		if err != nil {
 			return nil, err
 		}

@@ -176,8 +176,8 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 		workerUsageCollectorOptions{
 			Enabled:      true,
 			Cooldown:     30 * time.Second,
-			Host:         options.host,
 			MetricsScope: metricsScope,
+			WorkerType:   options.workerType,
 		},
 		logger,
 	)

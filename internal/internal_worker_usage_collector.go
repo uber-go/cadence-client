@@ -13,20 +13,20 @@ import (
 
 type (
 	workerUsageCollector struct {
+		workerType   string
 		cooldownTime time.Duration
 		logger       *zap.Logger
 		ctx          context.Context
 		wg           *sync.WaitGroup // graceful stop
 		cancel       context.CancelFunc
 		metricsScope tally.Scope
-		host         string
 	}
 
 	workerUsageCollectorOptions struct {
 		Enabled      bool
 		Cooldown     time.Duration
-		Host         string
 		MetricsScope tally.Scope
+		WorkerType   string
 	}
 
 	hardwareUsage struct {
@@ -48,8 +48,8 @@ func newWorkerUsageCollector(
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &workerUsageCollector{
+		workerType:   options.WorkerType,
 		cooldownTime: options.Cooldown,
-		host:         options.Host,
 		metricsScope: options.MetricsScope,
 		logger:       logger,
 		ctx:          ctx,
@@ -74,9 +74,13 @@ func (w *workerUsageCollector) Start() {
 			case <-w.ctx.Done():
 				return
 			case <-ticker.C:
-				hardwareUsageData := w.collectHardwareUsage()
-				if w.metricsScope != nil {
-					w.emitHardwareUsage(hardwareUsageData)
+				// Given that decision worker and activity worker are running in the same host, we only need to collect
+				// hardware usage from one of them.
+				if w.workerType == "DecisionWorker" {
+					hardwareUsageData := w.collectHardwareUsage()
+					if w.metricsScope != nil {
+						w.emitHardwareUsage(hardwareUsageData)
+					}
 				}
 			}
 		}
@@ -113,11 +117,10 @@ func (w *workerUsageCollector) collectHardwareUsage() hardwareUsage {
 
 // emitHardwareUsage emits collected hardware usage metrics to metrics scope
 func (w *workerUsageCollector) emitHardwareUsage(usage hardwareUsage) {
-	scope := w.metricsScope.Tagged(map[string]string{clientHostTag: w.host})
-	scope.Gauge(metrics.NumCPUCores).Update(float64(usage.NumCPUCores))
-	scope.Gauge(metrics.CPUPercentage).Update(usage.CPUPercent)
-	scope.Gauge(metrics.NumGoRoutines).Update(float64(usage.NumGoRoutines))
-	scope.Gauge(metrics.TotalMemory).Update(float64(usage.TotalMemory))
-	scope.Gauge(metrics.MemoryUsedHeap).Update(float64(usage.MemoryUsedHeap))
-	scope.Gauge(metrics.MemoryUsedStack).Update(float64(usage.MemoryUsedStack))
+	w.metricsScope.Gauge(metrics.NumCPUCores).Update(float64(usage.NumCPUCores))
+	w.metricsScope.Gauge(metrics.CPUPercentage).Update(usage.CPUPercent)
+	w.metricsScope.Gauge(metrics.NumGoRoutines).Update(float64(usage.NumGoRoutines))
+	w.metricsScope.Gauge(metrics.TotalMemory).Update(float64(usage.TotalMemory))
+	w.metricsScope.Gauge(metrics.MemoryUsedHeap).Update(float64(usage.MemoryUsedHeap))
+	w.metricsScope.Gauge(metrics.MemoryUsedStack).Update(float64(usage.MemoryUsedStack))
 }

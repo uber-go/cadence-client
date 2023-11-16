@@ -181,3 +181,13 @@ func TestParallel2(t *testing.T) {
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch2.json")
 	require.NoError(t, err)
 }
+
+// Runs a history which ends with WorkflowExecutionContinuedAsNew. Replay fails because of the additional checks done
+// for continue as new case by replayWorkflowHistory().
+// This should not have any error because it's a valid continue as new case.
+func TestContinueAsNew(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	replayer.RegisterWorkflowWithOptions(ContinueAsNewWorkflow, workflow.RegisterOptions{Name: "fx.SimpleSignalWorkflow"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "continue_as_new.json")
+	assert.ErrorContains(t, err, "replay workflow doesn't return the same result as the last event")
+}

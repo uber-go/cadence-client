@@ -55,8 +55,6 @@ var (
 
 var errShutdown = errors.New("worker shutting down")
 
-var collectHardwareUsageOnce sync.Once
-
 type (
 	// resultHandler that returns result
 	resultHandler   func(result []byte, err error)

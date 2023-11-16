@@ -68,21 +68,18 @@ func (w *workerUsageCollector) Start() {
 			}
 		}()
 		defer w.wg.Done()
-		collectHardwareUsageOnce.Do(
-			func() {
-				ticker := time.NewTicker(w.cooldownTime)
-				for {
-					select {
-					case <-w.ctx.Done():
-						return
-					case <-ticker.C:
-						hardwareUsageData := w.collectHardwareUsage()
-						if w.metricsScope != nil {
-							w.emitHardwareUsage(hardwareUsageData)
-						}
-					}
+		ticker := time.NewTicker(w.cooldownTime)
+		for {
+			select {
+			case <-w.ctx.Done():
+				return
+			case <-ticker.C:
+				hardwareUsageData := w.collectHardwareUsage()
+				if w.metricsScope != nil {
+					w.emitHardwareUsage(hardwareUsageData)
 				}
-			})
+			}
+		}
 	}()
 	return
 }

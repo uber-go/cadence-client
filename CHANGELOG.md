@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.0] - 2023-11-06
+### Added
+- Added new poller thread pool usage metrics #1275 #1291
+- Added metrics tag workflowruntimelength in workflow context #1277
+- Added GetWorkflowTaskList and GetActivityTaskList APIs #1292
+
+### Changed
+- Updated idl version
+- Improved retrieval of binaryChecksum #1279
+
+### Fixed
+- Fixed error log #1284
+- Fixed in TestEnv workflow interceptor is not propagated correctly for child workflows #1289
+
 ## [v1.0.2] - 2023-09-25
 ### Added 
 - Add a structured error for non-determinism failures

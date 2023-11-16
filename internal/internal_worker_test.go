@@ -196,7 +196,7 @@ func testActivityMultipleArgsWithStruct(ctx context.Context, i int, s testActivi
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorker() {
-	worker := createWorkerWithThrottle(s.T(), s.service, float64(500.0), WorkerOptions{})
+	worker := createWorkerWithThrottle(s.T(), s.service, 500, WorkerOptions{})
 	err := worker.Start()
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
@@ -221,6 +221,14 @@ func (s *internalWorkerTestSuite) TestCreateShadowWorker() {
 
 func (s *internalWorkerTestSuite) TestCreateWorker_WithAutoScaler() {
 	worker := createWorkerWithAutoscaler(s.T(), s.service)
+	err := worker.Start()
+	require.NoError(s.T(), err)
+	time.Sleep(time.Millisecond * 200)
+	worker.Stop()
+}
+
+func (s *internalWorkerTestSuite) TestCreateWorker_WithStrictNonDeterminism() {
+	worker := createWorkerWithStrictNonDeterminismDisabled(s.T(), s.service)
 	err := worker.Start()
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
@@ -348,7 +356,7 @@ func createWorker(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{})
 }
 
 func createShadowWorker(
@@ -356,7 +364,7 @@ func createShadowWorker(
 	service *workflowservicetest.MockClient,
 	shadowOptions *ShadowOptions,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{
 		EnableShadowWorker: true,
 		ShadowOptions:      *shadowOptions,
 	})
@@ -415,21 +423,28 @@ func createWorkerWithDataConverter(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{DataConverter: newTestDataConverter()})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{DataConverter: newTestDataConverter()})
 }
 
 func createWorkerWithAutoscaler(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
+}
+
+func createWorkerWithStrictNonDeterminismDisabled(
+	t *testing.T,
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{WorkerBugPorts: WorkerBugPorts{DisableStrictNonDeterminismCheck: true}})
 }
 
 func createWorkerWithHost(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{Host: "test_host"})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{Host: "test_host"})
 }
 
 func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions) {

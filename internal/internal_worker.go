@@ -1041,7 +1041,7 @@ func newAggregatedWorker(
 	var workflowWorker *workflowWorker
 	if !wOptions.DisableWorkflowWorker {
 		testTags := getTestTags(wOptions.BackgroundActivityContext)
-		if testTags != nil && len(testTags) > 0 {
+		if len(testTags) > 0 {
 			workflowWorker = newWorkflowWorkerWithPressurePoints(
 				service,
 				domain,

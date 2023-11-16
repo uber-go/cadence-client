@@ -216,11 +216,7 @@ func (bw *baseWorker) Start() {
 	go bw.runTaskDispatcher()
 
 	// We want the emit function run once per host instead of run once per worker
-	//collectHardwareUsageOnce.Do(func() {
-	//	bw.shutdownWG.Add(1)
-	//	go bw.emitHardwareUsage()
-	//})
-
+	// since the emit function is host level metric.
 	bw.shutdownWG.Add(1)
 	go bw.emitHardwareUsage()
 
@@ -253,7 +249,9 @@ func (bw *baseWorker) runPoller() {
 			return
 		case <-bw.pollerRequestCh:
 			bw.metricsScope.Gauge(metrics.ConcurrentTaskQuota).Update(float64(cap(bw.pollerRequestCh)))
-			bw.metricsScope.Gauge(metrics.ConcurrentTaskRunning).Update(float64(cap(bw.pollerRequestCh) - len(bw.pollerRequestCh)))
+			// This metric is used to monitor how many poll requests have been allocated
+			// and can be used to approximate number of concurrent task running (not pinpoint accurate)
+			bw.metricsScope.Gauge(metrics.PollerRequestBufferUsage).Update(float64(cap(bw.pollerRequestCh) - len(bw.pollerRequestCh)))
 			if bw.sessionTokenBucket != nil {
 				bw.sessionTokenBucket.waitForAvailableToken()
 			}

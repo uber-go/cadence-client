@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/internal/common/metrics"
@@ -63,12 +64,17 @@ func (w *workerUsageCollector) Start() {
 	go func() {
 		defer func() {
 			if p := recover(); p != nil {
-				w.logger.Error("Unhandled panic in workerUsageCollector.")
-				w.logger.Error(p.(error).Error())
+				w.metricsScope.Counter(metrics.WorkerUsageCollectorPanic).Inc(1)
+				topLine := fmt.Sprintf("WorkerUsageCollector panic for workertype: %v", w.workerType)
+				st := getStackTraceRaw(topLine, 7, 0)
+				w.logger.Error("WorkerUsageCollector panic.",
+					zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+					zap.String(tagPanicStack, st))
 			}
 		}()
 		defer w.wg.Done()
 		ticker := time.NewTicker(w.cooldownTime)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-w.ctx.Done():

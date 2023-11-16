@@ -171,8 +171,7 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 		)
 	}
 	// for now it's default to be enabled
-	var workerUC *workerUsageCollector
-	workerUC = newWorkerUsageCollector(
+	workerUC := newWorkerUsageCollector(
 		workerUsageCollectorOptions{
 			Enabled:      true,
 			Cooldown:     30 * time.Second,

@@ -56,7 +56,16 @@ type (
 		mockCtrl *gomock.Controller
 		service  *workflowservicetest.MockClient
 	}
+
+	// fakeSyncOnce is a fake implementation of oncePerHost interface
+	// that DOES NOT ensure run only once per host
+	fakeSyncOnce struct {
+	}
 )
+
+func (m *fakeSyncOnce) Do(f func()) {
+	f()
+}
 
 func helloWorldWorkflowFunc(ctx Context, input []byte) error {
 	queryResult := startingQueryValue
@@ -194,6 +203,8 @@ func (s *InterfacesTestSuite) TestInterface() {
 			Status: &domainStatus,
 		},
 	}
+
+	collectHardwareUsageOnce = &fakeSyncOnce{}
 
 	// mocks
 	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(domainDesc, nil).AnyTimes()

@@ -180,6 +180,7 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 		},
 		logger,
 	)
+	collectHardwareUsageOnce = &sync.Once{}
 
 	bw := &baseWorker{
 		options:              options,

@@ -38,7 +38,13 @@ type (
 		MemoryUsedHeap  float64
 		MemoryUsedStack float64
 	}
+
+	oncePerHost interface {
+		Do(func())
+	}
 )
+
+var collectHardwareUsageOnce oncePerHost
 
 func newWorkerUsageCollector(
 	options workerUsageCollectorOptions,
@@ -80,14 +86,13 @@ func (w *workerUsageCollector) Start() {
 			case <-w.ctx.Done():
 				return
 			case <-ticker.C:
-				// Given that decision worker and activity worker are running in the same host, we only need to collect
-				// hardware usage from one of them.
-				if w.workerType == "DecisionWorker" {
-					hardwareUsageData := w.collectHardwareUsage()
-					if w.metricsScope != nil {
-						w.emitHardwareUsage(hardwareUsageData)
-					}
-				}
+				collectHardwareUsageOnce.Do(
+					func() {
+						hardwareUsageData := w.collectHardwareUsage()
+						if w.metricsScope != nil {
+							w.emitHardwareUsage(hardwareUsageData)
+						}
+					})
 			}
 		}
 	}()

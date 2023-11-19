@@ -18,8 +18,8 @@ type (
 		cooldownTime    time.Duration
 		logger          *zap.Logger
 		ctx             context.Context
+		shutdownCh      chan struct{}
 		wg              *sync.WaitGroup // graceful stop
-		cancel          context.CancelFunc
 		metricsScope    tally.Scope
 		emitOncePerHost oncePerHost
 	}
@@ -53,16 +53,16 @@ func newWorkerUsageCollector(
 	if !options.Enabled {
 		return nil
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, _ := context.WithCancel(context.Background())
 	return &workerUsageCollector{
 		workerType:      options.WorkerType,
 		cooldownTime:    options.Cooldown,
 		metricsScope:    options.MetricsScope,
 		logger:          logger,
 		ctx:             ctx,
-		cancel:          cancel,
 		wg:              &sync.WaitGroup{},
 		emitOncePerHost: options.EmitOnce,
+		shutdownCh:      make(chan struct{}),
 	}
 }
 
@@ -82,24 +82,34 @@ func (w *workerUsageCollector) Start() {
 		defer w.wg.Done()
 		ticker := time.NewTicker(w.cooldownTime)
 		defer ticker.Stop()
+
+		w.wg.Add(1)
+		go w.runHardwareCollector(ticker)
+
+	}()
+	return
+}
+
+func (w *workerUsageCollector) Stop() {
+	close(w.shutdownCh)
+	w.wg.Wait()
+}
+
+func (w *workerUsageCollector) runHardwareCollector(tick *time.Ticker) {
+	defer w.wg.Done()
+	w.emitOncePerHost.Do(func() {
 		for {
 			select {
-			case <-w.ctx.Done():
+			case <-w.shutdownCh:
 				return
-			case <-ticker.C:
+			case <-tick.C:
 				hardwareUsageData := w.collectHardwareUsage()
 				if w.metricsScope != nil {
 					w.emitHardwareUsage(hardwareUsageData)
 				}
 			}
 		}
-	}()
-	return
-}
-
-func (w *workerUsageCollector) Stop() {
-	w.cancel()
-	w.wg.Wait()
+	})
 }
 
 func (w *workerUsageCollector) collectHardwareUsage() hardwareUsage {
@@ -126,12 +136,10 @@ func (w *workerUsageCollector) collectHardwareUsage() hardwareUsage {
 
 // emitHardwareUsage emits collected hardware usage metrics to metrics scope
 func (w *workerUsageCollector) emitHardwareUsage(usage hardwareUsage) {
-	emitOnce.Do(func() {
-		w.metricsScope.Gauge(metrics.NumCPUCores).Update(float64(usage.NumCPUCores))
-		w.metricsScope.Gauge(metrics.CPUPercentage).Update(usage.CPUPercent)
-		w.metricsScope.Gauge(metrics.NumGoRoutines).Update(float64(usage.NumGoRoutines))
-		w.metricsScope.Gauge(metrics.TotalMemory).Update(float64(usage.TotalMemory))
-		w.metricsScope.Gauge(metrics.MemoryUsedHeap).Update(float64(usage.MemoryUsedHeap))
-		w.metricsScope.Gauge(metrics.MemoryUsedStack).Update(float64(usage.MemoryUsedStack))
-	})
+	w.metricsScope.Gauge(metrics.NumCPUCores).Update(float64(usage.NumCPUCores))
+	w.metricsScope.Gauge(metrics.CPUPercentage).Update(usage.CPUPercent)
+	w.metricsScope.Gauge(metrics.NumGoRoutines).Update(float64(usage.NumGoRoutines))
+	w.metricsScope.Gauge(metrics.TotalMemory).Update(float64(usage.TotalMemory))
+	w.metricsScope.Gauge(metrics.MemoryUsedHeap).Update(float64(usage.MemoryUsedHeap))
+	w.metricsScope.Gauge(metrics.MemoryUsedStack).Update(float64(usage.MemoryUsedStack))
 }

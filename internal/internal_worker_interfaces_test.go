@@ -204,8 +204,6 @@ func (s *InterfacesTestSuite) TestInterface() {
 		},
 	}
 
-	collectHardwareUsageOnce = &fakeSyncOnce{}
-
 	// mocks
 	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(domainDesc, nil).AnyTimes()
 	s.service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), callOptionsWithIsolationGroupHeader()...).Return(&m.PollForActivityTaskResponse{}, nil).AnyTimes()
@@ -232,6 +230,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 
 	// Register activity instances and launch the worker.
 	activityWorker := newActivityWorker(s.service, domain, activityExecutionParameters, nil, registry, nil)
+	//activityWorker.worker.workerUsageCollector.emitOnce = &fakeSyncOnce{}
 	defer activityWorker.Stop()
 	activityWorker.Start()
 

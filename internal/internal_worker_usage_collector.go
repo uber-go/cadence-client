@@ -21,6 +21,7 @@ type (
 		wg           *sync.WaitGroup // graceful stop
 		cancel       context.CancelFunc
 		metricsScope tally.Scope
+		emitOnce     oncePerHost
 	}
 
 	workerUsageCollectorOptions struct {
@@ -28,6 +29,7 @@ type (
 		Cooldown     time.Duration
 		MetricsScope tally.Scope
 		WorkerType   string
+		EmitOnce     oncePerHost
 	}
 
 	hardwareUsage struct {
@@ -43,8 +45,6 @@ type (
 		Do(func())
 	}
 )
-
-var collectHardwareUsageOnce oncePerHost
 
 func newWorkerUsageCollector(
 	options workerUsageCollectorOptions,
@@ -62,6 +62,7 @@ func newWorkerUsageCollector(
 		ctx:          ctx,
 		cancel:       cancel,
 		wg:           &sync.WaitGroup{},
+		emitOnce:     options.EmitOnce,
 	}
 }
 
@@ -86,7 +87,7 @@ func (w *workerUsageCollector) Start() {
 			case <-w.ctx.Done():
 				return
 			case <-ticker.C:
-				collectHardwareUsageOnce.Do(
+				emitOnce.Do(
 					func() {
 						hardwareUsageData := w.collectHardwareUsage()
 						if w.metricsScope != nil {

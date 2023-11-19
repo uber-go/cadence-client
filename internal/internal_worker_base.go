@@ -55,6 +55,8 @@ var (
 
 var errShutdown = errors.New("worker shutting down")
 
+var emitOnce sync.Once
+
 type (
 	// resultHandler that returns result
 	resultHandler   func(result []byte, err error)
@@ -177,10 +179,10 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 			Cooldown:     30 * time.Second,
 			MetricsScope: metricsScope,
 			WorkerType:   options.workerType,
+			EmitOnce:     &emitOnce,
 		},
 		logger,
 	)
-	collectHardwareUsageOnce = &sync.Once{}
 
 	bw := &baseWorker{
 		options:              options,

@@ -20,6 +20,7 @@ type (
 		ctx             context.Context
 		shutdownCh      chan struct{}
 		wg              *sync.WaitGroup // graceful stop
+		cancel          context.CancelFunc
 		metricsScope    tally.Scope
 		emitOncePerHost oncePerHost
 	}
@@ -53,13 +54,14 @@ func newWorkerUsageCollector(
 	if !options.Enabled {
 		return nil
 	}
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	return &workerUsageCollector{
 		workerType:      options.WorkerType,
 		cooldownTime:    options.Cooldown,
 		metricsScope:    options.MetricsScope,
 		logger:          logger,
 		ctx:             ctx,
+		cancel:          cancel,
 		wg:              &sync.WaitGroup{},
 		emitOncePerHost: options.EmitOnce,
 		shutdownCh:      make(chan struct{}),
@@ -91,6 +93,7 @@ func (w *workerUsageCollector) Start() {
 }
 
 func (w *workerUsageCollector) Stop() {
+	w.cancel()
 	close(w.shutdownCh)
 	w.wg.Wait()
 }

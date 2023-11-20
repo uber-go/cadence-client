@@ -82,12 +82,10 @@ func (w *workerUsageCollector) Start() {
 			}
 		}()
 		defer w.wg.Done()
-		ticker := time.NewTicker(w.cooldownTime)
-		defer ticker.Stop()
 
 		w.wg.Add(1)
 		w.logger.Info(fmt.Sprintf("Going to start hardware collector for workertype: %v", w.workerType))
-		go w.runHardwareCollector(ticker)
+		go w.runHardwareCollector()
 
 	}()
 	return
@@ -100,15 +98,17 @@ func (w *workerUsageCollector) Stop() {
 
 }
 
-func (w *workerUsageCollector) runHardwareCollector(tick *time.Ticker) {
+func (w *workerUsageCollector) runHardwareCollector() {
 	defer w.wg.Done()
+	ticker := time.NewTicker(w.cooldownTime)
+	defer ticker.Stop()
 	w.emitOncePerHost.Do(func() {
 		w.logger.Info(fmt.Sprintf("Started worker usage collector for workertype: %v", w.workerType))
 		for {
 			select {
 			case <-w.shutdownCh:
 				return
-			case <-tick.C:
+			case <-ticker.C:
 				hardwareUsageData := w.collectHardwareUsage()
 				if w.metricsScope != nil {
 					w.emitHardwareUsage(hardwareUsageData)

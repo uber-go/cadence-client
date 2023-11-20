@@ -215,6 +215,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 	registry := newRegistry()
 	// Launch worker.
 	workflowWorker := newWorkflowWorker(s.service, domain, workflowExecutionParameters, nil, registry, nil)
+	workflowWorker.worker.workerUsageCollector.emitOncePerHost = &fakeSyncOnce{}
 	defer workflowWorker.Stop()
 	workflowWorker.Start()
 
@@ -230,6 +231,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 
 	// Register activity instances and launch the worker.
 	activityWorker := newActivityWorker(s.service, domain, activityExecutionParameters, nil, registry, nil)
+	activityWorker.worker.workerUsageCollector.emitOncePerHost = &fakeSyncOnce{}
 	defer activityWorker.Stop()
 	activityWorker.Start()
 

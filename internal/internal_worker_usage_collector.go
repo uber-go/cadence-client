@@ -86,6 +86,7 @@ func (w *workerUsageCollector) Start() {
 		defer ticker.Stop()
 
 		w.wg.Add(1)
+		w.logger.Info(fmt.Sprintf("Going to start hardware collector for workertype: %v", w.workerType))
 		go w.runHardwareCollector(ticker)
 
 	}()
@@ -93,14 +94,16 @@ func (w *workerUsageCollector) Start() {
 }
 
 func (w *workerUsageCollector) Stop() {
-	w.cancel()
 	close(w.shutdownCh)
 	w.wg.Wait()
+	w.cancel()
+
 }
 
 func (w *workerUsageCollector) runHardwareCollector(tick *time.Ticker) {
 	defer w.wg.Done()
 	w.emitOncePerHost.Do(func() {
+		w.logger.Info(fmt.Sprintf("Started worker usage collector for workertype: %v", w.workerType))
 		for {
 			select {
 			case <-w.shutdownCh:

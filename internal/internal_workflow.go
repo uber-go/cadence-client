@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -501,11 +502,7 @@ func (d *syncWorkflowDefinition) Execute(env workflowEnvironment, header *shared
 		eo := getWorkflowEnvOptions(d.rootCtx)
 		handler, ok := eo.queryHandlers[queryType]
 		if !ok {
-			keys := []string{QueryTypeStackTrace, QueryTypeOpenSessions}
-			for k := range eo.queryHandlers {
-				keys = append(keys, k)
-			}
-			return nil, fmt.Errorf("unknown queryType %v. KnownQueryTypes=%v", queryType, keys)
+			return nil, fmt.Errorf("unknown queryType %v. KnownQueryTypes=%v", queryType, eo.KnownQueryTypes())
 		}
 		return handler(queryArgs)
 	})
@@ -517,6 +514,10 @@ func (d *syncWorkflowDefinition) OnDecisionTaskStarted() {
 
 func (d *syncWorkflowDefinition) StackTrace() string {
 	return d.dispatcher.StackTrace()
+}
+
+func (d *syncWorkflowDefinition) KnownQueryTypes() []string {
+	return getWorkflowEnvOptions(d.rootCtx).KnownQueryTypes()
 }
 
 func (d *syncWorkflowDefinition) Close() {
@@ -1282,6 +1283,18 @@ func (w *workflowOptions) getUnhandledSignalNames() []string {
 		}
 	}
 	return unhandledSignals
+}
+
+// KnownQueryTypes returns a list of known query types of the workflowOptions with BuiltinQueryTypes
+func (w *workflowOptions) KnownQueryTypes() []string {
+	keys := BuiltinQueryTypes()
+
+	for k := range w.queryHandlers {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+	return keys
 }
 
 func (d *decodeFutureImpl) Get(ctx Context, value interface{}) error {

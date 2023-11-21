@@ -961,6 +961,8 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessQuery(queryType string, que
 		return weh.encodeArg(weh.StackTrace())
 	case QueryTypeOpenSessions:
 		return weh.encodeArg(weh.getOpenSessions())
+	case QueryTypeQueryTypes:
+		return weh.encodeArg(weh.KnownQueryTypes())
 	default:
 		result, err := weh.queryHandler(queryType, queryArgs)
 		if err != nil {
@@ -978,6 +980,10 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessQuery(queryType string, que
 
 		return result, nil
 	}
+}
+
+func (weh *workflowExecutionEventHandlerImpl) KnownQueryTypes() []string {
+	return weh.workflowDefinition.KnownQueryTypes()
 }
 
 func (weh *workflowExecutionEventHandlerImpl) StackTrace() string {

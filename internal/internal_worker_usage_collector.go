@@ -66,14 +66,12 @@ func newWorkerUsageCollector(
 
 func (w *workerUsageCollector) Start() {
 
-	if w.emitOncePerHost != nil {
-		w.emitOncePerHost.Do(
-			func() {
-				w.wg.Add(1)
-				w.logger.Info(fmt.Sprintf("Going to start hardware collector for workertype: %v", w.workerType))
-				go w.runHardwareCollector()
-			})
-	}
+	w.emitOncePerHost.Do(
+		func() {
+			w.wg.Add(1)
+			w.logger.Info(fmt.Sprintf("Going to start hardware collector for workertype: %v", w.workerType))
+			go w.runHardwareCollector()
+		})
 
 }
 

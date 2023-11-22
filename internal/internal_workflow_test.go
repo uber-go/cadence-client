@@ -1308,3 +1308,39 @@ func (t *tracingInterceptor) ExecuteWorkflow(ctx Context, workflowType string, a
 	t.trace = append(t.trace, "ExecuteWorkflow "+workflowType+" end")
 	return result
 }
+
+type WorkflowOptionTest struct {
+	suite.Suite
+}
+
+func TestWorkflowOption(t *testing.T) {
+	suite.Run(t, new(WorkflowOptionTest))
+}
+
+func (t *WorkflowOptionTest) TestKnowQueryType_NoHandlers() {
+	wo := workflowOptions{queryHandlers: make(map[string]func([]byte) ([]byte, error))}
+	t.ElementsMatch(
+		[]string{
+			QueryTypeStackTrace,
+			QueryTypeOpenSessions,
+			QueryTypeQueryTypes,
+		},
+		wo.KnownQueryTypes())
+}
+
+func (t *WorkflowOptionTest) TestKnowQueryType_WithHandlers() {
+	wo := workflowOptions{queryHandlers: map[string]func([]byte) ([]byte, error){
+		"a": nil,
+		"b": nil,
+	}}
+
+	t.ElementsMatch(
+		[]string{
+			QueryTypeStackTrace,
+			QueryTypeOpenSessions,
+			QueryTypeQueryTypes,
+			"a",
+			"b",
+		},
+		wo.KnownQueryTypes())
+}

@@ -382,3 +382,22 @@ func TestHistoryEstimationforPackedEvents(t *testing.T) {
 	trueSize := len(testEvents)*historySizeEstimationBuffer + len(byteArray)*2*len(testEvents)
 	assert.Equal(t, trueSize, historySizeSum)
 }
+
+func TestProcessQuery_KnownQueryTypes(t *testing.T) {
+	rootCtx := setWorkflowEnvOptionsIfNotExist(Background())
+	eo := getWorkflowEnvOptions(rootCtx)
+	eo.queryHandlers["a"] = nil
+
+	weh := &workflowExecutionEventHandlerImpl{
+		workflowEnvironmentImpl: &workflowEnvironmentImpl{
+			dataConverter: DefaultDataConverter,
+		},
+		workflowDefinition: &syncWorkflowDefinition{
+			rootCtx: rootCtx,
+		},
+	}
+
+	result, err := weh.ProcessQuery(QueryTypeQueryTypes, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, "[\"__open_sessions\",\"__query_types\",\"__stack_trace\",\"a\"]\n", string(result))
+}

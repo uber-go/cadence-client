@@ -43,6 +43,10 @@ const (
 	// QueryTypeOpenSessions is the build in query type for Client.QueryWorkflow() call. Use this query type to get all open
 	// sessions in the workflow. The result will be a list of SessionInfo encoded in the encoded.Value.
 	QueryTypeOpenSessions string = internal.QueryTypeOpenSessions
+
+	// QueryTypeQueryTypes is the build in query type for Client.QueryWorkflow() call. Use this query type to list
+	// all query types of the workflow. The result will be a string encoded in the EncodedValue.
+	QueryTypeQueryTypes string = internal.QueryTypeQueryTypes
 )
 
 type (

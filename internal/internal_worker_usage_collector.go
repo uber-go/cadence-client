@@ -65,6 +65,7 @@ func newWorkerUsageCollector(
 }
 
 func (w *workerUsageCollector) Start() {
+	w.logger.Info("Starting worker usage collector", zap.String("workerType", w.workerType))
 
 	w.emitOncePerHost.Do(
 		func() {

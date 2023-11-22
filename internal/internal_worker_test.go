@@ -367,6 +367,7 @@ func createShadowWorker(
 	return createWorkerWithThrottle(t, service, 0, WorkerOptions{
 		EnableShadowWorker: true,
 		ShadowOptions:      *shadowOptions,
+		Sync:               &fakeSyncOnce{},
 	})
 }
 
@@ -409,6 +410,7 @@ func createWorkerWithThrottle(
 	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
 	workerOptions.Logger = zaptest.NewLogger(t)
 	workerOptions.EnableSessionWorker = true
+	workerOptions.Sync = &fakeSyncOnce{}
 
 	// Start Worker.
 	worker := NewWorker(
@@ -423,14 +425,14 @@ func createWorkerWithDataConverter(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, 0, WorkerOptions{DataConverter: newTestDataConverter()})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{DataConverter: newTestDataConverter(), Sync: &fakeSyncOnce{}})
 }
 
 func createWorkerWithAutoscaler(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, 0, WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}, Sync: &fakeSyncOnce{}})
 }
 
 func createWorkerWithStrictNonDeterminismDisabled(
@@ -444,7 +446,7 @@ func createWorkerWithHost(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, 0, WorkerOptions{Host: "test_host"})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{Host: "test_host", Sync: &fakeSyncOnce{}})
 }
 
 func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions) {
@@ -1031,7 +1033,7 @@ func TestActivityNilArgs(t *testing.T) {
 func TestWorkerOptionDefaults(t *testing.T) {
 	domain := "worker-options-test"
 	taskList := "worker-options-tl"
-	aggWorker := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
+	aggWorker := newAggregatedWorker(nil, domain, taskList, WorkerOptions{Sync: &fakeSyncOnce{}})
 	decisionWorker := aggWorker.workflowWorker
 	require.True(t, decisionWorker.executionParameters.Identity != "")
 	require.NotNil(t, decisionWorker.executionParameters.Logger)

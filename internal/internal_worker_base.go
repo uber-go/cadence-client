@@ -122,6 +122,7 @@ type (
 		shutdownTimeout   time.Duration
 		userContextCancel context.CancelFunc
 		host              string
+		sync              *oncePerHost
 	}
 
 	// baseWorker that wraps worker activities.
@@ -148,6 +149,10 @@ type (
 	polledTask struct {
 		task interface{}
 	}
+
+	oncePerHost interface {
+		Do(func())
+	}
 )
 
 func createPollRetryPolicy() backoff.RetryPolicy {
@@ -172,6 +177,14 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 			logger,
 		)
 	}
+
+	var once oncePerHost
+	if options.sync == nil {
+		once = &emitOnce
+	} else {
+		once = *options.sync
+	}
+
 	// for now it's default to be enabled
 	workerUC := newWorkerUsageCollector(
 		workerUsageCollectorOptions{
@@ -179,7 +192,7 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 			Cooldown:     30 * time.Second,
 			MetricsScope: metricsScope,
 			WorkerType:   options.workerType,
-			EmitOnce:     &emitOnce,
+			EmitOnce:     once,
 		},
 		logger,
 	)

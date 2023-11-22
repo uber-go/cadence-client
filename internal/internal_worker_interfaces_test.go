@@ -63,6 +63,8 @@ type (
 	}
 )
 
+var fakeSyncOnceValue fakeSyncOnce
+
 func (m *fakeSyncOnce) Do(f func()) {
 	f()
 }
@@ -188,12 +190,12 @@ func (s *InterfacesTestSuite) TestInterface() {
 	domain := "testDomain"
 	// Workflow execution parameters.
 	workflowExecutionParameters := workerExecutionParameters{
-		TaskList: "testTaskList",
 		WorkerOptions: WorkerOptions{
 			MaxConcurrentActivityTaskPollers: 4,
 			MaxConcurrentDecisionTaskPollers: 4,
 			Logger:                           zaptest.NewLogger(s.T()),
-			Tracer:                           opentracing.NoopTracer{}},
+			Tracer:                           opentracing.NoopTracer{},
+			Sync:                             &fakeSyncOnce{}},
 	}
 
 	domainStatus := m.DomainStatusRegistered
@@ -215,7 +217,6 @@ func (s *InterfacesTestSuite) TestInterface() {
 	registry := newRegistry()
 	// Launch worker.
 	workflowWorker := newWorkflowWorker(s.service, domain, workflowExecutionParameters, nil, registry, nil)
-	workflowWorker.worker.workerUsageCollector.emitOncePerHost = &fakeSyncOnce{}
 	defer workflowWorker.Stop()
 	workflowWorker.Start()
 
@@ -226,12 +227,12 @@ func (s *InterfacesTestSuite) TestInterface() {
 			MaxConcurrentActivityTaskPollers: 10,
 			MaxConcurrentDecisionTaskPollers: 10,
 			Logger:                           zaptest.NewLogger(s.T()),
-			Tracer:                           opentracing.NoopTracer{}},
+			Tracer:                           opentracing.NoopTracer{},
+			Sync:                             &fakeSyncOnce{}},
 	}
 
 	// Register activity instances and launch the worker.
 	activityWorker := newActivityWorker(s.service, domain, activityExecutionParameters, nil, registry, nil)
-	activityWorker.worker.workerUsageCollector.emitOncePerHost = &fakeSyncOnce{}
 	defer activityWorker.Stop()
 	activityWorker.Start()
 

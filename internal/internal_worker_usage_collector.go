@@ -41,10 +41,6 @@ type (
 		MemoryUsedHeap  float64
 		MemoryUsedStack float64
 	}
-
-	oncePerHost interface {
-		Do(func())
-	}
 )
 
 func newWorkerUsageCollector(
@@ -69,26 +65,16 @@ func newWorkerUsageCollector(
 }
 
 func (w *workerUsageCollector) Start() {
-	w.wg.Add(1)
-	go func() {
-		defer func() {
-			if p := recover(); p != nil {
-				w.metricsScope.Counter(metrics.WorkerUsageCollectorPanic).Inc(1)
-				topLine := fmt.Sprintf("WorkerUsageCollector panic for workertype: %v", w.workerType)
-				st := getStackTraceRaw(topLine, 7, 0)
-				w.logger.Error("WorkerUsageCollector panic.",
-					zap.String(tagPanicError, fmt.Sprintf("%v", p)),
-					zap.String(tagPanicStack, st))
-			}
-		}()
-		defer w.wg.Done()
 
-		w.wg.Add(1)
-		w.logger.Info(fmt.Sprintf("Going to start hardware collector for workertype: %v", w.workerType))
-		go w.runHardwareCollector()
+	if w.emitOncePerHost != nil {
+		w.emitOncePerHost.Do(
+			func() {
+				w.wg.Add(1)
+				w.logger.Info(fmt.Sprintf("Going to start hardware collector for workertype: %v", w.workerType))
+				go w.runHardwareCollector()
+			})
+	}
 
-	}()
-	return
 }
 
 func (w *workerUsageCollector) Stop() {
@@ -102,20 +88,18 @@ func (w *workerUsageCollector) runHardwareCollector() {
 	defer w.wg.Done()
 	ticker := time.NewTicker(w.cooldownTime)
 	defer ticker.Stop()
-	w.emitOncePerHost.Do(func() {
-		w.logger.Info(fmt.Sprintf("Started worker usage collector for workertype: %v", w.workerType))
-		for {
-			select {
-			case <-w.shutdownCh:
-				return
-			case <-ticker.C:
-				hardwareUsageData := w.collectHardwareUsage()
-				if w.metricsScope != nil {
-					w.emitHardwareUsage(hardwareUsageData)
-				}
+	w.logger.Info(fmt.Sprintf("Started worker usage collector for workertype: %v", w.workerType))
+	for {
+		select {
+		case <-w.shutdownCh:
+			return
+		case <-ticker.C:
+			hardwareUsageData := w.collectHardwareUsage()
+			if w.metricsScope != nil {
+				w.emitHardwareUsage(hardwareUsageData)
 			}
 		}
-	})
+	}
 }
 
 func (w *workerUsageCollector) collectHardwareUsage() hardwareUsage {

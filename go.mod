@@ -68,12 +68,7 @@ require (
 )
 
 retract (
-	v1.2.6-prerelease2 // Published accidentally
-	v1.2.6-prerelease1 // Published accidentally
 	v1.2.5 // Published accidentally
-	v1.2.5-prerelease3 // Published accidentally
-	v1.2.5-prerelease2 // Published accidentally
-	v1.2.5-prerelease1 // Published accidentally
 	v1.2.4 // Published accidentally
 	v1.2.3 // Published accidentally
 	v1.2.2 // Published accidentally
@@ -96,7 +91,6 @@ retract (
 	v0.16.1 // Published accidentally
 	v0.15.1 // Published accidentally
 	v0.14.2 // Published accidentally
-	v0.12.0-reset-patch // Published accidentally
 	v0.10.3 // Published accidentally
 	v0.10.2 // Published accidentally
 	v0.5.5 // Published accidentally
@@ -116,6 +110,4 @@ retract (
 	v0.3.3 // Published accidentally
 	v0.3.0 // Published accidentally
 	v0.2.0 // Published accidentally
-	v0.1.1-beta // Published accidentally
-	v0.1.0-beta // Published accidentally
 )

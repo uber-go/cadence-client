@@ -66,3 +66,48 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.3.2 // indirect
 )
+
+retract (
+	v1.2.5 // Published accidentally
+	v1.2.4 // Published accidentally
+	v1.2.3 // Published accidentally
+	v1.2.2 // Published accidentally
+	v1.2.1 // Published accidentally
+	v0.25.0 // Published accidentally
+	v0.24.0 // Published accidentally
+	v0.23.2 // Published accidentally
+	v0.23.1 // Published accidentally
+	v0.22.4 // Published accidentally
+	v0.22.3 // Published accidentally
+	v0.22.2 // Published accidentally
+	v0.22.1 // Published accidentally
+	v0.22.0 // Published accidentally
+	v0.21.3 // Published accidentally
+	v0.21.2 // Published accidentally
+	v0.21.0 // Published accidentally
+	v0.20.0 // Published accidentally
+	v0.19.2 // Published accidentally
+	v0.18.0 // Published accidentally
+	v0.16.1 // Published accidentally
+	v0.15.1 // Published accidentally
+	v0.14.2 // Published accidentally
+	v0.10.3 // Published accidentally
+	v0.10.2 // Published accidentally
+	v0.5.5 // Published accidentally
+	v0.5.4 // Published accidentally
+	v0.5.3 // Published accidentally
+	v0.3.15 // Published accidentally
+	v0.3.14 // Published accidentally
+	v0.3.13 // Published accidentally
+	v0.3.12 // Published accidentally
+	v0.3.11 // Published accidentally
+	v0.3.9 // Published accidentally
+	v0.3.8 // Published accidentally
+	v0.3.7 // Published accidentally
+	v0.3.6 // Published accidentally
+	v0.3.5 // Published accidentally
+	v0.3.4 // Published accidentally
+	v0.3.3 // Published accidentally
+	v0.3.0 // Published accidentally
+	v0.2.0 // Published accidentally
+)

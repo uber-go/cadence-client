@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ## [v1.2.6] - 2023-11-24
 ### Added
-- Added a new query type `__query_type` #1295
+- Added a new query type `__query_types` #1295
 - Added calculate workflow history size and count and expose that to client #1270
 - Added honor non-determinism fail workflow policy #1287
 

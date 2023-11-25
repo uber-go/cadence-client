@@ -106,6 +106,9 @@ type (
 		// Executed after all history events since the previous decision are applied to workflowDefinition
 		OnDecisionTaskStarted()
 		StackTrace() string // Stack trace of all coroutines owned by the Dispatcher instance
+
+		// KnownQueryTypes returns a list of known query types of the workflowOptions with BuiltinQueryTypes
+		KnownQueryTypes() []string
 		Close()
 	}
 

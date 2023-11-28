@@ -468,8 +468,6 @@ func estimateHistorySize(logger *zap.Logger, event *s.HistoryEvent) int {
 			sum += len(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Control)
 			sum += len(event.SignalExternalWorkflowExecutionInitiatedEventAttributes.Input)
 		}
-
-	default: // Do not fail to be forward compatible with new events
 	}
 
 	return sum

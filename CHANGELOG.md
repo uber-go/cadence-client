@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [v1.2.7] - 2023-12-6
+### Changed
+- Upgraded cassandra image to 4.1.3 in docker compose files #1301
+
+### Fixed
+- Fixed history size exposure logging #1300
+
+## [v1.2.6] - 2023-11-24
+### Added
+- Added a new query type `__query_types` #1295
+- Added calculate workflow history size and count and expose that to client #1270
+- Added honor non-determinism fail workflow policy #1287
 
 ## [v1.1.0] - 2023-11-06
 ### Added

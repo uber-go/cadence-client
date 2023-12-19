@@ -111,3 +111,6 @@ retract (
 	v0.3.0 // Published accidentally
 	v0.2.0 // Published accidentally
 )
+
+// Cadence backend depends on older version of thrift, so we cannot use the latest version.
+replace github.com/apache/thrift => github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7

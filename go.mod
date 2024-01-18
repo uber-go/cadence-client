@@ -4,9 +4,9 @@ go 1.19
 
 require (
 	github.com/apache/thrift v0.16.0
-	github.com/cristalhq/jwt/v3 v3.1.0
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a
 	github.com/gogo/protobuf v1.3.2
+	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/golang/mock v1.5.0
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/opentracing/opentracing-go v1.1.0

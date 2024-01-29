@@ -33,6 +33,7 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/auth"
+	"go.uber.org/cadence/internal/common/isolationgroup"
 	"go.uber.org/cadence/internal/common/metrics"
 )
 
@@ -44,7 +45,20 @@ const (
 	// QueryTypeOpenSessions is the build in query type for Client.QueryWorkflow() call. Use this query type to get all open
 	// sessions in the workflow. The result will be a list of SessionInfo encoded in the EncodedValue.
 	QueryTypeOpenSessions string = "__open_sessions"
+
+	// QueryTypeQueryTypes is the build in query type for Client.QueryWorkflow() call. Use this query type to list
+	// all query types of the workflow. The result will be a string encoded in the EncodedValue.
+	QueryTypeQueryTypes string = "__query_types"
 )
+
+// BuiltinQueryTypes returns a list of built-in query types
+func BuiltinQueryTypes() []string {
+	return []string{
+		QueryTypeOpenSessions,
+		QueryTypeStackTrace,
+		QueryTypeQueryTypes,
+	}
+}
 
 type Option interface{ private() }
 
@@ -358,6 +372,7 @@ type (
 	ClientOptions struct {
 		MetricsScope       tally.Scope
 		Identity           string
+		IsolationGroup     string
 		DataConverter      DataConverter
 		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
@@ -577,6 +592,9 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	}
 	if options != nil && options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
+	}
+	if options != nil && options.IsolationGroup != "" {
+		service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
 	}
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &workflowClient{

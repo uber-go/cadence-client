@@ -22,6 +22,7 @@ package internal
 
 import (
 	"encoding/json"
+	"go.uber.org/cadence/internal/common"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -311,4 +312,92 @@ func Test_CreateSearchAttributesForChangeVersion(t *testing.T) {
 	val, ok := result["CadenceChangeVersion"]
 	require.True(t, ok, "Remember to update related key on server side")
 	require.Equal(t, []string{"cid-1"}, val)
+}
+
+func TestHistoryEstimationforSmallEvents(t *testing.T) {
+	taskList := "tasklist"
+	testEvents := []*s.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskScheduled(2, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(3),
+		{
+			EventId:   common.Int64Ptr(4),
+			EventType: common.EventTypePtr(s.EventTypeDecisionTaskFailed),
+		},
+		{
+			EventId:   common.Int64Ptr(5),
+			EventType: common.EventTypePtr(s.EventTypeWorkflowExecutionSignaled),
+		},
+		createTestEventDecisionTaskScheduled(6, &s.DecisionTaskScheduledEventAttributes{TaskList: &s.TaskList{Name: &taskList}}),
+		createTestEventDecisionTaskStarted(7),
+	}
+	core, _ := observer.New(zapcore.InfoLevel)
+	logger := zap.New(core, zap.Development())
+	w := workflowExecutionEventHandlerImpl{
+		workflowEnvironmentImpl: &workflowEnvironmentImpl{logger: logger},
+	}
+
+	w.logger = logger
+	historySizeSum := 0
+	for _, event := range testEvents {
+		sum := estimateHistorySize(logger, event)
+		historySizeSum += sum
+	}
+	trueSize := len(testEvents) * historySizeEstimationBuffer
+
+	assert.Equal(t, trueSize, historySizeSum)
+}
+
+func TestHistoryEstimationforPackedEvents(t *testing.T) {
+	// create an array of bytes for testing
+	var byteArray []byte
+	byteArray = append(byteArray, 100)
+	taskList := "tasklist"
+	testEvents := []*s.HistoryEvent{
+		createTestEventWorkflowExecutionStarted(1, &s.WorkflowExecutionStartedEventAttributes{
+			TaskList:                &s.TaskList{Name: &taskList},
+			Input:                   byteArray,
+			ContinuedFailureDetails: byteArray}),
+		createTestEventWorkflowExecutionStarted(2, &s.WorkflowExecutionStartedEventAttributes{
+			TaskList:                &s.TaskList{Name: &taskList},
+			Input:                   byteArray,
+			ContinuedFailureDetails: byteArray}),
+		createTestEventWorkflowExecutionStarted(3, &s.WorkflowExecutionStartedEventAttributes{
+			TaskList:                &s.TaskList{Name: &taskList},
+			Input:                   byteArray,
+			ContinuedFailureDetails: byteArray}),
+	}
+	core, _ := observer.New(zapcore.InfoLevel)
+	logger := zap.New(core, zap.Development())
+	w := workflowExecutionEventHandlerImpl{
+		workflowEnvironmentImpl: &workflowEnvironmentImpl{logger: logger},
+	}
+
+	w.logger = logger
+	historySizeSum := 0
+	for _, event := range testEvents {
+		sum := estimateHistorySize(logger, event)
+		historySizeSum += sum
+	}
+	trueSize := len(testEvents)*historySizeEstimationBuffer + len(byteArray)*2*len(testEvents)
+	assert.Equal(t, trueSize, historySizeSum)
+}
+
+func TestProcessQuery_KnownQueryTypes(t *testing.T) {
+	rootCtx := setWorkflowEnvOptionsIfNotExist(Background())
+	eo := getWorkflowEnvOptions(rootCtx)
+	eo.queryHandlers["a"] = nil
+
+	weh := &workflowExecutionEventHandlerImpl{
+		workflowEnvironmentImpl: &workflowEnvironmentImpl{
+			dataConverter: DefaultDataConverter,
+		},
+		workflowDefinition: &syncWorkflowDefinition{
+			rootCtx: rootCtx,
+		},
+	}
+
+	result, err := weh.ProcessQuery(QueryTypeQueryTypes, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, "[\"__open_sessions\",\"__query_types\",\"__stack_trace\",\"a\"]\n", string(result))
 }

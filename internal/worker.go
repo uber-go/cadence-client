@@ -128,6 +128,9 @@ type (
 		// default: default identity that include hostname, groupName and process ID.
 		Identity string
 
+		// Optional: Defines the 'zone' or the failure group that the worker belongs to
+		IsolationGroup string
+
 		// Optional: Metrics to be reported. Metrics emitted by the cadence client are not prometheus compatible by
 		// default. To ensure metrics are compatible with prometheus make sure to create tally scope with sanitizer
 		// options set.
@@ -259,6 +262,34 @@ type (
 		// Optional: Authorization interface to get the Auth Token
 		// default: No provider
 		Authorization auth.AuthorizationProvider
+
+		// Optional: Host is just string on the machine running the client
+		// default: empty string
+		Host string
+
+		// Optional: See WorkerBugPorts for more details
+		//
+		// Deprecated: All bugports are always deprecated and may be removed at any time.
+		WorkerBugPorts WorkerBugPorts
+	}
+
+	// WorkerBugPorts allows opt-in enabling of older, possibly buggy behavior, primarily intended to allow temporarily
+	// emulating old behavior until a fix is deployed.
+	// By default, bugs (especially rarely-occurring ones) are fixed and all users are opted into the new behavior.
+	// Back-ported buggy behavior *may* be available via these flags.
+	//
+	// Bugports are always deprecated and may be removed in future versions.
+	// Generally speaking they will *likely* remain in place for one minor version, and then they may be removed to
+	// allow cleaning up the additional code complexity that they cause.
+	// Deprecated: All bugports are always deprecated and may be removed at any time
+	WorkerBugPorts struct {
+		// Optional: Disable strict non-determinism checks for workflow.
+		// There are some non-determinism cases which are missed by original implementation and a fix is on the way.
+		// The fix will be toggleable by this parameter.
+		// Default: false, which means strict non-determinism checks are enabled.
+		//
+		// Deprecated: All bugports are always deprecated and may be removed at any time
+		DisableStrictNonDeterminismCheck bool
 	}
 )
 

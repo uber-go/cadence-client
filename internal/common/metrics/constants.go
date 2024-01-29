@@ -107,4 +107,16 @@ const (
 	ReplayFailedCounter  = CadenceMetricsPrefix + "replay-failed"
 	ReplaySkippedCounter = CadenceMetricsPrefix + "replay-skipped"
 	ReplayLatency        = CadenceMetricsPrefix + "replay-latency"
+
+	NumCPUCores     = CadenceMetricsPrefix + "num-cpu-cores"
+	CPUPercentage   = CadenceMetricsPrefix + "cpu-percentage"
+	TotalMemory     = CadenceMetricsPrefix + "total-memory"
+	MemoryUsedHeap  = CadenceMetricsPrefix + "memory-used-heap"
+	MemoryUsedStack = CadenceMetricsPrefix + "memory-used-stack"
+	NumGoRoutines   = CadenceMetricsPrefix + "num-go-routines"
+
+	EstimatedHistorySize  = CadenceMetricsPrefix + "estimated-history-size"
+	ServerSideHistorySize = CadenceMetricsPrefix + "server-side-history-size"
+	ConcurrentTaskQuota      = CadenceMetricsPrefix + "concurrent-task-quota"
+	PollerRequestBufferUsage = CadenceMetricsPrefix + "poller-request-buffer-usage"
 )

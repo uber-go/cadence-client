@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2021 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,18 +18,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package cadence
+package isolationgroup
 
-import "go.uber.org/cadence/internal"
+import (
+	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
+	internal "go.uber.org/cadence/internal/common/isolationgroup"
+)
 
-// LibraryVersion is a historical way to report the "library release" version,
-// prior to go modules providing a far more consistent way to do so.
-// It is sent in a header on every request.
-//
-// deprecated: For your own library-version reporting, use the go module version
-// in your build instead, e.g. from runtime/debug.ReadBuildInfo().
-// This may drift from the module version, does not report pre-release information,
-// and should only be used as a fallback.
-//
-// This may be removed or changed in a future version.
-const LibraryVersion = internal.LibraryVersion
+// NewIsolationGroupWrapper creates a client wrapper that sets isolation group header for all requests to cadence server
+func NewIsolationGroupWrapper(service workflowserviceclient.Interface, isolationGroup string) workflowserviceclient.Interface {
+	return internal.NewWorkflowServiceWrapper(service, isolationGroup)
+}

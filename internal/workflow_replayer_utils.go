@@ -1,15 +1,34 @@
+// Copyright (c) 2017-2021 Uber Technologies Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package internal
 
 import (
 	"bytes"
-	"fmt"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common/util"
 	"reflect"
 	"strings"
+
+	s "go.uber.org/cadence/.gen/go/shared"
 )
 
-func matchReplayWithHistory(replayDecisions []*s.Decision, historyEvents []*s.HistoryEvent) error {
+func matchReplayWithHistory(info *WorkflowInfo, replayDecisions []*s.Decision, historyEvents []*s.HistoryEvent) error {
 	di := 0
 	hi := 0
 	hSize := len(historyEvents)
@@ -39,16 +58,15 @@ matchLoop:
 		}
 
 		if d == nil {
-			return fmt.Errorf("nondeterministic workflow: missing replay decision for %s", util.HistoryEventToString(e))
+			return NewNonDeterminsticError("missing replay decision", info, e, nil)
 		}
 
 		if e == nil {
-			return fmt.Errorf("nondeterministic workflow: extra replay decision for %s", util.DecisionToString(d))
+			return NewNonDeterminsticError("extra replay decision", info, nil, d)
 		}
 
 		if !isDecisionMatchEvent(d, e, false) {
-			return fmt.Errorf("nondeterministic workflow: history event is %s, replay decision is %s",
-				util.HistoryEventToString(e), util.DecisionToString(d))
+			return NewNonDeterminsticError("mismatch", info, e, d)
 		}
 
 		di++

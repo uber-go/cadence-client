@@ -117,7 +117,7 @@ type (
 		service        workflowserviceclient.Interface
 		metricsScope   tally.Scope
 		startedEventID int64
-		maxEventID     int64
+		maxEventID     int64 // Equivalent to History Count
 		featureFlags   FeatureFlags
 	}
 
@@ -330,7 +330,6 @@ func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
 		})
 		return nil
 	}
-
 	doneCh := make(chan struct{})
 	laResultCh := make(chan *localActivityResult)
 	// close doneCh so local activity worker won't get blocked forever when trying to send back result to laResultCh.
@@ -341,6 +340,7 @@ func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
 		startTime := time.Now()
 		task.doneCh = doneCh
 		task.laResultCh = laResultCh
+		// Process the task.
 		completedRequest, err := wtp.taskHandler.ProcessWorkflowTask(
 			task,
 			func(response interface{}, startTime time.Time) (*workflowTask, error) {
@@ -895,6 +895,11 @@ func (h *historyIteratorImpl) Reset() {
 
 func (h *historyIteratorImpl) HasNextPage() bool {
 	return h.nextPageToken != nil
+}
+
+// GetHistoryCount returns History Event Count of current history (aka maxEventID)
+func (h *historyIteratorImpl) GetHistoryCount() int64 {
+	return h.maxEventID
 }
 
 func newGetHistoryPageFunc(

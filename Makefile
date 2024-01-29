@@ -365,6 +365,7 @@ unit_test: $(ALL_SRC) ## run all unit tests
 		go test "$$dir" $(TEST_ARG) -coverprofile=$(COVER_ROOT)/"$$dir"/cover.out || failed=1; \
 		cat $(COVER_ROOT)/"$$dir"/cover.out | grep -v "mode: atomic" >> $(UT_COVER_FILE); \
 	done; \
+	cat $(UT_COVER_FILE) > .build/cover.out;
 	exit $$failed
 
 integ_test_sticky_off: $(ALL_SRC)

@@ -57,6 +57,7 @@ func callOptions() []interface{} {
 		gomock.Any(), // feature version
 		gomock.Any(), // client name
 		gomock.Any(), // feature flags
+		gomock.Any(), // isolation group
 	}
 }
 
@@ -176,6 +177,7 @@ func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
 	workflowWorker := internal.NewWorker(s.service, "test-domain", "tasklist", worker.Options{
 		DisableActivityWorker: true,
 		Logger:                zaptest.NewLogger(s.T()),
+		IsolationGroup:        "zone-1",
 	})
 	// this is an arbitrary workflow we use for this test
 	// NOTE: a simple helloworld that doesn't execute an activity

@@ -364,6 +364,7 @@ func (env *testWorkflowEnvironmentImpl) newTestWorkflowEnvironmentForChild(param
 	childEnv.workerOptions = env.workerOptions
 	childEnv.workflowInterceptors = env.workflowInterceptors
 	childEnv.workerOptions.DataConverter = params.dataConverter
+	childEnv.workflowInterceptors = env.workflowInterceptors
 	childEnv.registry = env.registry
 
 	if params.workflowID == "" {

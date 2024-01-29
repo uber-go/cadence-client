@@ -36,6 +36,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/cadence/internal/common/isolationgroup"
@@ -792,7 +793,7 @@ func (aw *aggregatedWorker) RegisterActivityWithOptions(a interface{}, options R
 }
 
 func (aw *aggregatedWorker) Start() error {
-	if err := initBinaryChecksum(); err != nil {
+	if _, err := initBinaryChecksum(); err != nil {
 		return fmt.Errorf("failed to get executable checksum: %v", err)
 	}
 
@@ -874,38 +875,33 @@ func (aw *aggregatedWorker) Start() error {
 	return nil
 }
 
-var binaryChecksum string
+var binaryChecksum atomic.Value
 var binaryChecksumLock sync.Mutex
 
 // SetBinaryChecksum set binary checksum
 func SetBinaryChecksum(checksum string) {
+	binaryChecksum.Store(checksum)
+}
+
+func initBinaryChecksum() (string, error) {
+	// initBinaryChecksum may be called multiple times concurrently during worker startup.
+	// To avoid reading and hashing the contents of the binary multiple times acquire mutex here.
 	binaryChecksumLock.Lock()
 	defer binaryChecksumLock.Unlock()
 
-	binaryChecksum = checksum
-}
-
-func initBinaryChecksum() error {
-	binaryChecksumLock.Lock()
-	defer binaryChecksumLock.Unlock()
-
-	return initBinaryChecksumLocked()
-}
-
-// callers MUST hold binaryChecksumLock before calling
-func initBinaryChecksumLocked() error {
-	if len(binaryChecksum) > 0 {
-		return nil
+	// check if binaryChecksum already set/initialized.
+	if bcsVal, ok := binaryChecksum.Load().(string); ok {
+		return bcsVal, nil
 	}
 
 	exec, err := os.Executable()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	f, err := os.Open(exec)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func() {
 		_ = f.Close() // error is unimportant as it is read-only
@@ -913,27 +909,28 @@ func initBinaryChecksumLocked() error {
 
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return err
+		return "", err
 	}
 
 	checksum := h.Sum(nil)
-	binaryChecksum = hex.EncodeToString(checksum[:])
+	bcsVal := hex.EncodeToString(checksum[:])
+	binaryChecksum.Store(bcsVal)
 
-	return nil
+	return bcsVal, err
 }
 
 func getBinaryChecksum() string {
-	binaryChecksumLock.Lock()
-	defer binaryChecksumLock.Unlock()
-
-	if len(binaryChecksum) == 0 {
-		err := initBinaryChecksumLocked()
-		if err != nil {
-			panic(err)
-		}
+	bcsVal, ok := binaryChecksum.Load().(string)
+	if ok {
+		return bcsVal
 	}
 
-	return binaryChecksum
+	bcsVal, err := initBinaryChecksum()
+	if err != nil {
+		panic(err)
+	}
+
+	return bcsVal
 }
 
 func (aw *aggregatedWorker) Run() error {
@@ -1044,7 +1041,7 @@ func newAggregatedWorker(
 	var workflowWorker *workflowWorker
 	if !wOptions.DisableWorkflowWorker {
 		testTags := getTestTags(wOptions.BackgroundActivityContext)
-		if testTags != nil && len(testTags) > 0 {
+		if len(testTags) > 0 {
 			workflowWorker = newWorkflowWorkerWithPressurePoints(
 				service,
 				domain,

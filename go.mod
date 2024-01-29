@@ -15,7 +15,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/stretchr/testify v1.8.1
 	github.com/uber-go/tally v3.3.15+incompatible
-	github.com/uber/cadence-idl v0.0.0-20230131090243-b690237fffaa
+	github.com/uber/cadence-idl v0.0.0-20230905165949-03586319b849
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/tchannel-go v1.32.1
 	go.uber.org/atomic v1.9.0
@@ -65,4 +65,49 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.3.2 // indirect
+)
+
+retract (
+	v1.2.5 // Published accidentally
+	v1.2.4 // Published accidentally
+	v1.2.3 // Published accidentally
+	v1.2.2 // Published accidentally
+	v1.2.1 // Published accidentally
+	v0.25.0 // Published accidentally
+	v0.24.0 // Published accidentally
+	v0.23.2 // Published accidentally
+	v0.23.1 // Published accidentally
+	v0.22.4 // Published accidentally
+	v0.22.3 // Published accidentally
+	v0.22.2 // Published accidentally
+	v0.22.1 // Published accidentally
+	v0.22.0 // Published accidentally
+	v0.21.3 // Published accidentally
+	v0.21.2 // Published accidentally
+	v0.21.0 // Published accidentally
+	v0.20.0 // Published accidentally
+	v0.19.2 // Published accidentally
+	v0.18.0 // Published accidentally
+	v0.16.1 // Published accidentally
+	v0.15.1 // Published accidentally
+	v0.14.2 // Published accidentally
+	v0.10.3 // Published accidentally
+	v0.10.2 // Published accidentally
+	v0.5.5 // Published accidentally
+	v0.5.4 // Published accidentally
+	v0.5.3 // Published accidentally
+	v0.3.15 // Published accidentally
+	v0.3.14 // Published accidentally
+	v0.3.13 // Published accidentally
+	v0.3.12 // Published accidentally
+	v0.3.11 // Published accidentally
+	v0.3.9 // Published accidentally
+	v0.3.8 // Published accidentally
+	v0.3.7 // Published accidentally
+	v0.3.6 // Published accidentally
+	v0.3.5 // Published accidentally
+	v0.3.4 // Published accidentally
+	v0.3.3 // Published accidentally
+	v0.3.0 // Published accidentally
+	v0.2.0 // Published accidentally
 )

@@ -108,6 +108,9 @@ type (
 		// Executed after all history events since the previous decision are applied to workflowDefinition
 		OnDecisionTaskStarted()
 		StackTrace() string // Stack trace of all coroutines owned by the Dispatcher instance
+
+		// KnownQueryTypes returns a list of known query types of the workflowOptions with BuiltinQueryTypes
+		KnownQueryTypes() []string
 		Close()
 	}
 
@@ -216,11 +219,7 @@ func (bw *baseWorker) Start() {
 	go bw.runTaskDispatcher()
 
 	// We want the emit function run once per host instead of run once per worker
-	//collectHardwareUsageOnce.Do(func() {
-	//	bw.shutdownWG.Add(1)
-	//	go bw.emitHardwareUsage()
-	//})
-
+	// since the emit function is host level metric.
 	bw.shutdownWG.Add(1)
 	go bw.emitHardwareUsage()
 
@@ -252,6 +251,10 @@ func (bw *baseWorker) runPoller() {
 		case <-bw.shutdownCh:
 			return
 		case <-bw.pollerRequestCh:
+			bw.metricsScope.Gauge(metrics.ConcurrentTaskQuota).Update(float64(cap(bw.pollerRequestCh)))
+			// This metric is used to monitor how many poll requests have been allocated
+			// and can be used to approximate number of concurrent task running (not pinpoint accurate)
+			bw.metricsScope.Gauge(metrics.PollerRequestBufferUsage).Update(float64(cap(bw.pollerRequestCh) - len(bw.pollerRequestCh)))
 			if bw.sessionTokenBucket != nil {
 				bw.sessionTokenBucket.waitForAvailableToken()
 			}

@@ -223,6 +223,7 @@ func PollForDecisionTaskResponse(t *apiv1.PollForDecisionTaskResponse) *shared.P
 		StartedTimestamp:          timeToUnixNano(t.StartedTime),
 		Queries:                   WorkflowQueryMap(t.Queries),
 		NextEventId:               &t.NextEventId,
+		TotalHistoryBytes:         &t.TotalHistoryBytes,
 	}
 }
 

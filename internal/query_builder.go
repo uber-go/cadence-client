@@ -70,11 +70,14 @@ var (
 )
 
 type (
-	// QueryBuilder builds visibility query
+	// QueryBuilder builds visibility query. It's shadower's own Query builders that processes the shadow filter
+	// options into a query to pull t he required workflows.
+
 	QueryBuilder interface {
 		WorkflowTypes([]string) QueryBuilder
 		WorkflowStatus([]WorkflowStatus) QueryBuilder
 		StartTime(time.Time, time.Time) QueryBuilder
+		CloseTime(time.Time, time.Time) QueryBuilder
 		Build() string
 	}
 
@@ -128,6 +131,19 @@ func (q *queryBuilderImpl) StartTime(minStartTime, maxStartTime time.Time) Query
 	}
 
 	q.appendPartialQuery(strings.Join(startTimeQueries, " and "))
+	return q
+}
+
+func (q *queryBuilderImpl) CloseTime(minCloseTime, maxCloseTime time.Time) QueryBuilder {
+	CloseTimeQueries := make([]string, 0, 2)
+	if !minCloseTime.IsZero() {
+		CloseTimeQueries = append(CloseTimeQueries, fmt.Sprintf(keyCloseTime+` >= %v`, minCloseTime.UnixNano()))
+	}
+	if !maxCloseTime.Equal(maxTimestamp) {
+		CloseTimeQueries = append(CloseTimeQueries, fmt.Sprintf(keyCloseTime+` <= %v`, maxCloseTime.UnixNano()))
+	}
+
+	q.appendPartialQuery(strings.Join(CloseTimeQueries, " and "))
 	return q
 }
 

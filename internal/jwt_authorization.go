@@ -29,6 +29,8 @@ import (
 	"go.uber.org/cadence/internal/common/util"
 )
 
+const internalIssuer = "internal-jwt"
+
 type JWTAuthProvider struct {
 	PrivateKey []byte
 }
@@ -48,7 +50,7 @@ func (j *JWTAuthProvider) GetAuthToken() ([]byte, error) {
 	ttl := int64(60 * 10)
 	claims := auth.JWTClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    auth.JWTInternalIssuer,
+			Issuer:    internalIssuer,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Second * time.Duration(ttl))),
 		},

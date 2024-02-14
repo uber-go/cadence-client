@@ -22,17 +22,15 @@ package auth
 
 import (
 	"context"
+
 	"github.com/golang-jwt/jwt/v5"
-
-	"go.uber.org/yarpc"
-
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/yarpc"
 )
 
 const (
-	jwtHeaderName     = "cadence-authorization"
-	JWTInternalIssuer = "internal-jwt"
+	jwtHeaderName = "cadence-authorization"
 )
 
 type workflowServiceAuthWrapper struct {

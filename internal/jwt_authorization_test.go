@@ -21,11 +21,11 @@
 package internal
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/util"
 )

@@ -1360,7 +1360,7 @@ func Test_augmentWorkerOptions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, augmentWorkerOptions(tt.args.options), "augmentWorkerOptions(%v)", tt.args.options)
+			assert.Equalf(t, tt.want, AugmentWorkerOptions(tt.args.options), "AugmentWorkerOptions(%v)", tt.args.options)
 		})
 	}
 }

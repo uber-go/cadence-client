@@ -356,3 +356,9 @@ func SetBinaryChecksum(checksum string) {
 func NewAdminJwtAuthorizationProvider(privateKey []byte) AuthorizationProvider {
 	return internal.NewAdminJwtAuthorizationProvider(privateKey)
 }
+
+// AugmentWorkerOptions fill all unset worker Options fields with their default values
+// Use as getter for default worker options
+func AugmentWorkerOptions(options Options) Options {
+	return internal.AugmentWorkerOptions(options)
+}

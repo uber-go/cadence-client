@@ -1175,7 +1175,7 @@ func getRetryBackoffFromThriftRetryPolicy(tp *shared.RetryPolicy, attempt int32,
 
 func (env *testWorkflowEnvironmentImpl) ExecuteLocalActivity(params executeLocalActivityParams, callback laResultHandler) *localActivityInfo {
 	activityID := getStringID(env.nextID())
-	wOptions := augmentWorkerOptions(env.workerOptions)
+	wOptions := AugmentWorkerOptions(env.workerOptions)
 	ae := &activityExecutor{name: getActivityFunctionName(env.registry, params.ActivityFn), fn: params.ActivityFn}
 	if at, _ := getValidatedActivityFunction(params.ActivityFn, params.InputArgs, env.registry); at != nil {
 		// local activity could be registered, if so use the registered name. This name is only used to find a mock.
@@ -1623,7 +1623,7 @@ func (m *mockWrapper) executeMockWithActualArgs(ctx interface{}, inputArgs []int
 }
 
 func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList string, dataConverter DataConverter) ActivityTaskHandler {
-	wOptions := augmentWorkerOptions(env.workerOptions)
+	wOptions := AugmentWorkerOptions(env.workerOptions)
 	wOptions.DataConverter = dataConverter
 	params := workerExecutionParameters{
 		WorkerOptions:     wOptions,

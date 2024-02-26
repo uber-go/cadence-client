@@ -99,6 +99,23 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Partial_WithDecisionEv
 	s.NoError(err)
 }
 
+// This test case covers partial decision scenario where a decision is started but not closed
+// History:
+//
+//	1: WorkflowExecutionStarted
+//	2: DecisionTaskScheduled
+//	3: DecisionTaskStarted
+//	4: DecisionTaskFailed
+//	5: DecisionTaskScheduled
+//	6: DecisionTaskStarted
+//
+// Notes on task handling logic during replay:
+//
+//	reorderedHistory.NextDecisionEvents() ignores events 2, 3, 4 because it failed.
+//	it only returns 1 and 6 to be replayed.
+//	6 changes the state in decisionsHelper (generates a decision) however there's no corresponding
+//	respond due to missing close event (failed/complete etc.)
+//	Such partial decisions at the end of the history is ignored during replay tests to avoid non-determinism error
 func (s *workflowReplayerSuite) TestReplayWorkflowHistory_Partial_NoDecisionEvents() {
 	err := s.replayer.ReplayWorkflowHistory(s.logger, getTestReplayWorkflowPartialHistoryNoDecisionEvents(s.T()))
 	s.NoError(err)

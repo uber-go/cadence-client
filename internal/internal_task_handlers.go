@@ -262,6 +262,28 @@ func isDecisionEvent(eventType s.EventType) bool {
 	}
 }
 
+// isDecisionEventForReplay is different from isDecisionEvent because during replays
+// we want to intentionally ignore workflow complete/fail/cancel/continueasnew events so that
+// decision tree replays matches with the workflow processing respond tasks
+func isDecisionEventForReplay(eventType s.EventType) bool {
+	switch eventType {
+	case
+		s.EventTypeActivityTaskScheduled,
+		s.EventTypeActivityTaskCancelRequested,
+		s.EventTypeTimerStarted,
+		s.EventTypeTimerCanceled,
+		s.EventTypeCancelTimerFailed,
+		s.EventTypeMarkerRecorded,
+		s.EventTypeStartChildWorkflowExecutionInitiated,
+		s.EventTypeRequestCancelExternalWorkflowExecutionInitiated,
+		s.EventTypeSignalExternalWorkflowExecutionInitiated,
+		s.EventTypeUpsertWorkflowSearchAttributes:
+		return true
+	default:
+		return false
+	}
+}
+
 // NextDecisionEvents returns events that there processed as new by the next decision.
 // TODO(maxim): Refactor to return a struct instead of multiple parameters
 func (eh *history) NextDecisionEvents() (result []*s.HistoryEvent, markers []*s.HistoryEvent, binaryChecksum *string, err error) {
@@ -840,6 +862,19 @@ process_Workflow_Loop:
 	return response, err
 }
 
+// ProcessWorkflowTask processes the given workflow which includes
+// - fetching, reordering and replaying historical decision events. (Decision events in this context is an umbrella term for workflow relevant events)
+// - state machine is incrementally built with every decision.
+// - state machine makes sure that when a workflow restarts for some reason same activities (or timers etc.) are not called again and previous result state is loaded into memory
+//
+// Note about Replay tests mode:
+//
+//	This mode works by replaying the historical decision events responses (as defined in isDecisionEventForReplay())
+//	and comparing these with the replays gotten from state machine
+//
+//	Compared to isDecisionEvent(), isDecisionEventForReplay() omits the following events even though they are workflow relevant respond events:
+//		complete/failed/cancel/continueasnew
+//	The reason is that state machine doesn't have a correspondong decision for these so they cause false positive non-determinism errors in Replay tests.
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflowTask) (interface{}, error) {
 	task := workflowTask.task
 	historyIterator := workflowTask.historyIterator
@@ -899,8 +934,16 @@ ProcessEvents:
 		for i, event := range reorderedEvents {
 			isInReplay := reorderedHistory.IsReplayEvent(event)
 			isLast := !isInReplay && i == len(reorderedEvents)-1
-			if !skipReplayCheck && isDecisionEvent(event.GetEventType()) {
-				respondEvents = append(respondEvents, event)
+			if !skipReplayCheck {
+				isDecisionEventFn := isDecisionEvent
+				// when strict nondeterminism is enabled we use a different function to check for decision events during replay
+				if !w.wth.disableStrictNonDeterminism && isInReplay {
+					isDecisionEventFn = isDecisionEventForReplay
+				}
+
+				if isDecisionEventFn(event.GetEventType()) {
+					respondEvents = append(respondEvents, event)
+				}
 			}
 
 			if isPreloadMarkerEvent(event) {
@@ -918,7 +961,16 @@ ProcessEvents:
 			if err != nil {
 				return nil, err
 			}
-			if w.isWorkflowCompleted {
+
+			// Break the event processing loop if either
+			//  - Workflow is completed AND strict nondeterminism checks disabled.
+			//  - Workflow is completed AND strict nondeterminism checks enabled AND NOT in replay mode.
+			// 		With strict nondeterminism checks enabled, breaking the loop early causes missing events
+			// 		in respondEvents which then causes false positives or false negatives.
+			stopProcessing := (w.isWorkflowCompleted && w.wth.disableStrictNonDeterminism) ||
+				(w.isWorkflowCompleted && !w.wth.disableStrictNonDeterminism && !isInReplay)
+
+			if stopProcessing {
 				break ProcessEvents
 			}
 		}
@@ -936,6 +988,9 @@ ProcessEvents:
 			}
 		}
 		isReplay := len(reorderedEvents) > 0 && reorderedHistory.IsReplayEvent(reorderedEvents[len(reorderedEvents)-1])
+		// incomplete decisions (e.g. start without a complete) at the end of history will still have decisions in decisionsHelper
+		// but there won't be corresponding respond events. This breaks the non-determinism check therefore we ignore such final partial decisions.
+		// Example scenario is covered by TestReplayWorkflowHistory_Partial_NoDecisionEvents
 		lastDecisionEventsForReplayTest := isReplayTest && !reorderedHistory.HasNextDecisionEvents()
 		if isReplay && !lastDecisionEventsForReplayTest {
 			eventDecisions := eventHandler.decisionsHelper.getDecisions(true)

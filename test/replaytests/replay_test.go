@@ -35,6 +35,7 @@ import (
 	"go.uber.org/cadence/workflow"
 )
 
+// Basic happy paths
 func TestReplayWorkflowHistoryFromFile(t *testing.T) {
 	for _, testFile := range []string{"basic.json", "basic_new.json", "version.json", "version_new.json"} {
 		t.Run("replay_"+strings.Split(testFile, ".")[0], func(t *testing.T) {
@@ -48,6 +49,7 @@ func TestReplayWorkflowHistoryFromFile(t *testing.T) {
 	}
 }
 
+// Child workflow happy path
 func TestReplayChildWorkflowBugBackport(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterWorkflowWithOptions(childWorkflow, workflow.RegisterOptions{Name: "child"})
@@ -62,9 +64,10 @@ func TestGreetingsWorkflowforActivity(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflowActivity, workflow.RegisterOptions{Name: "greetings"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
-	require.Error(t, err)
+	assert.ErrorContains(t, err, "nondeterministic workflow: mismatching history event and replay decision found")
 }
 
+// Simple greeting workflow with 3 activities executed sequentially: getGreetingsActivity, getNameActivity, sayGreetingsActivity
 func TestGreetingsWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterWorkflowWithOptions(greetingsWorkflow, workflow.RegisterOptions{Name: "greetings"})
@@ -72,7 +75,7 @@ func TestGreetingsWorkflow(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// Should have failed but passed. Maybe, because the result recorded in history still matches the return type of the workflow.
+// Return types of activity change is not considered non-determinism (at least for now) so this test doesn't find non-determinism error
 func TestGreetingsWorkflow3(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterActivityWithOptions(getNameActivity3, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
@@ -81,92 +84,110 @@ func TestGreetingsWorkflow3(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// Fails because the expected signature was different from history.
-func TestGreetingsWorkflow4(t *testing.T) {
+// The recorded history has following activities in this order:  main.getOrderActivity, main.orderBananaActivity
+// This test runs a version of choice workflow which does the exact same thing so no errors expected.
+func TestExclusiveChoiceWorkflowSuccess(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-	replayer.RegisterActivityWithOptions(getNameActivity4, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
-	replayer.RegisterWorkflowWithOptions(greetingsWorkflow4, workflow.RegisterOptions{Name: "greetings"})
-	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
-	require.Error(t, err)
+	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflow, workflow.RegisterOptions{Name: "choice"})
+	replayer.RegisterActivityWithOptions(getBananaOrderActivity, activity.RegisterOptions{Name: "main.getOrderActivity"})
+	replayer.RegisterActivityWithOptions(orderBananaActivity, activity.RegisterOptions{Name: "main.orderBananaActivity"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
+	require.NoError(t, err)
 }
 
-// Panic with failed to register activity. This passes in cadence_samples because it's registered in Helper.
-// To test it on cadence_samples change the https://github.com/uber-common/cadence-samples/blob/master/cmd/samples/recipes/greetings/greetings_workflow.go
-// to include the extra return types in getNameActivity.
-func TestGreetingsWorkflow2(t *testing.T) {
-
-	t.Skip("Panic with failed to register activity. Here the activity returns incompatible arguments so the test should fail")
+// The recorded history has following activities in this order:  main.getOrderActivity, main.orderBananaActivity
+// This test runs a version of choice workflow which does the exact same thing but the activities are not registered.
+// It doesn't matter for replayer so no exceptions expected.
+// The reason is that activity result decoding logic just passes the result back to the given pointer
+func TestExclusiveChoiceWorkflowActivitiyRegistrationMissing(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-	replayer.RegisterActivityWithOptions(getNameActivity2, activity.RegisterOptions{Name: "main.getNameActivity", DisableAlreadyRegisteredCheck: true})
-	replayer.RegisterWorkflowWithOptions(greetingsWorkflow2, workflow.RegisterOptions{Name: "greetings"})
-	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "greetings.json")
-	require.Error(t, err)
-}
-
-// Ideally replayer doesn't concern itself with the change in the activity content until it matches the expected output type.
-// History has recorded the output of banana activity instead. The replayer should have failed because we have not registered any
-// activity here in the test.
-// The replayer still runs whatever it found in the history and passes.
-func TestExclusiveChoiceWorkflowWithUnregisteredActivity(t *testing.T) {
-	replayer := worker.NewWorkflowReplayer()
-
 	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflow, workflow.RegisterOptions{Name: "choice"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
 	require.NoError(t, err)
 }
 
-// This test registers Cherry Activity as the activity but calls Apple activity in the workflow code. Infact, Cherry and Banana
-// activities are not even a part of the workflow code in question.
-// History has recorded the output of banana activity. Here, The workflow is not waiting for the activity so it doesn't notice
-// that registered activity is different from executed activity.
-// The replayer relies on whatever is recorded in the History so as long as the main activity name in the options matched partially
-// it doesn't raise errors.
-func TestExclusiveChoiceWorkflowWithDifferentActvityCombo(t *testing.T) {
+// The recorded history has following activities in this order:  main.getOrderActivity, main.orderBananaActivity
+// This test runs a version of choice workflow which registers a single return parameter function for main.getOrderActivity
+// - Original main.getOrderActivity signature: func() (string, error)
+// - New main.getOrderActivity signature: func() error
+//
+// In this case result of main.getOrderActivity from history is not passed back to the given pointer by the workflow.
+// Compared to the activity registration missing scenario (above case) this is a little bit weird behavior.
+// The workflow code continues with orderChoice="" instead of "banana". Therefore it doesn't invoke 2nd activity main.getOrderActivity.
+// This means history has more events then replay decisions which causes non-determinism error
+func TestExclusiveChoiceWorkflowWithActivitySignatureChange(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-
-	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflow2, workflow.RegisterOptions{Name: "choice"})
-	replayer.RegisterActivityWithOptions(getAppleOrderActivity, activity.RegisterOptions{Name: "main.getOrderActivity"})
-	replayer.RegisterActivityWithOptions(orderAppleActivity, activity.RegisterOptions{Name: "testactivity"})
+	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflow, workflow.RegisterOptions{Name: "choice"})
+	replayer.RegisterActivityWithOptions(func() error { return nil }, activity.RegisterOptions{Name: "main.getOrderActivity"})
+	replayer.RegisterActivityWithOptions(orderBananaActivity, activity.RegisterOptions{Name: "main.orderBananaActivity"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
-	require.NoError(t, err)
+	assert.ErrorContains(t, err, "nondeterministic workflow: missing replay decision")
 }
 
+// The recorded history has following activities in this order:   main.getOrderActivity, main.orderBananaActivity
+// This test runs a version of choice workflow which calls main.getOrderActivity and then calls the main.orderCherryActivity.
+// The replayer will find non-determinism because of mismatch between replay decision and history (banana vs cherry)
+func TestExclusiveChoiceWorkflowWithMismatchingActivity(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	replayer.RegisterWorkflowWithOptions(exclusiveChoiceWorkflowAlwaysCherry, workflow.RegisterOptions{Name: "choice"})
+	replayer.RegisterActivityWithOptions(getBananaOrderActivity, activity.RegisterOptions{Name: "main.getOrderActivity"})
+	replayer.RegisterActivityWithOptions(orderCherryActivity, activity.RegisterOptions{Name: "main.orderCherryActivity"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "choice.json")
+	assert.ErrorContains(t, err, "nondeterministic workflow: mismatching history event and replay decision found")
+}
+
+// Branch workflow happy case.
+// It branches out to 3 open activities and then they complete.
 func TestBranchWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-
 	replayer.RegisterWorkflowWithOptions(sampleBranchWorkflow, workflow.RegisterOptions{Name: "branch"})
-
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch.json")
 	require.NoError(t, err)
 }
 
-// Fails with a non deterministic error because there was an additional unexpected branch. Decreasing the number of branches will
-// also fail the test because the history expects the same number of branches executing the activity.
+// Branch workflow normal history file is replayed against modified workflow code which
+// has 2 branches only.  This causes nondetereministic error.
 func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-
 	replayer.RegisterWorkflowWithOptions(sampleBranchWorkflow2, workflow.RegisterOptions{Name: "branch"})
-
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch.json")
-	assert.ErrorContains(t, err, "nondeterministic workflow")
+	assert.ErrorContains(t, err, "nondeterministic workflow: missing replay decision")
 }
 
-func TestParallel(t *testing.T) {
+// TestSequentialStepsWorkflow replays a history with 2 sequential non overlapping activity calls (one completes before the other is scheduled)
+// and runs it against new version of the workflow code which only calls 1 activity.
+// This is considered as non-determinism error.
+func TestSequentialStepsWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
+	replayer.RegisterWorkflowWithOptions(replayerHelloWorldWorkflow, workflow.RegisterOptions{Name: "fx.ReplayerHelloWorldWorkflow"})
+	replayer.RegisterActivityWithOptions(replayerHelloWorldActivity, activity.RegisterOptions{Name: "replayerhello"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "sequential.json")
+	assert.ErrorContains(t, err, "nondeterministic workflow: missing replay decision")
+}
 
+// Runs simpleParallelWorkflow which starts two workflow.Go routines that executes 1 and 2 activities respectively.
+func TestSimpleParallelWorkflow(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterWorkflowWithOptions(sampleParallelWorkflow, workflow.RegisterOptions{Name: "branch2"})
-
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch2.json")
 	require.NoError(t, err)
 }
 
-// Should have failed since the first go routine has only one branch whereas the history has two branches.
-// The replayer totally misses this change.
-func TestParallel2(t *testing.T) {
+// Runs modified version of simpleParallelWorkflow which starts 1 less activity in the second workflow-gouroutine.
+// This is considered as non-determinism error.
+func TestSimpleParallelWorkflowWithMissingActivityCall(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-
 	replayer.RegisterWorkflowWithOptions(sampleParallelWorkflow2, workflow.RegisterOptions{Name: "branch2"})
-
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch2.json")
-	require.NoError(t, err)
+	assert.ErrorContains(t, err, "nondeterministic workflow: missing replay decision")
+}
+
+// Runs a history which ends with WorkflowExecutionContinuedAsNew. Replay fails because of the additional checks done
+// for continue as new case by replayWorkflowHistory().
+// This should not have any error because it's a valid continue as new case.
+func TestContinueAsNew(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	replayer.RegisterWorkflowWithOptions(ContinueAsNewWorkflow, workflow.RegisterOptions{Name: "fx.SimpleSignalWorkflow"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "continue_as_new.json")
+	assert.ErrorContains(t, err, "replay workflow doesn't return the same result as the last event")
 }

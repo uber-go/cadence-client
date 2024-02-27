@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [v1.2.8] - 2024-02-27
+- Support two-legged OAuth flow (#1304)
+- Expose method to get default worker options (#1311)
+- Added CloseTime filter to shadower (#1309)
+- Making Workflow and Activity registration optional when they are mocked (#1256)
+- Addressing difference in workflow interceptors when using the testkit (#1257)
+- remove time.Sleep from tests (#1305)
+
 ## [v1.2.7] - 2023-12-6
 ### Changed
 - Upgraded cassandra image to 4.1.3 in docker compose files #1301

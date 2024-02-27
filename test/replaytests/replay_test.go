@@ -156,11 +156,10 @@ func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 func TestSequentialStepsWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 
-	replayer.RegisterWorkflowWithOptions(sequantialStepsWorkflow, workflow.RegisterOptions{Name: "sequentialStepsWorkflow"})
-
-	// branch.json file contains history of a run with 3 activity calls
+	replayer.RegisterWorkflowWithOptions(replayerHelloWorldWorkflow, workflow.RegisterOptions{Name: "fx.ReplayerHelloWorldWorkflow"})
+	replayer.RegisterActivityWithOptions(replayerHelloWorldActivity, activity.RegisterOptions{Name: "replayerhello"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "sequential.json")
-	assert.ErrorContains(t, err, "nondeterministic workflow")
+	assert.NoError(t, err)
 }
 
 func TestParallel(t *testing.T) {
@@ -190,5 +189,5 @@ func TestContinueAsNew(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 	replayer.RegisterWorkflowWithOptions(ContinueAsNewWorkflow, workflow.RegisterOptions{Name: "fx.SimpleSignalWorkflow"})
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "continue_as_new.json")
-	assert.ErrorContains(t, err, "replay workflow doesn't return the same result as the last event")
+	assert.ErrorContains(t, err, "missing replay decision for WorkflowExecutionContinuedAsNew")
 }

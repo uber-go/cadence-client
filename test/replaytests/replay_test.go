@@ -151,6 +151,17 @@ func TestBranchWorkflowWithExtraBranch(t *testing.T) {
 	assert.ErrorContains(t, err, "nondeterministic workflow")
 }
 
+// TestSequentialStepsWorkflow replays a history with 2 sequential activity calls and runs it against new version of the workflow code which only calls 1 activity.
+// This should be considered as non-determinism error.
+func TestSequentialStepsWorkflow(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+
+	replayer.RegisterWorkflowWithOptions(replayerHelloWorldWorkflow, workflow.RegisterOptions{Name: "fx.ReplayerHelloWorldWorkflow"})
+	replayer.RegisterActivityWithOptions(replayerHelloWorldActivity, activity.RegisterOptions{Name: "replayerhello"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "sequential.json")
+	assert.NoError(t, err)
+}
+
 func TestParallel(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
 
@@ -169,4 +180,14 @@ func TestParallel2(t *testing.T) {
 
 	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "branch2.json")
 	require.NoError(t, err)
+}
+
+// Runs a history which ends with WorkflowExecutionContinuedAsNew. Replay fails because of the additional checks done
+// for continue as new case by replayWorkflowHistory().
+// This should not have any error because it's a valid continue as new case.
+func TestContinueAsNew(t *testing.T) {
+	replayer := worker.NewWorkflowReplayer()
+	replayer.RegisterWorkflowWithOptions(ContinueAsNewWorkflow, workflow.RegisterOptions{Name: "fx.SimpleSignalWorkflow"})
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(zaptest.NewLogger(t), "continue_as_new.json")
+	assert.ErrorContains(t, err, "missing replay decision for WorkflowExecutionContinuedAsNew")
 }

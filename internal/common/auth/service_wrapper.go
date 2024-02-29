@@ -23,10 +23,10 @@ package auth
 import (
 	"context"
 
-	"go.uber.org/yarpc"
-
+	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/yarpc"
 )
 
 const (
@@ -45,11 +45,12 @@ type AuthorizationProvider interface {
 }
 
 type JWTClaims struct {
+	jwt.RegisteredClaims
+
 	Sub    string
 	Name   string
 	Groups string // separated by space
 	Admin  bool
-	Iat    int64
 	TTL    int64
 }
 

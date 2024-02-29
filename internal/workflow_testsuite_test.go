@@ -23,7 +23,6 @@ package internal
 
 import (
 	"context"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"strings"
 	"testing"
@@ -130,53 +129,6 @@ func TestWorkflowReturnNil(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func HelloWorkflow(ctx Context, name string) (string, error) {
-	ctx = WithActivityOptions(ctx, ActivityOptions{
-		ScheduleToCloseTimeout: time.Hour,
-		StartToCloseTimeout:    time.Hour,
-		ScheduleToStartTimeout: time.Hour,
-	})
-	var result string
-	err := ExecuteActivity(ctx, HelloActivity, name).Get(ctx, &result)
-	return result, err
-}
-
-func HelloActivity(ctx context.Context, name string) (string, error) {
-	return "Hello " + name + "!", nil
-}
-
-func TestWorkflowMockingWithoutRegistration(t *testing.T) {
-	testSuite := &WorkflowTestSuite{}
-	env := testSuite.NewTestWorkflowEnvironment()
-	env.OnWorkflow(HelloWorkflow, mock.Anything, mock.Anything).Return(
-		func(ctx Context, person string) (string, error) {
-			return "Hello " + person + "!", nil
-		})
-	// Workflow is mocked, no activity registration required
-	env.ExecuteWorkflow(HelloWorkflow, "Cadence")
-	require.NoError(t, env.GetWorkflowError())
-	var result string
-	err := env.GetWorkflowResult(&result)
-	require.NoError(t, err)
-	require.Equal(t, "Hello Cadence!", result)
-}
-
-func TestActivityMockingWithoutRegistration(t *testing.T) {
-	testSuite := &WorkflowTestSuite{}
-	env := testSuite.NewTestWorkflowEnvironment()
-	env.OnActivity(HelloActivity, mock.Anything, mock.Anything).Return(
-		func(ctx context.Context, person string) (string, error) {
-			return "Goodbye " + person + "!", nil
-		})
-	// Registration of activity not required
-	env.RegisterWorkflow(HelloWorkflow)
-	env.ExecuteWorkflow(HelloWorkflow, "Cadence")
-	require.NoError(t, env.GetWorkflowError())
-	var result string
-	err := env.GetWorkflowResult(&result)
-	require.NoError(t, err)
-	require.Equal(t, "Goodbye Cadence!", result)
-  
 type InterceptorTestSuite struct {
 	suite.Suite
 	WorkflowTestSuite

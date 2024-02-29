@@ -220,6 +220,9 @@ type (
 
 	// AuthorizationProvider is the interface that contains the method to get the auth token
 	AuthorizationProvider = auth.AuthorizationProvider
+
+	// OAuthConfig allows to configure external OAuth token provider.
+	OAuthConfig = internal.OAuthAuthorizerConfig
 )
 
 const (
@@ -355,4 +358,15 @@ func SetBinaryChecksum(checksum string) {
 // NewAdminJwtAuthorizationProvider creates a JwtAuthorizationProvider instance.
 func NewAdminJwtAuthorizationProvider(privateKey []byte) AuthorizationProvider {
 	return internal.NewAdminJwtAuthorizationProvider(privateKey)
+}
+
+// NewOAuthAuthorizationProvider asks for a token from external OAuth provider
+func NewOAuthAuthorizationProvider(config OAuthConfig) AuthorizationProvider {
+	return internal.NewOAuthAuthorizationProvider(config)
+}
+
+// AugmentWorkerOptions fill all unset worker Options fields with their default values
+// Use as getter for default worker options
+func AugmentWorkerOptions(options Options) Options {
+	return internal.AugmentWorkerOptions(options)
 }

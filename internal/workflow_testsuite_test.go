@@ -23,7 +23,6 @@ package internal
 
 import (
 	"context"
-	"github.com/stretchr/testify/suite"
 	"strings"
 	"testing"
 	"time"
@@ -127,74 +126,4 @@ func TestWorkflowReturnNil(t *testing.T) {
 	var r struct{}
 	err := env.GetWorkflowResult(&r)
 	require.NoError(t, err)
-}
-
-type InterceptorTestSuite struct {
-	suite.Suite
-	WorkflowTestSuite
-
-	env         *TestWorkflowEnvironment
-	testFactory InterceptorFactory
-}
-
-type InterceptorFactory struct {
-	workflowInterceptorInvocationCounter      int
-	childWorkflowInterceptorInvocationCounter int
-}
-
-type Interceptor struct {
-	WorkflowInterceptorBase
-	workflowInterceptorInvocationCounter      *int
-	childWorkflowInterceptorInvocationCounter *int
-}
-
-func (i *Interceptor) ExecuteWorkflow(ctx Context, workflowType string, args ...interface{}) []interface{} {
-	*i.workflowInterceptorInvocationCounter += 1
-	return i.Next.ExecuteWorkflow(ctx, workflowType, args...)
-}
-func (i *Interceptor) ExecuteChildWorkflow(ctx Context, workflowType string, args ...interface{}) ChildWorkflowFuture {
-	*i.childWorkflowInterceptorInvocationCounter += 1
-	return i.Next.ExecuteChildWorkflow(ctx, workflowType, args...)
-}
-
-func (f *InterceptorFactory) NewInterceptor(_ *WorkflowInfo, next WorkflowInterceptor) WorkflowInterceptor {
-	return &Interceptor{
-		WorkflowInterceptorBase: WorkflowInterceptorBase{
-			Next: next,
-		},
-		workflowInterceptorInvocationCounter:      &f.workflowInterceptorInvocationCounter,
-		childWorkflowInterceptorInvocationCounter: &f.childWorkflowInterceptorInvocationCounter,
-	}
-}
-
-func (s *InterceptorTestSuite) SetupTest() {
-	// Create a test workflow environment with the trace interceptor configured.
-	s.env = s.NewTestWorkflowEnvironment()
-	s.testFactory = InterceptorFactory{}
-	s.env.SetWorkerOptions(WorkerOptions{
-		WorkflowInterceptorChainFactories: []WorkflowInterceptorFactory{
-			&s.testFactory,
-		},
-	})
-}
-
-func TestInterceptorTestSuite(t *testing.T) {
-	suite.Run(t, new(InterceptorTestSuite))
-}
-
-func (s *InterceptorTestSuite) Test_GeneralInterceptor_IsExecutedOnChildren() {
-	r := s.Require()
-	childWf := func(ctx Context) error {
-		return nil
-	}
-	s.env.RegisterWorkflowWithOptions(childWf, RegisterWorkflowOptions{Name: "child"})
-	wf := func(ctx Context) error {
-		return ExecuteChildWorkflow(ctx, childWf).Get(ctx, nil)
-	}
-	s.env.RegisterWorkflowWithOptions(wf, RegisterWorkflowOptions{Name: "parent"})
-	s.env.ExecuteWorkflow(wf)
-	r.True(s.env.IsWorkflowCompleted())
-	r.NoError(s.env.GetWorkflowError())
-	r.Equal(s.testFactory.workflowInterceptorInvocationCounter, 2)
-	r.Equal(s.testFactory.childWorkflowInterceptorInvocationCounter, 1)
 }

@@ -72,7 +72,7 @@ func sampleBranchWorkflow2(ctx workflow.Context) error {
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
-	for i := 1; i <= 4; i++ {
+	for i := 1; i <= 2; i++ {
 		activityInput := fmt.Sprintf("branch %d of 4", i)
 		future := workflow.ExecuteActivity(ctx, sampleActivity, activityInput)
 		futures = append(futures, future)

@@ -974,7 +974,7 @@ func newAggregatedWorker(
 	taskList string,
 	options WorkerOptions,
 ) (worker *aggregatedWorker) {
-	wOptions := augmentWorkerOptions(options)
+	wOptions := AugmentWorkerOptions(options)
 	ctx := wOptions.BackgroundActivityContext
 	if ctx == nil {
 		ctx = context.Background()
@@ -1195,7 +1195,7 @@ func getReadOnlyChannel(c chan struct{}) <-chan struct{} {
 	return c
 }
 
-func augmentWorkerOptions(options WorkerOptions) WorkerOptions {
+func AugmentWorkerOptions(options WorkerOptions) WorkerOptions {
 	if options.MaxConcurrentActivityExecutionSize == 0 {
 		options.MaxConcurrentActivityExecutionSize = defaultMaxConcurrentActivityExecutionSize
 	}

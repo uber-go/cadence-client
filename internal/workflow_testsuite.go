@@ -240,8 +240,8 @@ func (t *TestWorkflowEnvironment) OnActivity(activity interface{}, args ...inter
 			panic(err)
 		}
 		fnName := getActivityFunctionName(t.impl.registry, activity)
+		t.impl.registry.RegisterActivityWithOptions(activity, RegisterActivityOptions{DisableAlreadyRegisteredCheck: true})
 		call = t.Mock.On(fnName, args...)
-
 	case reflect.String:
 		call = t.Mock.On(activity.(string), args...)
 	default:
@@ -289,11 +289,12 @@ func (t *TestWorkflowEnvironment) OnWorkflow(workflow interface{}, args ...inter
 		if alias, ok := t.impl.registry.getWorkflowAlias(fnName); ok {
 			fnName = alias
 		}
+		t.impl.registry.RegisterWorkflowWithOptions(workflow, RegisterWorkflowOptions{DisableAlreadyRegisteredCheck: true})
 		call = t.Mock.On(fnName, args...)
 	case reflect.String:
 		call = t.Mock.On(workflow.(string), args...)
 	default:
-		panic("activity must be function or string")
+		panic("workflow must be function or string")
 	}
 
 	return t.wrapCall(call)

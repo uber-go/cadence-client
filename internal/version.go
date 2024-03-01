@@ -43,7 +43,7 @@ package internal
 // Due to all of this unreliability, this should be used as strictly informational
 // metadata, e.g. for caller version monitoring, never behavioral (use
 // FeatureVersion or feature flags instead).
-const LibraryVersion = "1.2.6"
+const LibraryVersion = "1.2.8"
 
 // FeatureVersion is a semver that informs the server of what high-level behaviors
 // this client supports.

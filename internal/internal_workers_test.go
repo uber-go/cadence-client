@@ -171,7 +171,7 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 	ctx, cancel := context.WithCancel(context.Background())
 	executionParameters := workerExecutionParameters{
 		TaskList: "testTaskList",
-		WorkerOptions: augmentWorkerOptions(
+		WorkerOptions: AugmentWorkerOptions(
 			WorkerOptions{
 				MaxConcurrentActivityTaskPollers:   5,
 				MaxConcurrentActivityExecutionSize: 2,

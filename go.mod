@@ -70,6 +70,7 @@ require (
 )
 
 retract (
+	v1.2.8 // Contains bad commits
 	v1.2.5 // Published accidentally
 	v1.2.4 // Published accidentally
 	v1.2.3 // Published accidentally

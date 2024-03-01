@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [v1.2.9] - 2024-03-01
+### Added
+- retract directive for v1.2.8
+
+### Changed
+- Revert breaking changes from v1.2.8 (#1315)
+
 ## [v1.2.8] - 2024-02-27
 - Support two-legged OAuth flow (#1304)
 - Expose method to get default worker options (#1311)

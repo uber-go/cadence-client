@@ -95,7 +95,8 @@ func (s *WorkersTestSuite) TestWorkflowWorker() {
 		TaskList: "testTaskList",
 		WorkerOptions: WorkerOptions{
 			MaxConcurrentDecisionTaskPollers: 5,
-			Logger:                           logger},
+			Logger:                           logger,
+			Sync:                             &fakeSyncOnce{}},
 		UserContext:       ctx,
 		UserContextCancel: cancel,
 	}
@@ -127,7 +128,8 @@ func (s *WorkersTestSuite) testActivityWorker(useLocallyDispatched bool) {
 		TaskList: "testTaskList",
 		WorkerOptions: WorkerOptions{
 			MaxConcurrentActivityTaskPollers: 5,
-			Logger:                           zaptest.NewLogger(s.T())},
+			Logger:                           zaptest.NewLogger(s.T()),
+			Sync:                             &fakeSyncOnce{}},
 	}
 	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler(), useLocallyDispatchedActivityPoller: useLocallyDispatched}
 	a := &greeterActivity{}
@@ -174,6 +176,7 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 				MaxConcurrentActivityTaskPollers:   5,
 				MaxConcurrentActivityExecutionSize: 2,
 				Logger:                             zaptest.NewLogger(s.T()),
+				Sync:                               &fakeSyncOnce{},
 			},
 		),
 		UserContext:       ctx,
@@ -212,7 +215,8 @@ func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 		TaskList: "testDecisionTaskList",
 		WorkerOptions: WorkerOptions{
 			MaxConcurrentDecisionTaskPollers: 5,
-			Logger:                           zaptest.NewLogger(s.T())},
+			Logger:                           zaptest.NewLogger(s.T()),
+			Sync:                             &fakeSyncOnce{}},
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
@@ -339,6 +343,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 		Logger:                zaptest.NewLogger(s.T()),
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
+		Sync:                  &fakeSyncOnce{},
 	}
 	worker := newAggregatedWorker(s.service, domain, taskList, options)
 	worker.RegisterWorkflowWithOptions(
@@ -514,6 +519,7 @@ func (s *WorkersTestSuite) TestQueryTask_WorkflowCacheEvicted() {
 		// and we can force clear the cache when polling the query task.
 		// See the mock function for the second PollForDecisionTask call above.
 		MaxConcurrentDecisionTaskExecutionSize: 1,
+		Sync:                                   &fakeSyncOnce{},
 	}
 	worker := newAggregatedWorker(s.service, domain, taskList, options)
 	worker.RegisterWorkflowWithOptions(
@@ -637,6 +643,7 @@ func (s *WorkersTestSuite) TestMultipleLocalActivities() {
 		Logger:                zaptest.NewLogger(s.T()),
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
+		Sync:                  &fakeSyncOnce{},
 	}
 	worker := newAggregatedWorker(s.service, domain, taskList, options)
 	worker.RegisterWorkflowWithOptions(
@@ -747,6 +754,7 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 	options := WorkerOptions{
 		Logger:   zaptest.NewLogger(s.T()),
 		Identity: "test-worker-identity",
+		Sync:     &fakeSyncOnce{},
 	}
 	worker := newAggregatedWorker(s.service, domain, taskList, options)
 	worker.RegisterWorkflowWithOptions(
@@ -812,6 +820,7 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 	options := WorkerOptions{
 		Logger:   zaptest.NewLogger(s.T()),
 		Identity: "test-worker-identity",
+		Sync:     &fakeSyncOnce{},
 	}
 
 	s.service.EXPECT().DescribeDomain(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, nil).AnyTimes()

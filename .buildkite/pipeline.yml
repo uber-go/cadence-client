@@ -13,6 +13,7 @@ steps:
       - "make unit_test"
       - ".buildkite/scripts/gen_coverage_metadata.sh .build/metadata.txt"
     artifact_paths:
+      - ".build/*/coverage/*.out"
       - ".build/cover.out"
       - ".build/metadata.txt"
     plugins:

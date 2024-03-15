@@ -27,4 +27,4 @@ jobs:
           file: .build/cover.out
           exclude: ./
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: uber/cadence
+          slug: uber-go/cadence-client

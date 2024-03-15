@@ -4,13 +4,18 @@ steps:
       queue: "init"
       docker: "*"
     command: ".buildkite/scripts/fossa.sh"
+
   - label: ":golang: unit-test"
     agents:
       queue: "workers"
       docker: "*"
-    command: "make unit_test"
+    commands:
+      - "make unit_test"
+      - ".buildkite/scripts/gen_coverage_metadata.sh .build/metadata.txt"
     artifact_paths:
       - ".build/*/coverage/*.out"
+      - ".build/cover.out"
+      - ".build/metadata.txt"
     plugins:
       - docker-compose#v3.0.0:
           run: unit-test

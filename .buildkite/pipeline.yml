@@ -7,7 +7,7 @@ steps:
 
   - label: ":golang: unit-test"
     agents:
-      queue: "workers"
+      queue: "default"
       docker: "*"
     commands:
       - "make unit_test"
@@ -23,7 +23,7 @@ steps:
 
   - label: ":golang: integration-test-sticky-off"
     agents:
-      queue: "workers"
+      queue: "default"
       docker: "*"
     command: "make integ_test_sticky_off"
     artifact_paths:
@@ -38,7 +38,7 @@ steps:
 
   - label: ":golang: integration-test-sticky-on"
     agents:
-      queue: "workers"
+      queue: "default"
       docker: "*"
     command: "make integ_test_sticky_on"
     artifact_paths:
@@ -53,7 +53,7 @@ steps:
 
   - label: ":golang: integration-test-grpc-adapter"
     agents:
-      queue: "workers"
+      queue: "default"
       docker: "*"
     command: "make integ_test_grpc"
     artifact_paths:
@@ -70,7 +70,7 @@ steps:
 
   - label: ":golang: code-coverage"
     agents:
-      queue: "workers"
+      queue: "default"
       docker: "*"
     command: ".buildkite/scripts/gocov.sh"
     plugins:

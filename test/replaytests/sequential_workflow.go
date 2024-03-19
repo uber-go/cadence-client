@@ -25,9 +25,10 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"go.uber.org/cadence/activity"
 	"go.uber.org/cadence/workflow"
-	"go.uber.org/zap"
 )
 
 type replayerSampleMessage struct {

@@ -200,7 +200,6 @@ func TestAPICalls(t *testing.T) {
 				m.EXPECT().RespondActivityTaskCanceled(gomock.Any(), &shared.RespondActivityTaskCanceledRequest{}, gomock.Any()).Times(1).Return(nil)
 			},
 		},
-
 		"RespondActivityTaskCompleted": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return nil, sw.RespondActivityTaskCompleted(ctx, &shared.RespondActivityTaskCompletedRequest{})
@@ -209,7 +208,6 @@ func TestAPICalls(t *testing.T) {
 				m.EXPECT().RespondActivityTaskCompleted(gomock.Any(), &shared.RespondActivityTaskCompletedRequest{}, gomock.Any()).Times(1).Return(nil)
 			},
 		},
-
 		"RespondActivityTaskFailed": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return nil, sw.RespondActivityTaskFailed(ctx, &shared.RespondActivityTaskFailedRequest{})
@@ -218,7 +216,6 @@ func TestAPICalls(t *testing.T) {
 				m.EXPECT().RespondActivityTaskFailed(gomock.Any(), &shared.RespondActivityTaskFailedRequest{}, gomock.Any()).Times(1).Return(nil)
 			},
 		},
-
 		"RespondActivityTaskCompletedByID": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return nil, sw.RespondActivityTaskCompletedByID(ctx, &shared.RespondActivityTaskCompletedByIDRequest{})
@@ -227,7 +224,6 @@ func TestAPICalls(t *testing.T) {
 				m.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), &shared.RespondActivityTaskCompletedByIDRequest{}, gomock.Any()).Times(1).Return(nil)
 			},
 		},
-
 		"RespondActivityTaskCanceledByID": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return nil, sw.RespondActivityTaskCanceledByID(ctx, &shared.RespondActivityTaskCanceledByIDRequest{})
@@ -236,7 +232,6 @@ func TestAPICalls(t *testing.T) {
 				m.EXPECT().RespondActivityTaskCanceledByID(gomock.Any(), &shared.RespondActivityTaskCanceledByIDRequest{}, gomock.Any()).Times(1).Return(nil)
 			},
 		},
-
 		"RespondActivityTaskFailedByID": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return nil, sw.RespondActivityTaskFailedByID(ctx, &shared.RespondActivityTaskFailedByIDRequest{})
@@ -245,7 +240,6 @@ func TestAPICalls(t *testing.T) {
 				m.EXPECT().RespondActivityTaskFailedByID(gomock.Any(), &shared.RespondActivityTaskFailedByIDRequest{}, gomock.Any()).Times(1).Return(nil)
 			},
 		},
-
 		"RespondDecisionTaskCompleted": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return sw.RespondDecisionTaskCompleted(ctx, &shared.RespondDecisionTaskCompletedRequest{})
@@ -255,7 +249,6 @@ func TestAPICalls(t *testing.T) {
 			},
 			expectedResponse: &shared.RespondDecisionTaskCompletedResponse{},
 		},
-
 		"RespondDecisionTaskFailed": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return nil, sw.RespondDecisionTaskFailed(ctx, &shared.RespondDecisionTaskFailedRequest{})
@@ -272,7 +265,6 @@ func TestAPICalls(t *testing.T) {
 				m.EXPECT().SignalWorkflowExecution(gomock.Any(), &shared.SignalWorkflowExecutionRequest{}, gomock.Any()).Times(1).Return(nil)
 			},
 		},
-
 		"SignalWithStartWorkflowExecution": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return sw.SignalWithStartWorkflowExecution(ctx, &shared.SignalWithStartWorkflowExecutionRequest{})
@@ -282,7 +274,15 @@ func TestAPICalls(t *testing.T) {
 			},
 			expectedResponse: &shared.StartWorkflowExecutionResponse{},
 		},
-
+		"SignalWithStartWorkflowExecutionAsync": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.SignalWithStartWorkflowExecutionAsync(ctx, &shared.SignalWithStartWorkflowExecutionAsyncRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().SignalWithStartWorkflowExecutionAsync(gomock.Any(), &shared.SignalWithStartWorkflowExecutionAsyncRequest{}, gomock.Any()).Times(1).Return(&shared.SignalWithStartWorkflowExecutionAsyncResponse{}, nil)
+			},
+			expectedResponse: &shared.SignalWithStartWorkflowExecutionAsyncResponse{},
+		},
 		"StartWorkflowExecution": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return sw.StartWorkflowExecution(ctx, &shared.StartWorkflowExecutionRequest{})
@@ -292,7 +292,15 @@ func TestAPICalls(t *testing.T) {
 			},
 			expectedResponse: &shared.StartWorkflowExecutionResponse{},
 		},
-
+		"StartWorkflowExecutionAsync": {
+			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
+				return sw.StartWorkflowExecutionAsync(ctx, &shared.StartWorkflowExecutionAsyncRequest{})
+			},
+			affordance: func(m *workflowservicetest.MockClient) {
+				m.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), &shared.StartWorkflowExecutionAsyncRequest{}, gomock.Any()).Times(1).Return(&shared.StartWorkflowExecutionAsyncResponse{}, nil)
+			},
+			expectedResponse: &shared.StartWorkflowExecutionAsyncResponse{},
+		},
 		"TerminateWorkflowExecution": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return nil, sw.TerminateWorkflowExecution(ctx, &shared.TerminateWorkflowExecutionRequest{})
@@ -301,7 +309,6 @@ func TestAPICalls(t *testing.T) {
 				m.EXPECT().TerminateWorkflowExecution(gomock.Any(), &shared.TerminateWorkflowExecutionRequest{}, gomock.Any()).Times(1).Return(nil)
 			},
 		},
-
 		"ResetWorkflowExecution": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return sw.ResetWorkflowExecution(ctx, &shared.ResetWorkflowExecutionRequest{})
@@ -320,7 +327,6 @@ func TestAPICalls(t *testing.T) {
 			},
 			expectedResponse: &shared.UpdateDomainResponse{},
 		},
-
 		"QueryWorkflow": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return sw.QueryWorkflow(ctx, &shared.QueryWorkflowRequest{})
@@ -339,7 +345,6 @@ func TestAPICalls(t *testing.T) {
 			},
 			expectedResponse: &shared.ResetStickyTaskListResponse{},
 		},
-
 		"DescribeTaskList": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return sw.DescribeTaskList(ctx, &shared.DescribeTaskListRequest{})
@@ -349,7 +354,6 @@ func TestAPICalls(t *testing.T) {
 			},
 			expectedResponse: &shared.DescribeTaskListResponse{},
 		},
-
 		"RespondQueryTaskCompleted": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return nil, sw.RespondQueryTaskCompleted(ctx, &shared.RespondQueryTaskCompletedRequest{})
@@ -358,7 +362,6 @@ func TestAPICalls(t *testing.T) {
 				m.EXPECT().RespondQueryTaskCompleted(gomock.Any(), &shared.RespondQueryTaskCompletedRequest{}, gomock.Any()).Times(1).Return(nil)
 			},
 		},
-
 		"GetSearchAttributes": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return sw.GetSearchAttributes(ctx)
@@ -368,7 +371,6 @@ func TestAPICalls(t *testing.T) {
 			},
 			expectedResponse: &shared.GetSearchAttributesResponse{},
 		},
-
 		"ListTaskListPartitions": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return sw.ListTaskListPartitions(ctx, &shared.ListTaskListPartitionsRequest{})
@@ -378,7 +380,6 @@ func TestAPICalls(t *testing.T) {
 			},
 			expectedResponse: &shared.ListTaskListPartitionsResponse{},
 		},
-
 		"GetClusterInfo": {
 			action: func(ctx context.Context, sw workflowserviceclient.Interface) (interface{}, error) {
 				return sw.GetClusterInfo(ctx)

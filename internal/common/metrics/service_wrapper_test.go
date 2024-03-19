@@ -88,7 +88,10 @@ func Test_Wrapper(t *testing.T) {
 		{"RespondActivityTaskFailedByID", []interface{}{ctx, &s.RespondActivityTaskFailedByIDRequest{}}, []interface{}{nil}, []string{CadenceRequest}},
 		{"RespondDecisionTaskCompleted", []interface{}{ctx, &s.RespondDecisionTaskCompletedRequest{}}, []interface{}{nil, nil}, []string{CadenceRequest}},
 		{"SignalWorkflowExecution", []interface{}{ctx, &s.SignalWorkflowExecutionRequest{}}, []interface{}{nil}, []string{CadenceRequest}},
+		{"SignalWithStartWorkflowExecution", []interface{}{ctx, &s.SignalWithStartWorkflowExecutionRequest{}}, []interface{}{&s.StartWorkflowExecutionResponse{}, nil}, []string{CadenceRequest}},
+		{"SignalWithStartWorkflowExecutionAsync", []interface{}{ctx, &s.SignalWithStartWorkflowExecutionAsyncRequest{}}, []interface{}{&s.SignalWithStartWorkflowExecutionAsyncResponse{}, nil}, []string{CadenceRequest}},
 		{"StartWorkflowExecution", []interface{}{ctx, &s.StartWorkflowExecutionRequest{}}, []interface{}{&s.StartWorkflowExecutionResponse{}, nil}, []string{CadenceRequest}},
+		{"StartWorkflowExecutionAsync", []interface{}{ctx, &s.StartWorkflowExecutionAsyncRequest{}}, []interface{}{&s.StartWorkflowExecutionAsyncResponse{}, nil}, []string{CadenceRequest}},
 		{"TerminateWorkflowExecution", []interface{}{ctx, &s.TerminateWorkflowExecutionRequest{}}, []interface{}{nil}, []string{CadenceRequest}},
 		{"ResetWorkflowExecution", []interface{}{ctx, &s.ResetWorkflowExecutionRequest{}}, []interface{}{&s.ResetWorkflowExecutionResponse{}, nil}, []string{CadenceRequest}},
 		{"UpdateDomain", []interface{}{ctx, &s.UpdateDomainRequest{}}, []interface{}{&s.UpdateDomainResponse{}, nil}, []string{CadenceRequest}},
@@ -160,10 +163,14 @@ func runTest(
 			mockService.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), gomock.Any(), gomock.Any()).Return(returns...)
 		case "SignalWorkflowExecution":
 			mockService.EXPECT().SignalWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(returns...)
-		case "SignaWithStartlWorkflowExecution":
+		case "SignalWithStartWorkflowExecution":
 			mockService.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(returns...)
+		case "SignalWithStartWorkflowExecutionAsync":
+			mockService.EXPECT().SignalWithStartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(returns...)
 		case "StartWorkflowExecution":
 			mockService.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(returns...)
+		case "StartWorkflowExecutionAsync":
+			mockService.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(returns...)
 		case "TerminateWorkflowExecution":
 			mockService.EXPECT().TerminateWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(returns...)
 		case "ResetWorkflowExecution":

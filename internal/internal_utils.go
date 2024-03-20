@@ -26,12 +26,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"

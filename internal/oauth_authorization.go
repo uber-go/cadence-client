@@ -25,9 +25,10 @@ import (
 	"fmt"
 	"net/url"
 
-	"go.uber.org/cadence/internal/common/auth"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
+
+	"go.uber.org/cadence/internal/common/auth"
 )
 
 // OAuthAuthorizerConfig allows to configure external OAuth provider

@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
+
 	"go.uber.org/cadence/internal/common/auth"
 	"go.uber.org/cadence/internal/common/util"
 )

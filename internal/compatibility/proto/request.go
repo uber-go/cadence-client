@@ -417,6 +417,16 @@ func SignalWithStartWorkflowExecutionRequest(t *shared.SignalWithStartWorkflowEx
 	}
 }
 
+func SignalWithStartWorkflowExecutionAsyncRequest(t *shared.SignalWithStartWorkflowExecutionAsyncRequest) *apiv1.SignalWithStartWorkflowExecutionAsyncRequest {
+	if t == nil {
+		return nil
+	}
+
+	return &apiv1.SignalWithStartWorkflowExecutionAsyncRequest{
+		Request: SignalWithStartWorkflowExecutionRequest(t.GetRequest()),
+	}
+}
+
 func SignalWorkflowExecutionRequest(t *shared.SignalWorkflowExecutionRequest) *apiv1.SignalWorkflowExecutionRequest {
 	if t == nil {
 		return nil
@@ -454,6 +464,15 @@ func StartWorkflowExecutionRequest(t *shared.StartWorkflowExecutionRequest) *api
 		Header:                       Header(t.Header),
 		DelayStart:                   secondsToDuration(t.DelayStartSeconds),
 		JitterStart:                  secondsToDuration(t.JitterStartSeconds),
+	}
+}
+
+func StartWorkflowExecutionAsyncRequest(t *shared.StartWorkflowExecutionAsyncRequest) *apiv1.StartWorkflowExecutionAsyncRequest {
+	if t == nil {
+		return nil
+	}
+	return &apiv1.StartWorkflowExecutionAsyncRequest{
+		Request: StartWorkflowExecutionRequest(t.GetRequest()),
 	}
 }
 

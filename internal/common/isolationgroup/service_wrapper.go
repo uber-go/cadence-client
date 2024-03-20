@@ -211,9 +211,21 @@ func (w *workflowServiceIsolationGroupWrapper) SignalWithStartWorkflowExecution(
 	return result, err
 }
 
+func (w *workflowServiceIsolationGroupWrapper) SignalWithStartWorkflowExecutionAsync(ctx context.Context, request *shared.SignalWithStartWorkflowExecutionAsyncRequest, opts ...yarpc.CallOption) (*shared.SignalWithStartWorkflowExecutionAsyncResponse, error) {
+	opts = append(opts, w.getIsolationGroupIdentifier())
+	result, err := w.service.SignalWithStartWorkflowExecutionAsync(ctx, request, opts...)
+	return result, err
+}
+
 func (w *workflowServiceIsolationGroupWrapper) StartWorkflowExecution(ctx context.Context, request *shared.StartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionResponse, error) {
 	opts = append(opts, w.getIsolationGroupIdentifier())
 	result, err := w.service.StartWorkflowExecution(ctx, request, opts...)
+	return result, err
+}
+
+func (w *workflowServiceIsolationGroupWrapper) StartWorkflowExecutionAsync(ctx context.Context, request *shared.StartWorkflowExecutionAsyncRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionAsyncResponse, error) {
+	opts = append(opts, w.getIsolationGroupIdentifier())
+	result, err := w.service.StartWorkflowExecutionAsync(ctx, request, opts...)
 	return result, err
 }
 

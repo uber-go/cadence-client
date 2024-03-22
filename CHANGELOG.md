@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [v1.2.10-rc.1] - 2024-03-22
+### Added 
+-  Add documentation for propagators and how they are executed (#1312)
+- Update idl and add wrapper implementaton for async start/signalwithstart APIs (#1321)
+-  Enable codecov and generate metadata file as artifact (#1320)
+- Release v1.2.9 (#1317)
+
 ## [v1.2.9] - 2024-03-01
 ### Added
 - retract directive for v1.2.8

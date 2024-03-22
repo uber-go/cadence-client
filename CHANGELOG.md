@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ## [v1.2.10-rc.1] - 2024-03-22
 ### Added 
+- Fix coverage metadata commit info (#1323)
 -  Add documentation for propagators and how they are executed (#1312)
 - Update idl and add wrapper implementaton for async start/signalwithstart APIs (#1321)
 -  Enable codecov and generate metadata file as artifact (#1320)

@@ -15,10 +15,10 @@ set -ex
 
 output_path="$1"
 
-# if [ "$BUILDKITE_BRANCH" != "master" ] && [ "$BUILDKITE_BRANCH" != "origin/master" ]; then
-#   echo "Coverage metadata is only generated for master branch. Current branch: $BUILDKITE_BRANCH"
-#   exit 0
-# fi
+if [ "$BUILDKITE_BRANCH" != "master" ] && [ "$BUILDKITE_BRANCH" != "origin/master" ]; then
+  echo "Coverage metadata is only generated for master branch. Current branch: $BUILDKITE_BRANCH"
+  exit 0
+fi
 
 if [ -z "$BUILDKITE_COMMIT" ]; then
   echo "BUILDKITE_COMMIT is not set"

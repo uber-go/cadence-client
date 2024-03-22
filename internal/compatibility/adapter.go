@@ -219,6 +219,11 @@ func (a thrift2protoAdapter) SignalWithStartWorkflowExecution(ctx context.Contex
 	return thrift.SignalWithStartWorkflowExecutionResponse(response), thrift.Error(err)
 }
 
+func (a thrift2protoAdapter) SignalWithStartWorkflowExecutionAsync(ctx context.Context, request *shared.SignalWithStartWorkflowExecutionAsyncRequest, opts ...yarpc.CallOption) (*shared.SignalWithStartWorkflowExecutionAsyncResponse, error) {
+	response, err := a.workflow.SignalWithStartWorkflowExecutionAsync(ctx, proto.SignalWithStartWorkflowExecutionAsyncRequest(request), opts...)
+	return thrift.SignalWithStartWorkflowExecutionAsyncResponse(response), thrift.Error(err)
+}
+
 func (a thrift2protoAdapter) SignalWorkflowExecution(ctx context.Context, request *shared.SignalWorkflowExecutionRequest, opts ...yarpc.CallOption) error {
 	_, err := a.workflow.SignalWorkflowExecution(ctx, proto.SignalWorkflowExecutionRequest(request), opts...)
 	return thrift.Error(err)
@@ -227,6 +232,11 @@ func (a thrift2protoAdapter) SignalWorkflowExecution(ctx context.Context, reques
 func (a thrift2protoAdapter) StartWorkflowExecution(ctx context.Context, request *shared.StartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionResponse, error) {
 	response, err := a.workflow.StartWorkflowExecution(ctx, proto.StartWorkflowExecutionRequest(request), opts...)
 	return thrift.StartWorkflowExecutionResponse(response), thrift.Error(err)
+}
+
+func (a thrift2protoAdapter) StartWorkflowExecutionAsync(ctx context.Context, request *shared.StartWorkflowExecutionAsyncRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionAsyncResponse, error) {
+	response, err := a.workflow.StartWorkflowExecutionAsync(ctx, proto.StartWorkflowExecutionAsyncRequest(request), opts...)
+	return thrift.StartWorkflowExecutionAsyncResponse(response), thrift.Error(err)
 }
 
 func (a thrift2protoAdapter) TerminateWorkflowExecution(ctx context.Context, request *shared.TerminateWorkflowExecutionRequest, opts ...yarpc.CallOption) error {

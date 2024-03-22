@@ -81,6 +81,8 @@ services:
       dockerfile: ./docker/buildkite/Dockerfile
     environment:
       - "GO111MODULE=on"
+      - BUILDKITE_BRANCH
+      - BUILDKITE_COMMIT
     volumes:
       - ../../:/go/src/go.uber.org/cadence
     networks:

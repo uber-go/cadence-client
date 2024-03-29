@@ -39,6 +39,9 @@ type (
 	// Execution Details.
 	Execution = internal.WorkflowExecution
 
+	// ExecutionAsync Details.
+	ExecutionAsync = internal.WorkflowExecutionAsync
+
 	// Version represents a change version. See GetVersion call.
 	Version = internal.Version
 

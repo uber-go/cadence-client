@@ -400,6 +400,11 @@ type (
 		RunID string
 	}
 
+	// WorkflowExecutuonAsync Details.
+	WorkflowExecutionAsync struct {
+		ID string
+	}
+
 	// EncodedValue is type alias used to encapsulate/extract encoded result from workflow/activity.
 	EncodedValue struct {
 		value         []byte

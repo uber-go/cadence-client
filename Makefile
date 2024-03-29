@@ -55,8 +55,8 @@ $(BUILD)/dummy: $(BUILD)/fmt # do a build after fmt-ing
 $(BUILD)/fmt: $(BUILD)/copyright # formatting must occur only after all other go-file-modifications are done
 $(BUILD)/copyright: $(BUILD)/codegen # must add copyright to generated code
 $(BUILD)/codegen: $(BUILD)/thrift $(BUILD)/generate
+$(BUILD)/generate: $(BUILD)/thrift # go generate broadly requires compile-able code, which needs thrift
 $(BUILD)/thrift: $(BUILD)/go_mod_check
-$(BUILD)/generate: $(BUILD)/go_mod_check
 $(BUILD)/go_mod_check: | $(BUILD) $(BIN)
 
 # ====================================

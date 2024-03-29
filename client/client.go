@@ -18,6 +18,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+//go:generate mockery --srcpkg . --name Client --output ../mocks
+//go:generate mockery --srcpkg . --name DomainClient --output ../mocks
+//go:generate mockery --srcpkg go.uber.org/cadence/internal --name HistoryEventIterator --output ../mocks
+//go:generate mockery --srcpkg go.uber.org/cadence/internal --name WorkflowRun --output ../mocks
+
 // Package client contains functions to create Cadence clients used to communicate to Cadence service.
 //
 // Use these to perform CRUD on domains and start or query workflow executions.

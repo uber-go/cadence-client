@@ -157,6 +157,9 @@ $(BIN)/errcheck: internal/tools/go.mod
 $(BIN)/goveralls: internal/tools/go.mod
 	$(call go_build_tool,github.com/mattn/goveralls)
 
+$(BIN)/mockery: internal/tools/go.mod
+	$(call go_build_tool,github.com/vektra/mockery/v2,mockery)
+
 # copyright header checker/writer.  only requires stdlib, so no other dependencies are needed.
 $(BIN)/copyright: internal/cmd/tools/copyright/licensegen.go
 	go build -mod=readonly -o $@ ./internal/cmd/tools/copyright/licensegen.go

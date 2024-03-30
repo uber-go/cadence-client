@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// when adding any, make sure you update the files that it checks in the makefile
 //go:generate mockery --srcpkg . --name Client --output ../mocks
 //go:generate mockery --srcpkg . --name DomainClient --output ../mocks
 //go:generate mockery --srcpkg go.uber.org/cadence/internal --name HistoryEventIterator --output ../mocks

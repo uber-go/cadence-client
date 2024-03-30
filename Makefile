@@ -50,7 +50,7 @@ endif
 # ====================================
 
 # note that vars that do not yet exist are empty, so stick to BUILD/BIN and probably nothing else.
-$(BUILD)/lint: $(BUILD)/fmt $(BUILD)/dummy # lint will fail if fmt or dummy fails, so run them first
+$(BUILD)/lint: $(BUILD)/fmt # lint will fail if fmt (more generally, build) fails, so run it first
 $(BUILD)/fmt: $(BUILD)/copyright # formatting must occur only after all other go-file-modifications are done
 $(BUILD)/copyright: $(BUILD)/codegen # must add copyright to generated code
 $(BUILD)/codegen: $(BUILD)/thrift $(BUILD)/generate
@@ -163,10 +163,6 @@ $(BIN)/mockery: internal/tools/go.mod
 # copyright header checker/writer.  only requires stdlib, so no other dependencies are needed.
 $(BIN)/copyright: internal/cmd/tools/copyright/licensegen.go
 	go build -mod=readonly -o $@ ./internal/cmd/tools/copyright/licensegen.go
-
-# dummy binary that ensures most/all packages build, without needing to wait for tests.
-$(BUILD)/dummy: $(ALL_SRC) $(BUILD)/go_mod_check
-	go build -mod=readonly -o $@ internal/cmd/dummy/dummy.go
 
 # ensures mod files are in sync for critical packages
 $(BUILD)/go_mod_check: go.mod internal/tools/go.mod
@@ -314,7 +310,7 @@ tidy:
 	cd internal/tools; go mod tidy
 
 .PHONY: all
-all: $(BUILD)/lint ## refresh codegen, lint, and ensure the dummy binary builds, if necessary
+all: $(BUILD)/lint ## refresh codegen, lint, and ensure everything builds, whatever is necessary
 
 .PHONY: clean
 clean:

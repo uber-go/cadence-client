@@ -3,7 +3,7 @@
 set -ex
 
 pwd
-ls -a ..
+ls -a
 
 make tidy
 make build

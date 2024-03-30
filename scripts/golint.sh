@@ -4,6 +4,7 @@ set -ex
 
 pwd
 ls -a
+git status --porcelain
 
 make tidy
 make build

@@ -275,7 +275,7 @@ endef
 .PHONY: build
 build: $(BUILD)/fmt ## ensure all packages build
 	go build ./...
-	go test -exec /usr/bin/true ./... >/dev/null
+	go test -exec /usr/bin/true -v ./...
 
 .PHONY: lint
 # useful to actually re-run to get output again.

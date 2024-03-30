@@ -2,6 +2,9 @@
 
 set -ex
 
+pwd
+ls -a ..
+
 make tidy
 make build
 

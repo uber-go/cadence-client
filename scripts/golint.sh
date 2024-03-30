@@ -2,13 +2,8 @@
 
 set -ex
 
-pwd
-ls -a
-git status --porcelain
-
-which -a true
 make tidy
-make build || echo "uh why tho"
+make build
 
 # intentionally capture stderr, so status-errors are also PR-failing.
 # in particular this catches "dubious ownership" failures, which otherwise

@@ -6,6 +6,7 @@ pwd
 ls -a
 git status --porcelain
 
+which -a true
 make tidy
 make build || echo "uh why tho"
 

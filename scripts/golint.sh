@@ -9,6 +9,8 @@ git status --porcelain
 make tidy
 make build
 
+echo "uh what"
+
 # intentionally capture stderr, so status-errors are also PR-failing.
 # in particular this catches "dubious ownership" failures, which otherwise
 # do not fail this check and the $() hides the exit code.

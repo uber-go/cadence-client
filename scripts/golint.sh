@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -ex
+set -exu -o pipefail
 
 make tidy
 make build

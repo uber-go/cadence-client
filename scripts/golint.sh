@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-set -exu -o pipefail
+set -exu
 
 #make tidy
 #make build

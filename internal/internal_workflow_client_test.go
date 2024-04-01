@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/yarpc"
 
@@ -1213,6 +1214,45 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithMemoAndSearchAttr() {
 	s.NoError(err)
 }
 
+func (s *workflowClientTestSuite) TestStartWorkflow_RequestCreationFails() {
+	client, ok := s.client.(*workflowClient)
+	s.True(ok)
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        "", // this causes error
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+	}
+	f1 := func(ctx Context, r []byte) string {
+		return "result"
+	}
+
+	_, err := client.StartWorkflow(context.Background(), options, f1, []byte("test"))
+	s.Equal(getDefaultDataConverter(), client.dataConverter)
+	s.Error(err)
+}
+
+func (s *workflowClientTestSuite) TestStartWorkflow_Error() {
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        tasklist,
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+	}
+	wf := func(ctx Context) string {
+		return "result"
+	}
+	startResp := &shared.StartWorkflowExecutionResponse{}
+
+	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, errors.New("failed")).AnyTimes()
+
+	// Pass a context with a deadline so error retry doesn't take forever
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := s.client.StartWorkflow(ctx, options, wf)
+	s.Error(err)
+}
+
 func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_WithMemoAndSearchAttr() {
 	memo := map[string]interface{}{
 		"testMemo": "memo value",
@@ -1287,6 +1327,36 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_WithMemoAndSe
 	s.NoError(err)
 }
 
+func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_RequestCreationFails() {
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        "", // this causes error
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+	}
+	wf := func(ctx Context) string {
+		return "result"
+	}
+
+	_, err := s.client.SignalWithStartWorkflow(context.Background(), "wid", "signal", "value", options, wf)
+	s.Error(err)
+}
+
+func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_RequestCreationFails() {
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        "", // this causes error
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+	}
+	wf := func(ctx Context) string {
+		return "result"
+	}
+
+	_, err := s.client.SignalWithStartWorkflowAsync(context.Background(), "wid", "signal", "value", options, wf)
+	s.Error(err)
+}
+
 func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_Error() {
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
@@ -1305,27 +1375,6 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_Error() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	_, err := s.client.SignalWithStartWorkflowAsync(ctx, "wid", "signal", "value", options, wf)
-	s.Error(err)
-}
-
-func (s *workflowClientTestSuite) TestStartWorkflow_Error() {
-	options := StartWorkflowOptions{
-		ID:                              workflowID,
-		TaskList:                        tasklist,
-		ExecutionStartToCloseTimeout:    timeoutInSeconds,
-		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
-	}
-	wf := func(ctx Context) string {
-		return "result"
-	}
-	startResp := &shared.StartWorkflowExecutionResponse{}
-
-	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, errors.New("failed")).AnyTimes()
-
-	// Pass a context with a deadline so error retry doesn't take forever
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	_, err := s.client.StartWorkflow(ctx, options, wf)
 	s.Error(err)
 }
 
@@ -1415,6 +1464,22 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithMemoAndSearchAttr()
 
 	_, err := s.client.StartWorkflowAsync(context.Background(), options, wf)
 	s.NoError(err)
+}
+
+func (s *workflowClientTestSuite) TestStartWorkflowAsync_RequestCreationFails() {
+	client, ok := s.client.(*workflowClient)
+	s.True(ok)
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        "", // this causes error
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+	}
+	f1 := func(ctx Context, r []byte) string {
+		return "result"
+	}
+	_, err := client.StartWorkflowAsync(context.Background(), options, f1, []byte("test"))
+	s.Error(err)
 }
 
 func (s *workflowClientTestSuite) TestStartWorkflowAsync_Error() {
@@ -1637,4 +1702,151 @@ func (m *PartialCancelRequestMatcher) Matches(a interface{}) bool {
 
 func (m *PartialCancelRequestMatcher) String() string {
 	return "partial cancellation request matcher matches cause and wfId fields"
+}
+
+func TestGetWorkflowStartRequest(t *testing.T) {
+	tests := []struct {
+		name         string
+		options      StartWorkflowOptions
+		workflowFunc interface{}
+		args         []interface{}
+		wantRequest  *shared.StartWorkflowExecutionRequest
+		wantErr      string
+	}{
+		{
+			name: "success",
+			options: StartWorkflowOptions{
+				ID:                              workflowID,
+				TaskList:                        tasklist,
+				ExecutionStartToCloseTimeout:    10 * time.Second,
+				DecisionTaskStartToCloseTimeout: 5 * time.Second,
+				DelayStart:                      0 * time.Second,
+				JitterStart:                     0 * time.Second,
+			},
+			workflowFunc: func(ctx Context) {},
+			wantRequest: &shared.StartWorkflowExecutionRequest{
+				Domain:     common.StringPtr(domain),
+				WorkflowId: common.StringPtr(workflowID),
+				WorkflowType: &shared.WorkflowType{
+					Name: common.StringPtr("go.uber.org/cadence/internal.TestGetWorkflowStartRequest.func1"),
+				},
+				TaskList: &shared.TaskList{
+					Name: common.StringPtr(tasklist),
+				},
+				ExecutionStartToCloseTimeoutSeconds: common.Int32Ptr(10),
+				TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(5),
+				DelayStartSeconds:                   common.Int32Ptr(0),
+				JitterStartSeconds:                  common.Int32Ptr(0),
+				CronSchedule:                        common.StringPtr(""),
+				Header:                              &shared.Header{Fields: map[string][]byte{}},
+				WorkflowIdReusePolicy:               shared.WorkflowIdReusePolicyAllowDuplicateFailedOnly.Ptr(),
+			},
+		},
+		{
+			name: "missing TaskList",
+			options: StartWorkflowOptions{
+				ID:                              workflowID,
+				TaskList:                        "", // this causes error
+				ExecutionStartToCloseTimeout:    10 * time.Second,
+				DecisionTaskStartToCloseTimeout: 5 * time.Second,
+				DelayStart:                      0 * time.Second,
+				JitterStart:                     0 * time.Second,
+			},
+			workflowFunc: func(ctx Context) {},
+			wantErr:      "missing TaskList",
+		},
+		{
+			name: "invalid ExecutionStartToCloseTimeout",
+			options: StartWorkflowOptions{
+				ID:                              workflowID,
+				TaskList:                        tasklist,
+				ExecutionStartToCloseTimeout:    0 * time.Second, // this causes error
+				DecisionTaskStartToCloseTimeout: 5 * time.Second,
+				DelayStart:                      0 * time.Second,
+				JitterStart:                     0 * time.Second,
+			},
+			workflowFunc: func(ctx Context) {},
+			wantErr:      "missing or invalid ExecutionStartToCloseTimeout",
+		},
+		{
+			name: "negative DecisionTaskStartToCloseTimeout",
+			options: StartWorkflowOptions{
+				ID:                              workflowID,
+				TaskList:                        tasklist,
+				ExecutionStartToCloseTimeout:    10 * time.Second,
+				DecisionTaskStartToCloseTimeout: -1 * time.Second, // this causes error
+				DelayStart:                      0 * time.Second,
+				JitterStart:                     0 * time.Second,
+			},
+			workflowFunc: func(ctx Context) {},
+			wantErr:      "negative DecisionTaskStartToCloseTimeout provided",
+		},
+		{
+			name: "negative DelayStart",
+			options: StartWorkflowOptions{
+				ID:                              workflowID,
+				TaskList:                        tasklist,
+				ExecutionStartToCloseTimeout:    10 * time.Second,
+				DecisionTaskStartToCloseTimeout: 5 * time.Second,
+				DelayStart:                      -1 * time.Second, // this causes error
+				JitterStart:                     0 * time.Second,
+			},
+			workflowFunc: func(ctx Context) {},
+			wantErr:      "Invalid DelayStart option",
+		},
+		{
+			name: "negative JitterStart",
+			options: StartWorkflowOptions{
+				ID:                              workflowID,
+				TaskList:                        tasklist,
+				ExecutionStartToCloseTimeout:    10 * time.Second,
+				DecisionTaskStartToCloseTimeout: 5 * time.Second,
+				DelayStart:                      0 * time.Second,
+				JitterStart:                     -1 * time.Second, // this causes error
+			},
+			workflowFunc: func(ctx Context) {},
+			wantErr:      "Invalid JitterStart option",
+		},
+		{
+			name: "invalid workflow func",
+			options: StartWorkflowOptions{
+				ID:                              workflowID,
+				TaskList:                        tasklist,
+				ExecutionStartToCloseTimeout:    10 * time.Second,
+				DecisionTaskStartToCloseTimeout: 5 * time.Second,
+				DelayStart:                      0 * time.Second,
+				JitterStart:                     0 * time.Second,
+			},
+			workflowFunc: func(ctx Context, a, b int) {}, // this causes error because args not provided
+			wantErr:      "expected 2 args for function",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			service := workflowservicetest.NewMockClient(mockCtrl)
+			wc, ok := NewClient(service, domain, &ClientOptions{
+				Identity: "test-identity",
+			}).(*workflowClient)
+
+			if !ok {
+				t.Fatalf("expected NewClient to return a *workflowClient, but got %T", wc)
+			}
+
+			gotReq, err := wc.getWorkflowStartRequest(context.Background(), "", tc.options, tc.workflowFunc, tc.args...)
+			if tc.wantErr != "" {
+				assert.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			// set the fields that are not set in the expected request
+			tc.wantRequest.Identity = &wc.identity
+			tc.wantRequest.RequestId = gotReq.RequestId
+
+			assert.Equal(t, tc.wantRequest, gotReq)
+		})
+	}
 }

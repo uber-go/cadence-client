@@ -50,8 +50,7 @@ endif
 # ====================================
 
 # note that vars that do not yet exist are empty, so stick to BUILD/BIN and probably nothing else.
-$(BUILD)/lint: $(BUILD)/fmt $(BUILD)/dummy # lint will fail if fmt or dummy fails, so run them first
-$(BUILD)/dummy: $(BUILD)/fmt # do a build after fmt-ing
+$(BUILD)/lint: $(BUILD)/fmt # lint will fail if fmt (more generally, build) fails, so run it first
 $(BUILD)/fmt: $(BUILD)/copyright # formatting must occur only after all other go-file-modifications are done
 $(BUILD)/copyright: $(BUILD)/codegen # must add copyright to generated code
 $(BUILD)/codegen: $(BUILD)/thrift $(BUILD)/generate
@@ -165,10 +164,6 @@ $(BIN)/mockery: internal/tools/go.mod
 $(BIN)/copyright: internal/cmd/tools/copyright/licensegen.go
 	go build -mod=readonly -o $@ ./internal/cmd/tools/copyright/licensegen.go
 
-# dummy binary that ensures most/all packages build, without needing to wait for tests.
-$(BUILD)/dummy: $(ALL_SRC) $(BUILD)/go_mod_check
-	go build -mod=readonly -o $@ internal/cmd/dummy/dummy.go
-
 # ensures mod files are in sync for critical packages
 $(BUILD)/go_mod_check: go.mod internal/tools/go.mod
 	$Q # ensure both have the same apache/thrift replacement
@@ -278,7 +273,10 @@ $Q +$(MAKE) --no-print-directory $(addprefix $(BUILD)/,$(1))
 endef
 
 .PHONY: build
-build: $(BUILD)/dummy ## ensure all packages build
+build: $(BUILD)/fmt ## ensure all packages build
+	go build ./...
+	$Q # caution: some errors are reported on stdout for some reason
+	go test -exec true ./... >/dev/null
 
 .PHONY: lint
 # useful to actually re-run to get output again.
@@ -307,8 +305,13 @@ errcheck: $(BIN)/errcheck $(BUILD)/fmt ## (re)run errcheck
 .PHONY: generate
 generate: $(BUILD)/generate ## run go-generate
 
+.PHONY: tidy
+tidy:
+	go mod tidy
+	cd internal/tools; go mod tidy
+
 .PHONY: all
-all: $(BUILD)/lint ## refresh codegen, lint, and ensure the dummy binary builds, if necessary
+all: $(BUILD)/lint ## refresh codegen, lint, and ensure everything builds, whatever is necessary
 
 .PHONY: clean
 clean:

@@ -48,10 +48,6 @@ func (_m *Client) CancelWorkflow(ctx context.Context, workflowID string, runID s
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	if len(ret) == 0 {
-		panic("no return value specified for CancelWorkflow")
-	}
-
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...internal.Option) error); ok {
 		r0 = rf(ctx, workflowID, runID, opts...)
@@ -65,10 +61,6 @@ func (_m *Client) CancelWorkflow(ctx context.Context, workflowID string, runID s
 // CompleteActivity provides a mock function with given fields: ctx, taskToken, result, err
 func (_m *Client) CompleteActivity(ctx context.Context, taskToken []byte, result interface{}, err error) error {
 	ret := _m.Called(ctx, taskToken, result, err)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CompleteActivity")
-	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, []byte, interface{}, error) error); ok {
@@ -84,10 +76,6 @@ func (_m *Client) CompleteActivity(ctx context.Context, taskToken []byte, result
 func (_m *Client) CompleteActivityByID(ctx context.Context, domain string, workflowID string, runID string, activityID string, result interface{}, err error) error {
 	ret := _m.Called(ctx, domain, workflowID, runID, activityID, result, err)
 
-	if len(ret) == 0 {
-		panic("no return value specified for CompleteActivityByID")
-	}
-
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, interface{}, error) error); ok {
 		r0 = rf(ctx, domain, workflowID, runID, activityID, result, err)
@@ -102,15 +90,7 @@ func (_m *Client) CompleteActivityByID(ctx context.Context, domain string, workf
 func (_m *Client) CountWorkflow(ctx context.Context, request *shared.CountWorkflowExecutionsRequest) (*shared.CountWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	if len(ret) == 0 {
-		panic("no return value specified for CountWorkflow")
-	}
-
 	var r0 *shared.CountWorkflowExecutionsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.CountWorkflowExecutionsRequest) (*shared.CountWorkflowExecutionsResponse, error)); ok {
-		return rf(ctx, request)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, *shared.CountWorkflowExecutionsRequest) *shared.CountWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
@@ -119,6 +99,7 @@ func (_m *Client) CountWorkflow(ctx context.Context, request *shared.CountWorkfl
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *shared.CountWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
@@ -132,15 +113,7 @@ func (_m *Client) CountWorkflow(ctx context.Context, request *shared.CountWorkfl
 func (_m *Client) DescribeTaskList(ctx context.Context, tasklist string, tasklistType shared.TaskListType) (*shared.DescribeTaskListResponse, error) {
 	ret := _m.Called(ctx, tasklist, tasklistType)
 
-	if len(ret) == 0 {
-		panic("no return value specified for DescribeTaskList")
-	}
-
 	var r0 *shared.DescribeTaskListResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, shared.TaskListType) (*shared.DescribeTaskListResponse, error)); ok {
-		return rf(ctx, tasklist, tasklistType)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, shared.TaskListType) *shared.DescribeTaskListResponse); ok {
 		r0 = rf(ctx, tasklist, tasklistType)
 	} else {
@@ -149,6 +122,7 @@ func (_m *Client) DescribeTaskList(ctx context.Context, tasklist string, tasklis
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, shared.TaskListType) error); ok {
 		r1 = rf(ctx, tasklist, tasklistType)
 	} else {
@@ -162,15 +136,7 @@ func (_m *Client) DescribeTaskList(ctx context.Context, tasklist string, tasklis
 func (_m *Client) DescribeWorkflowExecution(ctx context.Context, workflowID string, runID string) (*shared.DescribeWorkflowExecutionResponse, error) {
 	ret := _m.Called(ctx, workflowID, runID)
 
-	if len(ret) == 0 {
-		panic("no return value specified for DescribeWorkflowExecution")
-	}
-
 	var r0 *shared.DescribeWorkflowExecutionResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*shared.DescribeWorkflowExecutionResponse, error)); ok {
-		return rf(ctx, workflowID, runID)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) *shared.DescribeWorkflowExecutionResponse); ok {
 		r0 = rf(ctx, workflowID, runID)
 	} else {
@@ -179,6 +145,7 @@ func (_m *Client) DescribeWorkflowExecution(ctx context.Context, workflowID stri
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = rf(ctx, workflowID, runID)
 	} else {
@@ -195,15 +162,7 @@ func (_m *Client) ExecuteWorkflow(ctx context.Context, options internal.StartWor
 	_ca = append(_ca, args...)
 	ret := _m.Called(_ca...)
 
-	if len(ret) == 0 {
-		panic("no return value specified for ExecuteWorkflow")
-	}
-
 	var r0 internal.WorkflowRun
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) (internal.WorkflowRun, error)); ok {
-		return rf(ctx, options, workflow, args...)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) internal.WorkflowRun); ok {
 		r0 = rf(ctx, options, workflow, args...)
 	} else {
@@ -212,6 +171,7 @@ func (_m *Client) ExecuteWorkflow(ctx context.Context, options internal.StartWor
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) error); ok {
 		r1 = rf(ctx, options, workflow, args...)
 	} else {
@@ -225,15 +185,7 @@ func (_m *Client) ExecuteWorkflow(ctx context.Context, options internal.StartWor
 func (_m *Client) GetSearchAttributes(ctx context.Context) (*shared.GetSearchAttributesResponse, error) {
 	ret := _m.Called(ctx)
 
-	if len(ret) == 0 {
-		panic("no return value specified for GetSearchAttributes")
-	}
-
 	var r0 *shared.GetSearchAttributesResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*shared.GetSearchAttributesResponse, error)); ok {
-		return rf(ctx)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context) *shared.GetSearchAttributesResponse); ok {
 		r0 = rf(ctx)
 	} else {
@@ -242,6 +194,7 @@ func (_m *Client) GetSearchAttributes(ctx context.Context) (*shared.GetSearchAtt
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
 		r1 = rf(ctx)
 	} else {
@@ -254,10 +207,6 @@ func (_m *Client) GetSearchAttributes(ctx context.Context) (*shared.GetSearchAtt
 // GetWorkflow provides a mock function with given fields: ctx, workflowID, runID
 func (_m *Client) GetWorkflow(ctx context.Context, workflowID string, runID string) internal.WorkflowRun {
 	ret := _m.Called(ctx, workflowID, runID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetWorkflow")
-	}
 
 	var r0 internal.WorkflowRun
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) internal.WorkflowRun); ok {
@@ -275,10 +224,6 @@ func (_m *Client) GetWorkflow(ctx context.Context, workflowID string, runID stri
 func (_m *Client) GetWorkflowHistory(ctx context.Context, workflowID string, runID string, isLongPoll bool, filterType shared.HistoryEventFilterType) internal.HistoryEventIterator {
 	ret := _m.Called(ctx, workflowID, runID, isLongPoll, filterType)
 
-	if len(ret) == 0 {
-		panic("no return value specified for GetWorkflowHistory")
-	}
-
 	var r0 internal.HistoryEventIterator
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool, shared.HistoryEventFilterType) internal.HistoryEventIterator); ok {
 		r0 = rf(ctx, workflowID, runID, isLongPoll, filterType)
@@ -295,15 +240,7 @@ func (_m *Client) GetWorkflowHistory(ctx context.Context, workflowID string, run
 func (_m *Client) ListArchivedWorkflow(ctx context.Context, request *shared.ListArchivedWorkflowExecutionsRequest) (*shared.ListArchivedWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	if len(ret) == 0 {
-		panic("no return value specified for ListArchivedWorkflow")
-	}
-
 	var r0 *shared.ListArchivedWorkflowExecutionsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListArchivedWorkflowExecutionsRequest) (*shared.ListArchivedWorkflowExecutionsResponse, error)); ok {
-		return rf(ctx, request)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListArchivedWorkflowExecutionsRequest) *shared.ListArchivedWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
@@ -312,6 +249,7 @@ func (_m *Client) ListArchivedWorkflow(ctx context.Context, request *shared.List
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListArchivedWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
@@ -325,15 +263,7 @@ func (_m *Client) ListArchivedWorkflow(ctx context.Context, request *shared.List
 func (_m *Client) ListClosedWorkflow(ctx context.Context, request *shared.ListClosedWorkflowExecutionsRequest) (*shared.ListClosedWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	if len(ret) == 0 {
-		panic("no return value specified for ListClosedWorkflow")
-	}
-
 	var r0 *shared.ListClosedWorkflowExecutionsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListClosedWorkflowExecutionsRequest) (*shared.ListClosedWorkflowExecutionsResponse, error)); ok {
-		return rf(ctx, request)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListClosedWorkflowExecutionsRequest) *shared.ListClosedWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
@@ -342,6 +272,7 @@ func (_m *Client) ListClosedWorkflow(ctx context.Context, request *shared.ListCl
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListClosedWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
@@ -355,15 +286,7 @@ func (_m *Client) ListClosedWorkflow(ctx context.Context, request *shared.ListCl
 func (_m *Client) ListOpenWorkflow(ctx context.Context, request *shared.ListOpenWorkflowExecutionsRequest) (*shared.ListOpenWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	if len(ret) == 0 {
-		panic("no return value specified for ListOpenWorkflow")
-	}
-
 	var r0 *shared.ListOpenWorkflowExecutionsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListOpenWorkflowExecutionsRequest) (*shared.ListOpenWorkflowExecutionsResponse, error)); ok {
-		return rf(ctx, request)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListOpenWorkflowExecutionsRequest) *shared.ListOpenWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
@@ -372,6 +295,7 @@ func (_m *Client) ListOpenWorkflow(ctx context.Context, request *shared.ListOpen
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListOpenWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
@@ -385,15 +309,7 @@ func (_m *Client) ListOpenWorkflow(ctx context.Context, request *shared.ListOpen
 func (_m *Client) ListWorkflow(ctx context.Context, request *shared.ListWorkflowExecutionsRequest) (*shared.ListWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	if len(ret) == 0 {
-		panic("no return value specified for ListWorkflow")
-	}
-
 	var r0 *shared.ListWorkflowExecutionsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListWorkflowExecutionsRequest) (*shared.ListWorkflowExecutionsResponse, error)); ok {
-		return rf(ctx, request)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListWorkflowExecutionsRequest) *shared.ListWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
@@ -402,6 +318,7 @@ func (_m *Client) ListWorkflow(ctx context.Context, request *shared.ListWorkflow
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
@@ -418,15 +335,7 @@ func (_m *Client) QueryWorkflow(ctx context.Context, workflowID string, runID st
 	_ca = append(_ca, args...)
 	ret := _m.Called(_ca...)
 
-	if len(ret) == 0 {
-		panic("no return value specified for QueryWorkflow")
-	}
-
 	var r0 internal.Value
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, ...interface{}) (internal.Value, error)); ok {
-		return rf(ctx, workflowID, runID, queryType, args...)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, ...interface{}) internal.Value); ok {
 		r0 = rf(ctx, workflowID, runID, queryType, args...)
 	} else {
@@ -435,6 +344,7 @@ func (_m *Client) QueryWorkflow(ctx context.Context, workflowID string, runID st
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, ...interface{}) error); ok {
 		r1 = rf(ctx, workflowID, runID, queryType, args...)
 	} else {
@@ -448,15 +358,7 @@ func (_m *Client) QueryWorkflow(ctx context.Context, workflowID string, runID st
 func (_m *Client) QueryWorkflowWithOptions(ctx context.Context, request *internal.QueryWorkflowWithOptionsRequest) (*internal.QueryWorkflowWithOptionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	if len(ret) == 0 {
-		panic("no return value specified for QueryWorkflowWithOptions")
-	}
-
 	var r0 *internal.QueryWorkflowWithOptionsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *internal.QueryWorkflowWithOptionsRequest) (*internal.QueryWorkflowWithOptionsResponse, error)); ok {
-		return rf(ctx, request)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, *internal.QueryWorkflowWithOptionsRequest) *internal.QueryWorkflowWithOptionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
@@ -465,6 +367,7 @@ func (_m *Client) QueryWorkflowWithOptions(ctx context.Context, request *interna
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *internal.QueryWorkflowWithOptionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
@@ -480,10 +383,6 @@ func (_m *Client) RecordActivityHeartbeat(ctx context.Context, taskToken []byte,
 	_ca = append(_ca, ctx, taskToken)
 	_ca = append(_ca, details...)
 	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RecordActivityHeartbeat")
-	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, []byte, ...interface{}) error); ok {
@@ -502,10 +401,6 @@ func (_m *Client) RecordActivityHeartbeatByID(ctx context.Context, domain string
 	_ca = append(_ca, details...)
 	ret := _m.Called(_ca...)
 
-	if len(ret) == 0 {
-		panic("no return value specified for RecordActivityHeartbeatByID")
-	}
-
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, ...interface{}) error); ok {
 		r0 = rf(ctx, domain, workflowID, runID, activityID, details...)
@@ -519,10 +414,6 @@ func (_m *Client) RecordActivityHeartbeatByID(ctx context.Context, domain string
 // RefreshWorkflowTasks provides a mock function with given fields: ctx, workflowID, runID
 func (_m *Client) RefreshWorkflowTasks(ctx context.Context, workflowID string, runID string) error {
 	ret := _m.Called(ctx, workflowID, runID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RefreshWorkflowTasks")
-	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
@@ -538,15 +429,7 @@ func (_m *Client) RefreshWorkflowTasks(ctx context.Context, workflowID string, r
 func (_m *Client) ResetWorkflow(ctx context.Context, request *shared.ResetWorkflowExecutionRequest) (*shared.ResetWorkflowExecutionResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	if len(ret) == 0 {
-		panic("no return value specified for ResetWorkflow")
-	}
-
 	var r0 *shared.ResetWorkflowExecutionResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ResetWorkflowExecutionRequest) (*shared.ResetWorkflowExecutionResponse, error)); ok {
-		return rf(ctx, request)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, *shared.ResetWorkflowExecutionRequest) *shared.ResetWorkflowExecutionResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
@@ -555,6 +438,7 @@ func (_m *Client) ResetWorkflow(ctx context.Context, request *shared.ResetWorkfl
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *shared.ResetWorkflowExecutionRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
@@ -568,15 +452,7 @@ func (_m *Client) ResetWorkflow(ctx context.Context, request *shared.ResetWorkfl
 func (_m *Client) ScanWorkflow(ctx context.Context, request *shared.ListWorkflowExecutionsRequest) (*shared.ListWorkflowExecutionsResponse, error) {
 	ret := _m.Called(ctx, request)
 
-	if len(ret) == 0 {
-		panic("no return value specified for ScanWorkflow")
-	}
-
 	var r0 *shared.ListWorkflowExecutionsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListWorkflowExecutionsRequest) (*shared.ListWorkflowExecutionsResponse, error)); ok {
-		return rf(ctx, request)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, *shared.ListWorkflowExecutionsRequest) *shared.ListWorkflowExecutionsResponse); ok {
 		r0 = rf(ctx, request)
 	} else {
@@ -585,6 +461,7 @@ func (_m *Client) ScanWorkflow(ctx context.Context, request *shared.ListWorkflow
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *shared.ListWorkflowExecutionsRequest) error); ok {
 		r1 = rf(ctx, request)
 	} else {
@@ -601,15 +478,7 @@ func (_m *Client) SignalWithStartWorkflow(ctx context.Context, workflowID string
 	_ca = append(_ca, workflowArgs...)
 	ret := _m.Called(_ca...)
 
-	if len(ret) == 0 {
-		panic("no return value specified for SignalWithStartWorkflow")
-	}
-
 	var r0 *internal.WorkflowExecution
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, interface{}, internal.StartWorkflowOptions, interface{}, ...interface{}) (*internal.WorkflowExecution, error)); ok {
-		return rf(ctx, workflowID, signalName, signalArg, options, workflowFunc, workflowArgs...)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, interface{}, internal.StartWorkflowOptions, interface{}, ...interface{}) *internal.WorkflowExecution); ok {
 		r0 = rf(ctx, workflowID, signalName, signalArg, options, workflowFunc, workflowArgs...)
 	} else {
@@ -618,6 +487,7 @@ func (_m *Client) SignalWithStartWorkflow(ctx context.Context, workflowID string
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, interface{}, internal.StartWorkflowOptions, interface{}, ...interface{}) error); ok {
 		r1 = rf(ctx, workflowID, signalName, signalArg, options, workflowFunc, workflowArgs...)
 	} else {
@@ -634,15 +504,7 @@ func (_m *Client) SignalWithStartWorkflowAsync(ctx context.Context, workflowID s
 	_ca = append(_ca, workflowArgs...)
 	ret := _m.Called(_ca...)
 
-	if len(ret) == 0 {
-		panic("no return value specified for SignalWithStartWorkflowAsync")
-	}
-
 	var r0 *internal.WorkflowExecutionAsync
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, interface{}, internal.StartWorkflowOptions, interface{}, ...interface{}) (*internal.WorkflowExecutionAsync, error)); ok {
-		return rf(ctx, workflowID, signalName, signalArg, options, workflow, workflowArgs...)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, interface{}, internal.StartWorkflowOptions, interface{}, ...interface{}) *internal.WorkflowExecutionAsync); ok {
 		r0 = rf(ctx, workflowID, signalName, signalArg, options, workflow, workflowArgs...)
 	} else {
@@ -651,6 +513,7 @@ func (_m *Client) SignalWithStartWorkflowAsync(ctx context.Context, workflowID s
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, interface{}, internal.StartWorkflowOptions, interface{}, ...interface{}) error); ok {
 		r1 = rf(ctx, workflowID, signalName, signalArg, options, workflow, workflowArgs...)
 	} else {
@@ -663,10 +526,6 @@ func (_m *Client) SignalWithStartWorkflowAsync(ctx context.Context, workflowID s
 // SignalWorkflow provides a mock function with given fields: ctx, workflowID, runID, signalName, arg
 func (_m *Client) SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error {
 	ret := _m.Called(ctx, workflowID, runID, signalName, arg)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SignalWorkflow")
-	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, interface{}) error); ok {
@@ -685,15 +544,7 @@ func (_m *Client) StartWorkflow(ctx context.Context, options internal.StartWorkf
 	_ca = append(_ca, args...)
 	ret := _m.Called(_ca...)
 
-	if len(ret) == 0 {
-		panic("no return value specified for StartWorkflow")
-	}
-
 	var r0 *internal.WorkflowExecution
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) (*internal.WorkflowExecution, error)); ok {
-		return rf(ctx, options, workflowFunc, args...)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) *internal.WorkflowExecution); ok {
 		r0 = rf(ctx, options, workflowFunc, args...)
 	} else {
@@ -702,6 +553,7 @@ func (_m *Client) StartWorkflow(ctx context.Context, options internal.StartWorkf
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) error); ok {
 		r1 = rf(ctx, options, workflowFunc, args...)
 	} else {
@@ -718,15 +570,7 @@ func (_m *Client) StartWorkflowAsync(ctx context.Context, options internal.Start
 	_ca = append(_ca, args...)
 	ret := _m.Called(_ca...)
 
-	if len(ret) == 0 {
-		panic("no return value specified for StartWorkflowAsync")
-	}
-
 	var r0 *internal.WorkflowExecutionAsync
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) (*internal.WorkflowExecutionAsync, error)); ok {
-		return rf(ctx, options, workflow, args...)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) *internal.WorkflowExecutionAsync); ok {
 		r0 = rf(ctx, options, workflow, args...)
 	} else {
@@ -735,6 +579,7 @@ func (_m *Client) StartWorkflowAsync(ctx context.Context, options internal.Start
 		}
 	}
 
+	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) error); ok {
 		r1 = rf(ctx, options, workflow, args...)
 	} else {
@@ -748,10 +593,6 @@ func (_m *Client) StartWorkflowAsync(ctx context.Context, options internal.Start
 func (_m *Client) TerminateWorkflow(ctx context.Context, workflowID string, runID string, reason string, details []byte) error {
 	ret := _m.Called(ctx, workflowID, runID, reason, details)
 
-	if len(ret) == 0 {
-		panic("no return value specified for TerminateWorkflow")
-	}
-
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []byte) error); ok {
 		r0 = rf(ctx, workflowID, runID, reason, details)
@@ -762,12 +603,13 @@ func (_m *Client) TerminateWorkflow(ctx context.Context, workflowID string, runI
 	return r0
 }
 
-// NewClient creates a new instance of Client. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
-// The first argument is typically a *testing.T value.
-func NewClient(t interface {
+type mockConstructorTestingTNewClient interface {
 	mock.TestingT
 	Cleanup(func())
-}) *Client {
+}
+
+// NewClient creates a new instance of Client. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+func NewClient(t mockConstructorTestingTNewClient) *Client {
 	mock := &Client{}
 	mock.Mock.Test(t)
 

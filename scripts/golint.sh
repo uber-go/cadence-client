@@ -5,7 +5,7 @@ set -exu -o pipefail
 #make tidy
 #make build
 
-val=$(git status --porcelain 2>&1)
+val="$(git status --porcelain 2>&1)"
 
 echo 'still here'
 

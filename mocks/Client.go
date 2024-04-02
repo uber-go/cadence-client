@@ -497,6 +497,32 @@ func (_m *Client) SignalWithStartWorkflow(ctx context.Context, workflowID string
 	return r0, r1
 }
 
+// SignalWithStartWorkflowAsync provides a mock function with given fields: ctx, workflowID, signalName, signalArg, options, workflow, workflowArgs
+func (_m *Client) SignalWithStartWorkflowAsync(ctx context.Context, workflowID string, signalName string, signalArg interface{}, options internal.StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (*internal.WorkflowExecutionAsync, error) {
+	var _ca []interface{}
+	_ca = append(_ca, ctx, workflowID, signalName, signalArg, options, workflow)
+	_ca = append(_ca, workflowArgs...)
+	ret := _m.Called(_ca...)
+
+	var r0 *internal.WorkflowExecutionAsync
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, interface{}, internal.StartWorkflowOptions, interface{}, ...interface{}) *internal.WorkflowExecutionAsync); ok {
+		r0 = rf(ctx, workflowID, signalName, signalArg, options, workflow, workflowArgs...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*internal.WorkflowExecutionAsync)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, interface{}, internal.StartWorkflowOptions, interface{}, ...interface{}) error); ok {
+		r1 = rf(ctx, workflowID, signalName, signalArg, options, workflow, workflowArgs...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SignalWorkflow provides a mock function with given fields: ctx, workflowID, runID, signalName, arg
 func (_m *Client) SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error {
 	ret := _m.Called(ctx, workflowID, runID, signalName, arg)
@@ -530,6 +556,32 @@ func (_m *Client) StartWorkflow(ctx context.Context, options internal.StartWorkf
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) error); ok {
 		r1 = rf(ctx, options, workflowFunc, args...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// StartWorkflowAsync provides a mock function with given fields: ctx, options, workflow, args
+func (_m *Client) StartWorkflowAsync(ctx context.Context, options internal.StartWorkflowOptions, workflow interface{}, args ...interface{}) (*internal.WorkflowExecutionAsync, error) {
+	var _ca []interface{}
+	_ca = append(_ca, ctx, options, workflow)
+	_ca = append(_ca, args...)
+	ret := _m.Called(_ca...)
+
+	var r0 *internal.WorkflowExecutionAsync
+	if rf, ok := ret.Get(0).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) *internal.WorkflowExecutionAsync); ok {
+		r0 = rf(ctx, options, workflow, args...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*internal.WorkflowExecutionAsync)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, internal.StartWorkflowOptions, interface{}, ...interface{}) error); ok {
+		r1 = rf(ctx, options, workflow, args...)
 	} else {
 		r1 = ret.Error(1)
 	}

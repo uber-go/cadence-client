@@ -178,7 +178,7 @@ func (wc *workflowClient) StartWorkflow(
 	}
 
 	if wc.metricsScope != nil {
-		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, startRequest.WorkflowType.GetName())
+		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, *startRequest.WorkflowType.Name)
 		scope.Counter(metrics.WorkflowStartCounter).Inc(1)
 	}
 
@@ -189,7 +189,7 @@ func (wc *workflowClient) StartWorkflow(
 	return executionInfo, nil
 }
 
-// StartWorkflowAsync queues a workflow execution which is going to be picked up and started by Cadence backend asynchronously.
+// StartWorkflowAsync behaves like StartWorkflow except that the request is queued and processed by Cadence backend asynchronously.
 // See StartWorkflow for details about inputs and usage.
 func (wc *workflowClient) StartWorkflowAsync(
 	ctx context.Context,
@@ -222,8 +222,8 @@ func (wc *workflowClient) StartWorkflowAsync(
 	}
 
 	if wc.metricsScope != nil {
-		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, startRequest.WorkflowType.GetName())
-		scope.Counter(metrics.WorkflowStartCounter).Inc(1)
+		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, *startRequest.WorkflowType.Name)
+		scope.Counter(metrics.WorkflowStartAsyncCounter).Inc(1)
 	}
 
 	executionInfo := &WorkflowExecutionAsync{
@@ -342,7 +342,7 @@ func (wc *workflowClient) SignalWithStartWorkflow(
 	}
 
 	if wc.metricsScope != nil {
-		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, signalWithStartRequest.WorkflowType.GetName())
+		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, *signalWithStartRequest.WorkflowType.Name)
 		scope.Counter(metrics.WorkflowSignalWithStartCounter).Inc(1)
 	}
 
@@ -388,8 +388,8 @@ func (wc *workflowClient) SignalWithStartWorkflowAsync(
 	}
 
 	if wc.metricsScope != nil {
-		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, signalWithStartRequest.WorkflowType.GetName())
-		scope.Counter(metrics.WorkflowSignalWithStartCounter).Inc(1)
+		scope := wc.metricsScope.GetTaggedScope(tagTaskList, options.TaskList, tagWorkflowType, *signalWithStartRequest.WorkflowType.Name)
+		scope.Counter(metrics.WorkflowSignalWithStartAsyncCounter).Inc(1)
 	}
 
 	executionInfo := &WorkflowExecutionAsync{

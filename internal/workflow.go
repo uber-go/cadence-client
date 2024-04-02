@@ -400,7 +400,7 @@ type (
 		RunID string
 	}
 
-	// WorkflowExecutuonAsync Details.
+	// WorkflowExecutionAsync Details.
 	WorkflowExecutionAsync struct {
 		ID string
 	}

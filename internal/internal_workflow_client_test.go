@@ -262,7 +262,7 @@ func (s *historyEventIteratorSuite) TestIterator_NoError_EmptyPage() {
 	s.Equal(2, len(events))
 }
 
-func (s *historyEventIteratorSuite) TestIterator_Error() {
+func (s *historyEventIteratorSuite) TestIterator_RPCError() {
 	filterType := shared.HistoryEventFilterTypeAllEvent
 	request1 := getGetWorkflowExecutionHistoryRequest(filterType)
 	response1 := &shared.GetWorkflowExecutionHistoryResponse{
@@ -1059,7 +1059,7 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflow() {
 	s.Equal(createResponse.GetRunId(), resp.RunID)
 }
 
-func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_Error() {
+func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_RPCError() {
 	signalName := "my signal"
 	signalInput := []byte("my signal input")
 	options := StartWorkflowOptions{}
@@ -1091,8 +1091,7 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_Error() {
 }
 
 func (s *workflowClientTestSuite) TestStartWorkflow() {
-	client, ok := s.client.(*workflowClient)
-	s.True(ok)
+	client := s.client.(*workflowClient)
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1116,8 +1115,7 @@ func (s *workflowClientTestSuite) TestStartWorkflow() {
 
 func (s *workflowClientTestSuite) TestStartWorkflow_WithContext() {
 	s.client = NewClient(s.service, domain, &ClientOptions{ContextPropagators: []ContextPropagator{NewStringMapPropagator([]string{testHeader})}})
-	client, ok := s.client.(*workflowClient)
-	s.True(ok)
+	client := s.client.(*workflowClient)
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1146,8 +1144,7 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithContext() {
 func (s *workflowClientTestSuite) TestStartWorkflow_WithDataConverter() {
 	dc := newTestDataConverter()
 	s.client = NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
-	client, ok := s.client.(*workflowClient)
-	s.True(ok)
+	client := s.client.(*workflowClient)
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1215,8 +1212,7 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithMemoAndSearchAttr() {
 }
 
 func (s *workflowClientTestSuite) TestStartWorkflow_RequestCreationFails() {
-	client, ok := s.client.(*workflowClient)
-	s.True(ok)
+	client := s.client.(*workflowClient)
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        "", // this causes error
@@ -1228,11 +1224,10 @@ func (s *workflowClientTestSuite) TestStartWorkflow_RequestCreationFails() {
 	}
 
 	_, err := client.StartWorkflow(context.Background(), options, f1, []byte("test"))
-	s.Equal(getDefaultDataConverter(), client.dataConverter)
-	s.Error(err)
+	s.ErrorContains(err, "missing TaskList")
 }
 
-func (s *workflowClientTestSuite) TestStartWorkflow_Error() {
+func (s *workflowClientTestSuite) TestStartWorkflow_RPCError() {
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1244,7 +1239,7 @@ func (s *workflowClientTestSuite) TestStartWorkflow_Error() {
 	}
 	startResp := &shared.StartWorkflowExecutionResponse{}
 
-	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, errors.New("failed")).AnyTimes()
+	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, errors.New("failed")).MinTimes(1)
 
 	// Pass a context with a deadline so error retry doesn't take forever
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -1339,7 +1334,7 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_RequestCreationFai
 	}
 
 	_, err := s.client.SignalWithStartWorkflow(context.Background(), "wid", "signal", "value", options, wf)
-	s.Error(err)
+	s.ErrorContains(err, "missing TaskList")
 }
 
 func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_RequestCreationFails() {
@@ -1354,10 +1349,10 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_RequestCreati
 	}
 
 	_, err := s.client.SignalWithStartWorkflowAsync(context.Background(), "wid", "signal", "value", options, wf)
-	s.Error(err)
+	s.ErrorContains(err, "missing TaskList")
 }
 
-func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_Error() {
+func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_RPCError() {
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1369,7 +1364,7 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_Error() {
 	}
 
 	s.service.EXPECT().SignalWithStartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any(),
-		gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("failed")).AnyTimes()
+		gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("failed")).MinTimes(1)
 
 	// Pass a context with a deadline so error retry doesn't take forever
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -1379,8 +1374,7 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_Error() {
 }
 
 func (s *workflowClientTestSuite) TestStartWorkflowAsync() {
-	client, ok := s.client.(*workflowClient)
-	s.True(ok)
+	client := s.client.(*workflowClient)
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1401,8 +1395,7 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync() {
 func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithDataConverter() {
 	dc := newTestDataConverter()
 	s.client = NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
-	client, ok := s.client.(*workflowClient)
-	s.True(ok)
+	client := s.client.(*workflowClient)
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1467,8 +1460,7 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithMemoAndSearchAttr()
 }
 
 func (s *workflowClientTestSuite) TestStartWorkflowAsync_RequestCreationFails() {
-	client, ok := s.client.(*workflowClient)
-	s.True(ok)
+	client := s.client.(*workflowClient)
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        "", // this causes error
@@ -1479,10 +1471,10 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync_RequestCreationFails() 
 		return "result"
 	}
 	_, err := client.StartWorkflowAsync(context.Background(), options, f1, []byte("test"))
-	s.Error(err)
+	s.ErrorContains(err, "missing TaskList")
 }
 
-func (s *workflowClientTestSuite) TestStartWorkflowAsync_Error() {
+func (s *workflowClientTestSuite) TestStartWorkflowAsync_RPCError() {
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1493,7 +1485,7 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync_Error() {
 		return "result"
 	}
 
-	s.service.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("failed")).AnyTimes()
+	s.service.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("failed")).MinTimes(1)
 
 	// Pass a context with a deadline so error retry doesn't take forever
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -1818,6 +1810,7 @@ func TestGetWorkflowStartRequest(t *testing.T) {
 				JitterStart:                     0 * time.Second,
 			},
 			workflowFunc: func(ctx Context, a, b int) {}, // this causes error because args not provided
+			args:         []interface{}{},
 			wantErr:      "expected 2 args for function",
 		},
 	}
@@ -1842,7 +1835,7 @@ func TestGetWorkflowStartRequest(t *testing.T) {
 
 			assert.NoError(t, err)
 
-			// set the fields that are not set in the expected request
+			// set the randomized fields in the expected request before comparison
 			tc.wantRequest.Identity = &wc.identity
 			tc.wantRequest.RequestId = gotReq.RequestId
 

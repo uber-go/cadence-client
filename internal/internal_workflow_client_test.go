@@ -21,7 +21,6 @@ package internal
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -1199,14 +1198,8 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithMemoAndSearchAttr() {
 
 	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, nil).
 		Do(func(_ interface{}, req *shared.StartWorkflowExecutionRequest, _ ...interface{}) {
-			var resultMemo, resultAttr string
-			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
-			s.NoError(err)
-			s.Equal("memo value", resultMemo)
-
-			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
-			s.NoError(err)
-			s.Equal("attr value", resultAttr)
+			s.Equal(`"memo value"`, req.Memo.Fields["testMemo"], "memos must be JSON-encoded")
+			s.Equal(`"attr value"`, req.SearchAttributes.IndexedFields["testAttr"], "search attributes must be JSON-encoded")
 		})
 
 	_, err := s.client.StartWorkflow(context.Background(), options, wf)
@@ -1273,14 +1266,8 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_WithMemoAndSearchA
 	s.service.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(),
 		gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, nil).
 		Do(func(_ interface{}, req *shared.SignalWithStartWorkflowExecutionRequest, _ ...interface{}) {
-			var resultMemo, resultAttr string
-			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
-			s.NoError(err)
-			s.Equal("memo value", resultMemo)
-
-			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
-			s.NoError(err)
-			s.Equal("attr value", resultAttr)
+			s.Equal(`"memo value"`, req.Memo.Fields["testMemo"], "memos must be JSON-encoded")
+			s.Equal(`"attr value"`, req.SearchAttributes.IndexedFields["testAttr"], "search attributes must be JSON-encoded")
 		})
 
 	_, err := s.client.SignalWithStartWorkflow(context.Background(), "wid", "signal", "value", options, wf)
@@ -1310,14 +1297,8 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_WithMemoAndSe
 		gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).
 		Do(func(_ interface{}, asyncReq *shared.SignalWithStartWorkflowExecutionAsyncRequest, _ ...interface{}) {
 			req := asyncReq.Request
-			var resultMemo, resultAttr string
-			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
-			s.NoError(err)
-			s.Equal("memo value", resultMemo)
-
-			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
-			s.NoError(err)
-			s.Equal("attr value", resultAttr)
+			s.Equal(`"memo value"`, req.Memo.Fields["testMemo"], "memos must be JSON-encoded")
+			s.Equal(`"attr value"`, req.SearchAttributes.IndexedFields["testAttr"], "search attributes must be JSON-encoded")
 		})
 
 	_, err := s.client.SignalWithStartWorkflowAsync(context.Background(), "wid", "signal", "value", options, wf)
@@ -1408,13 +1389,15 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithDataConverter() {
 	}
 	input := []byte("test")
 
+	// this test requires that the overridden test-data-converter is used, so we need to make sure the encoded input looks correct.
+	// the test data converter's output doesn't actually matter as long as it's noticeably different.
 	correctlyEncoded, err := dc.ToData([]interface{}{input})
 	require.NoError(s.T(), err, "test data converter should not fail on simple inputs")
-	defaultEncoded, err := getDefaultDataConverter().ToData([]interface{}{input})
+	wrongDefaultEncoding, err := getDefaultDataConverter().ToData([]interface{}{input})
 	require.NoError(s.T(), err, "default data converter should not fail on simple inputs")
 
 	// sanity check: we must be able to tell right from wrong
-	require.NotEqual(s.T(), correctlyEncoded, defaultEncoded, "test data converter should encode differently or the test is not valid")
+	require.NotEqual(s.T(), correctlyEncoded, wrongDefaultEncoding, "test data converter should encode differently or the test is not valid")
 
 	s.service.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).
 		Do(func(_ interface{}, asyncReq *shared.StartWorkflowExecutionAsyncRequest, _ ...interface{}) {
@@ -1447,14 +1430,8 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithMemoAndSearchAttr()
 	s.service.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).
 		Do(func(_ interface{}, asyncReq *shared.StartWorkflowExecutionAsyncRequest, _ ...interface{}) {
 			req := asyncReq.Request
-			var resultMemo, resultAttr string
-			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
-			s.NoError(err)
-			s.Equal("memo value", resultMemo)
-
-			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
-			s.NoError(err)
-			s.Equal("attr value", resultAttr)
+			s.Equal(`"memo value"`, req.Memo.Fields["testMemo"], "memos must be JSON-encoded")
+			s.Equal(`"attr value"`, req.SearchAttributes.IndexedFields["testAttr"], "search attributes must be JSON-encoded")
 		})
 
 	_, err := s.client.StartWorkflowAsync(context.Background(), options, wf)

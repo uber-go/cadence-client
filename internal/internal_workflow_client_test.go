@@ -32,6 +32,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/yarpc"
 
@@ -1143,8 +1144,7 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithContext() {
 
 func (s *workflowClientTestSuite) TestStartWorkflow_WithDataConverter() {
 	dc := newTestDataConverter()
-	s.client = NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
-	client := s.client.(*workflowClient)
+	client := NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1156,21 +1156,23 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithDataConverter() {
 	}
 	input := []byte("test")
 
+	correctlyEncoded, err := dc.ToData([]interface{}{input})
+	require.NoError(s.T(), err, "test data converter should not fail on simple inputs")
+	defaultEncoded, err := getDefaultDataConverter().ToData([]interface{}{input})
+	require.NoError(s.T(), err, "default data converter should not fail on simple inputs")
+
+	// sanity check: we must be able to tell right from wrong
+	require.NotEqual(s.T(), correctlyEncoded, defaultEncoded, "test data converter should encode differently or the test is not valid")
+
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
 	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).
 		Do(func(_ interface{}, req *shared.StartWorkflowExecutionRequest, _ ...interface{}) {
-			dc := client.dataConverter
-			encodedArg, _ := dc.ToData(input)
-			s.Equal(req.Input, encodedArg)
-			var decodedArg []byte
-			dc.FromData(req.Input, &decodedArg)
-			s.Equal(input, decodedArg)
+			assert.Equal(s.T(), correctlyEncoded, req.Input, "client-encoded data should use the customized data converter")
 		})
 
 	resp, err := client.StartWorkflow(context.Background(), options, f1, input)
-	s.Equal(newTestDataConverter(), client.dataConverter)
 	s.NoError(err)
 	s.Equal(createResponse.GetRunId(), resp.RunID)
 }
@@ -1394,8 +1396,7 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync() {
 
 func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithDataConverter() {
 	dc := newTestDataConverter()
-	s.client = NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
-	client := s.client.(*workflowClient)
+	client := NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1407,19 +1408,20 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithDataConverter() {
 	}
 	input := []byte("test")
 
+	correctlyEncoded, err := dc.ToData([]interface{}{input})
+	require.NoError(s.T(), err, "test data converter should not fail on simple inputs")
+	defaultEncoded, err := getDefaultDataConverter().ToData([]interface{}{input})
+	require.NoError(s.T(), err, "default data converter should not fail on simple inputs")
+
+	// sanity check: we must be able to tell right from wrong
+	require.NotEqual(s.T(), correctlyEncoded, defaultEncoded, "test data converter should encode differently or the test is not valid")
+
 	s.service.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).
 		Do(func(_ interface{}, asyncReq *shared.StartWorkflowExecutionAsyncRequest, _ ...interface{}) {
-			req := asyncReq.Request
-			dc := client.dataConverter
-			encodedArg, _ := dc.ToData(input)
-			s.Equal(req.Input, encodedArg)
-			var decodedArg []byte
-			dc.FromData(req.Input, &decodedArg)
-			s.Equal(input, decodedArg)
+			assert.Equal(s.T(), correctlyEncoded, asyncReq.Request.Input, "client-encoded data should use the customized data converter")
 		})
 
-	_, err := client.StartWorkflowAsync(context.Background(), options, f1, input)
-	s.Equal(newTestDataConverter(), client.dataConverter)
+	_, err = client.StartWorkflowAsync(context.Background(), options, f1, input)
 	s.NoError(err)
 }
 

@@ -5,8 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-## [v1.2.10-rc.1] - 2024-03-22
+## [v1.2.10] - 2024-04-05
 ### Added 
+-  Update client wrappers with new async APIs (#1327)
+- Server-like `make build` and ensuring builds are clean in CI (#1329)
+- Pin mockery and regenerate everything (#1328)
+- Enforce 85% new line coverage (#1325)
 - Fix coverage metadata commit info (#1323)
 -  Add documentation for propagators and how they are executed (#1312)
 - Update idl and add wrapper implementaton for async start/signalwithstart APIs (#1321)

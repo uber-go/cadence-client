@@ -93,6 +93,15 @@ type (
 		// subjected to change in the future.
 		StartWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*WorkflowExecution, error)
 
+		// StartWorkflowAsync behaves like StartWorkflow except that the request is first queued and then processed asynchronously.
+		// See StartWorkflow for parameter details.
+		// The returned AsyncWorkflowExecution doesn't contain run ID, because the workflow hasn't started yet.
+		// The errors it can return:
+		//	- EntityNotExistsError, if domain does not exists
+		//	- BadRequestError
+		//	- InternalServiceError
+		StartWorkflowAsync(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*WorkflowExecutionAsync, error)
+
 		// ExecuteWorkflow starts a workflow execution and return a WorkflowRun instance and error
 		// The user can use this to start using a function or workflow type name.
 		// Either by
@@ -159,6 +168,15 @@ type (
 		//	- InternalServiceError
 		SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
 			options StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (*WorkflowExecution, error)
+
+		// SignalWithStartWorkflowAsync behaves like SignalWithStartWorkflow except that the request is first queued and then processed asynchronously.
+		// See SignalWithStartWorkflow for parameter details.
+		// The errors it can return:
+		//  - EntityNotExistsError, if domain does not exist
+		//  - BadRequestError
+		//	- InternalServiceError
+		SignalWithStartWorkflowAsync(ctx context.Context, workflowID string, signalName string, signalArg interface{},
+			options StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (*WorkflowExecutionAsync, error)
 
 		// CancelWorkflow cancels a workflow in execution
 		// - workflow ID of the workflow.

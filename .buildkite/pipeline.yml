@@ -1,3 +1,4 @@
+# `yq 'explode(.)' .buildkite/pipeline.yml` to view expanded anchors/aliases
 container:
   kubernetes: &kubernetes
     gitEnvFrom:

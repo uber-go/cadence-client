@@ -21,6 +21,8 @@
 package internal
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -241,6 +243,30 @@ func (s *workflowShadowerSuite) TestShadowOptionsValidation() {
 			test.validationFn(&test.options)
 		})
 	}
+}
+
+func (s *workflowShadowerSuite) TestShadowOptionsWithExcludeTypes() {
+	excludeTypes := []string{"excludedType1", "excludedType2"}
+	options := ShadowOptions{
+		WorkflowTypes: []string{"includedType1", "includedType2"},
+		ExcludeTypes:  excludeTypes,
+		Mode:          ShadowModeNormal,
+	}
+	expectedQuery := fmt.Sprintf(
+		`(WorkflowType = "includedType1" or WorkflowType = "includedType2") and (WorkflowType != "excludedType1" and WorkflowType != "excludedType2") and (CloseTime = missing)`,
+	)
+	shadower, err := NewWorkflowShadower(s.mockService, "testDomain", options, ReplayOptions{}, nil)
+	s.NoError(err)
+	s.mockService.EXPECT().
+		ScanWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, request *shared.ListWorkflowExecutionsRequest, opts ...interface{}) (*shared.ListWorkflowExecutionsResponse, error) {
+			s.Equal(expectedQuery, *request.Query)
+			return &shared.ListWorkflowExecutionsResponse{
+				Executions:    nil,
+				NextPageToken: nil,
+			}, nil
+		}).Times(1)
+	s.NoError(shadower.shadowWorker())
 }
 
 func (s *workflowShadowerSuite) TestShadowWorkerExitCondition_ExpirationTime() {

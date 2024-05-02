@@ -71,10 +71,11 @@ var (
 
 type (
 	// QueryBuilder builds visibility query. It's shadower's own Query builders that processes the shadow filter
-	// options into a query to pull t he required workflows.
+	// options into a query to pull the required workflows.
 
 	QueryBuilder interface {
 		WorkflowTypes([]string) QueryBuilder
+		ExcludeWorkflowTypes([]string) QueryBuilder
 		WorkflowStatus([]WorkflowStatus) QueryBuilder
 		StartTime(time.Time, time.Time) QueryBuilder
 		CloseTime(time.Time, time.Time) QueryBuilder
@@ -97,6 +98,18 @@ func (q *queryBuilderImpl) WorkflowTypes(types []string) QueryBuilder {
 		workflowTypeQueries = append(workflowTypeQueries, fmt.Sprintf(keyWorkflowType+` = "%v"`, workflowType))
 	}
 	q.appendPartialQuery(strings.Join(workflowTypeQueries, " or "))
+	return q
+}
+
+func (q *queryBuilderImpl) ExcludeWorkflowTypes(types []string) QueryBuilder {
+	if len(types) == 0 {
+		return q
+	}
+	excludeTypeQueries := make([]string, 0, len(types))
+	for _, workflowType := range types {
+		excludeTypeQueries = append(excludeTypeQueries, fmt.Sprintf(keyWorkflowType+` != "%v"`, workflowType))
+	}
+	q.appendPartialQuery(strings.Join(excludeTypeQueries, " and "))
 	return q
 }
 

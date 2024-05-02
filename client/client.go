@@ -18,6 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// when adding any, make sure you update the files that it checks in the makefile
+//go:generate mockery --srcpkg . --name Client --output ../mocks --boilerplate-file ../LICENSE
+//go:generate mockery --srcpkg . --name DomainClient --output ../mocks --boilerplate-file ../LICENSE
+//go:generate mockery --srcpkg go.uber.org/cadence/internal --name HistoryEventIterator --output ../mocks --boilerplate-file ../LICENSE
+//go:generate mockery --srcpkg go.uber.org/cadence/internal --name WorkflowRun --output ../mocks --boilerplate-file ../LICENSE
+
 // Package client contains functions to create Cadence clients used to communicate to Cadence service.
 //
 // Use these to perform CRUD on domains and start or query workflow executions.
@@ -98,6 +104,15 @@ type (
 		//	- InternalServiceError
 		StartWorkflow(ctx context.Context, options StartWorkflowOptions, workflowFunc interface{}, args ...interface{}) (*workflow.Execution, error)
 
+		// StartWorkflowAsync behaves like StartWorkflow except that the request is first queued and then processed asynchronously.
+		// See StartWorkflow for parameter details.
+		// The returned AsyncWorkflowExecution doesn't contain run ID, because the workflow hasn't started yet.
+		// The errors it can return:
+		//	- EntityNotExistsError, if domain does not exists
+		//	- BadRequestError
+		//	- InternalServiceError
+		StartWorkflowAsync(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*workflow.ExecutionAsync, error)
+
 		// ExecuteWorkflow starts a workflow execution and return a WorkflowRun instance and error
 		// The user can use this to start using a function or workflow type name.
 		// Either by
@@ -162,6 +177,15 @@ type (
 		//	- InternalServiceError
 		SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
 			options StartWorkflowOptions, workflowFunc interface{}, workflowArgs ...interface{}) (*workflow.Execution, error)
+
+		// SignalWithStartWorkflowAsync behaves like SignalWithStartWorkflow except that the request is first queued and then processed asynchronously.
+		// See SignalWithStartWorkflow for parameter details.
+		// The errors it can return:
+		//  - EntityNotExistsError, if domain does not exist
+		//  - BadRequestError
+		//	- InternalServiceError
+		SignalWithStartWorkflowAsync(ctx context.Context, workflowID string, signalName string, signalArg interface{},
+			options StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (*workflow.ExecutionAsync, error)
 
 		// CancelWorkflow cancels a workflow in execution
 		// - workflow ID of the workflow.

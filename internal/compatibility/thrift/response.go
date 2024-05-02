@@ -293,6 +293,13 @@ func SignalWithStartWorkflowExecutionResponse(t *apiv1.SignalWithStartWorkflowEx
 	}
 }
 
+func SignalWithStartWorkflowExecutionAsyncResponse(t *apiv1.SignalWithStartWorkflowExecutionAsyncResponse) *shared.SignalWithStartWorkflowExecutionAsyncResponse {
+	if t == nil {
+		return nil
+	}
+	return &shared.SignalWithStartWorkflowExecutionAsyncResponse{}
+}
+
 func StartWorkflowExecutionResponse(t *apiv1.StartWorkflowExecutionResponse) *shared.StartWorkflowExecutionResponse {
 	if t == nil {
 		return nil
@@ -300,6 +307,13 @@ func StartWorkflowExecutionResponse(t *apiv1.StartWorkflowExecutionResponse) *sh
 	return &shared.StartWorkflowExecutionResponse{
 		RunId: &t.RunId,
 	}
+}
+
+func StartWorkflowExecutionAsyncResponse(t *apiv1.StartWorkflowExecutionAsyncResponse) *shared.StartWorkflowExecutionAsyncResponse {
+	if t == nil {
+		return nil
+	}
+	return &shared.StartWorkflowExecutionAsyncResponse{}
 }
 
 func UpdateDomainResponse(t *apiv1.UpdateDomainResponse) *shared.UpdateDomainResponse {

@@ -22,8 +22,9 @@ package internal
 
 import (
 	"encoding/json"
-	"go.uber.org/cadence/internal/common"
 	"testing"
+
+	"go.uber.org/cadence/internal/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

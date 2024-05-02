@@ -50,11 +50,11 @@ endif
 # ====================================
 
 # note that vars that do not yet exist are empty, so stick to BUILD/BIN and probably nothing else.
-$(BUILD)/lint: $(BUILD)/fmt $(BUILD)/dummy # lint will fail if fmt or dummy fails, so run them first
-$(BUILD)/dummy: $(BUILD)/fmt # do a build after fmt-ing
+$(BUILD)/lint: $(BUILD)/fmt # lint will fail if fmt (more generally, build) fails, so run it first
 $(BUILD)/fmt: $(BUILD)/copyright # formatting must occur only after all other go-file-modifications are done
 $(BUILD)/copyright: $(BUILD)/codegen # must add copyright to generated code
-$(BUILD)/codegen: $(BUILD)/thrift # thrift is currently the only codegen, but this way it's easier to extend
+$(BUILD)/codegen: $(BUILD)/thrift $(BUILD)/generate
+$(BUILD)/generate: $(BUILD)/thrift # go generate broadly requires compile-able code, which needs thrift
 $(BUILD)/thrift: $(BUILD)/go_mod_check
 $(BUILD)/go_mod_check: | $(BUILD) $(BIN)
 
@@ -157,13 +157,12 @@ $(BIN)/errcheck: internal/tools/go.mod
 $(BIN)/goveralls: internal/tools/go.mod
 	$(call go_build_tool,github.com/mattn/goveralls)
 
+$(BIN)/mockery: internal/tools/go.mod
+	$(call go_build_tool,github.com/vektra/mockery/v2,mockery)
+
 # copyright header checker/writer.  only requires stdlib, so no other dependencies are needed.
 $(BIN)/copyright: internal/cmd/tools/copyright/licensegen.go
 	go build -mod=readonly -o $@ ./internal/cmd/tools/copyright/licensegen.go
-
-# dummy binary that ensures most/all packages build, without needing to wait for tests.
-$(BUILD)/dummy: $(ALL_SRC) $(BUILD)/go_mod_check
-	go build -mod=readonly -o $@ internal/cmd/dummy/dummy.go
 
 # ensures mod files are in sync for critical packages
 $(BUILD)/go_mod_check: go.mod internal/tools/go.mod
@@ -185,7 +184,7 @@ $(if $(wildcard THRIFT_FILES),,$(error idls/ submodule must exist, or build will
 endef
 
 # codegen is done when thrift is done (it's just a naming-convenience, $(BUILD)/thrift would be fine too)
-$(BUILD)/codegen: $(BUILD)/thrift | $(BUILD)
+$(BUILD)/codegen: | $(BUILD)
 	$Q touch $@
 
 THRIFT_FILES := idls/thrift/cadence.thrift idls/thrift/shadower.thrift
@@ -214,6 +213,12 @@ $(THRIFT_GEN): $(THRIFT_FILES) $(BIN)/thriftrw $(BIN)/thriftrw-plugin-yarpc
 		--pkg-prefix=$(PROJECT_ROOT)/.gen/go \
 		--out=.gen/go \
 		$(subst $(BUILD),idls/thrift,$@)
+	$Q touch $@
+
+# mockery is quite noisy so it's worth being kinda precise with the files.
+# this needs to be both the files defining the generate command, AND the files that define the interfaces.
+$(BUILD)/generate: client/client.go encoded/encoded.go internal/internal_workflow_client.go $(BIN)/mockery
+	$Q $(BIN_PATH) go generate ./...
 	$Q touch $@
 
 # ====================================
@@ -268,7 +273,10 @@ $Q +$(MAKE) --no-print-directory $(addprefix $(BUILD)/,$(1))
 endef
 
 .PHONY: build
-build: $(BUILD)/dummy ## ensure all packages build
+build: $(BUILD)/fmt ## ensure all packages build
+	go build ./...
+	$Q # caution: some errors are reported on stdout for some reason
+	go test -exec true ./... >/dev/null
 
 .PHONY: lint
 # useful to actually re-run to get output again.
@@ -294,8 +302,16 @@ staticcheck: $(BIN)/staticcheck $(BUILD)/fmt ## (re)run staticcheck
 errcheck: $(BIN)/errcheck $(BUILD)/fmt ## (re)run errcheck
 	$(BIN)/errcheck ./...
 
+.PHONY: generate
+generate: $(BUILD)/generate ## run go-generate
+
+.PHONY: tidy
+tidy:
+	go mod tidy
+	cd internal/tools; go mod tidy
+
 .PHONY: all
-all: $(BUILD)/lint ## refresh codegen, lint, and ensure the dummy binary builds, if necessary
+all: $(BUILD)/lint ## refresh codegen, lint, and ensure everything builds, whatever is necessary
 
 .PHONY: clean
 clean:

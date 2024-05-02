@@ -27,6 +27,7 @@ import (
 	_ "github.com/kisielk/errcheck"
 	_ "github.com/mattn/goveralls"
 	_ "github.com/mgechev/revive"
+	_ "github.com/vektra/mockery/v2"
 	_ "go.uber.org/thriftrw"
 	_ "go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc"
 	_ "golang.org/x/tools/cmd/goimports"

@@ -354,6 +354,8 @@ func CancelExternalWorkflowExecutionFailedCause(t apiv1.CancelExternalWorkflowEx
 		return nil
 	case apiv1.CancelExternalWorkflowExecutionFailedCause_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNKNOWN_EXTERNAL_WORKFLOW_EXECUTION:
 		return shared.CancelExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution.Ptr()
+	case apiv1.CancelExternalWorkflowExecutionFailedCause_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_COMPLETED:
+		return shared.CancelExternalWorkflowExecutionFailedCauseWorkflowAlreadyCompleted.Ptr()
 	}
 	panic("unexpected enum value")
 }
@@ -364,6 +366,8 @@ func SignalExternalWorkflowExecutionFailedCause(t apiv1.SignalExternalWorkflowEx
 		return nil
 	case apiv1.SignalExternalWorkflowExecutionFailedCause_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNKNOWN_EXTERNAL_WORKFLOW_EXECUTION:
 		return shared.SignalExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution.Ptr()
+	case apiv1.SignalExternalWorkflowExecutionFailedCause_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_COMPLETED:
+		return shared.SignalExternalWorkflowExecutionFailedCauseWorkflowAlreadyCompleted.Ptr()
 	}
 	panic("unexpected enum value")
 }

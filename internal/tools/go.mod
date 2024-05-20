@@ -10,7 +10,7 @@ require (
 	github.com/vektra/mockery/v2 v2.16.0
 	go.uber.org/thriftrw v1.25.0
 	go.uber.org/yarpc v1.55.0
-	golang.org/x/tools v0.5.0
+	golang.org/x/tools v0.21.0
 	honnef.co/go/tools v0.4.0
 )
 
@@ -53,8 +53,9 @@ require (
 	go.uber.org/zap v1.17.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/exp/typeparams v0.0.0-20230203172020-98cc5a0785f9 // indirect
-	golang.org/x/mod v0.7.0 // indirect
-	golang.org/x/sys v0.4.0 // indirect
+	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467 // indirect
 	golang.org/x/text v0.6.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect

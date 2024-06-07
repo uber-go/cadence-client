@@ -375,14 +375,13 @@ test: unit_test integ_test_sticky_off integ_test_sticky_on ## run all tests (req
 unit_test: $(ALL_SRC) ## run all unit tests
 	$Q mkdir -p $(COVER_ROOT)
 	$Q echo "mode: atomic" > $(UT_COVER_FILE)
-	$Q failed=0; \
+	$Q FAIL=""; \
 	for dir in $(UT_DIRS); do \
 		mkdir -p $(COVER_ROOT)/"$$dir"; \
-		go test "$$dir" $(TEST_ARG) -coverprofile=$(COVER_ROOT)/"$$dir"/cover.out || failed=1; \
+		go test "$$dir" $(TEST_ARG) -coverprofile=$(COVER_ROOT)/"$$dir"/cover.out || FAIL="$$FAIL $$dir"; \
 		cat $(COVER_ROOT)/"$$dir"/cover.out | grep -v "mode: atomic" >> $(UT_COVER_FILE); \
-	done; \
+	done; test -z "$$FAIL" || (echo "Failed packages; $$FAIL"; exit 1)
 	cat $(UT_COVER_FILE) > .build/cover.out;
-	exit $$failed
 
 integ_test_sticky_off: $(ALL_SRC)
 	$Q mkdir -p $(COVER_ROOT)

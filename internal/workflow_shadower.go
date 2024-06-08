@@ -228,6 +228,21 @@ func (s *WorkflowShadower) Stop() {
 	}
 }
 
+// GetRegisteredWorkflows retrieves the list of workflows registered on the worker
+func (s *WorkflowShadower) GetRegisteredWorkflows() []string {
+	return s.replayer.GetRegisteredWorkflows()
+}
+
+// GetWorkflowAlias returns the workflow alias and true if the alias was found.
+func (s *WorkflowShadower) GetWorkflowAlias(fnName string) (string, bool) {
+	return s.replayer.GetWorkflowAlias(fnName)
+}
+
+// GetWorkflowFn returns the workflow function corresponding to the provided registerName
+func (s *WorkflowShadower) GetWorkflowFn(registerName string) (interface{}, bool) {
+	return s.replayer.GetWorkflowFn(registerName)
+}
+
 func (s *WorkflowShadower) shadowWorker() error {
 	s.shutdownWG.Add(1)
 	defer s.shutdownWG.Done()

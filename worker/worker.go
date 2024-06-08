@@ -79,6 +79,26 @@ type (
 		// This method panics if workflowFunc doesn't comply with the expected format or tries to register the same workflow
 		// type name twice. Use workflow.RegisterOptions.DisableAlreadyRegisteredCheck to allow multiple registrations.
 		RegisterWorkflowWithOptions(w interface{}, options workflow.RegisterOptions)
+
+		// GetRegisteredWorkflows returns a list of all registered workflow names on the registry.
+		// The workflow name is by default the method name. However, if the workflow was registered
+		// with options (see RegisterWorkflowWithOptions), it may have a customized name.
+		// For chained registries, this returns a combined list of all registered workflows from the current
+		// instance to the global registry. In this case, the list may contain duplicates names.
+		GetRegisteredWorkflows() []string
+
+		// GetWorkflowAlias returns the customized workflow name recorded for the provided function name
+		// and a boolean value indicating whether an alias was found.
+		// All customization on the workflow name are provided with workflow.RegisterOptions{}.
+		// The function returns "", false if no alias was found.
+		GetWorkflowAlias(fnName string) (string, bool)
+
+		// GetWorkflowFn takes a name and returns the corresponding workflow
+		// function and a boolean value indicating whether the activity was found.
+		// It returns nil, false when no activity was registered with the provided name.
+		// The registerName is the resolved name recorded on the registry after all options
+		// from workflow.RegisterOptions{} are applied.
+		GetWorkflowFn(registerName string) (interface{}, bool)
 	}
 
 	// ActivityRegistry exposes activity registration functions to consumers.
@@ -131,6 +151,28 @@ type (
 		// which might be useful for integration tests.
 		// worker.RegisterActivityWithOptions(barActivity, RegisterActivityOptions{DisableAlreadyRegisteredCheck: true})
 		RegisterActivityWithOptions(a interface{}, options activity.RegisterOptions)
+
+		// GetRegisteredActivities returns a list of all registered activity names on the registry.
+		// The activity name is by default the method name. However, if the activity was registered
+		// with options (see worker.RegisterActivityWithOptions), it may be a customized name.
+		// For example, struct pointer activities that were registered with the Name option activity.RegisterOptions{Name: ...}
+		// will have their method names prepended with the option name.
+		// For chained registries, this returns a combined list of all registered activities from the current
+		// instance to the global registry. In this case, the list may contain duplicates names.
+		GetRegisteredActivities() []string
+
+		// GetActivityAlias returns the customized activity name recorded for the provided function name
+		// and a boolean value indicating whether an alias was found.
+		// All customization on the activity name are provided with activity.RegisterOptions{}.
+		// The function returns "", false if no alias was found
+		GetActivityAlias(fnName string) (string, bool)
+
+		// GetActivityFn takes a name and returns the corresponding activity
+		// function and a boolean value indicating whether the activity was found.
+		// It returns nil, false when no activity was registered with the provided name.
+		// The registerName is the resolved name recorded on the registry after all options
+		// from activity.RegisterOptions{} are applied.
+		GetActivityFn(registerName string) (interface{}, bool)
 	}
 
 	// WorkflowReplayer supports replaying a workflow from its event history.

@@ -105,16 +105,16 @@ func TestWorkflowRegistration(t *testing.T) {
 			tt.register(r)
 
 			// Verify registered workflow type
-			workflowType := r.GetRegisteredWorkflowTypes()[0]
+			workflowType := r.GetRegisteredWorkflows()[0]
 			require.Equal(t, tt.workflowType, workflowType)
 
 			// Verify workflow is resolved from workflow type
-			_, ok := r.getWorkflowFn(tt.workflowType)
+			_, ok := r.GetWorkflowFn(tt.workflowType)
 			require.True(t, ok)
 
 			// Verify workflow is resolved from alternative (backwards compatible) workflow type
 			if len(tt.altWorkflowType) > 0 {
-				_, ok = r.getWorkflowFn(tt.altWorkflowType)
+				_, ok = r.GetWorkflowFn(tt.altWorkflowType)
 				require.True(t, ok)
 			}
 
@@ -126,6 +126,10 @@ func TestWorkflowRegistration(t *testing.T) {
 			if tt.resolveByAlias != "" {
 				workflowType = getWorkflowFunctionName(r, tt.resolveByAlias)
 				require.Equal(t, tt.workflowType, workflowType)
+				fnName := getFunctionName(tt.resolveByFunction)
+				alias, ok := r.GetWorkflowAlias(fnName)
+				require.Equal(t, tt.resolveByAlias, alias)
+				require.True(t, ok)
 			}
 		})
 	}
@@ -228,9 +232,12 @@ func TestActivityRegistration(t *testing.T) {
 			// Verify registered activity type
 			activityType := r.getRegisteredActivities()[0].ActivityType().Name
 			require.Equal(t, tt.activityType, activityType, "activity type")
+			require.Equal(t, tt.activityType, r.GetRegisteredActivities()[0])
 
 			// Verify activity is resolved from activity type
 			_, ok := r.GetActivity(tt.activityType)
+			require.True(t, ok)
+			_, ok = r.GetActivityFn(tt.activityType)
 			require.True(t, ok)
 
 			// Verify activity is resolved from alternative (backwards compatible) activity type
@@ -247,6 +254,10 @@ func TestActivityRegistration(t *testing.T) {
 			if tt.resolveByAlias != "" {
 				activityType = getActivityFunctionName(r, tt.resolveByAlias)
 				require.Equal(t, tt.activityType, activityType, "resolve by alias")
+				fnName := getFunctionName(tt.resolveByFunction)
+				alias, ok := r.GetActivityAlias(fnName)
+				require.Equal(t, tt.resolveByAlias, alias)
+				require.True(t, ok)
 			}
 		})
 	}

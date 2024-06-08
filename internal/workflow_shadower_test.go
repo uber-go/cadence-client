@@ -437,6 +437,18 @@ func (s *workflowShadowerSuite) TestShadowWorker_ExpectedReplayError() {
 	}
 }
 
+func (s *workflowShadowerSuite) TestWorkflowRegistration() {
+	wfName := s.testShadower.GetRegisteredWorkflows()[0]
+	require.Equal(s.T(), getFunctionName(testReplayWorkflow), wfName)
+
+	_, ok := s.testShadower.GetWorkflowAlias(wfName)
+	require.False(s.T(), ok)
+
+	_, ok = s.testShadower.GetWorkflowFn(wfName)
+	require.True(s.T(), ok)
+
+}
+
 func newTestWorkflowExecutions(size int) []*shared.WorkflowExecutionInfo {
 	executions := make([]*shared.WorkflowExecutionInfo, size)
 	for i := 0; i != size; i++ {

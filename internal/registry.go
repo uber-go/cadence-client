@@ -124,6 +124,39 @@ func (r *registry) RegisterActivityWithOptions(af interface{}, options RegisterA
 	}
 }
 
+func (r *registry) GetRegisteredWorkflows() []string {
+	return r.GetRegisteredWorkflowTypes()
+}
+
+func (r *registry) GetWorkflowAlias(fnName string) (string, bool) {
+	return r.getWorkflowAlias(fnName)
+}
+
+func (r *registry) GetWorkflowFn(registerName string) (interface{}, bool) {
+	return r.getWorkflowFn(registerName)
+}
+
+func (r *registry) GetRegisteredActivities() []string {
+	activities := r.getRegisteredActivities()
+	activityNames := make([]string, 0, len(activities))
+	for _, a := range activities {
+		activityNames = append(activityNames, a.ActivityType().Name)
+	}
+	return activityNames
+}
+
+func (r *registry) GetActivityAlias(fnName string) (string, bool) {
+	return r.getActivityAlias(fnName)
+}
+
+func (r *registry) GetActivityFn(registerName string) (interface{}, bool) {
+	a, ok := r.GetActivity(registerName)
+	if !ok {
+		return nil, ok
+	}
+	return a.GetFunction(), ok
+}
+
 func (r *registry) registerActivityFunction(af interface{}, options RegisterActivityOptions) error {
 	fnType := reflect.TypeOf(af)
 	if err := validateFnFormat(fnType, false); err != nil {

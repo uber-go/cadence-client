@@ -139,6 +139,19 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistoryFromFile() {
 	s.NoError(err)
 }
 
+func (s *workflowReplayerSuite) TestActivityRegistration() {
+	name := "test-Activity"
+	s.replayer.RegisterActivityWithOptions(testActivityFunction, RegisterActivityOptions{Name: name})
+	a := s.replayer.GetRegisteredActivities()[0]
+	require.Equal(s.T(), name, a)
+
+	_, ok := s.replayer.GetActivityAlias(getFunctionName(testActivityFunction))
+	require.True(s.T(), ok)
+
+	_, ok = s.replayer.GetActivityFn(a)
+	require.True(s.T(), ok)
+}
+
 func testReplayWorkflow(ctx Context) error {
 	ao := ActivityOptions{
 		ScheduleToStartTimeout: time.Second,

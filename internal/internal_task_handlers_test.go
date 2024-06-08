@@ -1505,6 +1505,8 @@ func (t *testActivityDeadline) GetOptions() RegisterActivityOptions {
 	return RegisterActivityOptions{}
 }
 
+func (t *testActivityDeadline) GetName() string { return "test-Activity-Deadline" }
+
 type deadlineTest struct {
 	actWaitDuration  time.Duration
 	ScheduleTS       time.Time

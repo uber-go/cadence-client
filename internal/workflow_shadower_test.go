@@ -23,6 +23,8 @@ package internal
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -439,14 +441,15 @@ func (s *workflowShadowerSuite) TestShadowWorker_ExpectedReplayError() {
 
 func (s *workflowShadowerSuite) TestWorkflowRegistration() {
 	wfName := s.testShadower.GetRegisteredWorkflows()[0]
-	require.Equal(s.T(), getFunctionName(testReplayWorkflow), wfName)
+	fnName := getFunctionName(testReplayWorkflow)
+	s.Equal(fnName, wfName)
 
 	_, ok := s.testShadower.GetWorkflowAlias(wfName)
-	require.False(s.T(), ok)
+	s.False(ok)
 
-	_, ok = s.testShadower.GetWorkflowFn(wfName)
-	require.True(s.T(), ok)
-
+	fn, ok := s.testShadower.GetWorkflowFn(wfName)
+	s.True(ok)
+	s.Equal(fnName, runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }
 
 func newTestWorkflowExecutions(size int) []*shared.WorkflowExecutionInfo {

@@ -24,6 +24,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -143,13 +145,16 @@ func (s *workflowReplayerSuite) TestActivityRegistration() {
 	name := "test-Activity"
 	s.replayer.RegisterActivityWithOptions(testActivityFunction, RegisterActivityOptions{Name: name})
 	a := s.replayer.GetRegisteredActivities()[0]
-	require.Equal(s.T(), name, a)
+	s.Equal(name, a)
 
-	_, ok := s.replayer.GetActivityAlias(getFunctionName(testActivityFunction))
-	require.True(s.T(), ok)
+	alias, ok := s.replayer.GetActivityAlias(getFunctionName(testActivityFunction))
+	s.True(ok)
+	s.Equal(name, alias)
 
-	_, ok = s.replayer.GetActivityFn(a)
-	require.True(s.T(), ok)
+	fn, ok := s.replayer.GetActivityFn(a)
+	s.True(ok)
+	s.Equal(reflect.Func, reflect.ValueOf(fn).Kind())
+	s.Equal(getFunctionName(testActivityFunction), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }
 
 func testReplayWorkflow(ctx Context) error {

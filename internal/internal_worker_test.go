@@ -26,6 +26,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -831,14 +832,58 @@ func testWorkflowReturnStructPtrPtr(ctx Context, arg1 int) (result **testWorkflo
 
 func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	r := newRegistry()
-	r.RegisterWorkflow(testWorkflowSample)
-	r.RegisterWorkflow(testWorkflowMultipleArgs)
-	r.RegisterWorkflow(testWorkflowNoArgs)
-	r.RegisterWorkflow(testWorkflowReturnInt)
-	r.RegisterWorkflow(testWorkflowReturnString)
-	r.RegisterWorkflow(testWorkflowReturnStruct)
-	r.RegisterWorkflow(testWorkflowReturnStructPtr)
-	r.RegisterWorkflow(testWorkflowReturnStructPtrPtr)
+	w := &aggregatedWorker{registry: r}
+	w.RegisterWorkflowWithOptions(testWorkflowSample, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowMultipleArgs, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowNoArgs, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnInt, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnString, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnStruct, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnStructPtr, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnStructPtrPtr, RegisterWorkflowOptions{EnableShortName: true})
+
+	wfs := w.GetRegisteredWorkflows()
+	assert.Equal(t, 8, len(wfs))
+	assert.Contains(t, wfs, "testWorkflowSample")
+	assert.Contains(t, wfs, "testWorkflowMultipleArgs")
+	assert.Contains(t, wfs, "testWorkflowNoArgs")
+	assert.Contains(t, wfs, "testWorkflowReturnInt")
+	assert.Contains(t, wfs, "testWorkflowReturnString")
+	assert.Contains(t, wfs, "testWorkflowReturnString")
+	assert.Contains(t, wfs, "testWorkflowReturnStructPtr")
+	assert.Contains(t, wfs, "testWorkflowReturnStructPtrPtr")
+
+	// sample assertion on workflow alias
+	alias, ok := w.GetWorkflowAlias(getFunctionName(testWorkflowSample))
+	assert.True(t, ok)
+	assert.Equal(t, "testWorkflowSample", alias)
+
+	// sample assertion on workflow func
+	fn, ok := w.GetWorkflowFn("testWorkflowSample")
+	assert.True(t, ok)
+	assert.Equal(t, reflect.Func, reflect.ValueOf(fn).Kind())
+	assert.Equal(t, getFunctionName(testWorkflowSample), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
+}
+
+func TestRegisterActivityWithOptions(t *testing.T) {
+	r := newRegistry()
+	w := &aggregatedWorker{registry: r}
+	w.RegisterActivityWithOptions(testActivityMultipleArgs, RegisterActivityOptions{EnableShortName: true})
+
+	wfs := w.GetRegisteredActivities()
+	assert.Equal(t, 1, len(wfs))
+	assert.Contains(t, wfs, "testActivityMultipleArgs")
+
+	// assert activity alias
+	alias, ok := w.GetActivityAlias(getFunctionName(testActivityMultipleArgs))
+	assert.True(t, ok)
+	assert.Equal(t, "testActivityMultipleArgs", alias)
+
+	// assert activity function
+	fn, ok := w.GetActivityFn("testActivityMultipleArgs")
+	assert.True(t, ok)
+	assert.Equal(t, reflect.Func, reflect.ValueOf(fn).Kind())
+	assert.Equal(t, getFunctionName(testActivityMultipleArgs), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }
 
 type testErrorDetails struct {

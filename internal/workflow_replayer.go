@@ -135,24 +135,16 @@ func (r *WorkflowReplayer) GetRegisteredWorkflows() []string {
 	return r.registry.GetRegisteredWorkflows()
 }
 
-func (r *WorkflowReplayer) GetWorkflowAlias(fnName string) (string, bool) {
-	return r.registry.GetWorkflowAlias(fnName)
-}
-
-func (r *WorkflowReplayer) GetWorkflowFn(registerName string) (interface{}, bool) {
-	return r.registry.GetWorkflowFn(registerName)
+func (r *WorkflowReplayer) GetWorkflowFunc(registerName string) (interface{}, bool) {
+	return r.registry.GetWorkflowFunc(registerName)
 }
 
 func (r *WorkflowReplayer) GetRegisteredActivities() []string {
 	return r.registry.GetRegisteredActivities()
 }
 
-func (r *WorkflowReplayer) GetActivityAlias(fnName string) (string, bool) {
-	return r.registry.GetActivityAlias(fnName)
-}
-
-func (r *WorkflowReplayer) GetActivityFn(registerName string) (interface{}, bool) {
-	return r.registry.GetActivityFn(registerName)
+func (r *WorkflowReplayer) GetActivityFunc(registerName string) (interface{}, bool) {
+	return r.registry.GetActivityFunc(registerName)
 }
 
 // ReplayWorkflowHistory executes a single decision task for the given history.

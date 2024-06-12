@@ -147,11 +147,7 @@ func (s *workflowReplayerSuite) TestActivityRegistration() {
 	a := s.replayer.GetRegisteredActivities()[0]
 	s.Equal(name, a)
 
-	alias, ok := s.replayer.GetActivityAlias(getFunctionName(testActivityFunction))
-	s.True(ok)
-	s.Equal(name, alias)
-
-	fn, ok := s.replayer.GetActivityFn(a)
+	fn, ok := s.replayer.GetActivityFunc(a)
 	s.True(ok)
 	s.Equal(reflect.Func, reflect.ValueOf(fn).Kind())
 	s.Equal(getFunctionName(testActivityFunction), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())

@@ -128,11 +128,7 @@ func (r *registry) GetRegisteredWorkflows() []string {
 	return r.GetRegisteredWorkflowTypes()
 }
 
-func (r *registry) GetWorkflowAlias(fnName string) (string, bool) {
-	return r.getWorkflowAlias(fnName)
-}
-
-func (r *registry) GetWorkflowFn(registerName string) (interface{}, bool) {
+func (r *registry) GetWorkflowFunc(registerName string) (interface{}, bool) {
 	return r.getWorkflowFn(registerName)
 }
 
@@ -145,14 +141,10 @@ func (r *registry) GetRegisteredActivities() []string {
 	return activityNames
 }
 
-func (r *registry) GetActivityAlias(fnName string) (string, bool) {
-	return r.getActivityAlias(fnName)
-}
-
-func (r *registry) GetActivityFn(registerName string) (interface{}, bool) {
+func (r *registry) GetActivityFunc(registerName string) (interface{}, bool) {
 	a, ok := r.GetActivity(registerName)
 	if !ok {
-		return nil, ok
+		return nil, false
 	}
 	return a.GetFunction(), ok
 }

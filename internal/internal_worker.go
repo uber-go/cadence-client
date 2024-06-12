@@ -780,24 +780,16 @@ func (aw *aggregatedWorker) GetRegisteredWorkflows() []string {
 	return aw.registry.GetRegisteredWorkflows()
 }
 
-func (aw *aggregatedWorker) GetWorkflowAlias(fnName string) (string, bool) {
-	return aw.registry.GetWorkflowAlias(fnName)
-}
-
-func (aw *aggregatedWorker) GetWorkflowFn(registerName string) (interface{}, bool) {
-	return aw.registry.GetWorkflowFn(registerName)
+func (aw *aggregatedWorker) GetWorkflowFunc(registerName string) (interface{}, bool) {
+	return aw.registry.GetWorkflowFunc(registerName)
 }
 
 func (aw *aggregatedWorker) GetRegisteredActivities() []string {
 	return aw.registry.GetRegisteredActivities()
 }
 
-func (aw *aggregatedWorker) GetActivityAlias(fnName string) (string, bool) {
-	return aw.registry.GetActivityAlias(fnName)
-}
-
-func (aw *aggregatedWorker) GetActivityFn(registerName string) (interface{}, bool) {
-	return aw.registry.GetActivityFn(registerName)
+func (aw *aggregatedWorker) GetActivityFunc(registerName string) (interface{}, bool) {
+	return aw.registry.GetActivityFunc(registerName)
 }
 
 func (aw *aggregatedWorker) RegisterWorkflow(w interface{}) {

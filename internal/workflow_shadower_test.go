@@ -444,10 +444,7 @@ func (s *workflowShadowerSuite) TestWorkflowRegistration() {
 	fnName := getFunctionName(testReplayWorkflow)
 	s.Equal(fnName, wfName)
 
-	_, ok := s.testShadower.GetWorkflowAlias(wfName)
-	s.False(ok)
-
-	fn, ok := s.testShadower.GetWorkflowFn(wfName)
+	fn, ok := s.testShadower.GetWorkflowFunc(wfName)
 	s.True(ok)
 	s.Equal(fnName, runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }

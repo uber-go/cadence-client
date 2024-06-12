@@ -87,18 +87,12 @@ type (
 		// instance to the global registry. In this case, the list may contain duplicate names.
 		GetRegisteredWorkflows() []string
 
-		// GetWorkflowAlias returns the customized workflow name recorded for the provided function name
-		// and a boolean value indicating whether an alias was found.
-		// All customization on the workflow name are provided with workflow.RegisterOptions{}.
-		// This method returns an empty string and false if no alias was found.
-		GetWorkflowAlias(fnName string) (string, bool)
-
-		// GetWorkflowFn takes a name and returns the corresponding workflow
+		// GetWorkflowFunc takes a name and returns the corresponding workflow
 		// function and a boolean value indicating whether the activity was found.
 		// It returns nil, false when no workflow was registered with the provided name.
 		// The registerName is the resolved name recorded on the registry after all options
 		// from workflow.RegisterOptions{} are applied.
-		GetWorkflowFn(registerName string) (interface{}, bool)
+		GetWorkflowFunc(registerName string) (interface{}, bool)
 	}
 
 	// ActivityRegistry exposes activity registration functions to consumers.
@@ -161,18 +155,12 @@ type (
 		// instance to the global registry. In this case, the list may contain duplicate names.
 		GetRegisteredActivities() []string
 
-		// GetActivityAlias returns the customized activity name recorded for the provided function name
-		// and a boolean value indicating whether an alias was found.
-		// All customization on the activity name are provided with Worker.RegisterActivityWithOptions.
-		// This method returns an empty string and false if no alias was found.
-		GetActivityAlias(fnName string) (string, bool)
-
-		// GetActivityFn takes a name and returns the corresponding activity
+		// GetActivityFunc takes a name and returns the corresponding activity
 		// function and a boolean value indicating whether the activity was found.
 		// It returns nil, false when no activity was registered with the provided name.
 		// The registerName is the resolved name recorded on the registry after all options
 		// from activity.RegisterOptions{} are applied.
-		GetActivityFn(registerName string) (interface{}, bool)
+		GetActivityFunc(registerName string) (interface{}, bool)
 	}
 
 	// WorkflowReplayer supports replaying a workflow from its event history.

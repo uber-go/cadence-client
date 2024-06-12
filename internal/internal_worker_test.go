@@ -853,13 +853,8 @@ func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	assert.Contains(t, wfs, "testWorkflowReturnStructPtr")
 	assert.Contains(t, wfs, "testWorkflowReturnStructPtrPtr")
 
-	// sample assertion on workflow alias
-	alias, ok := w.GetWorkflowAlias(getFunctionName(testWorkflowSample))
-	assert.True(t, ok)
-	assert.Equal(t, "testWorkflowSample", alias)
-
 	// sample assertion on workflow func
-	fn, ok := w.GetWorkflowFn("testWorkflowSample")
+	fn, ok := w.GetWorkflowFunc("testWorkflowSample")
 	assert.True(t, ok)
 	assert.Equal(t, reflect.Func, reflect.ValueOf(fn).Kind())
 	assert.Equal(t, getFunctionName(testWorkflowSample), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
@@ -874,13 +869,8 @@ func TestRegisterActivityWithOptions(t *testing.T) {
 	assert.Equal(t, 1, len(wfs))
 	assert.Contains(t, wfs, "testActivityMultipleArgs")
 
-	// assert activity alias
-	alias, ok := w.GetActivityAlias(getFunctionName(testActivityMultipleArgs))
-	assert.True(t, ok)
-	assert.Equal(t, "testActivityMultipleArgs", alias)
-
 	// assert activity function
-	fn, ok := w.GetActivityFn("testActivityMultipleArgs")
+	fn, ok := w.GetActivityFunc("testActivityMultipleArgs")
 	assert.True(t, ok)
 	assert.Equal(t, reflect.Func, reflect.ValueOf(fn).Kind())
 	assert.Equal(t, getFunctionName(testActivityMultipleArgs), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())

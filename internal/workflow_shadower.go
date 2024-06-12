@@ -233,14 +233,9 @@ func (s *WorkflowShadower) GetRegisteredWorkflows() []string {
 	return s.replayer.GetRegisteredWorkflows()
 }
 
-// GetWorkflowAlias returns the workflow alias and true if the alias was found.
-func (s *WorkflowShadower) GetWorkflowAlias(fnName string) (string, bool) {
-	return s.replayer.GetWorkflowAlias(fnName)
-}
-
 // GetWorkflowFn returns the workflow function corresponding to the provided registerName
-func (s *WorkflowShadower) GetWorkflowFn(registerName string) (interface{}, bool) {
-	return s.replayer.GetWorkflowFn(registerName)
+func (s *WorkflowShadower) GetWorkflowFunc(registerName string) (interface{}, bool) {
+	return s.replayer.GetWorkflowFunc(registerName)
 }
 
 func (s *WorkflowShadower) shadowWorker() error {

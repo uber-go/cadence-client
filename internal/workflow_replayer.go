@@ -131,6 +131,22 @@ func (r *WorkflowReplayer) RegisterActivityWithOptions(a interface{}, options Re
 	r.registry.RegisterActivityWithOptions(a, options)
 }
 
+func (r *WorkflowReplayer) GetRegisteredWorkflows() []string {
+	return r.registry.GetRegisteredWorkflows()
+}
+
+func (r *WorkflowReplayer) GetWorkflowFunc(registerName string) (interface{}, bool) {
+	return r.registry.GetWorkflowFunc(registerName)
+}
+
+func (r *WorkflowReplayer) GetRegisteredActivities() []string {
+	return r.registry.GetRegisteredActivities()
+}
+
+func (r *WorkflowReplayer) GetActivityFunc(registerName string) (interface{}, bool) {
+	return r.registry.GetActivityFunc(registerName)
+}
+
 // ReplayWorkflowHistory executes a single decision task for the given history.
 // Use for testing backwards compatibility of code changes and troubleshooting workflows in a debugger.
 // The logger is an optional parameter. Defaults to the noop logger.

@@ -62,6 +62,11 @@ type (
 		// default: empty list, which matches all workflow types
 		WorkflowTypes []string
 
+		// Optional: A list of workflow type names that need to be excluded in the query.
+		// The list will be used to construct WorkflowQuery.The listed workflow types will be excluded from replay.
+		// default: empty list, which matches all workflow types
+		ExcludeTypes []string
+
 		// Optional: A list of workflow status.
 		// The list will be used to construct WorkflowQuery. Only workflows with status listed will be replayed.
 		// accepted values (case-insensitive): OPEN, CLOSED, ALL, COMPLETED, FAILED, CANCELED, TERMINATED, CONTINUED_AS_NEW, TIMED_OUT
@@ -223,6 +228,16 @@ func (s *WorkflowShadower) Stop() {
 	}
 }
 
+// GetRegisteredWorkflows retrieves the list of workflows registered on the worker
+func (s *WorkflowShadower) GetRegisteredWorkflows() []string {
+	return s.replayer.GetRegisteredWorkflows()
+}
+
+// GetWorkflowFn returns the workflow function corresponding to the provided registerName
+func (s *WorkflowShadower) GetWorkflowFunc(registerName string) (interface{}, bool) {
+	return s.replayer.GetWorkflowFunc(registerName)
+}
+
 func (s *WorkflowShadower) shadowWorker() error {
 	s.shutdownWG.Add(1)
 	defer s.shutdownWG.Done()
@@ -310,7 +325,15 @@ func (o *ShadowOptions) validateAndPopulateFields() error {
 	}
 
 	if len(o.WorkflowQuery) == 0 {
-		queryBuilder := NewQueryBuilder().WorkflowTypes(o.WorkflowTypes)
+		queryBuilder := NewQueryBuilder()
+
+		if len(o.WorkflowTypes) > 0 {
+			queryBuilder.WorkflowTypes(o.WorkflowTypes)
+		}
+
+		if len(o.ExcludeTypes) > 0 {
+			queryBuilder.ExcludeWorkflowTypes(o.ExcludeTypes)
+		}
 
 		statuses := make([]WorkflowStatus, 0, len(o.WorkflowStatus))
 		for _, statusString := range o.WorkflowStatus {

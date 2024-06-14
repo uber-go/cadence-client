@@ -21,7 +21,6 @@ package internal
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -32,6 +31,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/yarpc"
 
@@ -1143,8 +1143,44 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithContext() {
 
 func (s *workflowClientTestSuite) TestStartWorkflow_WithDataConverter() {
 	dc := newTestDataConverter()
-	s.client = NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
-	client := s.client.(*workflowClient)
+	client := NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        tasklist,
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+	}
+	f1 := func(ctx Context, r string) string {
+		return "result"
+	}
+	input := "test" // note: not []byte as that bypasses encoding, and we are exercising the dataconverter
+
+	correctlyEncoded, err := dc.ToData(input) // []any is spread to ToData args
+	require.NoError(s.T(), err, "test data converter should not fail on simple inputs")
+	defaultEncoded, err := getDefaultDataConverter().ToData(input)
+	require.NoError(s.T(), err, "default data converter should not fail on simple inputs")
+
+	// sanity check: we must be able to tell right from wrong
+	require.NotEqual(s.T(), correctlyEncoded, defaultEncoded, "test data converter should encode differently or the test is not valid")
+
+	createResponse := &shared.StartWorkflowExecutionResponse{
+		RunId: common.StringPtr(runID),
+	}
+	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).
+		Do(func(_ interface{}, req *shared.StartWorkflowExecutionRequest, _ ...interface{}) {
+			assert.Equal(s.T(), correctlyEncoded, req.Input, "client-encoded data should use the customized data converter")
+		})
+
+	resp, err := client.StartWorkflow(context.Background(), options, f1, input)
+	s.NoError(err)
+	s.Equal(createResponse.GetRunId(), resp.RunID)
+}
+
+func (s *workflowClientTestSuite) TestStartWorkflow_ByteBypass() {
+	// default DataConverter checks for []byte args, and does not re-encode them.
+	// this is NOT a general feature of DataConverter, though perhaps it should be
+	// as it's a quite useful escape hatch when making incompatible type changes.
+	client := NewClient(s.service, domain, nil)
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1154,23 +1190,17 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithDataConverter() {
 	f1 := func(ctx Context, r []byte) string {
 		return "result"
 	}
-	input := []byte("test")
+	input := []byte("test") // intentionally bypassing dataconverter
 
 	createResponse := &shared.StartWorkflowExecutionResponse{
 		RunId: common.StringPtr(runID),
 	}
 	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(createResponse, nil).
 		Do(func(_ interface{}, req *shared.StartWorkflowExecutionRequest, _ ...interface{}) {
-			dc := client.dataConverter
-			encodedArg, _ := dc.ToData(input)
-			s.Equal(req.Input, encodedArg)
-			var decodedArg []byte
-			dc.FromData(req.Input, &decodedArg)
-			s.Equal(input, decodedArg)
+			assert.Equal(s.T(), input, req.Input, "[]byte inputs should not be re-encoded by the default converter")
 		})
 
 	resp, err := client.StartWorkflow(context.Background(), options, f1, input)
-	s.Equal(newTestDataConverter(), client.dataConverter)
 	s.NoError(err)
 	s.Equal(createResponse.GetRunId(), resp.RunID)
 }
@@ -1197,14 +1227,9 @@ func (s *workflowClientTestSuite) TestStartWorkflow_WithMemoAndSearchAttr() {
 
 	s.service.EXPECT().StartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, nil).
 		Do(func(_ interface{}, req *shared.StartWorkflowExecutionRequest, _ ...interface{}) {
-			var resultMemo, resultAttr string
-			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
-			s.NoError(err)
-			s.Equal("memo value", resultMemo)
-
-			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
-			s.NoError(err)
-			s.Equal("attr value", resultAttr)
+			// trailing newline is added by the dataconverter
+			s.Equal([]byte("\"memo value\"\n"), req.Memo.Fields["testMemo"], "memos use the dataconverter because they are user data")
+			s.Equal([]byte(`"attr value"`), req.SearchAttributes.IndexedFields["testAttr"], "search attributes must be JSON-encoded, not using dataconverter")
 		})
 
 	_, err := s.client.StartWorkflow(context.Background(), options, wf)
@@ -1271,14 +1296,9 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflow_WithMemoAndSearchA
 	s.service.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any(),
 		gomock.Any(), gomock.Any(), gomock.Any()).Return(startResp, nil).
 		Do(func(_ interface{}, req *shared.SignalWithStartWorkflowExecutionRequest, _ ...interface{}) {
-			var resultMemo, resultAttr string
-			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
-			s.NoError(err)
-			s.Equal("memo value", resultMemo)
-
-			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
-			s.NoError(err)
-			s.Equal("attr value", resultAttr)
+			// trailing newline is added by the dataconverter
+			s.Equal([]byte("\"memo value\"\n"), req.Memo.Fields["testMemo"], "memos use the dataconverter because they are user data")
+			s.Equal([]byte(`"attr value"`), req.SearchAttributes.IndexedFields["testAttr"], "search attributes must be JSON-encoded")
 		})
 
 	_, err := s.client.SignalWithStartWorkflow(context.Background(), "wid", "signal", "value", options, wf)
@@ -1308,14 +1328,9 @@ func (s *workflowClientTestSuite) TestSignalWithStartWorkflowAsync_WithMemoAndSe
 		gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).
 		Do(func(_ interface{}, asyncReq *shared.SignalWithStartWorkflowExecutionAsyncRequest, _ ...interface{}) {
 			req := asyncReq.Request
-			var resultMemo, resultAttr string
-			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
-			s.NoError(err)
-			s.Equal("memo value", resultMemo)
-
-			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
-			s.NoError(err)
-			s.Equal("attr value", resultAttr)
+			// trailing newline is added by the dataconverter
+			s.Equal([]byte("\"memo value\"\n"), req.Memo.Fields["testMemo"], "memos use the dataconverter because they are user data")
+			s.Equal([]byte(`"attr value"`), req.SearchAttributes.IndexedFields["testAttr"], "search attributes must be JSON-encoded")
 		})
 
 	_, err := s.client.SignalWithStartWorkflowAsync(context.Background(), "wid", "signal", "value", options, wf)
@@ -1394,8 +1409,42 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync() {
 
 func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithDataConverter() {
 	dc := newTestDataConverter()
-	s.client = NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
-	client := s.client.(*workflowClient)
+	client := NewClient(s.service, domain, &ClientOptions{DataConverter: dc})
+	options := StartWorkflowOptions{
+		ID:                              workflowID,
+		TaskList:                        tasklist,
+		ExecutionStartToCloseTimeout:    timeoutInSeconds,
+		DecisionTaskStartToCloseTimeout: timeoutInSeconds,
+	}
+	f1 := func(ctx Context, r string) string {
+		return "result"
+	}
+	input := "test" // note: not []byte as that bypasses encoding, and we are exercising the dataconverter
+
+	// this test requires that the overridden test-data-converter is used, so we need to make sure the encoded input looks correct.
+	// the test data converter's output doesn't actually matter as long as it's noticeably different.
+	correctlyEncoded, err := dc.ToData(input) // []any is spread to ToData args
+	require.NoError(s.T(), err, "test data converter should not fail on simple inputs")
+	wrongDefaultEncoding, err := getDefaultDataConverter().ToData(input)
+	require.NoError(s.T(), err, "default data converter should not fail on simple inputs")
+
+	// sanity check: we must be able to tell right from wrong
+	require.NotEqual(s.T(), correctlyEncoded, wrongDefaultEncoding, "test data converter should encode differently or the test is not valid")
+
+	s.service.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).
+		Do(func(_ interface{}, asyncReq *shared.StartWorkflowExecutionAsyncRequest, _ ...interface{}) {
+			assert.Equal(s.T(), correctlyEncoded, asyncReq.Request.Input, "client-encoded data should use the customized data converter")
+		})
+
+	_, err = client.StartWorkflowAsync(context.Background(), options, f1, input)
+	s.NoError(err)
+}
+
+func (s *workflowClientTestSuite) TestStartWorkflowAsync_ByteBypass() {
+	// default DataConverter checks for []byte args, and does not re-encode them.
+	// this is NOT a general feature of DataConverter, though perhaps it should be
+	// as it's a quite useful escape hatch when making incompatible type changes.
+	client := NewClient(s.service, domain, nil)
 	options := StartWorkflowOptions{
 		ID:                              workflowID,
 		TaskList:                        tasklist,
@@ -1405,21 +1454,14 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithDataConverter() {
 	f1 := func(ctx Context, r []byte) string {
 		return "result"
 	}
-	input := []byte("test")
+	input := []byte("test") // intentionally bypassing dataconverter
 
 	s.service.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).
-		Do(func(_ interface{}, asyncReq *shared.StartWorkflowExecutionAsyncRequest, _ ...interface{}) {
-			req := asyncReq.Request
-			dc := client.dataConverter
-			encodedArg, _ := dc.ToData(input)
-			s.Equal(req.Input, encodedArg)
-			var decodedArg []byte
-			dc.FromData(req.Input, &decodedArg)
-			s.Equal(input, decodedArg)
+		Do(func(_ interface{}, req *shared.StartWorkflowExecutionAsyncRequest, _ ...interface{}) {
+			assert.Equal(s.T(), input, req.Request.Input, "[]byte inputs should not be re-encoded by the default converter")
 		})
 
 	_, err := client.StartWorkflowAsync(context.Background(), options, f1, input)
-	s.Equal(newTestDataConverter(), client.dataConverter)
 	s.NoError(err)
 }
 
@@ -1445,14 +1487,9 @@ func (s *workflowClientTestSuite) TestStartWorkflowAsync_WithMemoAndSearchAttr()
 	s.service.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).
 		Do(func(_ interface{}, asyncReq *shared.StartWorkflowExecutionAsyncRequest, _ ...interface{}) {
 			req := asyncReq.Request
-			var resultMemo, resultAttr string
-			err := json.Unmarshal(req.Memo.Fields["testMemo"], &resultMemo)
-			s.NoError(err)
-			s.Equal("memo value", resultMemo)
-
-			err = json.Unmarshal(req.SearchAttributes.IndexedFields["testAttr"], &resultAttr)
-			s.NoError(err)
-			s.Equal("attr value", resultAttr)
+			// trailing newline is added by the dataconverter
+			s.Equal([]byte("\"memo value\"\n"), req.Memo.Fields["testMemo"], "memos use the dataconverter because they are user data")
+			s.Equal([]byte(`"attr value"`), req.SearchAttributes.IndexedFields["testAttr"], "search attributes must be JSON-encoded")
 		})
 
 	_, err := s.client.StartWorkflowAsync(context.Background(), options, wf)

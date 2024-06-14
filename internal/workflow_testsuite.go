@@ -141,6 +141,14 @@ func (t *TestActivityEnvironment) RegisterActivityWithOptions(a interface{}, opt
 	t.impl.RegisterActivityWithOptions(a, options)
 }
 
+func (t *TestActivityEnvironment) GetRegisteredActivities() []string {
+	return t.impl.GetRegisteredActivities()
+}
+
+func (t *TestActivityEnvironment) GetActivityFunc(registerName string) (interface{}, bool) {
+	return t.impl.GetActivityFunc(registerName)
+}
+
 // ExecuteActivity executes an activity. The tested activity will be executed synchronously in the calling goroutinue.
 // Caller should use Value.Get() to extract strong typed result value.
 func (t *TestActivityEnvironment) ExecuteActivity(activityFn interface{}, args ...interface{}) (Value, error) {
@@ -204,6 +212,22 @@ func (t *TestWorkflowEnvironment) RegisterActivityWithOptions(a interface{}, opt
 		panic("RegisterActivity calls cannot follow mock related ones like OnActivity or similar")
 	}
 	t.impl.RegisterActivityWithOptions(a, options)
+}
+
+func (t *TestWorkflowEnvironment) GetRegisteredWorkflows() []string {
+	return t.impl.GetRegisteredWorkflows()
+}
+
+func (t *TestWorkflowEnvironment) GetWorkflowFunc(registerName string) (interface{}, bool) {
+	return t.impl.GetWorkflowFunc(registerName)
+}
+
+func (t *TestWorkflowEnvironment) GetRegisteredActivities() []string {
+	return t.impl.GetRegisteredActivities()
+}
+
+func (t *TestWorkflowEnvironment) GetActivityFunc(registerName string) (interface{}, bool) {
+	return t.impl.GetActivityFunc(registerName)
 }
 
 // SetStartTime sets the start time of the workflow. This is optional, default start time will be the wall clock time when

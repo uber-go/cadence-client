@@ -1026,7 +1026,9 @@ func (s *workflowClientTestSuite) SetupSuite() {
 func (s *workflowClientTestSuite) SetupTest() {
 	s.mockCtrl = gomock.NewController(s.T())
 	s.service = workflowservicetest.NewMockClient(s.mockCtrl)
-	s.client = NewClient(s.service, domain, nil)
+	s.client = NewClient(s.service, domain, &ClientOptions{
+		Identity: identity,
+	})
 }
 
 func (s *workflowClientTestSuite) TearDownTest() {
@@ -1731,6 +1733,27 @@ func (m *PartialCancelRequestMatcher) Matches(a interface{}) bool {
 
 func (m *PartialCancelRequestMatcher) String() string {
 	return "partial cancellation request matcher matches cause and wfId fields"
+}
+
+func (s *workflowClientTestSuite) TestTerminateWorkflow() {
+	expectedRequest := &shared.TerminateWorkflowExecutionRequest{
+		Domain: common.StringPtr(domain),
+		WorkflowExecution: &shared.WorkflowExecution{
+			WorkflowId: common.StringPtr(workflowID),
+			RunId:      common.StringPtr(runID),
+		},
+		Reason:   common.StringPtr("test reason"),
+		Details:  []byte("test details"),
+		Identity: common.StringPtr(identity),
+	}
+
+	// We consider unknown errors retryable, so we expect the call to be retried
+	s.service.EXPECT().TerminateWorkflowExecution(gomock.Any(), expectedRequest, gomock.All(gomock.Any())).Return(assert.AnError)
+	s.service.EXPECT().TerminateWorkflowExecution(gomock.Any(), expectedRequest, gomock.All(gomock.Any())).Return(nil)
+
+	err := s.client.TerminateWorkflow(context.Background(), workflowID, runID, "test reason", []byte("test details"))
+
+	s.NoError(err)
 }
 
 func TestGetWorkflowStartRequest(t *testing.T) {

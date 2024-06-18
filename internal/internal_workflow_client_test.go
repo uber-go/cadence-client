@@ -1756,6 +1756,66 @@ func (s *workflowClientTestSuite) TestTerminateWorkflow() {
 	s.NoError(err)
 }
 
+func (s *workflowClientTestSuite) TestGetWorkflowHistory() {
+	// Page 1 of 2
+	//// Events
+	events, err := serializer.SerializeBatchEvents(
+		[]*shared.HistoryEvent{
+			{EventId: common.Int64Ptr(1)},
+			{EventId: common.Int64Ptr(2)},
+		},
+		shared.EncodingTypeThriftRW,
+	)
+	s.NoError(err)
+
+	//// Mock
+	s.service.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&shared.GetWorkflowExecutionHistoryResponse{
+			History:       nil,
+			RawHistory:    []*shared.DataBlob{events},
+			NextPageToken: []byte("token"),
+			Archived:      nil,
+		}, nil)
+
+	// Page 2 of 2
+	//// Events
+	events, err = serializer.SerializeBatchEvents(
+		[]*shared.HistoryEvent{
+			{EventId: common.Int64Ptr(3)},
+			{EventId: common.Int64Ptr(4)},
+		},
+		shared.EncodingTypeThriftRW,
+	)
+	s.NoError(err)
+
+	//// Mock
+	s.service.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&shared.GetWorkflowExecutionHistoryResponse{
+			History:       nil,
+			RawHistory:    []*shared.DataBlob{events},
+			NextPageToken: nil,
+			Archived:      nil,
+		}, nil)
+
+	// Act
+	iterator := s.client.GetWorkflowHistory(
+		context.Background(),
+		workflowID,
+		runID,
+		true,
+		shared.HistoryEventFilterTypeAllEvent,
+	)
+
+	s.NotNil(iterator)
+
+	// Check that the iterator returns the correct events
+	for i := 1; iterator.HasNext(); i++ {
+		event, err := iterator.Next()
+		s.NoError(err)
+		s.Equal(int64(i), event.GetEventId())
+	}
+}
+
 func TestGetWorkflowStartRequest(t *testing.T) {
 	tests := []struct {
 		name         string

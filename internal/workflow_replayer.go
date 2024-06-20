@@ -339,9 +339,6 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		return err
 	}
 
-	//if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted && last.GetEventType() != shared.EventTypeWorkflowExecutionContinuedAsNew {
-	//	return nil
-	//}
 	//Technically speaking we do not need extra validations for the continue as new cases as they are equivalent to that case getting completed.
 	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted {
 		return nil
@@ -354,14 +351,6 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		completeReq, ok := resp.(*shared.RespondDecisionTaskCompletedRequest)
 		if ok {
 			for _, d := range completeReq.Decisions {
-				//if d.GetDecisionType() == shared.DecisionTypeContinueAsNewWorkflowExecution &&
-				//	last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
-				//	inputA := d.ContinueAsNewWorkflowExecutionDecisionAttributes.Input
-				//	inputB := last.WorkflowExecutionContinuedAsNewEventAttributes.Input
-				//	if bytes.Compare(inputA, inputB) == 0 {
-				//		return nil
-				//	}
-				//}
 				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution &&
 					last.GetEventType() == shared.EventTypeWorkflowExecutionCompleted {
 					resultA := last.WorkflowExecutionCompletedEventAttributes.Result

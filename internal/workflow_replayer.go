@@ -339,10 +339,10 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		return err
 	}
 
-	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted && last.GetEventType() != shared.EventTypeWorkflowExecutionContinuedAsNew {
+	//Technically speaking we do not need extra validations for the continue as new cases as they are equivalent to that case getting completed.
+	if last.GetEventType() != shared.EventTypeWorkflowExecutionCompleted {
 		return nil
 	}
-
 	// TODO: the following result will not be executed if nextPageToken is not nil, which is probably fine as the actual workflow task
 	// processing logic does not have such check. If we want to always execute this check for closed workflows, we need to dump the
 	// entire history before starting the replay as otherwise we can't get the last event here.
@@ -351,14 +351,6 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 		completeReq, ok := resp.(*shared.RespondDecisionTaskCompletedRequest)
 		if ok {
 			for _, d := range completeReq.Decisions {
-				if d.GetDecisionType() == shared.DecisionTypeContinueAsNewWorkflowExecution &&
-					last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
-					inputA := d.ContinueAsNewWorkflowExecutionDecisionAttributes.Input
-					inputB := last.WorkflowExecutionContinuedAsNewEventAttributes.Input
-					if bytes.Compare(inputA, inputB) == 0 {
-						return nil
-					}
-				}
 				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution &&
 					last.GetEventType() == shared.EventTypeWorkflowExecutionCompleted {
 					resultA := last.WorkflowExecutionCompletedEventAttributes.Result
@@ -366,13 +358,6 @@ func (r *WorkflowReplayer) replayWorkflowHistory(
 					if bytes.Compare(resultA, resultB) == 0 {
 						return nil
 					}
-				}
-				if d.GetDecisionType() == shared.DecisionTypeCompleteWorkflowExecution &&
-					last.GetEventType() == shared.EventTypeWorkflowExecutionContinuedAsNew {
-					// for cron and retry workflow, decision will be completed workflow and
-					// and server side will convert it to a continue as new event.
-					// there's nothing to compare here
-					return nil
 				}
 			}
 		}

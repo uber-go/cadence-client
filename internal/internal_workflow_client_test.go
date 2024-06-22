@@ -1815,6 +1815,104 @@ func (s *workflowClientTestSuite) TestListOpenWorkflow() {
 	}
 }
 
+func (s *workflowClientTestSuite) TestListClosedWorkflow() {
+	testcases := []struct {
+		name    string
+		request *shared.ListClosedWorkflowExecutionsRequest
+		// both error and response should be returned as-is
+		err      error
+		response *shared.ListClosedWorkflowExecutionsResponse
+	}{
+		{
+			name: "success with domain-name",
+			request: &shared.ListClosedWorkflowExecutionsRequest{
+				Domain: common.StringPtr(domain),
+			},
+			err:      nil,
+			response: &shared.ListClosedWorkflowExecutionsResponse{},
+		},
+		{
+			// domain name should be taken from workflow client
+			name:     "success without domain-name",
+			request:  &shared.ListClosedWorkflowExecutionsRequest{},
+			err:      nil,
+			response: &shared.ListClosedWorkflowExecutionsResponse{},
+		},
+		{
+			name: "failed RPC",
+			request: &shared.ListClosedWorkflowExecutionsRequest{
+				Domain: common.StringPtr(domain),
+			},
+			err:      &shared.AccessDeniedError{},
+			response: nil,
+		},
+	}
+
+	for _, tt := range testcases {
+		s.Run(tt.name, func() {
+			s.service.EXPECT().
+				ListClosedWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).
+				Do(func(_ context.Context, req *shared.ListClosedWorkflowExecutionsRequest, _ ...yarpc.CallOption) {
+					s.Equal(domain, *req.Domain)
+				}).
+				Return(tt.response, tt.err)
+
+			resp, err := s.client.ListClosedWorkflow(context.Background(), tt.request)
+			s.Equal(tt.err, err)
+			s.Equal(tt.response, resp)
+		})
+	}
+}
+
+func (s *workflowClientTestSuite) TestResetWorkflow() {
+	testcases := []struct {
+		name    string
+		request *shared.ResetWorkflowExecutionRequest
+		// both error and response should be returned as-is
+		err      error
+		response *shared.ResetWorkflowExecutionResponse
+	}{
+		{
+			name: "success with domain-name",
+			request: &shared.ResetWorkflowExecutionRequest{
+				Domain: common.StringPtr(domain),
+			},
+			err:      nil,
+			response: &shared.ResetWorkflowExecutionResponse{},
+		},
+		{
+			// domain name should be taken from workflow client
+			name:     "success without domain-name",
+			request:  &shared.ResetWorkflowExecutionRequest{},
+			err:      nil,
+			response: &shared.ResetWorkflowExecutionResponse{},
+		},
+		{
+			name: "failed RPC",
+			request: &shared.ResetWorkflowExecutionRequest{
+				Domain: common.StringPtr(domain),
+			},
+			err:      &shared.AccessDeniedError{},
+			response: nil,
+		},
+	}
+
+	for _, tt := range testcases {
+		s.Run(tt.name, func() {
+			s.service.EXPECT().
+				ResetWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).
+				Do(func(_ context.Context, req *shared.ResetWorkflowExecutionRequest, _ ...yarpc.CallOption) {
+					s.Equal(domain, *req.Domain)
+				}).
+				Return(tt.response, tt.err)
+
+			resp, err := s.client.ResetWorkflow(context.Background(), tt.request)
+			s.Equal(tt.err, err)
+			s.Equal(tt.response, resp)
+		})
+	}
+}
+
 func (s *workflowClientTestSuite) TestGetWorkflowHistory() {
 	// Page 1 of 2
 	//// Events

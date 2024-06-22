@@ -1035,6 +1035,16 @@ func (s *workflowClientTestSuite) TearDownTest() {
 	s.mockCtrl.Finish() // assert mock’s expectations
 }
 
+func (s *workflowClientTestSuite) SetupSubTest() {
+	// required for s.Run in case of table tests and mocks
+	s.SetupTest()
+}
+
+func (s *workflowClientTestSuite) TearDownSubTest() {
+	// required for s.Run in case of table tests and mocks
+	s.TearDownTest()
+}
+
 func (s *workflowClientTestSuite) TestSignalWithStartWorkflow() {
 	signalName := "my signal"
 	signalInput := []byte("my signal input")

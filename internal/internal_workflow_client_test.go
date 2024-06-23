@@ -1766,6 +1766,76 @@ func (s *workflowClientTestSuite) TestTerminateWorkflow() {
 	s.NoError(err)
 }
 
+func (s *workflowClientTestSuite) TestDescribeTaskList() {
+	testcases := []struct {
+		name     string
+		rpcError error
+		response *shared.DescribeTaskListResponse
+	}{
+		{
+			name:     "success",
+			rpcError: nil,
+			response: &shared.DescribeTaskListResponse{},
+		},
+		{
+			name:     "failure",
+			rpcError: &shared.AccessDeniedError{},
+			response: nil,
+		},
+	}
+
+	for _, tt := range testcases {
+		s.Run(tt.name, func() {
+			expectedRequest := &shared.DescribeTaskListRequest{
+				Domain:       common.StringPtr(domain),
+				TaskList:     &shared.TaskList{Name: common.StringPtr(tasklist)},
+				TaskListType: shared.TaskListTypeActivity.Ptr(),
+			}
+			s.service.EXPECT().
+				DescribeTaskList(gomock.Any(), expectedRequest, gomock.Any()).
+				Return(tt.response, tt.rpcError)
+
+			r, err := s.client.DescribeTaskList(context.Background(), tasklist, shared.TaskListTypeActivity)
+			s.Equal(tt.rpcError, err, "error should be returned as-is")
+			s.Equal(tt.response, r)
+		})
+	}
+}
+
+func (s *workflowClientTestSuite) TestRefreshWorkflowTasks() {
+	testcases := []struct {
+		name     string
+		rpcError error
+	}{
+		{
+			name:     "success",
+			rpcError: nil,
+		},
+		{
+			name:     "failure",
+			rpcError: &shared.AccessDeniedError{},
+		},
+	}
+
+	for _, tt := range testcases {
+		s.Run(tt.name, func() {
+			expectedRequest := &shared.RefreshWorkflowTasksRequest{
+				Domain: common.StringPtr(domain),
+				Execution: &shared.WorkflowExecution{
+					WorkflowId: common.StringPtr(workflowID),
+					RunId:      common.StringPtr(runID),
+				},
+			}
+			s.service.EXPECT().
+				RefreshWorkflowTasks(gomock.Any(), expectedRequest, gomock.Any()).
+				Return(tt.rpcError)
+
+			err := s.client.RefreshWorkflowTasks(context.Background(), workflowID, runID)
+			s.Equal(tt.rpcError, err, "error should be returned as-is")
+		})
+	}
+}
+
 func (s *workflowClientTestSuite) TestListOpenWorkflow() {
 	testcases := []struct {
 		name    string
@@ -1909,6 +1979,44 @@ func (s *workflowClientTestSuite) TestResetWorkflow() {
 			resp, err := s.client.ResetWorkflow(context.Background(), tt.request)
 			s.Equal(tt.err, err)
 			s.Equal(tt.response, resp)
+		})
+	}
+}
+
+func (s *workflowClientTestSuite) TestDescribeWorkflowExecution() {
+	testcases := []struct {
+		name     string
+		rpcError error
+		response *shared.DescribeWorkflowExecutionResponse
+	}{
+		{
+			name:     "success",
+			rpcError: nil,
+			response: &shared.DescribeWorkflowExecutionResponse{},
+		},
+		{
+			name:     "failure",
+			rpcError: &shared.AccessDeniedError{},
+			response: nil,
+		},
+	}
+
+	for _, tt := range testcases {
+		s.Run(tt.name, func() {
+			expectedRequest := &shared.DescribeWorkflowExecutionRequest{
+				Domain: common.StringPtr(domain),
+				Execution: &shared.WorkflowExecution{
+					WorkflowId: common.StringPtr(workflowID),
+					RunId:      common.StringPtr(runID),
+				},
+			}
+			s.service.EXPECT().
+				DescribeWorkflowExecution(gomock.Any(), expectedRequest, gomock.Any()).
+				Return(tt.response, tt.rpcError)
+
+			r, err := s.client.DescribeWorkflowExecution(context.Background(), workflowID, runID)
+			s.Equal(tt.rpcError, err, "error should be returned as-is")
+			s.Equal(tt.response, r)
 		})
 	}
 }

@@ -47,8 +47,10 @@ const (
 	workflowID            = "some random workflow ID"
 	workflowType          = "some random workflow type"
 	runID                 = "some random run ID"
+	activityID            = "1234"
 	tasklist              = "some random tasklist"
 	identity              = "some random identity"
+	taskToken             = "some random task-token"
 	timeoutInSeconds      = 20
 	workflowIDReusePolicy = WorkflowIDReusePolicyAllowDuplicateFailedOnly
 	testHeader            = "test-header"
@@ -2017,6 +2019,327 @@ func (s *workflowClientTestSuite) TestDescribeWorkflowExecution() {
 			r, err := s.client.DescribeWorkflowExecution(context.Background(), workflowID, runID)
 			s.Equal(tt.rpcError, err, "error should be returned as-is")
 			s.Equal(tt.response, r)
+		})
+	}
+}
+
+func (s *workflowClientTestSuite) TestCompleteActivity() {
+	testcases := []struct {
+		name           string
+		taskToken      []byte
+		activityResult interface{}
+		activityError  error
+		mockRPC        func()
+		checkError     func(err error)
+	}{
+		{
+			name:           "ActivityTaskCompletedRequest success",
+			taskToken:      []byte(taskToken),
+			activityResult: "result string",
+			activityError:  nil,
+
+			mockRPC: func() {
+				request := &shared.RespondActivityTaskCompletedRequest{
+					TaskToken: []byte(taskToken),
+					Result:    []byte("\"result string\"\n"), // JSON encoded activityResult
+					Identity:  common.StringPtr(identity),
+				}
+
+				s.service.EXPECT().
+					RespondActivityTaskCompleted(gomock.Any(), request, gomock.Any()).
+					Return(nil)
+			},
+			checkError: func(err error) {
+				s.Nil(err)
+			},
+		},
+		{
+			name:           "ActivityTaskCompletedRequest failure",
+			taskToken:      []byte(taskToken),
+			activityResult: nil,
+			activityError:  nil,
+			mockRPC: func() {
+				s.service.EXPECT().
+					RespondActivityTaskCompleted(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&shared.AccessDeniedError{})
+			},
+			checkError: func(err error) {
+				s.Equal(&shared.AccessDeniedError{}, err)
+			},
+		},
+		{
+			name:      "missing taskToken",
+			taskToken: nil,
+
+			mockRPC: func() { /* we don't expect any RPC here */ },
+			checkError: func(err error) {
+				s.ErrorContains(err, "invalid task token provided")
+			},
+		},
+		{
+			name:           "fail to encode activity result",
+			taskToken:      []byte(taskToken),
+			activityResult: make(chan int), // can't be represented as JSON
+
+			mockRPC: func() { /* we don't expect any RPC here */ },
+			checkError: func(err error) {
+				s.ErrorContains(err, "unable to encode argument")
+			},
+		},
+		{
+			name:          "ActivityResultPending success",
+			taskToken:     []byte(taskToken),
+			activityError: ErrActivityResultPending,
+
+			mockRPC: func() { /* pending activity result is not reported to server */ },
+			checkError: func(err error) {
+				s.Nil(err)
+			},
+		},
+
+		{
+			name:          "ActivityTaskCanceled success",
+			taskToken:     []byte(taskToken),
+			activityError: NewCanceledError("some details"),
+
+			mockRPC: func() {
+				request := &shared.RespondActivityTaskCanceledRequest{
+					TaskToken: []byte(taskToken),
+					Details:   []byte("\"some details\"\n"),
+					Identity:  common.StringPtr(identity),
+				}
+				s.service.EXPECT().
+					RespondActivityTaskCanceled(gomock.Any(), request, gomock.Any()).
+					Return(nil)
+			},
+			checkError: func(err error) {
+				s.Nil(err)
+			},
+		},
+		{
+			name:          "ActivityTaskCanceled failure",
+			taskToken:     []byte(taskToken),
+			activityError: context.Canceled, // canceled context is another reason for canceled activity
+
+			mockRPC: func() {
+				s.service.EXPECT().
+					RespondActivityTaskCanceled(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&shared.AccessDeniedError{})
+			},
+			checkError: func(err error) {
+				s.Equal(&shared.AccessDeniedError{}, err)
+			},
+		},
+		{
+			name:          "ActivityTaskFailed success",
+			taskToken:     []byte(taskToken),
+			activityError: NewCustomError("some reason", "some details"),
+
+			mockRPC: func() {
+				request := &shared.RespondActivityTaskFailedRequest{
+					TaskToken: []byte(taskToken),
+					Reason:    common.StringPtr("some reason"),
+					Details:   []byte("\"some details\"\n"),
+					Identity:  common.StringPtr(identity),
+				}
+				s.service.EXPECT().
+					RespondActivityTaskFailed(gomock.Any(), request, gomock.Any()).
+					Return(nil)
+			},
+			checkError: func(err error) {
+				s.Nil(err)
+			},
+		},
+		{
+			name:          "ActivityTaskFailed failure",
+			taskToken:     []byte(taskToken),
+			activityError: NewCustomError("some reason"),
+
+			mockRPC: func() {
+				s.service.EXPECT().
+					RespondActivityTaskFailed(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&shared.AccessDeniedError{})
+			},
+			checkError: func(err error) {
+				s.Equal(&shared.AccessDeniedError{}, err)
+			},
+		},
+	}
+
+	for _, tt := range testcases {
+		s.Run(tt.name, func() {
+			tt.mockRPC()
+			err := s.client.CompleteActivity(context.Background(), tt.taskToken, tt.activityResult, tt.activityError)
+			tt.checkError(err)
+		})
+	}
+}
+
+func (s *workflowClientTestSuite) TestCompleteActivityByID() {
+	testcases := []struct {
+		name           string
+		activityID     string
+		activityResult interface{}
+		activityError  error
+		mockRPC        func()
+		checkError     func(err error)
+	}{
+		{
+			name:           "ActivityTaskCompletedByID success",
+			activityID:     activityID,
+			activityResult: "result string",
+			activityError:  nil,
+
+			mockRPC: func() {
+				request := &shared.RespondActivityTaskCompletedByIDRequest{
+					Domain:     common.StringPtr(domain),
+					WorkflowID: common.StringPtr(workflowID),
+					RunID:      common.StringPtr(runID),
+					ActivityID: common.StringPtr(activityID),
+					Result:     []byte("\"result string\"\n"), // JSON encoded activityResult
+					Identity:   common.StringPtr(identity),
+				}
+
+				s.service.EXPECT().
+					RespondActivityTaskCompletedByID(gomock.Any(), request, gomock.Any()).
+					Return(nil)
+			},
+			checkError: func(err error) {
+				s.Nil(err)
+			},
+		},
+		{
+			name:           "ActivityTaskCompletedByID failure",
+			activityID:     activityID,
+			activityResult: nil,
+			activityError:  nil,
+
+			mockRPC: func() {
+				s.service.EXPECT().
+					RespondActivityTaskCompletedByID(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&shared.AccessDeniedError{})
+			},
+			checkError: func(err error) {
+				s.Equal(&shared.AccessDeniedError{}, err)
+			},
+		},
+		{
+			name:       "missing activityID",
+			activityID: "",
+
+			mockRPC: func() { /* we don't expect any RPC here */ },
+			checkError: func(err error) {
+				s.ErrorContains(err, "empty activity")
+			},
+		},
+		{
+			name:           "fail to encode activity result",
+			activityID:     activityID,
+			activityResult: make(chan int), // can't be represented as JSON
+
+			mockRPC: func() { /* we don't expect any RPC here */ },
+			checkError: func(err error) {
+				s.ErrorContains(err, "unable to encode argument")
+			},
+		},
+		{
+			name:          "ActivityResultPending success",
+			activityID:    activityID,
+			activityError: ErrActivityResultPending,
+
+			mockRPC: func() { /* pending activity result is not reported to server */ },
+			checkError: func(err error) {
+				s.Nil(err)
+			},
+		},
+
+		{
+			name:          "ActivityTaskCanceledByID success",
+			activityID:    activityID,
+			activityError: NewCanceledError("some details"),
+
+			mockRPC: func() {
+				request := &shared.RespondActivityTaskCanceledByIDRequest{
+					Domain:     common.StringPtr(domain),
+					WorkflowID: common.StringPtr(workflowID),
+					RunID:      common.StringPtr(runID),
+					ActivityID: common.StringPtr(activityID),
+					Details:    []byte("\"some details\"\n"),
+					Identity:   common.StringPtr(identity),
+				}
+				s.service.EXPECT().
+					RespondActivityTaskCanceledByID(gomock.Any(), request, gomock.Any()).
+					Return(nil)
+			},
+			checkError: func(err error) {
+				s.Nil(err)
+			},
+		},
+		{
+			name:          "ActivityTaskCanceledByID failure",
+			activityID:    activityID,
+			activityError: context.Canceled, // canceled context is another reason for canceled activity
+
+			mockRPC: func() {
+				s.service.EXPECT().
+					RespondActivityTaskCanceledByID(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&shared.AccessDeniedError{})
+			},
+			checkError: func(err error) {
+				s.Equal(&shared.AccessDeniedError{}, err)
+			},
+		},
+		{
+			name:          "ActivityTaskFailedByID success",
+			activityID:    activityID,
+			activityError: NewCustomError("some reason", "some details"),
+
+			mockRPC: func() {
+				request := &shared.RespondActivityTaskFailedByIDRequest{
+					Domain:     common.StringPtr(domain),
+					WorkflowID: common.StringPtr(workflowID),
+					RunID:      common.StringPtr(runID),
+					ActivityID: common.StringPtr(activityID),
+					Reason:     common.StringPtr("some reason"),
+					Details:    []byte("\"some details\"\n"),
+					Identity:   common.StringPtr(identity),
+				}
+				s.service.EXPECT().
+					RespondActivityTaskFailedByID(gomock.Any(), request, gomock.Any()).
+					Return(nil)
+			},
+			checkError: func(err error) {
+				s.Nil(err)
+			},
+		},
+		{
+			name:          "ActivityTaskFailedByID failure",
+			activityID:    activityID,
+			activityError: NewCustomError("some reason"),
+
+			mockRPC: func() {
+				s.service.EXPECT().
+					RespondActivityTaskFailedByID(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&shared.AccessDeniedError{})
+			},
+			checkError: func(err error) {
+				s.Equal(&shared.AccessDeniedError{}, err)
+			},
+		},
+	}
+
+	for _, tt := range testcases {
+		s.Run(tt.name, func() {
+			tt.mockRPC()
+			err := s.client.CompleteActivityByID(
+				context.Background(),
+				domain,
+				workflowID,
+				runID,
+				tt.activityID,
+				tt.activityResult, tt.activityError,
+			)
+			tt.checkError(err)
 		})
 	}
 }

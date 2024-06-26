@@ -271,6 +271,12 @@ type (
 		//
 		// Deprecated: All bugports are always deprecated and may be removed at any time.
 		WorkerBugPorts WorkerBugPorts
+
+		// Optional: This implementation ensures that a specific function is executed only once per instance.
+		// The mechanism can be overridden by other interfaces that implement the 'Do()' method.
+		//
+		// default: nil, that would ensure some functions are executed only once
+		Sync oncePerHost
 	}
 
 	// WorkerBugPorts allows opt-in enabling of older, possibly buggy behavior, primarily intended to allow temporarily

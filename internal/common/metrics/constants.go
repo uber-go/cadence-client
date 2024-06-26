@@ -121,4 +121,6 @@ const (
 	ServerSideHistorySize    = CadenceMetricsPrefix + "server-side-history-size"
 	ConcurrentTaskQuota      = CadenceMetricsPrefix + "concurrent-task-quota"
 	PollerRequestBufferUsage = CadenceMetricsPrefix + "poller-request-buffer-usage"
+
+	WorkerUsageCollectorPanic = CadenceMetricsPrefix + "worker-metrics-collector-panic"
 )

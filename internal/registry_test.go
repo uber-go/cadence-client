@@ -105,16 +105,16 @@ func TestWorkflowRegistration(t *testing.T) {
 			tt.register(r)
 
 			// Verify registered workflow type
-			workflowType := r.GetRegisteredWorkflowTypes()[0]
+			workflowType := r.GetRegisteredWorkflows()[0]
 			require.Equal(t, tt.workflowType, workflowType)
 
 			// Verify workflow is resolved from workflow type
-			_, ok := r.getWorkflowFn(tt.workflowType)
+			_, ok := r.GetWorkflowFunc(tt.workflowType)
 			require.True(t, ok)
 
 			// Verify workflow is resolved from alternative (backwards compatible) workflow type
 			if len(tt.altWorkflowType) > 0 {
-				_, ok = r.getWorkflowFn(tt.altWorkflowType)
+				_, ok = r.GetWorkflowFunc(tt.altWorkflowType)
 				require.True(t, ok)
 			}
 
@@ -228,9 +228,12 @@ func TestActivityRegistration(t *testing.T) {
 			// Verify registered activity type
 			activityType := r.getRegisteredActivities()[0].ActivityType().Name
 			require.Equal(t, tt.activityType, activityType, "activity type")
+			require.Equal(t, tt.activityType, r.GetRegisteredActivities()[0])
 
 			// Verify activity is resolved from activity type
 			_, ok := r.GetActivity(tt.activityType)
+			require.True(t, ok)
+			_, ok = r.GetActivityFunc(tt.activityType)
 			require.True(t, ok)
 
 			// Verify activity is resolved from alternative (backwards compatible) activity type

@@ -24,6 +24,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -137,6 +139,18 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistoryFromFileParent() {
 func (s *workflowReplayerSuite) TestReplayWorkflowHistoryFromFile() {
 	err := s.replayer.ReplayWorkflowHistoryFromJSONFile(s.logger, "testdata/sampleHistory.json")
 	s.NoError(err)
+}
+
+func (s *workflowReplayerSuite) TestActivityRegistration() {
+	name := "test-Activity"
+	s.replayer.RegisterActivityWithOptions(testActivityFunction, RegisterActivityOptions{Name: name})
+	a := s.replayer.GetRegisteredActivities()[0]
+	s.Equal(name, a)
+
+	fn, ok := s.replayer.GetActivityFunc(a)
+	s.True(ok)
+	s.Equal(reflect.Func, reflect.ValueOf(fn).Kind())
+	s.Equal(getFunctionName(testActivityFunction), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }
 
 func testReplayWorkflow(ctx Context) error {

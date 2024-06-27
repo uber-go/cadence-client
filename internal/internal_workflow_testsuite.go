@@ -1884,6 +1884,22 @@ func (env *testWorkflowEnvironmentImpl) ExecuteChildWorkflow(params executeWorkf
 	return env.executeChildWorkflowWithDelay(0, params, callback, startedHandler)
 }
 
+func (env *testWorkflowEnvironmentImpl) GetRegisteredWorkflows() []string {
+	return env.registry.GetRegisteredWorkflows()
+}
+
+func (env *testWorkflowEnvironmentImpl) GetWorkflowFunc(registerName string) (interface{}, bool) {
+	return env.registry.GetWorkflowFunc(registerName)
+}
+
+func (env *testWorkflowEnvironmentImpl) GetRegisteredActivities() []string {
+	return env.registry.GetRegisteredActivities()
+}
+
+func (env *testWorkflowEnvironmentImpl) GetActivityFunc(registerName string) (interface{}, bool) {
+	return env.registry.GetActivityFunc(registerName)
+}
+
 func (env *testWorkflowEnvironmentImpl) executeChildWorkflowWithDelay(delayStart time.Duration, params executeWorkflowParams, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error {
 	childEnv, err := env.newTestWorkflowEnvironmentForChild(&params, callback, startedHandler)
 	if err != nil {

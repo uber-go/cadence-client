@@ -776,6 +776,22 @@ type aggregatedWorker struct {
 	registry                        *registry
 }
 
+func (aw *aggregatedWorker) GetRegisteredWorkflows() []string {
+	return aw.registry.GetRegisteredWorkflows()
+}
+
+func (aw *aggregatedWorker) GetWorkflowFunc(registerName string) (interface{}, bool) {
+	return aw.registry.GetWorkflowFunc(registerName)
+}
+
+func (aw *aggregatedWorker) GetRegisteredActivities() []string {
+	return aw.registry.GetRegisteredActivities()
+}
+
+func (aw *aggregatedWorker) GetActivityFunc(registerName string) (interface{}, bool) {
+	return aw.registry.GetActivityFunc(registerName)
+}
+
 func (aw *aggregatedWorker) RegisterWorkflow(w interface{}) {
 	aw.registry.RegisterWorkflow(w)
 }

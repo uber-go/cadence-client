@@ -91,7 +91,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			decision: &shared.Decision{DecisionType: common.DecisionTypePtr(shared.DecisionTypeRequestCancelActivityTask)},
 		},
 		{
-			name: "case DecisionTypeRequestCancelActivityTask - decision activityID != event activityID",
+			name: "case DecisionTypeRequestCancelActivityTask - different activityIDs",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeRequestCancelActivityTask),
 				RequestCancelActivityTaskDecisionAttributes: &shared.RequestCancelActivityTaskDecisionAttributes{ActivityId: common.StringPtr("ActivityID-1")},
@@ -102,7 +102,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			},
 		},
 		{
-			name: "case DecisionTypeRequestCancelActivityTask - decision activityID == event activityID",
+			name: "case DecisionTypeRequestCancelActivityTask - equal activityIDs",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeRequestCancelActivityTask),
 				RequestCancelActivityTaskDecisionAttributes: &shared.RequestCancelActivityTaskDecisionAttributes{ActivityId: common.StringPtr(testdata.ActivityID)},
@@ -121,7 +121,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "case DecisionTypeStartTimer - decision timerID != event timerID",
+			name: "case DecisionTypeStartTimer - different timerIDs",
 			decision: &shared.Decision{
 				DecisionType:                 common.DecisionTypePtr(shared.DecisionTypeStartTimer),
 				StartTimerDecisionAttributes: &shared.StartTimerDecisionAttributes{TimerId: common.StringPtr("timerID-1")},
@@ -132,7 +132,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			},
 		},
 		{
-			name: "case DecisionTypeStartTimer - decision timerID == event timerID",
+			name: "case DecisionTypeStartTimer - equal timerIDs",
 			decision: &shared.Decision{
 				DecisionType:                 common.DecisionTypePtr(shared.DecisionTypeStartTimer),
 				StartTimerDecisionAttributes: &shared.StartTimerDecisionAttributes{TimerId: common.StringPtr("timerID")},
@@ -144,7 +144,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "case DecisionTypeCancelTimer - event type != EventTypeTimerCanceled",
+			name: "case DecisionTypeCancelTimer - event not of type EventTypeTimerCanceled",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeCancelTimer),
 			},
@@ -194,7 +194,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "case DecisionTypeCompleteWorkflowExecution - event type != EventTypeWorkflowExecutionCompleted",
+			name: "case DecisionTypeCompleteWorkflowExecution - event not of type EventTypeWorkflowExecutionCompleted",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeCompleteWorkflowExecution),
 			},
@@ -222,7 +222,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "case DecisionTypeFailWorkflowExecution - event type != EventTypeWorkflowExecutionFailed",
+			name: "case DecisionTypeFailWorkflowExecution - event not of type EventTypeWorkflowExecutionFailed",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeFailWorkflowExecution),
 			},
@@ -270,7 +270,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "case DecisionTypeRecordMarker - event type not EventTypeMarkerRecorded",
+			name: "case DecisionTypeRecordMarker - event not of type EventTypeMarkerRecorded",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeRecordMarker),
 			},
@@ -280,7 +280,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "case DecisionTypeRequestCancelExternalWorkflowExecution - event type not EventTypeRequestCancelExternalWorkflowExecutionInitiated",
+			name: "case DecisionTypeRequestCancelExternalWorkflowExecution - event not of type EventTypeRequestCancelExternalWorkflowExecutionInitiated",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeRequestCancelExternalWorkflowExecution),
 			},
@@ -320,7 +320,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "case DecisionTypeSignalExternalWorkflowExecution - event type not EventTypeSignalExternalWorkflowExecutionInitiated",
+			name: "case DecisionTypeSignalExternalWorkflowExecution - event not of type EventTypeSignalExternalWorkflowExecutionInitiated",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeSignalExternalWorkflowExecution),
 			},
@@ -344,7 +344,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			},
 		},
 		{
-			name: "case DecisionTypeCancelWorkflowExecution - event type not EventTypeSignalExternalWorkflowExecutionInitiated",
+			name: "case DecisionTypeCancelWorkflowExecution - event not of type EventTypeSignalExternalWorkflowExecutionInitiated",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeCancelWorkflowExecution),
 			},
@@ -378,7 +378,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			expected:   true,
 		},
 		{
-			name: "case DecisionTypeContinueAsNewWorkflowExecution - event type not EventTypeWorkflowExecutionContinuedAsNew",
+			name: "case DecisionTypeContinueAsNewWorkflowExecution - event not of type EventTypeWorkflowExecutionContinuedAsNew",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeContinueAsNewWorkflowExecution),
 			},
@@ -397,7 +397,7 @@ func TestIsDecisionMatchEvent(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "case DecisionTypeStartChildWorkflowExecution - event type not EventTypeStartChildWorkflowExecutionInitiated",
+			name: "case DecisionTypeStartChildWorkflowExecution - event not of type EventTypeStartChildWorkflowExecutionInitiated",
 			decision: &shared.Decision{
 				DecisionType: common.DecisionTypePtr(shared.DecisionTypeStartChildWorkflowExecution),
 			},

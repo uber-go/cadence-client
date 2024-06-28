@@ -21,8 +21,9 @@
 package internal
 
 import (
-	"go.uber.org/cadence/internal/compatibility/testdata"
 	"testing"
+
+	"go.uber.org/cadence/internal/compatibility/testdata"
 
 	"github.com/stretchr/testify/assert"
 

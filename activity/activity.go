@@ -31,7 +31,6 @@ import (
 
 type (
 	// Type identifies an activity type.
-	// TODO: remove
 	Type = internal.ActivityType
 
 	// Info contains information about a currently executing activity.

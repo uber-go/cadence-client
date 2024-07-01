@@ -26,9 +26,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/yarpc"
 	"go.uber.org/zap/zaptest"
+
+	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
+	"go.uber.org/cadence/.gen/go/shared"
 )
 
 func TestLocalActivityPanic(t *testing.T) {
@@ -53,4 +58,54 @@ func TestLocalActivityPanic(t *testing.T) {
 	require.True(t, errors.As(err, &perr), "error should be a panic error")
 	assert.Contains(t, perr.StackTrace(), "panic")
 	assert.Contains(t, perr.StackTrace(), t.Name(), "should mention the source location of the local activity that panicked")
+}
+
+func TestActivityTaskPollerHandlesPanics(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	service := workflowservicetest.NewMockClient(ctrl)
+	service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *shared.PollForActivityTaskRequest, opts ...yarpc.CallOption) (*shared.PollForActivityTaskResponse, error) {
+		panic("oh no")
+	})
+	workerStopChannel := make(chan struct{}, 1)
+	activityPoller := newActivityTaskPoller(nil, service, "test", workerExecutionParameters{
+		TaskList: "tasklist",
+
+		WorkerStopChannel: workerStopChannel,
+		WorkerOptions: WorkerOptions{
+			Identity: "identity",
+			Logger:   zaptest.NewLogger(t),
+		},
+	})
+
+	result, err := activityPoller.PollTask()
+
+	assert.Nil(t, result)
+	var panicErr *PanicError
+	assert.ErrorAs(t, err, &panicErr)
+	assert.Equal(t, "oh no", panicErr.value)
+}
+
+func TestWorkflowTaskPollerHandlesPanics(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	service := workflowservicetest.NewMockClient(ctrl)
+	service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *shared.PollForDecisionTaskRequest, opts ...yarpc.CallOption) (*shared.PollForDecisionTaskResponse, error) {
+		panic("oh no")
+	})
+	workerStopChannel := make(chan struct{}, 1)
+	workflowTaskPoller := newWorkflowTaskPoller(nil, nil, service, "test", workerExecutionParameters{
+		TaskList: "tasklist",
+
+		WorkerStopChannel: workerStopChannel,
+		WorkerOptions: WorkerOptions{
+			Identity: "identity",
+			Logger:   zaptest.NewLogger(t),
+		},
+	})
+
+	result, err := workflowTaskPoller.PollTask()
+
+	assert.Nil(t, result)
+	var panicErr *PanicError
+	assert.ErrorAs(t, err, &panicErr)
+	assert.Equal(t, "oh no", panicErr.value)
 }

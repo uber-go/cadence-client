@@ -85,6 +85,33 @@ func TestActivityTaskPollerHandlesPanics(t *testing.T) {
 	assert.Equal(t, "oh no", panicErr.value)
 }
 
+func TestActivityTaskPollerHandlesCancel(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	service := workflowservicetest.NewMockClient(ctrl)
+	workerStopChannel := make(chan struct{}, 1)
+	pollBlockingChannel := make(chan struct{}, 1)
+	defer close(pollBlockingChannel)
+	activityPoller := newActivityTaskPoller(nil, service, "test", workerExecutionParameters{
+		TaskList: "tasklist",
+
+		WorkerStopChannel: workerStopChannel,
+		WorkerOptions: WorkerOptions{
+			Identity: "identity",
+			Logger:   zaptest.NewLogger(t),
+		},
+	})
+	service.EXPECT().PollForActivityTask(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *shared.PollForActivityTaskRequest, opts ...yarpc.CallOption) (*shared.PollForActivityTaskResponse, error) {
+		workerStopChannel <- struct{}{}
+		<-pollBlockingChannel
+		return nil, nil
+	})
+
+	result, err := activityPoller.PollTask()
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, errShutdown)
+}
+
 func TestWorkflowTaskPollerHandlesPanics(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	service := workflowservicetest.NewMockClient(ctrl)

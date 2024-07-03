@@ -112,7 +112,6 @@ services:
       - BUILDKITE_BUILD_CREATOR_EMAIL
       - BUILDKITE_BUILD_CREATOR_TEAMS
       - BUILDKITE_PULL_REQUEST_REPO
-      - COVERALLS_TOKEN
       - "GO111MODULE=on"
     volumes:
       - ../../:/go/src/go.uber.org/cadence

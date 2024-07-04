@@ -260,7 +260,7 @@ func (r *registry) getWorkflowNoLock(registerName string) (interface{}, bool) {
 	if ok {
 		return a.GetFunction(), ok
 	}
-	return a, ok
+	return nil, ok
 }
 
 func (r *registry) GetRegisteredWorkflowTypes() []string {

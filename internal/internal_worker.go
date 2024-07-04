@@ -732,9 +732,7 @@ func (ae *activityExecutor) Execute(ctx context.Context, input []byte) ([]byte, 
 	}
 
 	fnValue := reflect.ValueOf(ae.fn)
-	//
 	retValues := fnValue.Call(args)
-	//
 	return validateFunctionAndGetResults(ae.fn, retValues, dataConverter)
 }
 

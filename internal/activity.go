@@ -35,9 +35,16 @@ import (
 )
 
 type (
+	// RegistryActivityInfo
+	RegistryActivityInfo interface {
+		ActivityType() ActivityType
+		GetFunction() interface{}
+	}
+
 	// ActivityType identifies a activity type.
 	ActivityType struct {
 		Name string
+		Path string
 	}
 
 	// ActivityInfo contains information about currently executing activity.

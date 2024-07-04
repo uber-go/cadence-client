@@ -229,13 +229,8 @@ func (s *WorkflowShadower) Stop() {
 }
 
 // GetRegisteredWorkflows retrieves the list of workflows registered on the worker
-func (s *WorkflowShadower) GetRegisteredWorkflows() []string {
+func (s *WorkflowShadower) GetRegisteredWorkflows() []RegistryWorkflowInfo {
 	return s.replayer.GetRegisteredWorkflows()
-}
-
-// GetWorkflowFn returns the workflow function corresponding to the provided registerName
-func (s *WorkflowShadower) GetWorkflowFunc(registerName string) (interface{}, bool) {
-	return s.replayer.GetWorkflowFunc(registerName)
 }
 
 func (s *WorkflowShadower) shadowWorker() error {

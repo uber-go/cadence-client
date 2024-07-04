@@ -843,21 +843,29 @@ func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	w.RegisterWorkflowWithOptions(testWorkflowReturnStructPtrPtr, RegisterWorkflowOptions{EnableShortName: true})
 
 	wfs := w.GetRegisteredWorkflows()
+	var wfNames []string
+	for _, wf := range wfs {
+		wfNames = append(wfNames, wf.WorkflowType().Name)
+	}
 	assert.Equal(t, 8, len(wfs))
-	assert.Contains(t, wfs, "testWorkflowSample")
-	assert.Contains(t, wfs, "testWorkflowMultipleArgs")
-	assert.Contains(t, wfs, "testWorkflowNoArgs")
-	assert.Contains(t, wfs, "testWorkflowReturnInt")
-	assert.Contains(t, wfs, "testWorkflowReturnString")
-	assert.Contains(t, wfs, "testWorkflowReturnString")
-	assert.Contains(t, wfs, "testWorkflowReturnStructPtr")
-	assert.Contains(t, wfs, "testWorkflowReturnStructPtrPtr")
+	assert.Contains(t, wfNames, "testWorkflowSample")
+	assert.Contains(t, wfNames, "testWorkflowMultipleArgs")
+	assert.Contains(t, wfNames, "testWorkflowNoArgs")
+	assert.Contains(t, wfNames, "testWorkflowReturnInt")
+	assert.Contains(t, wfNames, "testWorkflowReturnString")
+	assert.Contains(t, wfNames, "testWorkflowReturnString")
+	assert.Contains(t, wfNames, "testWorkflowReturnStructPtr")
+	assert.Contains(t, wfNames, "testWorkflowReturnStructPtrPtr")
 
 	// sample assertion on workflow func
-	fn, ok := w.GetWorkflowFunc("testWorkflowSample")
-	assert.True(t, ok)
-	assert.Equal(t, reflect.Func, reflect.ValueOf(fn).Kind())
-	assert.Equal(t, getFunctionName(testWorkflowSample), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
+	var sampleFunc interface{}
+	for _, wf := range wfs {
+		if wf.WorkflowType().Name == "testWorkflowSample" {
+			sampleFunc = wf.GetFunction()
+			break
+		}
+	}
+	assert.Equal(t, getFunctionName(testWorkflowSample), runtime.FuncForPC(reflect.ValueOf(sampleFunc).Pointer()).Name())
 }
 
 func TestRegisterActivityWithOptions(t *testing.T) {
@@ -865,13 +873,12 @@ func TestRegisterActivityWithOptions(t *testing.T) {
 	w := &aggregatedWorker{registry: r}
 	w.RegisterActivityWithOptions(testActivityMultipleArgs, RegisterActivityOptions{EnableShortName: true})
 
-	wfs := w.GetRegisteredActivities()
-	assert.Equal(t, 1, len(wfs))
-	assert.Contains(t, wfs, "testActivityMultipleArgs")
+	a := w.GetRegisteredActivities()
+	assert.Equal(t, 1, len(a))
+	assert.Contains(t, a[0].ActivityType().Name, "testActivityMultipleArgs")
 
 	// assert activity function
-	fn, ok := w.GetActivityFunc("testActivityMultipleArgs")
-	assert.True(t, ok)
+	fn := a[0].GetFunction()
 	assert.Equal(t, reflect.Func, reflect.ValueOf(fn).Kind())
 	assert.Equal(t, getFunctionName(testActivityMultipleArgs), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }

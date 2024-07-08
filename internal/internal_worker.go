@@ -653,6 +653,7 @@ func decodeAndAssignValue(dc DataConverter, from interface{}, toValuePtr interfa
 type workflowExecutor struct {
 	workflowType string
 	fn           interface{}
+	path         string
 }
 
 func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
@@ -677,15 +678,27 @@ func (we *workflowExecutor) Execute(ctx Context, input []byte) ([]byte, error) {
 	return serializeResults(we.fn, results, dataConverter)
 }
 
+func (we *workflowExecutor) WorkflowType() WorkflowType {
+	return WorkflowType{
+		Name: we.workflowType,
+		Path: we.path,
+	}
+}
+
+func (we *workflowExecutor) GetFunction() interface{} {
+	return we.fn
+}
+
 // Wrapper to execute activity functions.
 type activityExecutor struct {
 	name    string
 	fn      interface{}
 	options RegisterActivityOptions
+	path    string
 }
 
 func (ae *activityExecutor) ActivityType() ActivityType {
-	return ActivityType{Name: ae.name}
+	return ActivityType{Name: ae.name, Path: ae.path}
 }
 
 func (ae *activityExecutor) GetFunction() interface{} {
@@ -776,20 +789,22 @@ type aggregatedWorker struct {
 	registry                        *registry
 }
 
-func (aw *aggregatedWorker) GetRegisteredWorkflows() []string {
-	return aw.registry.GetRegisteredWorkflows()
+func (aw *aggregatedWorker) GetRegisteredWorkflows() []RegistryWorkflowInfo {
+	workflows := aw.registry.GetRegisteredWorkflows()
+	var result []RegistryWorkflowInfo
+	for _, wf := range workflows {
+		result = append(result, wf)
+	}
+	return result
 }
 
-func (aw *aggregatedWorker) GetWorkflowFunc(registerName string) (interface{}, bool) {
-	return aw.registry.GetWorkflowFunc(registerName)
-}
-
-func (aw *aggregatedWorker) GetRegisteredActivities() []string {
-	return aw.registry.GetRegisteredActivities()
-}
-
-func (aw *aggregatedWorker) GetActivityFunc(registerName string) (interface{}, bool) {
-	return aw.registry.GetActivityFunc(registerName)
+func (aw *aggregatedWorker) GetRegisteredActivities() []RegistryActivityInfo {
+	activities := aw.registry.getRegisteredActivities()
+	var result []RegistryActivityInfo
+	for _, a := range activities {
+		result = append(result, a)
+	}
+	return result
 }
 
 func (aw *aggregatedWorker) RegisterWorkflow(w interface{}) {

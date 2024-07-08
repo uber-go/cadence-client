@@ -131,20 +131,24 @@ func (r *WorkflowReplayer) RegisterActivityWithOptions(a interface{}, options Re
 	r.registry.RegisterActivityWithOptions(a, options)
 }
 
-func (r *WorkflowReplayer) GetRegisteredWorkflows() []string {
-	return r.registry.GetRegisteredWorkflows()
+// GetRegisteredWorkflows retrieves the registered workflows on the replayer
+func (r *WorkflowReplayer) GetRegisteredWorkflows() []RegistryWorkflowInfo {
+	workflows := r.registry.GetRegisteredWorkflows()
+	var result []RegistryWorkflowInfo
+	for _, wf := range workflows {
+		result = append(result, wf)
+	}
+	return result
 }
 
-func (r *WorkflowReplayer) GetWorkflowFunc(registerName string) (interface{}, bool) {
-	return r.registry.GetWorkflowFunc(registerName)
-}
-
-func (r *WorkflowReplayer) GetRegisteredActivities() []string {
-	return r.registry.GetRegisteredActivities()
-}
-
-func (r *WorkflowReplayer) GetActivityFunc(registerName string) (interface{}, bool) {
-	return r.registry.GetActivityFunc(registerName)
+// GetRegisteredActivities retrieves the registered activities on the replayer
+func (r *WorkflowReplayer) GetRegisteredActivities() []RegistryActivityInfo {
+	activities := r.registry.getRegisteredActivities()
+	var result []RegistryActivityInfo
+	for _, a := range activities {
+		result = append(result, a)
+	}
+	return result
 }
 
 // ReplayWorkflowHistory executes a single decision task for the given history.

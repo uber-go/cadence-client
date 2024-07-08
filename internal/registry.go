@@ -39,7 +39,7 @@ var globalRegistry *registry
 
 func newRegistry() *registry {
 	return &registry{
-		workflowFuncMap:  make(map[string]interface{}),
+		workflowFuncMap:  make(map[string]workflow),
 		workflowAliasMap: make(map[string]string),
 		activityFuncMap:  make(map[string]activity),
 		activityAliasMap: make(map[string]string),
@@ -50,7 +50,7 @@ func newRegistry() *registry {
 func getGlobalRegistry() *registry {
 	once.Do(func() {
 		globalRegistry = &registry{
-			workflowFuncMap:  make(map[string]interface{}),
+			workflowFuncMap:  make(map[string]workflow),
 			workflowAliasMap: make(map[string]string),
 			activityFuncMap:  make(map[string]activity),
 			activityAliasMap: make(map[string]string),
@@ -61,7 +61,7 @@ func getGlobalRegistry() *registry {
 
 type registry struct {
 	sync.Mutex
-	workflowFuncMap  map[string]interface{}
+	workflowFuncMap  map[string]workflow
 	workflowAliasMap map[string]string
 	activityFuncMap  map[string]activity
 	activityAliasMap map[string]string
@@ -100,7 +100,7 @@ func (r *registry) RegisterWorkflowWithOptions(
 			panic(fmt.Sprintf("workflow name \"%v\" is already registered", registerName))
 		}
 	}
-	r.workflowFuncMap[registerName] = wf
+	r.workflowFuncMap[registerName] = &workflowExecutor{registerName, wf, fnName}
 	if len(alias) > 0 || options.EnableShortName {
 		r.workflowAliasMap[fnName] = registerName
 	}
@@ -124,29 +124,18 @@ func (r *registry) RegisterActivityWithOptions(af interface{}, options RegisterA
 	}
 }
 
-func (r *registry) GetRegisteredWorkflows() []string {
-	return r.GetRegisteredWorkflowTypes()
-}
-
-func (r *registry) GetWorkflowFunc(registerName string) (interface{}, bool) {
-	return r.getWorkflowFn(registerName)
-}
-
-func (r *registry) GetRegisteredActivities() []string {
-	activities := r.getRegisteredActivities()
-	activityNames := make([]string, 0, len(activities))
-	for _, a := range activities {
-		activityNames = append(activityNames, a.ActivityType().Name)
+func (r *registry) GetRegisteredWorkflows() []workflow {
+	r.Lock()
+	var result []workflow
+	for _, wf := range r.workflowFuncMap {
+		result = append(result, wf)
 	}
-	return activityNames
-}
-
-func (r *registry) GetActivityFunc(registerName string) (interface{}, bool) {
-	a, ok := r.GetActivity(registerName)
-	if !ok {
-		return nil, false
+	r.Unlock()
+	if r.next != nil {
+		nextWFs := r.next.GetRegisteredWorkflows()
+		result = append(result, nextWFs...)
 	}
-	return a.GetFunction(), ok
+	return result
 }
 
 func (r *registry) registerActivityFunction(af interface{}, options RegisterActivityOptions) error {
@@ -174,7 +163,7 @@ func (r *registry) registerActivityFunction(af interface{}, options RegisterActi
 			return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 		}
 	}
-	r.activityFuncMap[registerName] = &activityExecutor{registerName, af, options}
+	r.activityFuncMap[registerName] = &activityExecutor{registerName, af, options, fnName}
 	if len(alias) > 0 || options.EnableShortName {
 		r.activityAliasMap[fnName] = registerName
 	}
@@ -216,7 +205,7 @@ func (r *registry) registerActivityStruct(aStruct interface{}, options RegisterA
 				return fmt.Errorf("activity type \"%v\" is already registered", registerName)
 			}
 		}
-		r.activityFuncMap[registerName] = &activityExecutor{registerName, methodValue.Interface(), options}
+		r.activityFuncMap[registerName] = &activityExecutor{registerName, methodValue.Interface(), options, methodName}
 		if len(structPrefix) > 0 || options.EnableShortName {
 			r.activityAliasMap[methodName] = registerName
 		}
@@ -248,16 +237,19 @@ func (r *registry) getWorkflowAlias(fnName string) (string, bool) {
 
 func (r *registry) getWorkflowFn(fnName string) (interface{}, bool) {
 	r.Lock() // do not defer for Unlock to call next.getWorkflowFn without lock
-	fn, ok := r.workflowFuncMap[fnName]
+	wf, ok := r.workflowFuncMap[fnName]
 	if !ok { // if exact match is not found, check for backwards compatible name without -fm suffix
-		fn, ok = r.workflowFuncMap[strings.TrimSuffix(fnName, "-fm")]
+		wf, ok = r.workflowFuncMap[strings.TrimSuffix(fnName, "-fm")]
 	}
 	if !ok && r.next != nil {
 		r.Unlock()
 		return r.next.getWorkflowFn(fnName)
 	}
 	r.Unlock()
-	return fn, ok
+	if ok {
+		return wf.GetFunction(), ok
+	}
+	return nil, ok
 }
 
 func (r *registry) getWorkflowNoLock(registerName string) (interface{}, bool) {
@@ -265,7 +257,10 @@ func (r *registry) getWorkflowNoLock(registerName string) (interface{}, bool) {
 	if !ok && r.next != nil {
 		return r.next.getWorkflowNoLock(registerName)
 	}
-	return a, ok
+	if ok {
+		return a.GetFunction(), ok
+	}
+	return nil, ok
 }
 
 func (r *registry) GetRegisteredWorkflowTypes() []string {

@@ -6,22 +6,14 @@
 
 ## How to use
 
-Make sure you clone this repo into the correct location.
-
-```bash
-git clone git@github.com:uber-go/cadence-client.git $GOPATH/src/go.uber.org/cadence
-```
-
-or
-
 ```bash
 go get go.uber.org/cadence
 ```
 
 See [samples](https://github.com/uber-common/cadence-samples) to get started. 
 
-Documentation is available [here](https://cadenceworkflow.io/docs/go-client/). 
-You can also find the API documentation [here](https://godoc.org/go.uber.org/cadence).
+Higher level / conceptual documentation is available on the main website: https://cadenceworkflow.io/docs/go-client/  
+Most technical details are documented extensively in code, so they are visible in your IDE and at Go's documentation site: https://go.uber.org/cadence
 
 ## Contributing
 We'd love your help in making the Cadence Go client great. Please review our [contribution guidelines](CONTRIBUTING.md).

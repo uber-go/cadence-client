@@ -136,20 +136,3 @@ steps:
       - docker-compose#v3.0.0:
           run: integ-test-grpc
           config: docker/buildkite/docker-compose.yml
-
-  - wait
-
-  - label: ":golang: code-coverage"
-    plugins:
-      - kubernetes:
-          <<: *kubernetes
-          podSpec:
-            <<: *podSpec
-            containers:
-              - <<: *commandContainer
-                command:
-                - |-
-                  .buildkite/scripts/gocov.sh
-      - docker-compose#v3.0.0:
-          run: coverage-report
-          config: docker/buildkite/docker-compose.yml

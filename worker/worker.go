@@ -239,6 +239,9 @@ type (
 
 	// OAuthConfig allows to configure external OAuth token provider.
 	OAuthConfig = internal.OAuthAuthorizerConfig
+
+	//StatsCollector
+	StatsCollector = internal.StatsCollector
 )
 
 const (

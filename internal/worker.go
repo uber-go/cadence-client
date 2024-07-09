@@ -271,6 +271,11 @@ type (
 		//
 		// Deprecated: All bugports are always deprecated and may be removed at any time.
 		WorkerBugPorts WorkerBugPorts
+
+		// Optional: StatsCollector provides a set of methods that can be used to collect
+		// stats on the Worker for debugging purposes.
+		// default: noop implementation
+		StatsCollector StatsCollector
 	}
 
 	// WorkerBugPorts allows opt-in enabling of older, possibly buggy behavior, primarily intended to allow temporarily
@@ -290,6 +295,16 @@ type (
 		//
 		// Deprecated: All bugports are always deprecated and may be removed at any time
 		DisableStrictNonDeterminismCheck bool
+	}
+
+	// StatsCollector
+	StatsCollector interface {
+		StartPoller()
+		ShutdownPoller()
+		ExecuteActivity()
+		RecordActivityCompleted()
+		ExecuteWorkflow()
+		RecordWorkflowCompleted()
 	}
 )
 

@@ -240,7 +240,7 @@ type (
 	// OAuthConfig allows to configure external OAuth token provider.
 	OAuthConfig = internal.OAuthAuthorizerConfig
 
-	//StatsCollector
+	//StatsCollector contains a set of methods to collect stats on worker
 	StatsCollector = internal.StatsCollector
 )
 

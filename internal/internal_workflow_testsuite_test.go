@@ -1856,7 +1856,9 @@ func (s *WorkflowTestSuiteUnitTest) Test_WorkflowLocalActivityWithMockAndListene
 
 	env.ExecuteWorkflow(workflowFn)
 	env.AssertExpectations(s.T())
-	s.Equal(2, startedCount)
+	// the canceled workflow may not have actually started by the time it was canceled
+	s.GreaterOrEqual(startedCount, 1)
+	s.LessOrEqual(startedCount, 2)
 	s.Equal(1, completedCount)
 	s.Equal(1, canceledCount)
 	s.True(env.IsWorkflowCompleted())

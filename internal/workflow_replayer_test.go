@@ -144,11 +144,10 @@ func (s *workflowReplayerSuite) TestReplayWorkflowHistoryFromFile() {
 func (s *workflowReplayerSuite) TestActivityRegistration() {
 	name := "test-Activity"
 	s.replayer.RegisterActivityWithOptions(testActivityFunction, RegisterActivityOptions{Name: name})
-	a := s.replayer.GetRegisteredActivities()[0]
+	a := s.replayer.GetRegisteredActivities()[0].ActivityType().Name
 	s.Equal(name, a)
 
-	fn, ok := s.replayer.GetActivityFunc(a)
-	s.True(ok)
+	fn := s.replayer.GetRegisteredActivities()[0].GetFunction()
 	s.Equal(reflect.Func, reflect.ValueOf(fn).Kind())
 	s.Equal(getFunctionName(testActivityFunction), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }

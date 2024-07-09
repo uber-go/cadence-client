@@ -249,7 +249,7 @@ func createWorkflowTaskWithQueries(
 	copy(eventsCopy, events)
 	return &s.PollForDecisionTaskResponse{
 		PreviousStartedEventId: common.Int64Ptr(previousStartEventID),
-		WorkflowType:           workflowTypePtr(WorkflowType{workflowName}),
+		WorkflowType:           workflowTypePtr(WorkflowType{Name: workflowName}),
 		History:                &s.History{Events: eventsCopy},
 		WorkflowExecution: &s.WorkflowExecution{
 			WorkflowId: common.StringPtr("fake-workflow-id"),

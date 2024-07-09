@@ -1884,20 +1884,22 @@ func (env *testWorkflowEnvironmentImpl) ExecuteChildWorkflow(params executeWorkf
 	return env.executeChildWorkflowWithDelay(0, params, callback, startedHandler)
 }
 
-func (env *testWorkflowEnvironmentImpl) GetRegisteredWorkflows() []string {
-	return env.registry.GetRegisteredWorkflows()
+func (env *testWorkflowEnvironmentImpl) GetRegisteredWorkflows() []RegistryWorkflowInfo {
+	workflows := env.registry.GetRegisteredWorkflows()
+	var result []RegistryWorkflowInfo
+	for _, wf := range workflows {
+		result = append(result, wf)
+	}
+	return result
 }
 
-func (env *testWorkflowEnvironmentImpl) GetWorkflowFunc(registerName string) (interface{}, bool) {
-	return env.registry.GetWorkflowFunc(registerName)
-}
-
-func (env *testWorkflowEnvironmentImpl) GetRegisteredActivities() []string {
-	return env.registry.GetRegisteredActivities()
-}
-
-func (env *testWorkflowEnvironmentImpl) GetActivityFunc(registerName string) (interface{}, bool) {
-	return env.registry.GetActivityFunc(registerName)
+func (env *testWorkflowEnvironmentImpl) GetRegisteredActivities() []RegistryActivityInfo {
+	activities := env.registry.getRegisteredActivities()
+	var result []RegistryActivityInfo
+	for _, a := range activities {
+		result = append(result, a)
+	}
+	return result
 }
 
 func (env *testWorkflowEnvironmentImpl) executeChildWorkflowWithDelay(delayStart time.Duration, params executeWorkflowParams, callback resultHandler, startedHandler func(r WorkflowExecution, e error)) error {

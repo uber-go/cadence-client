@@ -389,9 +389,16 @@ type (
 		SignalChildWorkflow(ctx Context, signalName string, data interface{}) Future
 	}
 
+	// RegistryWorkflowInfo
+	RegistryWorkflowInfo interface {
+		WorkflowType() WorkflowType
+		GetFunction() interface{}
+	}
+
 	// WorkflowType identifies a workflow type.
 	WorkflowType struct {
 		Name string
+		Path string
 	}
 
 	// WorkflowExecution Details.

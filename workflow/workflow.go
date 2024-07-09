@@ -57,6 +57,8 @@ type (
 
 	// Info information about currently executing workflow
 	Info = internal.WorkflowInfo
+
+	RegistryInfo = internal.RegistryWorkflowInfo
 )
 
 // Register - registers a workflow function with the framework.

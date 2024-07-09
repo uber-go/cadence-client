@@ -1145,17 +1145,8 @@ func newAggregatedWorker(
 // statsCollector implements the StatsCollector interface
 type statsCollector struct{}
 
-func (s *statsCollector) StartPoller() {}
-
+func (s *statsCollector) StartPoller()    {}
 func (s *statsCollector) ShutdownPoller() {}
-
-func (s *statsCollector) ExecuteActivity() {}
-
-func (s *statsCollector) RecordActivityCompleted() {}
-
-func (s *statsCollector) ExecuteWorkflow() {}
-
-func (s *statsCollector) RecordWorkflowCompleted() {}
 
 func newNoopStatsCollector() StatsCollector {
 	return &statsCollector{}

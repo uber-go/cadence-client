@@ -297,14 +297,14 @@ type (
 		DisableStrictNonDeterminismCheck bool
 	}
 
-	// StatsCollector
+	// StatsCollector contains a set of methods to collect information on a running worker
 	StatsCollector interface {
+		// StartPoller collects information on poller start up.
+		// consumers should provide a concurrency-safe implementation.
 		StartPoller()
+		// ShutdownPoller collects information on poller shutdown
+		// consumers should provide a concurrency-safe implementation.
 		ShutdownPoller()
-		ExecuteActivity()
-		RecordActivityCompleted()
-		ExecuteWorkflow()
-		RecordWorkflowCompleted()
 	}
 )
 

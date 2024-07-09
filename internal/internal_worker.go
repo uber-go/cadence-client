@@ -187,6 +187,10 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	if params.UserContext == nil {
 		params.UserContext = context.Background()
 	}
+	if params.StatsCollector == nil {
+		params.StatsCollector = newNoopStatsCollector()
+		params.Logger.Info("No StatsCollector configured for cadence worker. Use noop StatsCollector as default.")
+	}
 }
 
 // verifyDomainExist does a DescribeDomain operation on the specified domain with backoff/retry
@@ -281,7 +285,8 @@ func newWorkflowTaskWorkerInternal(
 		taskWorker:        poller,
 		identity:          params.Identity,
 		workerType:        "DecisionWorker",
-		shutdownTimeout:   params.WorkerStopTimeout},
+		shutdownTimeout:   params.WorkerStopTimeout,
+		statsCollector:    params.StatsCollector},
 		params.Logger,
 		params.MetricsScope,
 		nil,
@@ -304,7 +309,8 @@ func newWorkflowTaskWorkerInternal(
 		taskWorker:        localActivityTaskPoller,
 		identity:          params.Identity,
 		workerType:        "LocalActivityWorker",
-		shutdownTimeout:   params.WorkerStopTimeout},
+		shutdownTimeout:   params.WorkerStopTimeout,
+		statsCollector:    params.StatsCollector},
 		params.Logger,
 		params.MetricsScope,
 		nil,
@@ -482,7 +488,9 @@ func newActivityTaskWorker(
 			identity:          workerParams.Identity,
 			workerType:        workerType,
 			shutdownTimeout:   workerParams.WorkerStopTimeout,
-			userContextCancel: workerParams.UserContextCancel},
+			userContextCancel: workerParams.UserContextCancel,
+			statsCollector:    workerParams.StatsCollector},
+
 		workerParams.Logger,
 		workerParams.MetricsScope,
 		sessionTokenBucket,
@@ -1132,6 +1140,25 @@ func newAggregatedWorker(
 		logger:                          logger,
 		registry:                        registry,
 	}
+}
+
+// statsCollector implements the StatsCollector interface
+type statsCollector struct{}
+
+func (s *statsCollector) StartPoller() {}
+
+func (s *statsCollector) ShutdownPoller() {}
+
+func (s *statsCollector) ExecuteActivity() {}
+
+func (s *statsCollector) RecordActivityCompleted() {}
+
+func (s *statsCollector) ExecuteWorkflow() {}
+
+func (s *statsCollector) RecordWorkflowCompleted() {}
+
+func newNoopStatsCollector() StatsCollector {
+	return &statsCollector{}
 }
 
 // tagScope with one or multiple tags, like

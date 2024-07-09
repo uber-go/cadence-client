@@ -127,6 +127,7 @@ type (
 		shutdownTimeout   time.Duration
 		userContextCancel context.CancelFunc
 		host              string
+		statsCollector    StatsCollector
 	}
 
 	// baseWorker that wraps worker activities.
@@ -244,7 +245,10 @@ func (bw *baseWorker) isShutdown() bool {
 
 func (bw *baseWorker) runPoller() {
 	defer bw.shutdownWG.Done()
+	defer bw.options.statsCollector.ShutdownPoller()
+
 	bw.metricsScope.Counter(metrics.PollerStartCounter).Inc(1)
+	bw.options.statsCollector.StartPoller()
 
 	for {
 		select {

@@ -38,6 +38,9 @@ type (
 
 	// RegisterOptions consists of options for registering an activity
 	RegisterOptions = internal.RegisterActivityOptions
+
+	// RegistryInfo
+	RegistryInfo = internal.RegistryActivityInfo
 )
 
 // ErrResultPending is returned from activity's implementation to indicate the activity is not completed when

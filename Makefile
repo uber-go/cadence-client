@@ -369,7 +369,7 @@ INTEG_GRPC_COVER_FILE := $(COVER_ROOT)/integ_test_grpc_cover.out
 
 UT_DIRS := $(filter-out $(INTEG_TEST_ROOT)%, $(sort $(dir $(filter %_test.go,$(ALL_SRC)))))
 
-.PHONY: unit_test integ_test_sticky_off integ_test_sticky_on integ_test_grpc cover cover_ci
+.PHONY: unit_test integ_test_sticky_off integ_test_sticky_on integ_test_grpc cover
 test: unit_test integ_test_sticky_off integ_test_sticky_on ## run all tests (requires a running cadence instance)
 
 unit_test: $(ALL_SRC) ## run all unit tests
@@ -409,6 +409,3 @@ coverage_report: $(COVER_ROOT)/cover.out
 
 cover: $(COVER_ROOT)/cover.out
 	go tool cover -html=$(COVER_ROOT)/cover.out;
-
-cover_ci: $(COVER_ROOT)/cover.out $(BIN)/goveralls
-	$(BIN)/goveralls -coverprofile=$(COVER_ROOT)/cover.out -service=buildkite || echo -e "\x1b[31mCoveralls failed\x1b[m";

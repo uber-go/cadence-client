@@ -33,7 +33,6 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
-	"github.com/uber-go/tally"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
@@ -44,7 +43,6 @@ import (
 
 // Assert that structs do indeed implement the interfaces
 var _ Client = (*workflowClient)(nil)
-var _ DomainClient = (*domainClient)(nil)
 
 const (
 	defaultDecisionTaskTimeoutInSecs = 10
@@ -67,14 +65,6 @@ type (
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
 		featureFlags       FeatureFlags
-	}
-
-	// domainClient is the client for managing domains.
-	domainClient struct {
-		workflowService workflowserviceclient.Interface
-		metricsScope    tally.Scope
-		identity        string
-		featureFlags    FeatureFlags
 	}
 
 	// WorkflowRun represents a started non child workflow
@@ -1186,63 +1176,6 @@ func (wc *workflowClient) getSignalWithStartRequest(
 	}
 
 	return signalWithStartRequest, nil
-}
-
-// Register a domain with cadence server
-// The errors it can throw:
-//   - DomainAlreadyExistsError
-//   - BadRequestError
-//   - InternalServiceError
-func (dc *domainClient) Register(ctx context.Context, request *s.RegisterDomainRequest) error {
-	return backoff.Retry(ctx,
-		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx, dc.featureFlags)
-			defer cancel()
-			return dc.workflowService.RegisterDomain(tchCtx, request, opt...)
-		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
-}
-
-// Describe a domain. The domain has 3 part of information
-// DomainInfo - Which has Name, Status, Description, Owner Email
-// DomainConfiguration - Configuration like Workflow Execution Retention Period In Days, Whether to emit metrics.
-// ReplicationConfiguration - replication config like clusters and active cluster name
-// The errors it can throw:
-//   - EntityNotExistsError
-//   - BadRequestError
-//   - InternalServiceError
-func (dc *domainClient) Describe(ctx context.Context, name string) (*s.DescribeDomainResponse, error) {
-	request := &s.DescribeDomainRequest{
-		Name: common.StringPtr(name),
-	}
-
-	var response *s.DescribeDomainResponse
-	err := backoff.Retry(ctx,
-		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx, dc.featureFlags)
-			defer cancel()
-			var err error
-			response, err = dc.workflowService.DescribeDomain(tchCtx, request, opt...)
-			return err
-		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-// Update a domain.
-// The errors it can throw:
-//   - EntityNotExistsError
-//   - BadRequestError
-//   - InternalServiceError
-func (dc *domainClient) Update(ctx context.Context, request *s.UpdateDomainRequest) error {
-	return backoff.Retry(ctx,
-		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx, dc.featureFlags)
-			defer cancel()
-			_, err := dc.workflowService.UpdateDomain(tchCtx, request, opt...)
-			return err
-		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 }
 
 func getRunID(runID string) *string {

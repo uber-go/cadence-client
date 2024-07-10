@@ -440,12 +440,11 @@ func (s *workflowShadowerSuite) TestShadowWorker_ExpectedReplayError() {
 }
 
 func (s *workflowShadowerSuite) TestWorkflowRegistration() {
-	wfName := s.testShadower.GetRegisteredWorkflows()[0]
+	wfName := s.testShadower.GetRegisteredWorkflows()[0].WorkflowType().Name
 	fnName := getFunctionName(testReplayWorkflow)
 	s.Equal(fnName, wfName)
 
-	fn, ok := s.testShadower.GetWorkflowFunc(wfName)
-	s.True(ok)
+	fn := s.testShadower.GetRegisteredWorkflows()[0].GetFunction()
 	s.Equal(fnName, runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }
 

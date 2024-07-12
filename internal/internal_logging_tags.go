@@ -41,7 +41,6 @@ const (
 	tagVisibilityQuery             = "VisibilityQuery"
 	tagPanicError                  = "PanicError"
 	tagPanicStack                  = "PanicStack"
-	tagPollerType                  = "PollerType"
 	causeTag                       = "pollerrorcause"
 	tagWorkflowRuntimeLength       = "workflowruntimelength"
 	tagNonDeterminismDetectionType = "NonDeterminismDetectionType"

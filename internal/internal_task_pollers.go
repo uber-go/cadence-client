@@ -34,7 +34,6 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
@@ -64,9 +63,7 @@ type (
 
 	// basePoller is the base class for all poller implementations
 	basePoller struct {
-		shutdownC    <-chan struct{}
-		metricsScope *metrics.TaggedScope
-		logger       *zap.Logger
+		shutdownC <-chan struct{}
 	}
 
 	// workflowTaskPoller implements polling/processing a workflow task
@@ -78,6 +75,8 @@ type (
 		service      workflowserviceclient.Interface
 		taskHandler  WorkflowTaskHandler
 		ldaTunnel    *locallyDispatchedActivityTunnel
+		metricsScope *metrics.TaggedScope
+		logger       *zap.Logger
 
 		stickyUUID                   string
 		disableStickyExecution       bool
@@ -98,6 +97,8 @@ type (
 		identity            string
 		service             workflowserviceclient.Interface
 		taskHandler         ActivityTaskHandler
+		metricsScope        *metrics.TaggedScope
+		logger              *zap.Logger
 		activitiesPerSecond float64
 		featureFlags        FeatureFlags
 	}
@@ -122,8 +123,10 @@ type (
 
 	localActivityTaskPoller struct {
 		basePoller
-		handler  *localActivityTaskHandler
-		laTunnel *localActivityTunnel
+		handler      *localActivityTaskHandler
+		metricsScope tally.Scope
+		logger       *zap.Logger
+		laTunnel     *localActivityTunnel
 	}
 
 	localActivityTaskHandler struct {
@@ -249,28 +252,20 @@ func (bp *basePoller) doPoll(
 	var err error
 	var result interface{}
 
+	doneC := make(chan struct{})
 	ctx, cancel, _ := newChannelContext(context.Background(), featureFlags, chanTimeout(pollTaskServiceTimeOut))
-	defer cancel()
 
 	go func() {
-		defer cancel()
-		defer func() {
-			if p := recover(); p != nil {
-				bp.metricsScope.Counter(metrics.InternalPanicCounter).Inc(1)
-				st := getStackTraceRaw("base poller [panic]:", 7, 0)
-				bp.logger.Error("Unhandled panic",
-					zap.String(tagPanicError, fmt.Sprintf("%v", p)),
-					zap.String(tagPanicStack, st))
-				err = newPanicError(p, st)
-			}
-		}()
 		result, err = pollFunc(ctx)
+		cancel()
+		close(doneC)
 	}()
 
 	select {
-	case <-ctx.Done():
+	case <-doneC:
 		return result, err
 	case <-bp.shutdownC:
+		cancel()
 		return nil, errShutdown
 	}
 }
@@ -284,17 +279,15 @@ func newWorkflowTaskPoller(
 	params workerExecutionParameters,
 ) *workflowTaskPoller {
 	return &workflowTaskPoller{
-		basePoller: basePoller{
-			shutdownC:    params.WorkerStopChannel,
-			metricsScope: metrics.NewTaggedScope(params.MetricsScope),
-			logger:       params.Logger.With(zapcore.Field{Key: tagPollerType, Type: zapcore.StringType, String: "Workflow"}),
-		},
+		basePoller:                   basePoller{shutdownC: params.WorkerStopChannel},
 		service:                      service,
 		domain:                       domain,
 		taskListName:                 params.TaskList,
 		identity:                     params.Identity,
 		taskHandler:                  taskHandler,
 		ldaTunnel:                    ldaTunnel,
+		metricsScope:                 metrics.NewTaggedScope(params.MetricsScope),
+		logger:                       params.Logger,
 		stickyUUID:                   uuid.New(),
 		disableStickyExecution:       params.DisableStickyExecution,
 		StickyScheduleToStartTimeout: params.StickyScheduleToStartTimeout,
@@ -538,13 +531,11 @@ func newLocalActivityPoller(params workerExecutionParameters, laTunnel *localAct
 		tracer:             params.Tracer,
 	}
 	return &localActivityTaskPoller{
-		basePoller: basePoller{
-			shutdownC:    params.WorkerStopChannel,
-			metricsScope: metrics.NewTaggedScope(params.MetricsScope),
-			logger:       params.Logger.With(zapcore.Field{Key: tagPollerType, Type: zapcore.StringType, String: "LocalActivity"}),
-		},
-		handler:  handler,
-		laTunnel: laTunnel,
+		basePoller:   basePoller{shutdownC: params.WorkerStopChannel},
+		handler:      handler,
+		metricsScope: params.MetricsScope,
+		logger:       params.Logger,
+		laTunnel:     laTunnel,
 	}
 }
 
@@ -999,16 +990,14 @@ func newActivityTaskPoller(taskHandler ActivityTaskHandler, service workflowserv
 	domain string, params workerExecutionParameters) *activityTaskPoller {
 
 	activityTaskPoller := &activityTaskPoller{
-		basePoller: basePoller{
-			shutdownC:    params.WorkerStopChannel,
-			logger:       params.Logger.With(zap.Field{Key: tagPollerType, Type: zapcore.StringType, String: "Activity"}),
-			metricsScope: metrics.NewTaggedScope(params.MetricsScope),
-		},
+		basePoller:          basePoller{shutdownC: params.WorkerStopChannel},
 		taskHandler:         taskHandler,
 		service:             service,
 		domain:              domain,
 		taskListName:        params.TaskList,
 		identity:            params.Identity,
+		logger:              params.Logger,
+		metricsScope:        metrics.NewTaggedScope(params.MetricsScope),
 		activitiesPerSecond: params.TaskListActivitiesPerSecond,
 		featureFlags:        params.FeatureFlags,
 	}

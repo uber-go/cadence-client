@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ## [v1.2.10] - 2024-07-10
 ### Added
+- Revert "Handle panics while polling for tasks (#1352)" (#1357)
 - Remove coveralls integration (#1354)
 - Change registry Apis signature to return info interface (#1355)
 - Adjust startedCount assertion in Test_WorkflowLocalActivityWithMockAndListeners (#1353)

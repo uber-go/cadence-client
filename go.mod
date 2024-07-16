@@ -114,3 +114,5 @@ retract (
 	v0.3.0 // Published accidentally
 	v0.2.0 // Published accidentally
 )
+
+replace github.com/uber/cadence-idl => ./idls

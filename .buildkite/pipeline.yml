@@ -52,6 +52,7 @@ steps:
               - <<: *commandContainer
                 command:
                 - |-
+                  git submodule update --init
                   make unit_test
                   .buildkite/scripts/gen_coverage_metadata.sh .build/metadata.txt
       - docker-compose#v3.0.0:
@@ -72,6 +73,7 @@ steps:
               - <<: *commandContainer
                 command:
                 - |-
+                  git submodule update --init
                   ./scripts/golint.sh
       - docker-compose#v3.0.0:
           run: unit-test
@@ -92,6 +94,7 @@ steps:
               - <<: *commandContainer
                 command:
                 - |-
+                  git submodule update --init
                   make integ_test_sticky_off
       - docker-compose#v3.0.0:
           run: integ-test
@@ -112,6 +115,7 @@ steps:
               - <<: *commandContainer
                 command:
                 - |-
+                  git submodule update --init
                   make integ_test_sticky_on
       - docker-compose#v3.0.0:
           run: integ-test
@@ -132,6 +136,7 @@ steps:
               - <<: *commandContainer
                 command:
                 - |-
+                  git submodule update --init
                   make integ_test_grpc
       - docker-compose#v3.0.0:
           run: integ-test-grpc

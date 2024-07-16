@@ -7,6 +7,7 @@ ADD go.mod go.sum /go/src/go.uber.org/cadence/
 
 # allow git-status and similar to work
 RUN git config --global --add safe.directory /go/src/go.uber.org/cadence
+RUN git submodule update --init --recursive
 RUN GO111MODULE=on go mod download
 
 # Install Buildkite agent

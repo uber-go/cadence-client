@@ -2554,6 +2554,7 @@ func TestGetWorkflowStartRequest(t *testing.T) {
 				TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(5),
 				DelayStartSeconds:                   common.Int32Ptr(0),
 				JitterStartSeconds:                  common.Int32Ptr(0),
+				FirstRunAtTimestamp:                 common.Int64Ptr(0),
 				CronSchedule:                        common.StringPtr(""),
 				Header:                              &shared.Header{Fields: map[string][]byte{}},
 				WorkflowIdReusePolicy:               shared.WorkflowIdReusePolicyAllowDuplicateFailedOnly.Ptr(),

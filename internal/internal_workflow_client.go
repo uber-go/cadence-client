@@ -1050,7 +1050,7 @@ func (wc *workflowClient) getWorkflowStartRequest(
 
 	firstRunAtTimestamp := options.FirstRunAt.UnixNano()
 	if options.FirstRunAt.IsZero() {
-		firstRunAtTimestamp = 0
+		firstRunAtTimestamp = time.Now().Add(1 * time.Hour).UnixNano()
 	}
 	if firstRunAtTimestamp < 0 {
 		return nil, errors.New("Invalid FirstRunAt option")

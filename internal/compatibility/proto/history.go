@@ -542,6 +542,7 @@ func StartChildWorkflowExecutionInitiatedEventAttributes(t *shared.StartChildWor
 		SearchAttributes:             SearchAttributes(t.SearchAttributes),
 		DelayStart:                   secondsToDuration(t.DelayStartSeconds),
 		JitterStart:                  secondsToDuration(t.JitterStartSeconds),
+		FirstRunAt:                   unixNanoToTime(t.FirstRunAtTimestamp),
 	}
 }
 

@@ -85,7 +85,6 @@ const (
 	ActivityLocalDispatchFailedCounter          = CadenceMetricsPrefix + "activity-local-dispatch-failed"
 	ActivityLocalDispatchSucceedCounter         = CadenceMetricsPrefix + "activity-local-dispatch-succeed"
 	WorkerPanicCounter                          = CadenceMetricsPrefix + "worker-panic"
-	InternalPanicCounter                        = CadenceMetricsPrefix + "internal-panic"
 
 	UnhandledSignalsCounter = CadenceMetricsPrefix + "unhandled-signals"
 	CorruptedSignalsCounter = CadenceMetricsPrefix + "corrupted-signals"

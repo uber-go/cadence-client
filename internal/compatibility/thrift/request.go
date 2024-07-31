@@ -463,6 +463,7 @@ func StartWorkflowExecutionRequest(t *apiv1.StartWorkflowExecutionRequest) *shar
 		Header:                              Header(t.Header),
 		DelayStartSeconds:                   durationToSeconds(t.DelayStart),
 		JitterStartSeconds:                  durationToSeconds(t.JitterStart),
+		FirstRunAtTimestamp:                 timeToUnixNano(t.FirstRunAt),
 	}
 }
 

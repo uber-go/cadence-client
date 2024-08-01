@@ -2554,6 +2554,7 @@ func TestGetWorkflowStartRequest(t *testing.T) {
 				TaskStartToCloseTimeoutSeconds:      common.Int32Ptr(5),
 				DelayStartSeconds:                   common.Int32Ptr(0),
 				JitterStartSeconds:                  common.Int32Ptr(0),
+				FirstRunAtTimestamp:                 common.Int64Ptr(0),
 				CronSchedule:                        common.StringPtr(""),
 				Header:                              &shared.Header{Fields: map[string][]byte{}},
 				WorkflowIdReusePolicy:               shared.WorkflowIdReusePolicyAllowDuplicateFailedOnly.Ptr(),
@@ -2625,6 +2626,19 @@ func TestGetWorkflowStartRequest(t *testing.T) {
 			wantErr:      "Invalid JitterStart option",
 		},
 		{
+			name: "negative firstRunAtTimestamp",
+			options: StartWorkflowOptions{
+				ID:                              workflowID,
+				TaskList:                        tasklist,
+				ExecutionStartToCloseTimeout:    10 * time.Second,
+				DecisionTaskStartToCloseTimeout: 5 * time.Second,
+				DelayStart:                      0 * time.Second,
+				FirstRunAt:                      time.Unix(-12, 0), // this causes error
+			},
+			workflowFunc: func(ctx Context) {},
+			wantErr:      "Invalid FirstRunAt option",
+		},
+		{
 			name: "invalid workflow func",
 			options: StartWorkflowOptions{
 				ID:                              workflowID,
@@ -2653,6 +2667,62 @@ func TestGetWorkflowStartRequest(t *testing.T) {
 			}
 
 			gotReq, err := wc.getWorkflowStartRequest(context.Background(), "", tc.options, tc.workflowFunc, tc.args...)
+			if tc.wantErr != "" {
+				assert.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			// set the randomized fields in the expected request before comparison
+			tc.wantRequest.Identity = &wc.identity
+			tc.wantRequest.RequestId = gotReq.RequestId
+
+			assert.Equal(t, tc.wantRequest, gotReq)
+		})
+	}
+}
+
+func TestGetSignalWithStartRequest(t *testing.T) {
+	tests := []struct {
+		name         string
+		workflowID   string
+		signalName   string
+		signalArg    interface{}
+		options      StartWorkflowOptions
+		workflowFunc interface{}
+		args         []interface{}
+		wantRequest  *shared.SignalWithStartWorkflowExecutionRequest
+		wantErr      string
+	}{
+		{
+			name: "first run at negative",
+			options: StartWorkflowOptions{
+				ID:                              workflowID,
+				TaskList:                        tasklist,
+				ExecutionStartToCloseTimeout:    10 * time.Second,
+				DecisionTaskStartToCloseTimeout: 5 * time.Second,
+				DelayStart:                      0 * time.Second,
+				JitterStart:                     0 * time.Second,
+				FirstRunAt:                      time.Unix(-12, 0),
+			},
+			workflowFunc: func(ctx Context) {},
+			wantErr:      "Invalid FirstRunAt option",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			service := workflowservicetest.NewMockClient(mockCtrl)
+			wc, ok := NewClient(service, domain, &ClientOptions{
+				Identity: "test-identity",
+			}).(*workflowClient)
+
+			if !ok {
+				t.Fatalf("expected NewClient to return a *workflowClient, but got %T", wc)
+			}
+
+			gotReq, err := wc.getSignalWithStartRequest(context.Background(), "", tc.workflowID, tc.signalName, tc.signalArg, tc.options, tc.workflowFunc, tc.args...)
 			if tc.wantErr != "" {
 				assert.ErrorContains(t, err, tc.wantErr)
 				return

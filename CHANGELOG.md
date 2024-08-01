@@ -5,6 +5,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [v1.2.10] - 2024-07-10
+### Added
+- Revert "Handle panics while polling for tasks (#1352)" (#1357)
+- Remove coveralls integration (#1354)
+- Change registry Apis signature to return info interface (#1355)
+- Adjust startedCount assertion in Test_WorkflowLocalActivityWithMockAndListeners (#1353)
+- Handle panics while polling for tasks (#1352)
+- Ensure PR description follows a template when potential breaking changes are made (#1351)
+- Add tests for replayer utils isDecisionMatchEvent (#1350)
+- Adding tests for internal_workflow_client (#1349)
+- Extracting domain client to a separate file (#1348)
+- Test for GetWorkflowHistory (#1346)
+- Added test for TerminateWorkflow in the internal package (#1345)
+- Implement the registered workflows and activities APIs in testsuite (#1343)
+- Add methods on Worker to get registered workflows and activities (#1342)
+- Update compability adapter to support new enum value (#1337)
+- Bump x/tools for tools, to support go 1.22 (#1336)
+- Added an option to exclude the list of workflows by Type (#1335)
+- Migrate CI from AWS queues to Google Kubernetes Engine queues (#1333)
+- Internal workflow client test improvements (#1331)
+- Update client wrappers with new async APIs (#1327)
+- Server-like `make build` and ensuring builds are clean in CI (#1329)
+- Pin mockery and regenerate everything (#1328)
+- Enforce 85% new line coverage (#1325)
+- Add documentation for propagators and how they are executed (#1312)
+- Update idl and add wrapper implementaton for async start/signalwithstart APIs (#1321)
+- Enable codecov and generate metadata file as artifact (#1320)
+- Release v1.2.9 (#1317)
+
+### Fixed
+- Partial fix for Continue as new case (#1347)
+- Fixing unit_test failure detection, and tests for data converters (#1341)
+- Fix coverage metadata commit info (#1323)
+
+
 ## [v1.2.9] - 2024-03-01
 ### Added
 - retract directive for v1.2.8

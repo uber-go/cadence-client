@@ -1048,6 +1048,14 @@ func (wc *workflowClient) getWorkflowStartRequest(
 		return nil, errors.New("Invalid JitterStart option")
 	}
 
+	firstRunAtTimestamp := options.FirstRunAt.UnixNano()
+	if options.FirstRunAt.IsZero() {
+		firstRunAtTimestamp = 0
+	}
+	if firstRunAtTimestamp < 0 {
+		return nil, errors.New("Invalid FirstRunAt option")
+	}
+
 	// create a workflow start span and attach it to the context object.
 	// N.B. we need to finish this immediately as jaeger does not give us a way
 	// to recreate a span given a span context - which means we will run into
@@ -1080,6 +1088,7 @@ func (wc *workflowClient) getWorkflowStartRequest(
 		Header:                              header,
 		DelayStartSeconds:                   common.Int32Ptr(delayStartSeconds),
 		JitterStartSeconds:                  common.Int32Ptr(jitterStartSeconds),
+		FirstRunAtTimestamp:                 common.Int64Ptr(firstRunAtTimestamp),
 	}
 
 	return startRequest, nil
@@ -1146,6 +1155,14 @@ func (wc *workflowClient) getSignalWithStartRequest(
 		return nil, errors.New("Invalid JitterStart option")
 	}
 
+	firstRunAtTimestamp := options.FirstRunAt.UnixNano()
+	if options.FirstRunAt.IsZero() {
+		firstRunAtTimestamp = 0
+	}
+	if firstRunAtTimestamp < 0 {
+		return nil, errors.New("Invalid FirstRunAt option")
+	}
+
 	// create a workflow start span and attach it to the context object. finish it immediately
 	ctx, span := createOpenTracingWorkflowSpan(ctx, wc.tracer, time.Now(), fmt.Sprintf("%s-%s", tracePrefix, workflowType.Name), workflowID)
 	span.Finish()
@@ -1173,6 +1190,7 @@ func (wc *workflowClient) getSignalWithStartRequest(
 		Header:                              header,
 		DelayStartSeconds:                   common.Int32Ptr(delayStartSeconds),
 		JitterStartSeconds:                  common.Int32Ptr(jitterStartSeconds),
+		FirstRunAtTimestamp:                 common.Int64Ptr(firstRunAtTimestamp),
 	}
 
 	return signalWithStartRequest, nil

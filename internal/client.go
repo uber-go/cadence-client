@@ -466,6 +466,11 @@ type (
 		// This works with CronSchedule and with DelayStart.
 		// Optional: defaulted to 0 seconds
 		JitterStart time.Duration
+
+		// FirstRunAt - Specific time (in RFC 3339 format) to let the first run of the workflow to start at,
+		// This will only be used and override DelayStart and JitterStart if provided in the first run
+		// Optional: defaulted to Unix epoch time
+		FirstRunAt time.Time
 	}
 
 	// RetryPolicy defines the retry policy.

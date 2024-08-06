@@ -1097,7 +1097,9 @@ func TestWorkerOptionDefaults(t *testing.T) {
 			Tracer:                                  opentracing.NoopTracer{},
 			Logger:                                  decisionWorker.executionParameters.Logger,
 			MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
-			Identity:                                decisionWorker.executionParameters.Identity},
+			Identity:                                decisionWorker.executionParameters.Identity,
+			StatsCollector:                          newNoopStatsCollector(),
+		},
 		UserContext: decisionWorker.executionParameters.UserContext,
 	}
 
@@ -1156,7 +1158,8 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 			Tracer:                                  options.Tracer,
 			Logger:                                  options.Logger,
 			MetricsScope:                            options.MetricsScope,
-			Identity:                                options.Identity},
+			Identity:                                options.Identity,
+			StatsCollector:                          newNoopStatsCollector()},
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
@@ -1183,6 +1186,7 @@ func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParam
 	require.Equal(t, paramsA.NonDeterministicWorkflowPolicy, paramsB.NonDeterministicWorkflowPolicy)
 	require.Equal(t, paramsA.EnableLoggingInReplay, paramsB.EnableLoggingInReplay)
 	require.Equal(t, paramsA.DisableStickyExecution, paramsB.DisableStickyExecution)
+	require.Equal(t, paramsA.StatsCollector, paramsB.StatsCollector)
 }
 
 /*

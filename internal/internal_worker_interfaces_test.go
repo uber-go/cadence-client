@@ -56,7 +56,18 @@ type (
 		mockCtrl *gomock.Controller
 		service  *workflowservicetest.MockClient
 	}
+
+	// fakeSyncOnce is a fake implementation of oncePerHost interface
+	// that DOES NOT ensure run only once per host
+	fakeSyncOnce struct {
+	}
 )
+
+var fakeSyncOnceValue fakeSyncOnce
+
+func (m *fakeSyncOnce) Do(f func()) {
+	f()
+}
 
 func helloWorldWorkflowFunc(ctx Context, input []byte) error {
 	queryResult := startingQueryValue
@@ -179,12 +190,12 @@ func (s *InterfacesTestSuite) TestInterface() {
 	domain := "testDomain"
 	// Workflow execution parameters.
 	workflowExecutionParameters := workerExecutionParameters{
-		TaskList: "testTaskList",
 		WorkerOptions: WorkerOptions{
 			MaxConcurrentActivityTaskPollers: 4,
 			MaxConcurrentDecisionTaskPollers: 4,
 			Logger:                           zaptest.NewLogger(s.T()),
-			Tracer:                           opentracing.NoopTracer{}},
+			Tracer:                           opentracing.NoopTracer{},
+			Sync:                             &fakeSyncOnce{}},
 	}
 
 	domainStatus := m.DomainStatusRegistered
@@ -216,7 +227,8 @@ func (s *InterfacesTestSuite) TestInterface() {
 			MaxConcurrentActivityTaskPollers: 10,
 			MaxConcurrentDecisionTaskPollers: 10,
 			Logger:                           zaptest.NewLogger(s.T()),
-			Tracer:                           opentracing.NoopTracer{}},
+			Tracer:                           opentracing.NoopTracer{},
+			Sync:                             &fakeSyncOnce{}},
 	}
 
 	// Register activity instances and launch the worker.

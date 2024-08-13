@@ -187,9 +187,9 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	if params.UserContext == nil {
 		params.UserContext = context.Background()
 	}
-	if params.StatsCollector == nil {
-		params.StatsCollector = newNoopStatsCollector()
-		params.Logger.Info("No StatsCollector configured for cadence worker. Use noop StatsCollector as default.")
+	if params.EventMonitoring.PollerLifeCycle == nil {
+		params.EventMonitoring.PollerLifeCycle = newNoopPollerLifeCycle()
+		params.Logger.Info("No PollerLifeCycle configured for cadence worker. Use noop PollerLifeCycle as default.")
 	}
 }
 
@@ -286,7 +286,8 @@ func newWorkflowTaskWorkerInternal(
 		identity:          params.Identity,
 		workerType:        "DecisionWorker",
 		shutdownTimeout:   params.WorkerStopTimeout,
-		statsCollector:    params.StatsCollector},
+		pollerLifeCycle:   params.EventMonitoring.PollerLifeCycle,
+	},
 		params.Logger,
 		params.MetricsScope,
 		nil,
@@ -310,7 +311,8 @@ func newWorkflowTaskWorkerInternal(
 		identity:          params.Identity,
 		workerType:        "LocalActivityWorker",
 		shutdownTimeout:   params.WorkerStopTimeout,
-		statsCollector:    params.StatsCollector},
+		pollerLifeCycle:   params.EventMonitoring.PollerLifeCycle,
+	},
 		params.Logger,
 		params.MetricsScope,
 		nil,
@@ -489,7 +491,8 @@ func newActivityTaskWorker(
 			workerType:        workerType,
 			shutdownTimeout:   workerParams.WorkerStopTimeout,
 			userContextCancel: workerParams.UserContextCancel,
-			statsCollector:    workerParams.StatsCollector},
+			pollerLifeCycle:   workerParams.EventMonitoring.PollerLifeCycle,
+		},
 
 		workerParams.Logger,
 		workerParams.MetricsScope,
@@ -1142,16 +1145,6 @@ func newAggregatedWorker(
 	}
 }
 
-// statsCollector implements the StatsCollector interface
-type statsCollector struct{}
-
-func (s *statsCollector) StartPoller()    {}
-func (s *statsCollector) ShutdownPoller() {}
-
-func newNoopStatsCollector() StatsCollector {
-	return &statsCollector{}
-}
-
 // tagScope with one or multiple tags, like
 // tagScope(scope, tag1, val1, tag2, val2)
 func tagScope(metricsScope tally.Scope, keyValueinPairs ...string) tally.Scope {
@@ -1335,3 +1328,15 @@ func StartVersionMetrics(metricsScope tally.Scope) {
 		}()
 	})
 }
+
+// pollerLifeCycleImpl implements the PollerLifeCycle interface
+type pollerLifeCycleImpl struct{}
+
+func (p *pollerLifeCycleImpl) Start(workerID string) PollerRun { return &pollerRunImpl{} }
+
+// pollerRunImpl implements the PollerRun interface
+type pollerRunImpl struct{}
+
+func (p *pollerRunImpl) Stop() {}
+
+func newNoopPollerLifeCycle() PollerLifeCycle { return &pollerLifeCycleImpl{} }

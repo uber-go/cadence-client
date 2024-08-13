@@ -1098,7 +1098,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 			Logger:                                  decisionWorker.executionParameters.Logger,
 			MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
 			Identity:                                decisionWorker.executionParameters.Identity,
-			StatsCollector:                          newNoopStatsCollector(),
+			EventMonitoring:                         EventMonitoring{newNoopPollerLifeCycle()},
 		},
 		UserContext: decisionWorker.executionParameters.UserContext,
 	}
@@ -1159,7 +1159,8 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 			Logger:                                  options.Logger,
 			MetricsScope:                            options.MetricsScope,
 			Identity:                                options.Identity,
-			StatsCollector:                          newNoopStatsCollector()},
+			EventMonitoring:                         EventMonitoring{newNoopPollerLifeCycle()},
+		},
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
@@ -1186,7 +1187,7 @@ func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParam
 	require.Equal(t, paramsA.NonDeterministicWorkflowPolicy, paramsB.NonDeterministicWorkflowPolicy)
 	require.Equal(t, paramsA.EnableLoggingInReplay, paramsB.EnableLoggingInReplay)
 	require.Equal(t, paramsA.DisableStickyExecution, paramsB.DisableStickyExecution)
-	require.Equal(t, paramsA.StatsCollector, paramsB.StatsCollector)
+	require.Equal(t, paramsA.EventMonitoring.PollerLifeCycle, paramsB.EventMonitoring.PollerLifeCycle)
 }
 
 /*

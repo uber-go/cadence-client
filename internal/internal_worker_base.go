@@ -27,12 +27,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/debug"
 	"os"
 	"runtime"
 	"sync"
 	"syscall"
 	"time"
+
+	"go.uber.org/cadence/internal/debug"
 
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/uber-go/tally"

@@ -29,7 +29,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/debug"
 	"io"
 	"os"
 	"reflect"
@@ -39,6 +38,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/cadence/internal/debug"
 
 	"go.uber.org/cadence/internal/common/isolationgroup"
 
@@ -190,7 +191,7 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	}
 	if params.EventMonitoring.LifeCycle == nil {
 		params.EventMonitoring.LifeCycle = debug.NewLifeCycle()
-		params.Logger.Debug("No PollerLifeCycle configured for cadence worker. Use noop PollerLifeCycle as default.")
+		params.Logger.Debug("No PollerLifeCycle configured for cadence worker. Use default one.")
 	}
 }
 

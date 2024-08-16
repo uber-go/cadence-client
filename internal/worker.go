@@ -23,8 +23,9 @@ package internal
 
 import (
 	"context"
-	"go.uber.org/cadence/debug"
 	"time"
+
+	"go.uber.org/cadence/debug"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
@@ -275,7 +276,7 @@ type (
 
 		// Optional: EventMonitoring provides a set of methods that can be used to collect
 		// stats on the Worker for debugging purposes.
-		// default: noop implementation
+		// default: internal implementation provided
 		// Deprecated: in development and very likely to change
 		EventMonitoring debug.EventMonitoring
 	}

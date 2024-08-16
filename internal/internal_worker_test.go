@@ -24,13 +24,14 @@ package internal
 import (
 	"context"
 	"errors"
-	"go.uber.org/cadence/internal/debug"
 	"os"
 	"reflect"
 	"runtime"
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/cadence/internal/debug"
 
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"

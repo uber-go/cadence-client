@@ -18,21 +18,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package worker
+package debug
 
-import "go.uber.org/cadence/internal"
+import "go.uber.org/cadence/internal/debug"
 
 type (
-	// EventsMonitoring provides a set of methods that can be used to collect
+	// LifeCycle contains a set of methods to collect information on a running worker
+	// Deprecated: in development and very likely to change
+	LifeCycle = debug.LifeCycle
+
+	// Run is a helper for simpler tracking of the go routine run
+	// Deprecated: in development and very likely to change
+	Run = debug.Run
+
+	// EventMonitoring provides a set of methods that can be used to collect
 	// stats on the Worker for debugging purposes.
 	// Deprecated: in development and very likely to change
-	EventMonitoring = internal.EventMonitoring
-
-	// PollerLifeCycle contains a set of methods to collect information on running pollers for a worker
-	// Deprecated: in development and very likely to change
-	PollerLifeCycle = internal.PollerLifeCycle
-
-	// PollerRun contains a set of methods to collect information on
-	// Deprecated: in development and very likely to change
-	PollerRun = internal.PollerRun
+	EventMonitoring = debug.EventMonitoring
 )
+
+// NewLifeCycle creates a new LifeCycle instance
+func NewLifeCycle() LifeCycle {
+	return debug.NewLifeCycle()
+}

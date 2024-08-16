@@ -24,6 +24,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"go.uber.org/cadence/internal/debug"
 	"os"
 	"reflect"
 	"runtime"
@@ -1098,7 +1099,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 			Logger:                                  decisionWorker.executionParameters.Logger,
 			MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
 			Identity:                                decisionWorker.executionParameters.Identity,
-			EventMonitoring:                         EventMonitoring{newNoopPollerLifeCycle()},
+			EventMonitoring:                         debug.EventMonitoring{debug.NewLifeCycle()},
 		},
 		UserContext: decisionWorker.executionParameters.UserContext,
 	}
@@ -1159,7 +1160,7 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 			Logger:                                  options.Logger,
 			MetricsScope:                            options.MetricsScope,
 			Identity:                                options.Identity,
-			EventMonitoring:                         EventMonitoring{newNoopPollerLifeCycle()},
+			EventMonitoring:                         debug.EventMonitoring{debug.NewLifeCycle()},
 		},
 	}
 
@@ -1187,7 +1188,7 @@ func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParam
 	require.Equal(t, paramsA.NonDeterministicWorkflowPolicy, paramsB.NonDeterministicWorkflowPolicy)
 	require.Equal(t, paramsA.EnableLoggingInReplay, paramsB.EnableLoggingInReplay)
 	require.Equal(t, paramsA.DisableStickyExecution, paramsB.DisableStickyExecution)
-	require.Equal(t, paramsA.EventMonitoring.PollerLifeCycle, paramsB.EventMonitoring.PollerLifeCycle)
+	require.Equal(t, paramsA.EventMonitoring.LifeCycle, paramsB.EventMonitoring.LifeCycle)
 }
 
 /*

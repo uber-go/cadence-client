@@ -29,6 +29,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/debug"
 	"io"
 	"os"
 	"reflect"
@@ -187,9 +188,9 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	if params.UserContext == nil {
 		params.UserContext = context.Background()
 	}
-	if params.EventMonitoring.PollerLifeCycle == nil {
-		params.EventMonitoring.PollerLifeCycle = newNoopPollerLifeCycle()
-		params.Logger.Info("No PollerLifeCycle configured for cadence worker. Use noop PollerLifeCycle as default.")
+	if params.EventMonitoring.LifeCycle == nil {
+		params.EventMonitoring.LifeCycle = debug.NewLifeCycle()
+		params.Logger.Debug("No PollerLifeCycle configured for cadence worker. Use noop PollerLifeCycle as default.")
 	}
 }
 
@@ -286,7 +287,7 @@ func newWorkflowTaskWorkerInternal(
 		identity:          params.Identity,
 		workerType:        "DecisionWorker",
 		shutdownTimeout:   params.WorkerStopTimeout,
-		pollerLifeCycle:   params.EventMonitoring.PollerLifeCycle,
+		pollerLifeCycle:   params.EventMonitoring.LifeCycle,
 	},
 		params.Logger,
 		params.MetricsScope,
@@ -311,7 +312,7 @@ func newWorkflowTaskWorkerInternal(
 		identity:          params.Identity,
 		workerType:        "LocalActivityWorker",
 		shutdownTimeout:   params.WorkerStopTimeout,
-		pollerLifeCycle:   params.EventMonitoring.PollerLifeCycle,
+		pollerLifeCycle:   params.EventMonitoring.LifeCycle,
 	},
 		params.Logger,
 		params.MetricsScope,
@@ -491,7 +492,7 @@ func newActivityTaskWorker(
 			workerType:        workerType,
 			shutdownTimeout:   workerParams.WorkerStopTimeout,
 			userContextCancel: workerParams.UserContextCancel,
-			pollerLifeCycle:   workerParams.EventMonitoring.PollerLifeCycle,
+			pollerLifeCycle:   workerParams.EventMonitoring.LifeCycle,
 		},
 
 		workerParams.Logger,
@@ -1328,15 +1329,3 @@ func StartVersionMetrics(metricsScope tally.Scope) {
 		}()
 	})
 }
-
-// pollerLifeCycleImpl implements the PollerLifeCycle interface
-type pollerLifeCycleImpl struct{}
-
-func (p *pollerLifeCycleImpl) Start(workerID string) PollerRun { return &pollerRunImpl{} }
-
-// pollerRunImpl implements the PollerRun interface
-type pollerRunImpl struct{}
-
-func (p *pollerRunImpl) Stop() {}
-
-func newNoopPollerLifeCycle() PollerLifeCycle { return &pollerLifeCycleImpl{} }

@@ -27,6 +27,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/debug"
 	"os"
 	"runtime"
 	"sync"
@@ -127,7 +128,7 @@ type (
 		shutdownTimeout   time.Duration
 		userContextCancel context.CancelFunc
 		host              string
-		pollerLifeCycle   PollerLifeCycle
+		pollerLifeCycle   debug.LifeCycle
 	}
 
 	// baseWorker that wraps worker activities.
@@ -245,7 +246,7 @@ func (bw *baseWorker) isShutdown() bool {
 
 func (bw *baseWorker) runPoller() {
 	defer bw.shutdownWG.Done()
-	defer bw.options.pollerLifeCycle.Start(bw.options.identity).Stop()
+	defer bw.options.pollerLifeCycle.PollerStart(bw.options.identity).Stop()
 
 	bw.metricsScope.Counter(metrics.PollerStartCounter).Inc(1)
 

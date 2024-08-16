@@ -23,6 +23,7 @@ package internal
 
 import (
 	"context"
+	"go.uber.org/cadence/debug"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -276,7 +277,7 @@ type (
 		// stats on the Worker for debugging purposes.
 		// default: noop implementation
 		// Deprecated: in development and very likely to change
-		EventMonitoring EventMonitoring
+		EventMonitoring debug.EventMonitoring
 	}
 
 	// WorkerBugPorts allows opt-in enabling of older, possibly buggy behavior, primarily intended to allow temporarily
@@ -296,25 +297,6 @@ type (
 		//
 		// Deprecated: All bugports are always deprecated and may be removed at any time
 		DisableStrictNonDeterminismCheck bool
-	}
-
-	// PollerRun is a helper for simpler tracking of the go routine run
-	PollerRun interface {
-		// Stop is the method to report stats once a poller thread is done
-		Stop()
-	}
-
-	// PollerLifeCycle contains a set of methods to collect information on a running worker
-	PollerLifeCycle interface {
-		// Start collects information on poller start up.
-		// consumers should provide a concurrency-safe implementation.
-		Start(workerID string) PollerRun
-	}
-
-	// EventMonitoring provides a set of methods that can be used to collect
-	// stats on the Worker for debugging purposes.
-	EventMonitoring struct {
-		PollerLifeCycle PollerLifeCycle
 	}
 )
 

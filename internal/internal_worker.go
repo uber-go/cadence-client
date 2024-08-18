@@ -191,7 +191,7 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	}
 	if params.EventMonitoring.LifeCycle == nil {
 		params.EventMonitoring.LifeCycle = debug.NewLifeCycle()
-		params.Logger.Debug("No PollerLifeCycle configured for cadence worker. Use default one.")
+		params.Logger.Debug("No LifeCycle configured for EventMonitoring option. Use default one.")
 	}
 }
 

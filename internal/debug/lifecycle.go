@@ -47,6 +47,7 @@ type (
 		// PollerStart collects information on poller start up.
 		// consumers should provide a concurrency-safe implementation.
 		PollerStart(workerID string) Run
+		// ReadPollerCount return the number or running pollers
 		ReadPollerCount() int32
 	}
 
@@ -70,6 +71,7 @@ func (lc *lifeCycleImpl) ReadPollerCount() int32 {
 	return lc.pollerCount.Load()
 }
 
+// NewLifeCycle creates a new LifeCycle instance
 func NewLifeCycle() LifeCycle { return &lifeCycleImpl{} }
 
 var _ LifeCycle = &lifeCycleImpl{}

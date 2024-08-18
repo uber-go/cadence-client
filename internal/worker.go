@@ -25,7 +25,7 @@ import (
 	"context"
 	"time"
 
-	"go.uber.org/cadence/debug"
+	"go.uber.org/cadence/internal/debug"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"

@@ -188,8 +188,8 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	if params.UserContext == nil {
 		params.UserContext = context.Background()
 	}
-	if params.EventMonitoring.LifeCycle == nil {
-		params.EventMonitoring.LifeCycle = debug.NewLifeCycle()
+	if params.Monitor.LifeCycle == nil {
+		params.Monitor.LifeCycle = debug.NewLifeCycle()
 		params.Logger.Debug("No LifeCycle configured for EventMonitor option. Will use the default.")
 	}
 }
@@ -287,7 +287,7 @@ func newWorkflowTaskWorkerInternal(
 		identity:          params.Identity,
 		workerType:        "DecisionWorker",
 		shutdownTimeout:   params.WorkerStopTimeout,
-		pollerLifeCycle:   params.EventMonitoring.LifeCycle,
+		pollerLifeCycle:   params.Monitor.LifeCycle,
 	},
 		params.Logger,
 		params.MetricsScope,
@@ -312,7 +312,7 @@ func newWorkflowTaskWorkerInternal(
 		identity:          params.Identity,
 		workerType:        "LocalActivityWorker",
 		shutdownTimeout:   params.WorkerStopTimeout,
-		pollerLifeCycle:   params.EventMonitoring.LifeCycle,
+		pollerLifeCycle:   params.Monitor.LifeCycle,
 	},
 		params.Logger,
 		params.MetricsScope,
@@ -492,7 +492,7 @@ func newActivityTaskWorker(
 			workerType:        workerType,
 			shutdownTimeout:   workerParams.WorkerStopTimeout,
 			userContextCancel: workerParams.UserContextCancel,
-			pollerLifeCycle:   workerParams.EventMonitoring.LifeCycle,
+			pollerLifeCycle:   workerParams.Monitor.LifeCycle,
 		},
 
 		workerParams.Logger,

@@ -23,9 +23,8 @@ package internal
 
 import (
 	"context"
+	"go.uber.org/cadence/internal/common/debug"
 	"time"
-
-	"go.uber.org/cadence/internal/debug"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
@@ -278,7 +277,7 @@ type (
 		// stats on the Worker for debugging purposes.
 		// default: internal implementation provided
 		// Deprecated: in development and very likely to change
-		EventMonitoring debug.EventMonitoring
+		EventMonitoring debug.EventMonitor
 	}
 
 	// WorkerBugPorts allows opt-in enabling of older, possibly buggy behavior, primarily intended to allow temporarily

@@ -24,14 +24,13 @@ package internal
 import (
 	"context"
 	"errors"
+	"go.uber.org/cadence/internal/common/debug"
 	"os"
 	"reflect"
 	"runtime"
 	"sync"
 	"testing"
 	"time"
-
-	"go.uber.org/cadence/internal/debug"
 
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
@@ -1100,7 +1099,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 			Logger:                                  decisionWorker.executionParameters.Logger,
 			MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
 			Identity:                                decisionWorker.executionParameters.Identity,
-			EventMonitoring:                         debug.EventMonitoring{debug.NewLifeCycle()},
+			EventMonitoring:                         debug.EventMonitor{debug.NewLifeCycle()},
 		},
 		UserContext: decisionWorker.executionParameters.UserContext,
 	}
@@ -1161,7 +1160,7 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 			Logger:                                  options.Logger,
 			MetricsScope:                            options.MetricsScope,
 			Identity:                                options.Identity,
-			EventMonitoring:                         debug.EventMonitoring{debug.NewLifeCycle()},
+			EventMonitoring:                         debug.EventMonitor{debug.NewLifeCycle()},
 		},
 	}
 

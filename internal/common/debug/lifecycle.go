@@ -51,10 +51,10 @@ type (
 		ReadPollerCount() int32
 	}
 
-	// EventMonitoring provides a set of methods that can be used to collect
+	// EventMonitor provides a set of methods that can be used to collect
 	// stats on the Worker for debugging purposes.
 	// Deprecated: in development and very likely to change
-	EventMonitoring struct {
+	EventMonitor struct {
 		LifeCycle LifeCycle
 	}
 )

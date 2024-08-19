@@ -23,8 +23,9 @@ package internal
 
 import (
 	"context"
-	"go.uber.org/cadence/internal/common/debug"
 	"time"
+
+	"go.uber.org/cadence/internal/common/debug"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"

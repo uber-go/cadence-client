@@ -29,7 +29,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/debug"
 	"io"
 	"os"
 	"reflect"
@@ -39,6 +38,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/cadence/internal/common/debug"
 
 	"go.uber.org/cadence/internal/common/isolationgroup"
 

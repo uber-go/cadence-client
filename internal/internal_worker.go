@@ -189,9 +189,9 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	if params.UserContext == nil {
 		params.UserContext = context.Background()
 	}
-	if params.EventMonitor.LifeCycle == nil {
-		params.EventMonitor.LifeCycle = debug.NewLifeCycle()
-		params.Logger.Debug("No LifeCycle configured for EventMonitor option. Will use the default.")
+	if params.WorkerStats.PollerTracker == nil {
+		params.WorkerStats.PollerTracker = debug.NewNoopPollerTracker()
+		params.Logger.Debug("No PollerTracker configured for WorkerStats option. Will use the default.")
 	}
 }
 
@@ -288,7 +288,7 @@ func newWorkflowTaskWorkerInternal(
 		identity:          params.Identity,
 		workerType:        "DecisionWorker",
 		shutdownTimeout:   params.WorkerStopTimeout,
-		pollerLifeCycle:   params.EventMonitor.LifeCycle,
+		pollerTracker:     params.WorkerStats.PollerTracker,
 	},
 		params.Logger,
 		params.MetricsScope,
@@ -313,7 +313,7 @@ func newWorkflowTaskWorkerInternal(
 		identity:          params.Identity,
 		workerType:        "LocalActivityWorker",
 		shutdownTimeout:   params.WorkerStopTimeout,
-		pollerLifeCycle:   params.EventMonitor.LifeCycle,
+		pollerTracker:     params.WorkerStats.PollerTracker,
 	},
 		params.Logger,
 		params.MetricsScope,
@@ -493,7 +493,7 @@ func newActivityTaskWorker(
 			workerType:        workerType,
 			shutdownTimeout:   workerParams.WorkerStopTimeout,
 			userContextCancel: workerParams.UserContextCancel,
-			pollerLifeCycle:   workerParams.EventMonitor.LifeCycle,
+			pollerTracker:     workerParams.WorkerStats.PollerTracker,
 		},
 
 		workerParams.Logger,

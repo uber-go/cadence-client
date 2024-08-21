@@ -274,11 +274,11 @@ type (
 		// Deprecated: All bugports are always deprecated and may be removed at any time.
 		WorkerBugPorts WorkerBugPorts
 
-		// Optional: EventMonitor provides a set of methods that can be used to collect
+		// Optional: WorkerStats provides a set of methods that can be used to collect
 		// stats on the Worker for debugging purposes.
-		// default: internal implementation provided
+		// default: noop implementation provided
 		// Deprecated: in development and very likely to change
-		EventMonitor debug.EventMonitor
+		WorkerStats debug.WorkerStats
 	}
 
 	// WorkerBugPorts allows opt-in enabling of older, possibly buggy behavior, primarily intended to allow temporarily

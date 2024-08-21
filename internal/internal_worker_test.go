@@ -305,9 +305,9 @@ func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
 			go func() { errC <- worker.Run() }()
 			select {
 			case e := <-errC:
-				assert.Error(t, e, "worker.Run() MUST fail when domain is invalid")
+				assert.Error(t, e, "worker.Stopper() MUST fail when domain is invalid")
 			case <-time.After(time.Second):
-				assert.Fail(t, "worker.Run() MUST fail when domain is invalid")
+				assert.Fail(t, "worker.Stopper() MUST fail when domain is invalid")
 			}
 			continue
 		}
@@ -1100,7 +1100,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 			Logger:                                  decisionWorker.executionParameters.Logger,
 			MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
 			Identity:                                decisionWorker.executionParameters.Identity,
-			EventMonitor:                            debug.EventMonitor{debug.NewLifeCycle()},
+			WorkerStats:                             debug.WorkerStats{debug.NewNoopPollerTracker()},
 		},
 		UserContext: decisionWorker.executionParameters.UserContext,
 	}
@@ -1161,7 +1161,7 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 			Logger:                                  options.Logger,
 			MetricsScope:                            options.MetricsScope,
 			Identity:                                options.Identity,
-			EventMonitor:                            debug.EventMonitor{debug.NewLifeCycle()},
+			WorkerStats:                             debug.WorkerStats{debug.NewNoopPollerTracker()},
 		},
 	}
 
@@ -1189,7 +1189,7 @@ func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParam
 	require.Equal(t, paramsA.NonDeterministicWorkflowPolicy, paramsB.NonDeterministicWorkflowPolicy)
 	require.Equal(t, paramsA.EnableLoggingInReplay, paramsB.EnableLoggingInReplay)
 	require.Equal(t, paramsA.DisableStickyExecution, paramsB.DisableStickyExecution)
-	require.Equal(t, paramsA.EventMonitor.LifeCycle, paramsB.EventMonitor.LifeCycle)
+	require.Equal(t, paramsA.WorkerStats.PollerTracker, paramsB.WorkerStats.PollerTracker)
 }
 
 /*

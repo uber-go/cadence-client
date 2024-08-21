@@ -129,7 +129,7 @@ type (
 		shutdownTimeout   time.Duration
 		userContextCancel context.CancelFunc
 		host              string
-		pollerLifeCycle   debug.LifeCycle
+		pollerTracker     debug.PollerTracker
 	}
 
 	// baseWorker that wraps worker activities.
@@ -181,16 +181,15 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 	}
 
 	bw := &baseWorker{
-		options:          options,
-		shutdownCh:       make(chan struct{}),
-		taskLimiter:      rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
-		retrier:          backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
-		logger:           logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
-		metricsScope:     tagScope(metricsScope, tagWorkerType, options.workerType),
-		pollerRequestCh:  make(chan struct{}, options.maxConcurrentTask),
-		pollerAutoScaler: pollerAS,
-		taskQueueCh:      make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
-
+		options:              options,
+		shutdownCh:           make(chan struct{}),
+		taskLimiter:          rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
+		retrier:              backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
+		logger:               logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
+		metricsScope:         tagScope(metricsScope, tagWorkerType, options.workerType),
+		pollerRequestCh:      make(chan struct{}, options.maxConcurrentTask),
+		pollerAutoScaler:     pollerAS,
+		taskQueueCh:          make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
 		limiterContext:       ctx,
 		limiterContextCancel: cancel,
 		sessionTokenBucket:   sessionTokenBucket,
@@ -247,7 +246,7 @@ func (bw *baseWorker) isShutdown() bool {
 
 func (bw *baseWorker) runPoller() {
 	defer bw.shutdownWG.Done()
-	defer bw.options.pollerLifeCycle.PollerStart(bw.options.identity).Stop()
+	defer bw.options.pollerTracker.Start().Stop()
 
 	bw.metricsScope.Counter(metrics.PollerStartCounter).Inc(1)
 

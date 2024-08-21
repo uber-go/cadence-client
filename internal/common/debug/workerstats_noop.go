@@ -20,23 +20,16 @@
 
 package debug
 
-import (
-	internal "go.uber.org/cadence/internal/common/debug"
-)
-
 type (
-	// PollerTracker is an interface to track running pollers on a worker
-	// Deprecated: in development and very likely to change
-	PollerTracker = internal.PollerTracker
-
-	// Stopper is an interface for tracking stop events in an ongoing process or goroutine.
-	// Implementations should ensure that Stop() is used to signal and track the stop event
-	// and not to clean up any resources opened by worker
-	// Deprecated: in development and very likely to change
-	Stopper = internal.Stopper
-
-	// WorkerStats provides a set of methods that can be used to collect
-	// stats on the Worker for debugging purposes.
-	// Deprecated: in development and very likely to change
-	WorkerStats = internal.WorkerStats
+	// pollerTrackerNoopImpl implements the PollerTracker interface
+	pollerTrackerNoopImpl struct{}
+	// stopperNoopImpl implements the Stopper interface
+	stopperNoopImpl struct{}
 )
+
+func (lc *pollerTrackerNoopImpl) Start() Stopper { return &stopperNoopImpl{} }
+func (lc *pollerTrackerNoopImpl) Stats() int32   { return 0 }
+func (r *stopperNoopImpl) Stop()                 {}
+
+// NewNoopPollerTracker creates a new PollerTracker instance
+func NewNoopPollerTracker() PollerTracker { return &pollerTrackerNoopImpl{} }

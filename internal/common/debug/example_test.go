@@ -21,31 +21,61 @@
 package debug
 
 import (
-	"testing"
+	"fmt"
 
-	"github.com/stretchr/testify/assert"
+	"go.uber.org/atomic"
 )
 
-func TestPollerLifeCycle(t *testing.T) {
-	lifeCycle := NewLifeCycle()
+type (
+	// pollerTrackerImpl implements the PollerTracker interface
+	pollerTrackerImpl struct {
+		pollerCount atomic.Int32
+	}
+
+	// stopperImpl implements the Stopper interface
+	stopperImpl struct {
+		pollerTracker *pollerTrackerImpl
+	}
+)
+
+func (p *pollerTrackerImpl) Start() Stopper {
+	p.pollerCount.Inc()
+	return &stopperImpl{
+		pollerTracker: p,
+	}
+}
+
+func (p *pollerTrackerImpl) Stats() int32 {
+	return p.pollerCount.Load()
+}
+
+func (s *stopperImpl) Stop() {
+	s.pollerTracker.pollerCount.Dec()
+}
+
+func Example() {
+	var pollerTracker PollerTracker
+	pollerTracker = &pollerTrackerImpl{}
 
 	// Initially, poller count should be 0
-	assert.Equal(t, int32(0), lifeCycle.ReadPollerCount())
+	fmt.Println(fmt.Sprintf("stats: %d", pollerTracker.Stats()))
 
 	// Start a poller and verify that the count increments
-	run1 := lifeCycle.PollerStart("worker-1")
-	assert.Equal(t, int32(1), lifeCycle.ReadPollerCount())
+	stopper1 := pollerTracker.Start()
+	fmt.Println(fmt.Sprintf("stats: %d", pollerTracker.Stats()))
 
 	// Start another poller and verify that the count increments again
-	run2 := lifeCycle.PollerStart("worker-2")
-	assert.Equal(t, int32(2), lifeCycle.ReadPollerCount())
+	stopper2 := pollerTracker.Start()
+	fmt.Println(fmt.Sprintf("stats: %d", pollerTracker.Stats()))
 
-	// Stop the poller twice and verify idempotency
-	run1.Stop()
-	assert.Equal(t, int32(1), lifeCycle.ReadPollerCount())
-	run1.Stop()
-	assert.Equal(t, int32(1), lifeCycle.ReadPollerCount())
+	// Stop the pollers and verify the counter
+	stopper1.Stop()
+	stopper2.Stop()
+	fmt.Println(fmt.Sprintf("stats: %d", pollerTracker.Stats()))
 
-	run2.Stop()
-	assert.Equal(t, int32(0), lifeCycle.ReadPollerCount())
+	// Output:
+	// stats: 0
+	// stats: 1
+	// stats: 2
+	// stats: 0
 }

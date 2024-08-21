@@ -305,9 +305,9 @@ func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
 			go func() { errC <- worker.Run() }()
 			select {
 			case e := <-errC:
-				assert.Error(t, e, "worker.Stopper() MUST fail when domain is invalid")
+				assert.Error(t, e, "worker.Run() MUST fail when domain is invalid")
 			case <-time.After(time.Second):
-				assert.Fail(t, "worker.Stopper() MUST fail when domain is invalid")
+				assert.Fail(t, "worker.Run() MUST fail when domain is invalid")
 			}
 			continue
 		}

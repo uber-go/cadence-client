@@ -35,9 +35,6 @@ container:
 agents:
   queue: "buildkite-gcp"
 steps:
-  - label: "fossa analyze"
-    command: ".buildkite/scripts/fossa.sh"
-
   - label: ":golang: unit-test"
     artifact_paths:
       - ".build/*/coverage/*.out"

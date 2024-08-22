@@ -18,7 +18,7 @@ require (
 	github.com/uber/cadence-idl v0.0.0-20240723221048-0482c040f91d
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/tchannel-go v1.32.1
-	go.uber.org/atomic v1.9.0
+	go.uber.org/atomic v1.11.0
 	go.uber.org/goleak v1.1.12
 	go.uber.org/multierr v1.6.0
 	go.uber.org/thriftrw v1.25.0

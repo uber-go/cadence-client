@@ -39,6 +39,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/cadence/internal/common/debug"
+
 	"go.uber.org/cadence/internal/common/isolationgroup"
 
 	"github.com/opentracing/opentracing-go"
@@ -187,6 +189,10 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 	if params.UserContext == nil {
 		params.UserContext = context.Background()
 	}
+	if params.WorkerStats.PollerTracker == nil {
+		params.WorkerStats.PollerTracker = debug.NewNoopPollerTracker()
+		params.Logger.Debug("No PollerTracker configured for WorkerStats option. Will use the default.")
+	}
 }
 
 // verifyDomainExist does a DescribeDomain operation on the specified domain with backoff/retry
@@ -281,7 +287,9 @@ func newWorkflowTaskWorkerInternal(
 		taskWorker:        poller,
 		identity:          params.Identity,
 		workerType:        "DecisionWorker",
-		shutdownTimeout:   params.WorkerStopTimeout},
+		shutdownTimeout:   params.WorkerStopTimeout,
+		pollerTracker:     params.WorkerStats.PollerTracker,
+	},
 		params.Logger,
 		params.MetricsScope,
 		nil,
@@ -304,7 +312,9 @@ func newWorkflowTaskWorkerInternal(
 		taskWorker:        localActivityTaskPoller,
 		identity:          params.Identity,
 		workerType:        "LocalActivityWorker",
-		shutdownTimeout:   params.WorkerStopTimeout},
+		shutdownTimeout:   params.WorkerStopTimeout,
+		pollerTracker:     params.WorkerStats.PollerTracker,
+	},
 		params.Logger,
 		params.MetricsScope,
 		nil,
@@ -482,7 +492,10 @@ func newActivityTaskWorker(
 			identity:          workerParams.Identity,
 			workerType:        workerType,
 			shutdownTimeout:   workerParams.WorkerStopTimeout,
-			userContextCancel: workerParams.UserContextCancel},
+			userContextCancel: workerParams.UserContextCancel,
+			pollerTracker:     workerParams.WorkerStats.PollerTracker,
+		},
+
 		workerParams.Logger,
 		workerParams.MetricsScope,
 		sessionTokenBucket,

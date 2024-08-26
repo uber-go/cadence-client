@@ -34,6 +34,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/cadence/internal/common/debug"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
@@ -152,6 +154,7 @@ type (
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
 		featureFlags       FeatureFlags
+		activityTracker    debug.ActivityTracker
 	}
 
 	// history wrapper method to help information about events.
@@ -1417,6 +1420,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		contextPropagators: params.ContextPropagators,
 		tracer:             params.Tracer,
 		featureFlags:       params.FeatureFlags,
+		activityTracker:    params.WorkerStats.ActivityTracker,
 	}
 }
 
@@ -1710,7 +1714,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			}
 		}()
 	}
-
+	defer ath.activityTracker.Start().Stop()
 	output, err := activityImplementation.Execute(ctx, t.Input)
 
 	dlCancelFunc()

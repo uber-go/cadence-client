@@ -28,8 +28,8 @@ type (
 )
 
 func (lc *pollerTrackerNoopImpl) Start() Stopper { return &stopperNoopImpl{} }
-func (lc *pollerTrackerNoopImpl) Stats() int32   { return 0 }
+func (lc *pollerTrackerNoopImpl) Stats() int64   { return 0 }
 func (r *stopperNoopImpl) Stop()                 {}
 
-// NewNoopPollerTracker creates a new PollerTracker instance
-func NewNoopPollerTracker() PollerTracker { return &pollerTrackerNoopImpl{} }
+// NewNoopCountTracker creates a new PollerTracker instance
+func NewNoopCountTracker() CountTracker { return &pollerTrackerNoopImpl{} }

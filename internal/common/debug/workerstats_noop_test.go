@@ -27,9 +27,9 @@ import (
 )
 
 func TestWorkerStats(t *testing.T) {
-	pollerTracker := NewNoopPollerTracker()
+	pollerTracker := NewNoopCountTracker()
 	assert.NotNil(t, pollerTracker)
 	assert.NotNil(t, pollerTracker.Start())
-	assert.Equal(t, int32(0), pollerTracker.Stats())
+	assert.Equal(t, int64(0), pollerTracker.Stats())
 	assert.NotPanics(t, pollerTracker.Start().Stop)
 }

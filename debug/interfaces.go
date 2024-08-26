@@ -39,4 +39,8 @@ type (
 	// stats on the Worker for debugging purposes.
 	// Deprecated: in development and very likely to change
 	WorkerStats = internal.WorkerStats
+
+	// ActivityTracker is a worker option to track executing activities on a worker
+	// Deprecated: in development and very likely to change
+	ActivityTracker = internal.ActivityTracker
 )

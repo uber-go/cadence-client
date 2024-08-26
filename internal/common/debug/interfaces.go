@@ -32,17 +32,28 @@ type (
 	// PollerTracker is an interface to track running pollers on a worker
 	// Deprecated: in development and very likely to change
 	PollerTracker interface {
-		// Start collects information on poller start up.
-		// consumers should provide a concurrency-safe implementation.
-		Start() Stopper
-		// Stats return the number or running pollers
-		Stats() int32
+		CountTracker
 	}
 
 	// WorkerStats provides a set of methods that can be used to collect
 	// stats on the Worker for debugging purposes.
 	// Deprecated: in development and very likely to change
 	WorkerStats struct {
-		PollerTracker PollerTracker
+		PollerTracker   PollerTracker
+		ActivityTracker ActivityTracker
+	}
+
+	// ActivityTracker is a worker option to track executing activities on a worker
+	// Deprecated: in development and very likely to change
+	ActivityTracker interface {
+		CountTracker
+	}
+
+	CountTracker interface {
+		// Start collects information on poller start up.
+		// consumers should provide a concurrency-safe implementation.
+		Start() Stopper
+		// Stats return the number or running pollers
+		Stats() int64
 	}
 )

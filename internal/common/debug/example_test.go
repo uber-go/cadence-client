@@ -29,7 +29,7 @@ import (
 type (
 	// pollerTrackerImpl implements the PollerTracker interface
 	pollerTrackerImpl struct {
-		pollerCount atomic.Int64
+		pollerCount atomic.Int32
 	}
 
 	// stopperImpl implements the Stopper interface
@@ -45,7 +45,7 @@ func (p *pollerTrackerImpl) Start() Stopper {
 	}
 }
 
-func (p *pollerTrackerImpl) Stats() int64 {
+func (p *pollerTrackerImpl) Stats() int32 {
 	return p.pollerCount.Load()
 }
 

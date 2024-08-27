@@ -190,12 +190,8 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 		params.UserContext = context.Background()
 	}
 	if params.WorkerStats.PollerTracker == nil {
-		params.WorkerStats.PollerTracker = debug.NewNoopCountTracker()
+		params.WorkerStats.PollerTracker = debug.NewNoopPollerTracker()
 		params.Logger.Debug("No PollerTracker configured for WorkerStats option. Will use the default.")
-	}
-	if params.WorkerStats.ActivityTracker == nil {
-		params.WorkerStats.ActivityTracker = debug.NewNoopCountTracker()
-		params.Logger.Debug("No ActivityTracker configured for WorkerStats option. Will use the default.")
 	}
 }
 

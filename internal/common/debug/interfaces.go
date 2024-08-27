@@ -50,10 +50,10 @@ type (
 	}
 
 	CountTracker interface {
-		// Start collects information on start events.
+		// Start collects information on poller start up.
 		// consumers should provide a concurrency-safe implementation.
 		Start() Stopper
-		// Stats return the number of currently running threads.
+		// Stats return the number or running pollers
 		Stats() int64
 	}
 )

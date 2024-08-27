@@ -30,8 +30,6 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/cadence/internal/common/debug"
-
 	"github.com/facebookgo/clock"
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
@@ -628,11 +626,10 @@ func (env *testWorkflowEnvironmentImpl) executeLocalActivity(
 		},
 	}
 	taskHandler := localActivityTaskHandler{
-		userContext:     env.workerOptions.BackgroundActivityContext,
-		metricsScope:    env.metricsScope,
-		logger:          env.logger,
-		tracer:          opentracing.NoopTracer{},
-		activityTracker: debug.NewNoopCountTracker(),
+		userContext:  env.workerOptions.BackgroundActivityContext,
+		metricsScope: env.metricsScope,
+		logger:       env.logger,
+		tracer:       opentracing.NoopTracer{},
 	}
 
 	result := taskHandler.executeLocalActivityTask(task)
@@ -1198,7 +1195,6 @@ func (env *testWorkflowEnvironmentImpl) ExecuteLocalActivity(params executeLocal
 		dataConverter:      wOptions.DataConverter,
 		tracer:             wOptions.Tracer,
 		contextPropagators: wOptions.ContextPropagators,
-		activityTracker:    debug.NewNoopCountTracker(),
 	}
 
 	env.localActivities[activityID] = task

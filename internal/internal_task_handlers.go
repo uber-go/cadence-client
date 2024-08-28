@@ -27,6 +27,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/common/debug"
 	"math"
 	"reflect"
 	"strings"
@@ -152,6 +153,7 @@ type (
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
 		featureFlags       FeatureFlags
+		activityTracker    debug.ActivityTracker
 	}
 
 	// history wrapper method to help information about events.
@@ -1417,6 +1419,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		contextPropagators: params.ContextPropagators,
 		tracer:             params.Tracer,
 		featureFlags:       params.FeatureFlags,
+		activityTracker:    params.WorkerStats.ActivityTracker,
 	}
 }
 
@@ -1710,7 +1713,13 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			}
 		}()
 	}
-
+	debugInfo := debug.ActivityInfo{
+		WorkflowID:   *t.WorkflowExecution.WorkflowId,
+		RunID:        *t.WorkflowExecution.RunId,
+		TaskList:     ath.taskListName,
+		ActivityType: activityType,
+	}
+	defer ath.activityTracker.Start(debugInfo).Stop()
 	output, err := activityImplementation.Execute(ctx, t.Input)
 
 	dlCancelFunc()

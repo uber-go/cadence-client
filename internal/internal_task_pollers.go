@@ -27,6 +27,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.uber.org/cadence/internal/common/debug"
 	"sync"
 	"time"
 
@@ -136,6 +137,7 @@ type (
 		dataConverter      DataConverter
 		contextPropagators []ContextPropagator
 		tracer             opentracing.Tracer
+		activityTracker    debug.ActivityTracker
 	}
 
 	localActivityResult struct {
@@ -529,6 +531,7 @@ func newLocalActivityPoller(params workerExecutionParameters, laTunnel *localAct
 		dataConverter:      params.DataConverter,
 		contextPropagators: params.ContextPropagators,
 		tracer:             params.Tracer,
+		activityTracker:    params.WorkerStats.ActivityTracker,
 	}
 	return &localActivityTaskPoller{
 		basePoller:   basePoller{shutdownC: params.WorkerStopChannel},
@@ -658,6 +661,13 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 
 		laStartTime := time.Now()
 		ctx, span := createOpenTracingActivitySpan(ctx, lath.tracer, time.Now(), task.params.ActivityType, task.params.WorkflowInfo.WorkflowExecution.ID, task.params.WorkflowInfo.WorkflowExecution.RunID)
+		debugInfo := debug.ActivityInfo{
+			WorkflowID:   task.params.WorkflowInfo.WorkflowExecution.ID,
+			RunID:        task.params.WorkflowInfo.WorkflowExecution.RunID,
+			TaskList:     task.params.WorkflowInfo.TaskListName,
+			ActivityType: activityType,
+		}
+		defer lath.activityTracker.Start(debugInfo).Stop()
 		defer span.Finish()
 		laResult, err = ae.ExecuteWithActualArgs(ctx, task.params.InputArgs)
 		executionLatency := time.Now().Sub(laStartTime)

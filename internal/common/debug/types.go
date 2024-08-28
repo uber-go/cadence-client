@@ -62,6 +62,12 @@ type (
 		// Start ...
 		Start(info ActivityInfo) Stopper
 		// Stats ...
-		Stats()
+		Stats() Activities
+	}
+
+	// Activities ...
+	Activities []struct {
+		Info  ActivityInfo
+		Count int64
 	}
 )

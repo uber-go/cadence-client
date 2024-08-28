@@ -37,7 +37,7 @@ func (r *stopperNoopImpl) Stop()                 {}
 func NewNoopPollerTracker() PollerTracker { return &pollerTrackerNoopImpl{} }
 
 func (at *activityTrackerNoopImpl) Start(info ActivityInfo) Stopper { return &stopperNoopImpl{} }
-func (at *activityTrackerNoopImpl) Stats()                          {}
+func (at *activityTrackerNoopImpl) Stats() Activities               { return nil }
 
 // NewNoopActivityTracker creates a new PollerTracker instance
 func NewNoopActivityTracker() ActivityTracker { return &activityTrackerNoopImpl{} }

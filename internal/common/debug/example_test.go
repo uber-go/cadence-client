@@ -22,6 +22,7 @@ package debug
 
 import (
 	"fmt"
+	"sync"
 
 	"go.uber.org/atomic"
 )
@@ -36,7 +37,53 @@ type (
 	stopperImpl struct {
 		pollerTracker *pollerTrackerImpl
 	}
+
+	// activityTrackerImpl implements the ActivityTracker interface
+	activityTrackerImpl struct {
+		sync.RWMutex
+		m map[ActivityInfo]int64
+	}
+
+	// activityStopperImpl implements the Stopper interface
+	activityStopperImpl struct {
+		sync.Once
+		info    ActivityInfo
+		tracker *activityTrackerImpl
+	}
 )
+
+var _ ActivityTracker = &activityTrackerImpl{}
+var _ Stopper = &activityStopperImpl{}
+
+func (ati *activityTrackerImpl) Start(info ActivityInfo) Stopper {
+	ati.Lock()
+	ati.m[info]++
+	ati.Unlock()
+	return &activityStopperImpl{info: info, tracker: ati}
+}
+
+func (ati *activityTrackerImpl) Stats() Activities {
+	var activities Activities
+	ati.RLock()
+	defer ati.RUnlock()
+	for a, count := range ati.m {
+		if count > 0 {
+			activities = append(activities, struct {
+				Info  ActivityInfo
+				Count int64
+			}{Info: a, Count: count})
+		}
+	}
+	return activities
+}
+
+func (asi *activityStopperImpl) Stop() {
+	asi.Do(func() {
+		asi.tracker.Lock()
+		defer asi.tracker.Unlock()
+		asi.tracker.m[asi.info]--
+	})
+}
 
 func (p *pollerTrackerImpl) Start() Stopper {
 	p.pollerCount.Inc()

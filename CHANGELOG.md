@@ -5,8 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-## [v1.2.10] - 2024-07-10
+## [v1.2.10] - 2024-08-29
 ### Added
+- Add ActivityTracker to worker stats option (#1362)
+- Add workerStats as worker options to collect stats on poller start/stop events (#1356)
+- Remove deprecated fossa (#1361)
 - Add FirstRunAt to StartWorkflowOptions (#1360)
 - Revert "Handle panics while polling for tasks (#1352)" (#1357)
 - Remove coveralls integration (#1354)

@@ -662,13 +662,11 @@ func (lath *localActivityTaskHandler) executeLocalActivityTask(task *localActivi
 
 		laStartTime := time.Now()
 		ctx, span := createOpenTracingActivitySpan(ctx, lath.tracer, time.Now(), task.params.ActivityType, task.params.WorkflowInfo.WorkflowExecution.ID, task.params.WorkflowInfo.WorkflowExecution.RunID)
-		debugInfo := debug.ActivityInfo{
-			WorkflowID:   task.params.WorkflowInfo.WorkflowExecution.ID,
-			RunID:        task.params.WorkflowInfo.WorkflowExecution.RunID,
+		activityInfo := debug.ActivityInfo{
 			TaskList:     task.params.WorkflowInfo.TaskListName,
 			ActivityType: activityType,
 		}
-		defer lath.activityTracker.Start(debugInfo).Stop()
+		defer lath.activityTracker.Start(activityInfo).Stop()
 		defer span.Finish()
 		laResult, err = ae.ExecuteWithActualArgs(ctx, task.params.InputArgs)
 		executionLatency := time.Now().Sub(laStartTime)

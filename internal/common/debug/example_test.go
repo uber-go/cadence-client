@@ -42,7 +42,7 @@ type (
 	// activityTrackerImpl implements the ActivityTracker interface
 	activityTrackerImpl struct {
 		sync.RWMutex
-		m map[ActivityInfo]int64
+		activityCount map[ActivityInfo]int64
 	}
 
 	// activityStopperImpl implements the Stopper interface
@@ -58,8 +58,8 @@ var _ Stopper = &activityStopperImpl{}
 
 func (ati *activityTrackerImpl) Start(info ActivityInfo) Stopper {
 	ati.Lock()
-	ati.m[info]++
-	ati.Unlock()
+	defer ati.Unlock()
+	ati.activityCount[info]++
 	return &activityStopperImpl{info: info, tracker: ati}
 }
 
@@ -67,7 +67,7 @@ func (ati *activityTrackerImpl) Stats() Activities {
 	var activities Activities
 	ati.RLock()
 	defer ati.RUnlock()
-	for a, count := range ati.m {
+	for a, count := range ati.activityCount {
 		if count > 0 {
 			activities = append(activities, struct {
 				Info  ActivityInfo
@@ -82,7 +82,10 @@ func (asi *activityStopperImpl) Stop() {
 	asi.Do(func() {
 		asi.tracker.Lock()
 		defer asi.tracker.Unlock()
-		asi.tracker.m[asi.info]--
+		asi.tracker.activityCount[asi.info]--
+		if asi.tracker.activityCount[asi.info] == 0 {
+			delete(asi.tracker.activityCount, asi.info)
+		}
 	})
 }
 
@@ -122,20 +125,16 @@ func Example() {
 	fmt.Println(fmt.Sprintf("poller stats: %d", pollerTracker.Stats()))
 
 	var activityTracker ActivityTracker
-	activityTracker = &activityTrackerImpl{m: make(map[ActivityInfo]int64)}
+	activityTracker = &activityTrackerImpl{activityCount: make(map[ActivityInfo]int64)}
 
 	info1 := ActivityInfo{
-		WorkflowID:   "id1",
-		RunID:        "rid1",
 		TaskList:     "task-list",
-		ActivityType: "activity",
+		ActivityType: "activity1",
 	}
 
 	info2 := ActivityInfo{
-		WorkflowID:   "id2",
-		RunID:        "rid2",
 		TaskList:     "task-list",
-		ActivityType: "activity",
+		ActivityType: "activity2",
 	}
 
 	stopper1 = activityTracker.Start(info1)
@@ -161,19 +160,15 @@ func Example() {
 	// [
 	//   {
 	//     "Info": {
-	//       "WorkflowID": "id1",
-	//       "RunID": "rid1",
 	//       "TaskList": "task-list",
-	//       "ActivityType": "activity"
+	//       "ActivityType": "activity1"
 	//     },
 	//     "Count": 1
 	//   },
 	//   {
 	//     "Info": {
-	//       "WorkflowID": "id2",
-	//       "RunID": "rid2",
 	//       "TaskList": "task-list",
-	//       "ActivityType": "activity"
+	//       "ActivityType": "activity2"
 	//     },
 	//     "Count": 1
 	//   }
@@ -181,10 +176,8 @@ func Example() {
 	// [
 	//   {
 	//     "Info": {
-	//       "WorkflowID": "id2",
-	//       "RunID": "rid2",
 	//       "TaskList": "task-list",
-	//       "ActivityType": "activity"
+	//       "ActivityType": "activity2"
 	//     },
 	//     "Count": 1
 	//   }

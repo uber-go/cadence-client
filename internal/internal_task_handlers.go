@@ -1714,13 +1714,11 @@ func (ath *activityTaskHandlerImpl) Execute(taskList string, t *s.PollForActivit
 			}
 		}()
 	}
-	debugInfo := debug.ActivityInfo{
-		WorkflowID:   *t.WorkflowExecution.WorkflowId,
-		RunID:        *t.WorkflowExecution.RunId,
+	activityInfo := debug.ActivityInfo{
 		TaskList:     ath.taskListName,
 		ActivityType: activityType,
 	}
-	defer ath.activityTracker.Start(debugInfo).Stop()
+	defer ath.activityTracker.Start(activityInfo).Stop()
 	output, err := activityImplementation.Execute(ctx, t.Input)
 
 	dlCancelFunc()

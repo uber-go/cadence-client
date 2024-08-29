@@ -50,8 +50,6 @@ type (
 	// ActivityInfo contains details on the executing activity
 	// Deprecated: in development and very likely to change
 	ActivityInfo struct {
-		WorkflowID   string
-		RunID        string
 		TaskList     string
 		ActivityType string
 	}

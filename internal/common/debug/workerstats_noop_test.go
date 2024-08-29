@@ -28,8 +28,11 @@ import (
 
 func TestWorkerStats(t *testing.T) {
 	pollerTracker := NewNoopPollerTracker()
+	activityTracker := NewNoopActivityTracker()
 	assert.NotNil(t, pollerTracker)
 	assert.NotNil(t, pollerTracker.Start())
 	assert.Equal(t, int32(0), pollerTracker.Stats())
 	assert.NotPanics(t, pollerTracker.Start().Stop)
+	assert.NotNil(t, activityTracker.Start(ActivityInfo{}))
+	assert.Nil(t, activityTracker.Stats())
 }

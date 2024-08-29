@@ -1542,6 +1542,7 @@ func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
 				Tracer:        opentracing.NoopTracer{},
 			},
 		}
+		ensureRequiredParams(&wep)
 		activityHandler := newActivityTaskHandler(mockService, wep, registry)
 		pats := &s.PollForActivityTaskResponse{
 			TaskToken: []byte("token"),

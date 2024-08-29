@@ -193,6 +193,10 @@ func ensureRequiredParams(params *workerExecutionParameters) {
 		params.WorkerStats.PollerTracker = debug.NewNoopPollerTracker()
 		params.Logger.Debug("No PollerTracker configured for WorkerStats option. Will use the default.")
 	}
+	if params.WorkerStats.ActivityTracker == nil {
+		params.WorkerStats.ActivityTracker = debug.NewNoopActivityTracker()
+		params.Logger.Debug("No ActivityTracker configured for WorkerStats option. Will use the default.")
+	}
 }
 
 // verifyDomainExist does a DescribeDomain operation on the specified domain with backoff/retry

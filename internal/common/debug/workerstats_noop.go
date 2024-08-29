@@ -25,6 +25,8 @@ type (
 	pollerTrackerNoopImpl struct{}
 	// stopperNoopImpl implements the Stopper interface
 	stopperNoopImpl struct{}
+	// activityTrackerNoopImpl implements the ActivityTracker interface
+	activityTrackerNoopImpl struct{}
 )
 
 func (lc *pollerTrackerNoopImpl) Start() Stopper { return &stopperNoopImpl{} }
@@ -33,3 +35,13 @@ func (r *stopperNoopImpl) Stop()                 {}
 
 // NewNoopPollerTracker creates a new PollerTracker instance
 func NewNoopPollerTracker() PollerTracker { return &pollerTrackerNoopImpl{} }
+
+func (at *activityTrackerNoopImpl) Start(info ActivityInfo) Stopper { return &stopperNoopImpl{} }
+func (at *activityTrackerNoopImpl) Stats() Activities               { return nil }
+
+// NewNoopActivityTracker creates a new PollerTracker instance
+func NewNoopActivityTracker() ActivityTracker { return &activityTrackerNoopImpl{} }
+
+var _ PollerTracker = &pollerTrackerNoopImpl{}
+var _ Stopper = &stopperNoopImpl{}
+var _ ActivityTracker = &activityTrackerNoopImpl{}

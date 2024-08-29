@@ -52,13 +52,3 @@ type (
 	// Deprecated: in development and very likely to change
 	Activities = internal.Activities
 )
-
-func (a Activities) GroupByActivityType() Activities {
-	// implement me... maybe here or in monorepo ??
-	return nil
-}
-
-func (a Activities) GroupByWorkflowID() Activities {
-	// implement me... maybe ??
-	return nil
-}

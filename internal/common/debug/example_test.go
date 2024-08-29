@@ -21,10 +21,10 @@
 package debug
 
 import (
+	"encoding/json"
 	"fmt"
-	"sync"
-
 	"go.uber.org/atomic"
+	"sync"
 )
 
 type (
@@ -105,24 +105,88 @@ func Example() {
 	pollerTracker = &pollerTrackerImpl{}
 
 	// Initially, poller count should be 0
-	fmt.Println(fmt.Sprintf("stats: %d", pollerTracker.Stats()))
+	fmt.Println(fmt.Sprintf("poller stats: %d", pollerTracker.Stats()))
 
 	// Start a poller and verify that the count increments
 	stopper1 := pollerTracker.Start()
-	fmt.Println(fmt.Sprintf("stats: %d", pollerTracker.Stats()))
+	fmt.Println(fmt.Sprintf("poller stats: %d", pollerTracker.Stats()))
 
 	// Start another poller and verify that the count increments again
 	stopper2 := pollerTracker.Start()
-	fmt.Println(fmt.Sprintf("stats: %d", pollerTracker.Stats()))
+	fmt.Println(fmt.Sprintf("poller stats: %d", pollerTracker.Stats()))
 
 	// Stop the pollers and verify the counter
 	stopper1.Stop()
 	stopper2.Stop()
-	fmt.Println(fmt.Sprintf("stats: %d", pollerTracker.Stats()))
+	fmt.Println(fmt.Sprintf("poller stats: %d", pollerTracker.Stats()))
+
+	var activityTracker ActivityTracker
+	activityTracker = &activityTrackerImpl{m: make(map[ActivityInfo]int64)}
+
+	info1 := ActivityInfo{
+		WorkflowID:   "id1",
+		RunID:        "rid1",
+		TaskList:     "task-list",
+		ActivityType: "activity",
+	}
+
+	info2 := ActivityInfo{
+		WorkflowID:   "id2",
+		RunID:        "rid2",
+		TaskList:     "task-list",
+		ActivityType: "activity",
+	}
+
+	stopper1 = activityTracker.Start(info1)
+	stopper2 = activityTracker.Start(info2)
+	jsonActivities, _ := json.MarshalIndent(activityTracker.Stats(), "", "  ")
+	fmt.Println(string(jsonActivities))
+
+	stopper1.Stop()
+	stopper1.Stop()
+	jsonActivities, _ = json.MarshalIndent(activityTracker.Stats(), "", "  ")
+
+	fmt.Println(string(jsonActivities))
+	stopper2.Stop()
+
+	jsonActivities, _ = json.MarshalIndent(activityTracker.Stats(), "", "  ")
+	fmt.Println(string(jsonActivities))
 
 	// Output:
-	// stats: 0
-	// stats: 1
-	// stats: 2
-	// stats: 0
+	// poller stats: 0
+	// poller stats: 1
+	// poller stats: 2
+	// poller stats: 0
+	// [
+	//   {
+	//     "Info": {
+	//       "WorkflowID": "id1",
+	//       "RunID": "rid1",
+	//       "TaskList": "task-list",
+	//       "ActivityType": "activity"
+	//     },
+	//     "Count": 1
+	//   },
+	//   {
+	//     "Info": {
+	//       "WorkflowID": "id2",
+	//       "RunID": "rid2",
+	//       "TaskList": "task-list",
+	//       "ActivityType": "activity"
+	//     },
+	//     "Count": 1
+	//   }
+	// ]
+	// [
+	//   {
+	//     "Info": {
+	//       "WorkflowID": "id2",
+	//       "RunID": "rid2",
+	//       "TaskList": "task-list",
+	//       "ActivityType": "activity"
+	//     },
+	//     "Count": 1
+	//   }
+	// ]
+	// null
 }

@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/debug"
+
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/assert"
@@ -1097,7 +1099,12 @@ func TestWorkerOptionDefaults(t *testing.T) {
 			Tracer:                                  opentracing.NoopTracer{},
 			Logger:                                  decisionWorker.executionParameters.Logger,
 			MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
-			Identity:                                decisionWorker.executionParameters.Identity},
+			Identity:                                decisionWorker.executionParameters.Identity,
+			WorkerStats: debug.WorkerStats{
+				PollerTracker:   debug.NewNoopPollerTracker(),
+				ActivityTracker: debug.NewNoopActivityTracker(),
+			},
+		},
 		UserContext: decisionWorker.executionParameters.UserContext,
 	}
 
@@ -1156,7 +1163,12 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 			Tracer:                                  options.Tracer,
 			Logger:                                  options.Logger,
 			MetricsScope:                            options.MetricsScope,
-			Identity:                                options.Identity},
+			Identity:                                options.Identity,
+			WorkerStats: debug.WorkerStats{
+				PollerTracker:   debug.NewNoopPollerTracker(),
+				ActivityTracker: debug.NewNoopActivityTracker(),
+			},
+		},
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
@@ -1183,6 +1195,8 @@ func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParam
 	require.Equal(t, paramsA.NonDeterministicWorkflowPolicy, paramsB.NonDeterministicWorkflowPolicy)
 	require.Equal(t, paramsA.EnableLoggingInReplay, paramsB.EnableLoggingInReplay)
 	require.Equal(t, paramsA.DisableStickyExecution, paramsB.DisableStickyExecution)
+	require.Equal(t, paramsA.WorkerStats.PollerTracker, paramsB.WorkerStats.PollerTracker)
+	require.Equal(t, paramsA.WorkerStats.ActivityTracker, paramsB.WorkerStats.ActivityTracker)
 }
 
 /*

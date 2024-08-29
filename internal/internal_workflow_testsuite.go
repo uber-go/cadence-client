@@ -25,11 +25,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/debug"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/cadence/internal/common/debug"
 
 	"github.com/facebookgo/clock"
 	"github.com/golang/mock/gomock"

@@ -27,13 +27,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/debug"
 	"math"
 	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/cadence/internal/common/debug"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"

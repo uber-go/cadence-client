@@ -47,7 +47,7 @@ type (
 		ActivityTracker ActivityTracker
 	}
 
-	// ActivityInfo ...
+	// ActivityInfo contains details on the executing activity
 	// Deprecated: in development and very likely to change
 	ActivityInfo struct {
 		WorkflowID   string
@@ -59,13 +59,14 @@ type (
 	// ActivityTracker is a worker option to track executing activities on a worker
 	// Deprecated: in development and very likely to change
 	ActivityTracker interface {
-		// Start ...
+		// Start records activity execution
 		Start(info ActivityInfo) Stopper
-		// Stats ...
+		// Stats returns a list of executing activity info
 		Stats() Activities
 	}
 
-	// Activities ...
+	// Activities is a list of executing activities on the worker
+	// Deprecated: in development and very likely to change
 	Activities []struct {
 		Info  ActivityInfo
 		Count int64

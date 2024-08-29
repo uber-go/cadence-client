@@ -48,7 +48,7 @@ type (
 	// Deprecated: in development and very likely to change
 	ActivityInfo = internal.ActivityInfo
 
-	// Activities ...
+	// Activities is a list of executing activities on the worker
 	// Deprecated: in development and very likely to change
 	Activities = internal.Activities
 )

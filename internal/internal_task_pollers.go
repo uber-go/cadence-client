@@ -27,9 +27,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.uber.org/cadence/internal/common/debug"
 	"sync"
 	"time"
+
+	"go.uber.org/cadence/internal/common/debug"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"

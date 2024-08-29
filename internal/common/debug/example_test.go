@@ -23,8 +23,9 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
-	"go.uber.org/atomic"
 	"sync"
+
+	"go.uber.org/atomic"
 )
 
 type (

@@ -44,7 +44,7 @@ type (
 	// Deprecated: in development and very likely to change
 	ActivityTracker = internal.ActivityTracker
 
-	// ActivityInfo ...
+	// ActivityInfo contains details on the executing activity
 	// Deprecated: in development and very likely to change
 	ActivityInfo = internal.ActivityInfo
 

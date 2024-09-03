@@ -69,4 +69,10 @@ type (
 		Info  ActivityInfo
 		Count int64
 	}
+
+	// Debugger exposes stats collected on a running Worker
+	// Deprecated: in development and very likely to change
+	Debugger interface {
+		GetWorkerStats() WorkerStats
+	}
 )

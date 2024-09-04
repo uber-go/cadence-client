@@ -1116,6 +1116,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 	require.NotNil(t, activityWorker.executionParameters.MetricsScope)
 	require.Nil(t, activityWorker.executionParameters.ContextPropagators)
 	assertWorkerExecutionParamsEqual(t, expected, activityWorker.executionParameters)
+	assert.Equal(t, expected.WorkerStats, aggWorker.GetWorkerStats())
 }
 
 func TestWorkerOptionNonDefaults(t *testing.T) {
@@ -1176,6 +1177,7 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 	activityWorker := aggWorker.activityWorker
 	require.True(t, len(activityWorker.executionParameters.ContextPropagators) > 0)
 	assertWorkerExecutionParamsEqual(t, expected, activityWorker.executionParameters)
+	assert.Equal(t, expected.WorkerStats, aggWorker.GetWorkerStats())
 }
 
 func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParameters, paramsB workerExecutionParameters) {

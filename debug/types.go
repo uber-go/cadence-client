@@ -51,4 +51,8 @@ type (
 	// Activities is a list of executing activities on the worker
 	// Deprecated: in development and very likely to change
 	Activities = internal.Activities
+
+	// Debugger exposes stats collected on a running Worker
+	// Deprecated: in development and very likely to change
+	Debugger = internal.Debugger
 )

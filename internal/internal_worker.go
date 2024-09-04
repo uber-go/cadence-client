@@ -804,7 +804,10 @@ type aggregatedWorker struct {
 	shadowWorker                    *shadowWorker
 	logger                          *zap.Logger
 	registry                        *registry
+	workerstats                     debug.WorkerStats
 }
+
+var _ debug.Debugger = &aggregatedWorker{}
 
 func (aw *aggregatedWorker) GetRegisteredWorkflows() []RegistryWorkflowInfo {
 	workflows := aw.registry.GetRegisteredWorkflows()
@@ -1010,6 +1013,10 @@ func (aw *aggregatedWorker) Stop() {
 	aw.logger.Info("Stopped Worker")
 }
 
+func (aw *aggregatedWorker) GetWorkerStats() debug.WorkerStats {
+	return aw.workerstats
+}
+
 // AggregatedWorker returns an instance to manage the workers. Use defaultConcurrentPollRoutineSize (which is 2) as
 // poller size. The typical RTT (round-trip time) is below 1ms within data center. And the poll API latency is about 5ms.
 // With 2 poller, we could achieve around 300~400 RPS.
@@ -1148,6 +1155,7 @@ func newAggregatedWorker(
 		shadowWorker:                    shadowWorker,
 		logger:                          logger,
 		registry:                        registry,
+		workerstats:                     workerParams.WorkerStats,
 	}
 }
 

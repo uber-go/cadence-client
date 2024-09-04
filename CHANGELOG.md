@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ## [v1.2.10] - 2024-08-29
 ### Added
+- Add debugger interface to allow extracting the workerStats from Worker (#1363)
 - Add ActivityTracker to worker stats option (#1362)
 - Add workerStats as worker options to collect stats on poller start/stop events (#1356)
 - Remove deprecated fossa (#1361)

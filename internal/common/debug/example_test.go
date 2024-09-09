@@ -78,6 +78,14 @@ func (ati *activityTrackerImpl) Stats() Activities {
 			}{Info: a, Count: count})
 		}
 	}
+	slices.SortFunc(
+		activities,
+		func(a, b struct {
+			Info  ActivityInfo
+			Count int64
+		}) int {
+			return cmp.Compare(strings.ToLower(a.Info.ActivityType), strings.ToLower(b.Info.ActivityType))
+		})
 	return activities
 }
 
@@ -142,22 +150,12 @@ func Example() {
 
 	stopper1 = activityTracker.Start(info1)
 	stopper2 = activityTracker.Start(info2)
-	sortFn := func(a, b struct {
-		Info  ActivityInfo
-		Count int64
-	}) int {
-		return cmp.Compare(strings.ToLower(a.Info.ActivityType), strings.ToLower(b.Info.ActivityType))
-	}
-	activities := activityTracker.Stats()
-	slices.SortFunc(activities, sortFn)
-	jsonActivities, _ := json.MarshalIndent(activities, "", "  ")
+	jsonActivities, _ := json.MarshalIndent(activityTracker.Stats(), "", "  ")
 	fmt.Println(string(jsonActivities))
 
 	stopper1.Stop()
 	stopper1.Stop()
-	activities = activityTracker.Stats()
-	slices.SortFunc(activities, sortFn)
-	jsonActivities, _ = json.MarshalIndent(activities, "", "  ")
+	jsonActivities, _ = json.MarshalIndent(activityTracker.Stats(), "", "  ")
 
 	fmt.Println(string(jsonActivities))
 	stopper2.Stop()

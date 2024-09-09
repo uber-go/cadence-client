@@ -21,9 +21,9 @@
 package debug
 
 import (
-	"cmp"
 	"encoding/json"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"slices"
 	"strings"
 	"sync"

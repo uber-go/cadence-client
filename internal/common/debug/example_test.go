@@ -24,7 +24,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/exp/slices"
+	"slices"
 	"strings"
 	"sync"
 

@@ -78,7 +78,7 @@ func (ati *activityTrackerImpl) Stats() Activities {
 		}
 	}
 	sort.Slice(activities, func(i, j int) bool {
-		return strings.Compare(strings.ToLower(activities[i].Info.ActivityType), strings.ToLower(activities[j].Info.ActivityType)) < 0
+		return strings.Compare(activities[i].Info.ActivityType, activities[j].Info.ActivityType) < 0
 	})
 	return activities
 }

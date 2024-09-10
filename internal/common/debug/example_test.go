@@ -23,6 +23,8 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 
 	"go.uber.org/atomic"
@@ -75,6 +77,14 @@ func (ati *activityTrackerImpl) Stats() Activities {
 			}{Info: a, Count: count})
 		}
 	}
+	slices.SortFunc(
+		activities,
+		func(a, b struct {
+			Info  ActivityInfo
+			Count int64
+		}) int {
+			return strings.Compare(strings.ToLower(a.Info.ActivityType), strings.ToLower(b.Info.ActivityType))
+		})
 	return activities
 }
 

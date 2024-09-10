@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 
 	"go.uber.org/atomic"
@@ -78,7 +77,7 @@ func (ati *activityTrackerImpl) Stats() Activities {
 		}
 	}
 	sort.Slice(activities, func(i, j int) bool {
-		return strings.Compare(activities[i].Info.ActivityType, activities[j].Info.ActivityType) < 0
+		return activities[i].Info.ActivityType < activities[j].Info.ActivityType
 	})
 	return activities
 }

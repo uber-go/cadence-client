@@ -23,7 +23,7 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
+	"sort"
 	"strings"
 	"sync"
 
@@ -77,14 +77,9 @@ func (ati *activityTrackerImpl) Stats() Activities {
 			}{Info: a, Count: count})
 		}
 	}
-	slices.SortFunc(
-		activities,
-		func(a, b struct {
-			Info  ActivityInfo
-			Count int64
-		}) int {
-			return strings.Compare(strings.ToLower(a.Info.ActivityType), strings.ToLower(b.Info.ActivityType))
-		})
+	sort.Slice(activities, func(i, j int) bool {
+		return strings.Compare(strings.ToLower(activities[i].Info.ActivityType), strings.ToLower(activities[j].Info.ActivityType)) < 0
+	})
 	return activities
 }
 

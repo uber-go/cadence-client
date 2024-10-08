@@ -1286,10 +1286,10 @@ func AugmentWorkerOptions(options WorkerOptions) WorkerOptions {
 		options.MaxConcurrentSessionExecutionSize = defaultMaxConcurrentSessionExecutionSize
 	}
 	if options.MinConcurrentActivityTaskPollers == 0 {
-		options.MinConcurrentActivityTaskPollers = defaultMinConcurrentPollerSize
+		options.MinConcurrentActivityTaskPollers = defaultMinConcurrentActivityPollerSize
 	}
 	if options.MinConcurrentDecisionTaskPollers == 0 {
-		options.MinConcurrentDecisionTaskPollers = defaultMinConcurrentPollerSize
+		options.MinConcurrentDecisionTaskPollers = defaultMinConcurrentDecisionPollerSize
 	}
 	if options.PollerAutoScalerCooldown == 0 {
 		options.PollerAutoScalerCooldown = defaultPollerAutoScalerCooldown

@@ -283,7 +283,11 @@ func New(
 	taskList string,
 	options Options,
 ) Worker {
-	return internal.NewWorker(service, domain, taskList, options)
+	w, err := internal.NewWorker(service, domain, taskList, options)
+	if err != nil {
+		panic(err)
+	}
+	return w
 }
 
 // NewWorkflowReplayer creates a WorkflowReplayer instance.

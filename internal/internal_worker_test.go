@@ -414,11 +414,12 @@ func createWorkerWithThrottle(
 	workerOptions.EnableSessionWorker = true
 
 	// Start Worker.
-	worker := NewWorker(
+	worker, err := NewWorker(
 		service,
 		domain,
 		"testGroupName2",
 		workerOptions)
+	require.NoError(t, err)
 	return worker
 }
 

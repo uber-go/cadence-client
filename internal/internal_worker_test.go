@@ -1389,7 +1389,7 @@ func Test_augmentWorkerOptions(t *testing.T) {
 				MaxConcurrentDecisionTaskExecutionSize:  1000,
 				WorkerDecisionTasksPerSecond:            100000,
 				MaxConcurrentDecisionTaskPollers:        2,
-				MinConcurrentDecisionTaskPollers:        1,
+				MinConcurrentDecisionTaskPollers:        2,
 				PollerAutoScalerCooldown:                time.Minute,
 				PollerAutoScalerTargetUtilization:       0.6,
 				PollerAutoScalerDryRun:                  false,

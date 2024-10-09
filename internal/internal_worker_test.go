@@ -1076,7 +1076,8 @@ func TestActivityNilArgs(t *testing.T) {
 func TestWorkerOptionDefaults(t *testing.T) {
 	domain := "worker-options-test"
 	taskList := "worker-options-tl"
-	aggWorker := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
+	aggWorker, err := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
+	require.NoError(t, err)
 	decisionWorker := aggWorker.workflowWorker
 	require.True(t, decisionWorker.executionParameters.Identity != "")
 	require.NotNil(t, decisionWorker.executionParameters.Logger)
@@ -1144,7 +1145,8 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 		Tracer:                                  opentracing.NoopTracer{},
 	}
 
-	aggWorker := newAggregatedWorker(nil, domain, taskList, options)
+	aggWorker, err := newAggregatedWorker(nil, domain, taskList, options)
+	require.NoError(t, err)
 	decisionWorker := aggWorker.workflowWorker
 	require.True(t, len(decisionWorker.executionParameters.ContextPropagators) > 0)
 

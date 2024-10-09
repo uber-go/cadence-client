@@ -335,10 +335,7 @@ func NewWorker(
 	taskList string,
 	options WorkerOptions,
 ) (*aggregatedWorker, error) {
-	if err := options.Validate(); err != nil {
-		return nil, fmt.Errorf("worker options validation error: %w", err)
-	}
-	return newAggregatedWorker(service, domain, taskList, options), nil
+	return newAggregatedWorker(service, domain, taskList, options)
 }
 
 // ReplayWorkflowExecution loads a workflow execution history from the Cadence service and executes a single decision task for it.

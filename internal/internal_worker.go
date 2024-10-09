@@ -1025,8 +1025,12 @@ func newAggregatedWorker(
 	domain string,
 	taskList string,
 	options WorkerOptions,
-) (worker *aggregatedWorker) {
+) (worker *aggregatedWorker, err error) {
 	wOptions := AugmentWorkerOptions(options)
+	if err := options.Validate(); err != nil {
+		return nil, fmt.Errorf("worker options validation error: %w", err)
+	}
+
 	ctx := wOptions.BackgroundActivityContext
 	if ctx == nil {
 		ctx = context.Background()
@@ -1156,7 +1160,7 @@ func newAggregatedWorker(
 		logger:                          logger,
 		registry:                        registry,
 		workerstats:                     workerParams.WorkerStats,
-	}
+	}, nil
 }
 
 // tagScope with one or multiple tags, like

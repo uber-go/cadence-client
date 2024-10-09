@@ -180,6 +180,7 @@ func (s *CacheEvictionSuite) TestResetStickyOnEviction() {
 		IsolationGroup:        "zone-1",
 	})
 	s.Require().NoError(err)
+
 	// this is an arbitrary workflow we use for this test
 	// NOTE: a simple helloworld that doesn't execute an activity
 	// won't work because the workflow will simply just complete

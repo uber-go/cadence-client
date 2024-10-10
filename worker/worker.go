@@ -285,12 +285,12 @@ func New(
 
 // NewV2 returns an instance of worker for managing workflow and activity executions and an error.
 //
-//		service  - thrift connection to the cadence server
-//		domain   - the name of the cadence domain
-//		taskList - is the task list name you use to identify your client worker, also
-//		           identifies group of workflow and activity implementations that are
-//		           hosted by a single worker process
-//		options  - configure any worker specific options like logger, metrics, identity
+//	service  - thrift connection to the cadence server
+//	domain   - the name of the cadence domain
+//	taskList - is the task list name you use to identify your client worker, also
+//	           identifies group of workflow and activity implementations that are
+//	           hosted by a single worker process
+//	options  - configure any worker specific options like logger, metrics, identity
 func NewV2(
 	service workflowserviceclient.Interface,
 	domain string,

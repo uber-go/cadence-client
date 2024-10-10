@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Added worker.NewV2 with validation on decision poller count (#1370)
+
 ## [v1.2.10] - 2024-07-10
 ### Added
 - Revert "Handle panics while polling for tasks (#1352)" (#1357)
@@ -83,16 +86,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed in TestEnv workflow interceptor is not propagated correctly for child workflows #1289
 
 ## [v1.0.2] - 2023-09-25
-### Added 
+### Added
 - Add a structured error for non-determinism failures
 
-### Changed 
-- Do not log when automatic heart beating fails due to cancellations 
+### Changed
+- Do not log when automatic heart beating fails due to cancellations
 
 ## [v1.0.1] - 2023-08-14
 ### Added
 - Emit cadence worker's hardware utilization inside worker once per host by @timl3136 in #1260
-### Changed 
+### Changed
 - Updated supported Go version to 1.19
 - Log when the automatic heartbeating fails
 - Updated golang.org/x/net and github.com/prometheus/client_golang

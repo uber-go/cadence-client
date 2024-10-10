@@ -269,16 +269,7 @@ const (
 	ShadowModeContinuous = internal.ShadowModeContinuous
 )
 
-// New creates an instance of worker for managing workflow and activity executions.
-//
-//	service  - thrift connection to the cadence server
-//	domain   - the name of the cadence domain
-//	taskList - is the task list name you use to identify your client worker, also
-//	           identifies group of workflow and activity implementations that are
-//	           hosted by a single worker process
-//	options  - configure any worker specific options like logger, metrics, identity
-//
-// DEPRCATED: use NewV2 instead since this implementation will panic on error
+// Deprecated: use NewV2 instead since this implementation will panic on error
 func New(
 	service workflowserviceclient.Interface,
 	domain string,
@@ -300,7 +291,6 @@ func New(
 //		           identifies group of workflow and activity implementations that are
 //		           hosted by a single worker process
 //		options  - configure any worker specific options like logger, metrics, identity
-//	 Returns an error if the worker cannot be created.
 func NewV2(
 	service workflowserviceclient.Interface,
 	domain string,

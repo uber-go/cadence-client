@@ -414,11 +414,12 @@ func createWorkerWithThrottle(
 	workerOptions.EnableSessionWorker = true
 
 	// Start Worker.
-	worker := NewWorker(
+	worker, err := NewWorker(
 		service,
 		domain,
 		"testGroupName2",
 		workerOptions)
+	require.NoError(t, err)
 	return worker
 }
 
@@ -1075,7 +1076,8 @@ func TestActivityNilArgs(t *testing.T) {
 func TestWorkerOptionDefaults(t *testing.T) {
 	domain := "worker-options-test"
 	taskList := "worker-options-tl"
-	aggWorker := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
+	aggWorker, err := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
+	require.NoError(t, err)
 	decisionWorker := aggWorker.workflowWorker
 	require.True(t, decisionWorker.executionParameters.Identity != "")
 	require.NotNil(t, decisionWorker.executionParameters.Logger)
@@ -1143,7 +1145,8 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 		Tracer:                                  opentracing.NoopTracer{},
 	}
 
-	aggWorker := newAggregatedWorker(nil, domain, taskList, options)
+	aggWorker, err := newAggregatedWorker(nil, domain, taskList, options)
+	require.NoError(t, err)
 	decisionWorker := aggWorker.workflowWorker
 	require.True(t, len(decisionWorker.executionParameters.ContextPropagators) > 0)
 
@@ -1388,7 +1391,7 @@ func Test_augmentWorkerOptions(t *testing.T) {
 				MaxConcurrentDecisionTaskExecutionSize:  1000,
 				WorkerDecisionTasksPerSecond:            100000,
 				MaxConcurrentDecisionTaskPollers:        2,
-				MinConcurrentDecisionTaskPollers:        1,
+				MinConcurrentDecisionTaskPollers:        2,
 				PollerAutoScalerCooldown:                time.Minute,
 				PollerAutoScalerTargetUtilization:       0.6,
 				PollerAutoScalerDryRun:                  false,

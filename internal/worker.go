@@ -23,6 +23,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/cadence/internal/common/debug"
@@ -108,7 +109,7 @@ type (
 		// optional: Sets the minimum number of goroutines that will concurrently poll the
 		// cadence-server to retrieve decision tasks. If FeatureFlags.PollerAutoScalerEnabled is set to true,
 		// changing this value will NOT affect the rate at which the worker is able to consume tasks from a task list.
-		// Default value is 1
+		// Default value is 2
 		MinConcurrentDecisionTaskPollers int
 
 		// optional: Sets the interval of poller autoscaling, between which poller autoscaler changes the poller count
@@ -333,7 +334,7 @@ func NewWorker(
 	domain string,
 	taskList string,
 	options WorkerOptions,
-) *aggregatedWorker {
+) (*aggregatedWorker, error) {
 	return newAggregatedWorker(service, domain, taskList, options)
 }
 
@@ -382,4 +383,13 @@ func ReplayWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string) 
 func ReplayPartialWorkflowHistoryFromJSONFile(logger *zap.Logger, jsonfileName string, lastEventID int64) error {
 	r := NewWorkflowReplayer()
 	return r.ReplayPartialWorkflowHistoryFromJSONFile(logger, jsonfileName, lastEventID)
+}
+
+// Validate sanity validation of WorkerOptions
+func (o WorkerOptions) Validate() error {
+	// decision task pollers must be >= 2 or unset if sticky tasklist is enabled https://github.com/uber-go/cadence-client/issues/1369
+	if !o.DisableStickyExecution && (o.MaxConcurrentDecisionTaskPollers == 1 || o.MinConcurrentDecisionTaskPollers == 1) {
+		return fmt.Errorf("DecisionTaskPollers must be >= 2 or use default value")
+	}
+	return nil
 }

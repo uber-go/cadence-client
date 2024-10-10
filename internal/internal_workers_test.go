@@ -340,7 +340,8 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
 	}
-	worker := newAggregatedWorker(s.service, domain, taskList, options)
+	worker, err := newAggregatedWorker(s.service, domain, taskList, options)
+	s.Require().NoError(err)
 	worker.RegisterWorkflowWithOptions(
 		longDecisionWorkflowFn,
 		RegisterWorkflowOptions{Name: "long-running-decision-workflow-type"},
@@ -515,7 +516,8 @@ func (s *WorkersTestSuite) TestQueryTask_WorkflowCacheEvicted() {
 		// See the mock function for the second PollForDecisionTask call above.
 		MaxConcurrentDecisionTaskExecutionSize: 1,
 	}
-	worker := newAggregatedWorker(s.service, domain, taskList, options)
+	worker, err := newAggregatedWorker(s.service, domain, taskList, options)
+	s.Require().NoError(err)
 	worker.RegisterWorkflowWithOptions(
 		queryWorkflowFn,
 		RegisterWorkflowOptions{Name: workflowType},
@@ -638,7 +640,8 @@ func (s *WorkersTestSuite) TestMultipleLocalActivities() {
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
 	}
-	worker := newAggregatedWorker(s.service, domain, taskList, options)
+	worker, err := newAggregatedWorker(s.service, domain, taskList, options)
+	s.Require().NoError(err)
 	worker.RegisterWorkflowWithOptions(
 		longDecisionWorkflowFn,
 		RegisterWorkflowOptions{Name: "multiple-local-activities-workflow-type"},
@@ -748,7 +751,8 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 		Logger:   zaptest.NewLogger(s.T()),
 		Identity: "test-worker-identity",
 	}
-	worker := newAggregatedWorker(s.service, domain, taskList, options)
+	worker, err := newAggregatedWorker(s.service, domain, taskList, options)
+	s.Require().NoError(err)
 	worker.RegisterWorkflowWithOptions(
 		workflowFn,
 		RegisterWorkflowOptions{Name: workflowType},
@@ -859,14 +863,15 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 		return nil
 	}).MinTimes(1)
 
-	worker := newAggregatedWorker(s.service, domain, taskList, options)
+	worker, err := newAggregatedWorker(s.service, domain, taskList, options)
+	s.Require().NoError(err)
 	worker.RegisterWorkflowWithOptions(
 		workflowFn,
 		RegisterWorkflowOptions{Name: workflowType},
 	)
 	worker.RegisterActivityWithOptions(activitySleep, RegisterActivityOptions{Name: "activitySleep"})
 	s.NotNil(worker.locallyDispatchedActivityWorker)
-	err := worker.Start()
+	err = worker.Start()
 	s.NoError(err, "worker failed to start")
 
 	// wait for test to complete

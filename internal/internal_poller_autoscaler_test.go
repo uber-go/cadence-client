@@ -61,7 +61,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 				taskPoll:           0,
 				unrelated:          0,
 				initialPollerCount: 10,
-				minPollerCount:     1,
+				minPollerCount:     2,
 				maxPollerCount:     10,
 				targetMilliUsage:   500,
 				cooldownTime:       coolDownTime,

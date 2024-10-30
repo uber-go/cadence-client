@@ -219,7 +219,6 @@ $(THRIFT_GEN): $(THRIFT_FILES) $(BIN)/thriftrw $(BIN)/thriftrw-plugin-yarpc
 # this needs to be both the files defining the generate command, AND the files that define the interfaces.
 $(BUILD)/generate: client/client.go encoded/encoded.go internal/internal_workflow_client.go $(BIN)/mockery
 	$Q $(BIN_PATH) go generate ./...
-	$Q touch $@
 
 # ====================================
 # other intermediates

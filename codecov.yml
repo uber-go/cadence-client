@@ -31,6 +31,7 @@ codecov:
 ignore:
   - "**/*_generated.go"
   - "**/*_mock.go"
+  - "**/mock_*.go"
   - "**/testdata/**"
   - "**/*_test.go"
   - "**/*_testsuite.go"

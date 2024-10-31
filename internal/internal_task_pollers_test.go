@@ -173,7 +173,7 @@ func TestProcessTask_failures(t *testing.T) {
 	})
 }
 
-func buildWorkflowTaskPoller(t *testing.T) (*workflowTaskPoller, *workflowservicetest.MockClient, *MockWorkflowTaskHandler, *MockLocalDispatcher) {
+func buildWorkflowTaskPoller(t *testing.T) (*workflowTaskPoller, *workflowservicetest.MockClient, *MockWorkflowTaskHandler, *mockLocalDispatcher) {
 	ctrl := gomock.NewController(t)
 	mockService := workflowservicetest.NewMockClient(ctrl)
 	taskHandler := &MockWorkflowTaskHandler{}

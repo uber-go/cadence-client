@@ -274,6 +274,7 @@ func (s *internalWorkerTestSuite) TestNoActivitiesOrWorkflows() {
 	assert.Empty(t, w.registry.getRegisteredActivities())
 	assert.Empty(t, w.registry.GetRegisteredWorkflowTypes())
 	assert.NoError(t, w.Start())
+	w.Stop()
 }
 
 func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
@@ -1141,8 +1142,8 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 		DataConverter:                           &defaultDataConverter{},
 		BackgroundActivityContext:               context.Background(),
 		Logger:                                  zap.NewNop(),
-		MetricsScope:                            tally.NoopScope,
-		Tracer:                                  opentracing.NoopTracer{},
+		MetricsScope:                            tally.NewTestScope("", nil),
+		Tracer:                                  opentracing.GlobalTracer(),
 	}
 
 	aggWorker, err := newAggregatedWorker(nil, domain, taskList, options)

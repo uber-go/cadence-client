@@ -165,6 +165,9 @@ func newWorkflowWorker(
 }
 
 func ensureRequiredParams(params *workerExecutionParameters) {
+	if params.Tracer == nil {
+		params.Tracer = opentracing.NoopTracer{}
+	}
 	if params.Identity == "" {
 		params.Identity = getWorkerIdentity(params.TaskList)
 	}

@@ -525,6 +525,12 @@ func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}
 }
 
 func newLocalActivityPoller(params workerExecutionParameters, laTunnel *localActivityTunnel) *localActivityTaskPoller {
+	if params.Tracer == nil {
+		params.Tracer = opentracing.NoopTracer{}
+	}
+	if params.WorkerStats.ActivityTracker == nil {
+		params.WorkerStats.ActivityTracker = debug.NewNoopActivityTracker()
+	}
 	handler := &localActivityTaskHandler{
 		userContext:        params.UserContext,
 		metricsScope:       metrics.NewTaggedScope(params.MetricsScope),

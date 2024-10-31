@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap/zaptest"
 
@@ -184,7 +183,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 			MaxConcurrentActivityTaskPollers: 4,
 			MaxConcurrentDecisionTaskPollers: 4,
 			Logger:                           zaptest.NewLogger(s.T()),
-			Tracer:                           opentracing.NoopTracer{}},
+		},
 	}
 
 	domainStatus := m.DomainStatusRegistered
@@ -216,7 +215,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 			MaxConcurrentActivityTaskPollers: 10,
 			MaxConcurrentDecisionTaskPollers: 10,
 			Logger:                           zaptest.NewLogger(s.T()),
-			Tracer:                           opentracing.NoopTracer{}},
+		},
 	}
 
 	// Register activity instances and launch the worker.

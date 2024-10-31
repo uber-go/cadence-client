@@ -274,6 +274,7 @@ func (s *internalWorkerTestSuite) TestNoActivitiesOrWorkflows() {
 	assert.Empty(t, w.registry.getRegisteredActivities())
 	assert.Empty(t, w.registry.GetRegisteredWorkflowTypes())
 	assert.NoError(t, w.Start())
+	w.Stop()
 }
 
 func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {

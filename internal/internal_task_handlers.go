@@ -1406,6 +1406,12 @@ func newActivityTaskHandlerWithCustomProvider(
 	registry *registry,
 	activityProvider activityProvider,
 ) ActivityTaskHandler {
+	if params.Tracer == nil {
+		params.Tracer = opentracing.NoopTracer{}
+	}
+	if params.WorkerStats.ActivityTracker == nil {
+		params.WorkerStats.ActivityTracker = debug.NewNoopActivityTracker()
+	}
 	return &activityTaskHandlerImpl{
 		taskListName:       params.TaskList,
 		identity:           params.Identity,

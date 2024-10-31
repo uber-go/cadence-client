@@ -281,6 +281,12 @@ func newWorkflowTaskPoller(
 	domain string,
 	params workerExecutionParameters,
 ) *workflowTaskPoller {
+	if params.Tracer == nil {
+		params.Tracer = opentracing.NoopTracer{}
+	}
+	if params.WorkerStats.PollerTracker == nil {
+		params.WorkerStats.PollerTracker = debug.NewNoopPollerTracker()
+	}
 	return &workflowTaskPoller{
 		basePoller:                   basePoller{shutdownC: params.WorkerStopChannel},
 		service:                      service,

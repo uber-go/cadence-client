@@ -45,7 +45,7 @@ import (
 	"go.uber.org/cadence/internal/common/serializer"
 )
 
-//go:generate mockery --srcpkg . --name LocalDispatcher --output . --outpkg internal --inpackage --with-expecter --case snake --boilerplate-file  ../LICENSE
+//go:generate mockery --name LocalDispatcher --inpackage --with-expecter --case snake --boilerplate-file ../LICENSE
 
 const (
 	pollTaskServiceTimeOut = 150 * time.Second // Server long poll is 2 * Minutes + delta

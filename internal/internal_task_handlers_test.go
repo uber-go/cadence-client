@@ -1248,7 +1248,6 @@ func (t *TaskHandlersTestSuite) TestLocalActivityRetry_DecisionHeartbeatFail() {
 		WorkerOptions: WorkerOptions{
 			Identity: "test-id-1",
 			Logger:   t.logger,
-			Tracer:   opentracing.NoopTracer{},
 		},
 		WorkerStopChannel: stopCh,
 	}

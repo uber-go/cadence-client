@@ -45,7 +45,7 @@ import (
 	"go.uber.org/cadence/internal/common/serializer"
 )
 
-//go:generate mockery --name LocalDispatcher --inpackage --with-expecter --case snake --boilerplate-file ../LICENSE
+//go:generate mockery --name localDispatcher --inpackage --with-expecter --case snake --boilerplate-file ../LICENSE
 
 const (
 	pollTaskServiceTimeOut = 150 * time.Second // Server long poll is 2 * Minutes + delta
@@ -78,7 +78,7 @@ type (
 		identity     string
 		service      workflowserviceclient.Interface
 		taskHandler  WorkflowTaskHandler
-		ldaTunnel    LocalDispatcher
+		ldaTunnel    localDispatcher
 		metricsScope *metrics.TaggedScope
 		logger       *zap.Logger
 
@@ -163,7 +163,7 @@ type (
 	}
 
 	// LocalDispatcher is an interface to dispatch locally dispatched activities.
-	LocalDispatcher interface {
+	localDispatcher interface {
 		SendTask(task *locallyDispatchedActivityTask) bool
 	}
 )

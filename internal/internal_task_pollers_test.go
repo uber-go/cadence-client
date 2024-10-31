@@ -177,7 +177,7 @@ func buildWorkflowTaskPoller(t *testing.T) (*workflowTaskPoller, *workflowservic
 	ctrl := gomock.NewController(t)
 	mockService := workflowservicetest.NewMockClient(ctrl)
 	taskHandler := &MockWorkflowTaskHandler{}
-	lda := &MockLocalDispatcher{}
+	lda := &mockLocalDispatcher{}
 
 	return &workflowTaskPoller{
 		basePoller: basePoller{

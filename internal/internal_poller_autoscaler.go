@@ -83,11 +83,10 @@ func newPollerScaler(
 	options pollerAutoScalerOptions,
 	logger *zap.Logger,
 	hooks ...func()) *pollerAutoScaler {
-	ctx, cancel := context.WithCancel(context.Background())
 	if !options.Enabled {
 		return nil
 	}
-
+	ctx, cancel := context.WithCancel(context.Background())
 	return &pollerAutoScaler{
 		isDryRun:             options.DryRun,
 		cooldownTime:         options.Cooldown,

@@ -26,6 +26,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestMain(m *testing.M) {
+	EnableVerboseLogging(true)
+	m.Run()
+}
+
 func Test_NewWorker(t *testing.T) {
 	tests := []struct {
 		name      string

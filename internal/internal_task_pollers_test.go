@@ -25,6 +25,7 @@ import (
 	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
@@ -41,12 +42,6 @@ const (
 	_testTaskList   = "test-tasklist"
 	_testIdentity   = "test-worker"
 )
-
-// Enable verbose logging for tests.
-func TestMain(m *testing.M) {
-	EnableVerboseLogging(true)
-	m.Run()
-}
 
 func TestLocalActivityPanic(t *testing.T) {
 	// regression: panics in local activities should not terminate the process
@@ -120,7 +115,6 @@ func TestRespondTaskCompleted_failed(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, res)
 	})
-
 }
 
 func TestRespondTaskCompleted_Unsupported(t *testing.T) {
@@ -128,6 +122,52 @@ func TestRespondTaskCompleted_Unsupported(t *testing.T) {
 
 	assert.Panics(t, func() {
 		_, _ = poller.RespondTaskCompleted(assert.AnError, nil, &s.PollForDecisionTaskResponse{}, time.Now())
+	})
+}
+
+func TestProcessTask_failures(t *testing.T) {
+	t.Run("shutdown", func(t *testing.T) {
+		poller, _, _, _ := buildWorkflowTaskPoller(t)
+		ch := make(chan struct{})
+		poller.shutdownC = ch
+		close(ch)
+
+		err := poller.ProcessTask(&workflowTask{})
+		assert.ErrorIs(t, err, errShutdown)
+	})
+	t.Run("unsupported task type", func(t *testing.T) {
+		poller, _, _, _ := buildWorkflowTaskPoller(t)
+		assert.Panics(t, func() {
+			_ = poller.ProcessTask(10)
+		})
+	})
+	t.Run("nil task", func(t *testing.T) {
+		poller, _, _, _ := buildWorkflowTaskPoller(t)
+
+		err := poller.ProcessTask(&workflowTask{})
+		assert.NoError(t, err)
+	})
+	t.Run("heartbeat error", func(t *testing.T) {
+		poller, _, mockedTaskHandler, _ := buildWorkflowTaskPoller(t)
+		hearbeatErr := &decisionHeartbeatError{}
+		mockedTaskHandler.EXPECT().ProcessWorkflowTask(mock.Anything, mock.Anything).Return(nil, hearbeatErr)
+		err := poller.ProcessTask(&workflowTask{
+			task: &s.PollForDecisionTaskResponse{},
+		})
+		assert.ErrorIs(t, err, hearbeatErr)
+	})
+	t.Run("ResetStickyTaskList fail", func(t *testing.T) {
+		poller, client, _, _ := buildWorkflowTaskPoller(t)
+		client.EXPECT().ResetStickyTaskList(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, assert.AnError)
+		err := poller.ProcessTask(&resetStickinessTask{
+			task: &s.ResetStickyTaskListRequest{
+				Execution: &s.WorkflowExecution{
+					WorkflowId: common.StringPtr("test-workflow-id"),
+					RunId:      common.StringPtr("test-run-id"),
+				},
+			},
+		})
+		assert.ErrorIs(t, err, assert.AnError)
 	})
 }
 

@@ -27,9 +27,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.uber.org/yarpc"
 	"sync"
 	"time"
+
+	"go.uber.org/yarpc"
 
 	"go.uber.org/cadence/internal/common/debug"
 

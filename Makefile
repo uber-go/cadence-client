@@ -216,7 +216,8 @@ $(THRIFT_GEN): $(THRIFT_FILES) $(BIN)/thriftrw $(BIN)/thriftrw-plugin-yarpc
 	$Q touch $@
 
 # mockery is quite noisy so it's worth being kinda precise with the files.
-# this needs to be both the files defining the generate command, AND the files that define the interfaces.
+# as long as the //go:generate line is in the file that defines the thing to mock, this will auto-discover it.
+# if we build any fancier generators, like the server's wrappers, this might need adjusting / switch to completely manual.
 $(BUILD)/generate: $(shell grep --files-with-matches -E '^//go:generate' $(ALL_SRC)) $(BIN)/mockery
 	$Q $(BIN_PATH) go generate ./...
 	$Q touch $@

@@ -30,6 +30,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/yarpc"
+
 	"go.uber.org/cadence/internal/common/debug"
 
 	"github.com/opentracing/opentracing-go"
@@ -44,6 +46,8 @@ import (
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/cadence/internal/common/serializer"
 )
+
+//go:generate mockery --name localDispatcher --inpackage --with-expecter --case snake --filename local_dispatcher_mock.go --boilerplate-file ../LICENSE
 
 const (
 	pollTaskServiceTimeOut = 150 * time.Second // Server long poll is 2 * Minutes + delta
@@ -76,7 +80,7 @@ type (
 		identity     string
 		service      workflowserviceclient.Interface
 		taskHandler  WorkflowTaskHandler
-		ldaTunnel    *locallyDispatchedActivityTunnel
+		ldaTunnel    localDispatcher
 		metricsScope *metrics.TaggedScope
 		logger       *zap.Logger
 
@@ -159,6 +163,11 @@ type (
 		stopCh       <-chan struct{}
 		metricsScope *metrics.TaggedScope
 	}
+
+	// LocalDispatcher is an interface to dispatch locally dispatched activities.
+	localDispatcher interface {
+		SendTask(task *locallyDispatchedActivityTask) bool
+	}
 )
 
 func newLocalActivityTunnel(stopCh <-chan struct{}) *localActivityTunnel {
@@ -214,7 +223,7 @@ func (ldat *locallyDispatchedActivityTunnel) getTask() *locallyDispatchedActivit
 	}
 }
 
-func (ldat *locallyDispatchedActivityTunnel) sendTask(task *locallyDispatchedActivityTask) bool {
+func (ldat *locallyDispatchedActivityTunnel) SendTask(task *locallyDispatchedActivityTask) bool {
 	select {
 	case ldat.taskCh <- task:
 		return true
@@ -365,7 +374,7 @@ func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
 		if completedRequest == nil && err == nil {
 			return nil
 		}
-		if _, ok := err.(decisionHeartbeatError); ok {
+		if errors.As(err, new(*decisionHeartbeatError)) {
 			return err
 		}
 		response, err = wtp.RespondTaskCompletedWithMetrics(completedRequest, err, task.task, startTime)
@@ -398,7 +407,6 @@ func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTa
 }
 
 func (wtp *workflowTaskPoller) RespondTaskCompletedWithMetrics(completedRequest interface{}, taskErr error, task *s.PollForDecisionTaskResponse, startTime time.Time) (response *s.RespondDecisionTaskCompletedResponse, err error) {
-
 	metricsScope := wtp.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
 	if taskErr != nil {
 		metricsScope.Counter(metrics.DecisionExecutionFailedCounter).Inc(1)
@@ -416,7 +424,7 @@ func (wtp *workflowTaskPoller) RespondTaskCompletedWithMetrics(completedRequest 
 	metricsScope.Timer(metrics.DecisionExecutionLatency).Record(time.Now().Sub(startTime))
 
 	responseStartTime := time.Now()
-	if response, err = wtp.RespondTaskCompleted(completedRequest, task); err != nil {
+	if response, err = wtp.respondTaskCompleted(completedRequest, task); err != nil {
 		metricsScope.Counter(metrics.DecisionResponseFailedCounter).Inc(1)
 		return
 	}
@@ -425,103 +433,116 @@ func (wtp *workflowTaskPoller) RespondTaskCompletedWithMetrics(completedRequest 
 	return
 }
 
-func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}, task *s.PollForDecisionTaskResponse) (response *s.RespondDecisionTaskCompletedResponse, err error) {
+func (wtp *workflowTaskPoller) respondTaskCompleted(completedRequest interface{}, task *s.PollForDecisionTaskResponse) (response *s.RespondDecisionTaskCompletedResponse, err error) {
 	ctx := context.Background()
 	// Respond task completion.
 	err = backoff.Retry(ctx,
 		func() error {
-			tchCtx, cancel, opt := newChannelContext(ctx, wtp.featureFlags)
-			defer cancel()
-			var err1 error
-			switch request := completedRequest.(type) {
-			case *s.RespondDecisionTaskFailedRequest:
-				// Only fail decision on first attempt, subsequent failure on the same decision task will timeout.
-				// This is to avoid spin on the failed decision task. Checking Attempt not nil for older server.
-				if task.Attempt != nil && task.GetAttempt() == 0 {
-					err1 = wtp.service.RespondDecisionTaskFailed(tchCtx, request, opt...)
-					if err1 != nil {
-						traceLog(func() {
-							wtp.logger.Debug("RespondDecisionTaskFailed failed.", zap.Error(err1))
-						})
-					}
-				}
-			case *s.RespondDecisionTaskCompletedRequest:
-				if request.StickyAttributes == nil && !wtp.disableStickyExecution {
-					request.StickyAttributes = &s.StickyExecutionAttributes{
-						WorkerTaskList:                &s.TaskList{Name: common.StringPtr(getWorkerTaskList(wtp.stickyUUID))},
-						ScheduleToStartTimeoutSeconds: common.Int32Ptr(common.Int32Ceil(wtp.StickyScheduleToStartTimeout.Seconds())),
-					}
-				} else {
-					request.ReturnNewDecisionTask = common.BoolPtr(false)
-				}
-				var activityTasks []*locallyDispatchedActivityTask
-				if wtp.ldaTunnel != nil {
-					for _, decision := range request.Decisions {
-						attr := decision.ScheduleActivityTaskDecisionAttributes
-						if attr != nil && wtp.taskListName == attr.TaskList.GetName() {
-							// assume the activity type is in registry otherwise the activity would be failed and retried from server
-							activityTask := &locallyDispatchedActivityTask{
-								readyCh:                       make(chan bool, 1),
-								ActivityId:                    attr.ActivityId,
-								ActivityType:                  attr.ActivityType,
-								Input:                         attr.Input,
-								Header:                        attr.Header,
-								WorkflowDomain:                common.StringPtr(wtp.domain),
-								ScheduleToCloseTimeoutSeconds: attr.ScheduleToCloseTimeoutSeconds,
-								StartToCloseTimeoutSeconds:    attr.StartToCloseTimeoutSeconds,
-								HeartbeatTimeoutSeconds:       attr.HeartbeatTimeoutSeconds,
-								WorkflowExecution:             task.WorkflowExecution,
-								WorkflowType:                  task.WorkflowType,
-							}
-							if wtp.ldaTunnel.sendTask(activityTask) {
-								wtp.metricsScope.Counter(metrics.ActivityLocalDispatchSucceedCounter).Inc(1)
-								decision.ScheduleActivityTaskDecisionAttributes.RequestLocalDispatch = common.BoolPtr(true)
-								activityTasks = append(activityTasks, activityTask)
-							} else {
-								// all pollers are busy - no room to optimize
-								wtp.metricsScope.Counter(metrics.ActivityLocalDispatchFailedCounter).Inc(1)
-							}
-						}
-					}
-				}
-				defer func() {
-					for _, at := range activityTasks {
-						started := false
-						if response != nil && err1 == nil {
-							if adl, ok := response.ActivitiesToDispatchLocally[*at.ActivityId]; ok {
-								at.ScheduledTimestamp = adl.ScheduledTimestamp
-								at.StartedTimestamp = adl.StartedTimestamp
-								at.ScheduledTimestampOfThisAttempt = adl.ScheduledTimestampOfThisAttempt
-								at.TaskToken = adl.TaskToken
-								started = true
-							}
-						}
-						at.readyCh <- started
-					}
-				}()
-				response, err1 = wtp.service.RespondDecisionTaskCompleted(tchCtx, request, opt...)
-				if err1 != nil {
-					traceLog(func() {
-						wtp.logger.Debug("RespondDecisionTaskCompleted failed.", zap.Error(err1))
-					})
-				}
-
-			case *s.RespondQueryTaskCompletedRequest:
-				err1 = wtp.service.RespondQueryTaskCompleted(tchCtx, request, opt...)
-				if err1 != nil {
-					traceLog(func() {
-						wtp.logger.Debug("RespondQueryTaskCompleted failed.", zap.Error(err1))
-					})
-				}
-			default:
-				// should not happen
-				panic("unknown request type from ProcessWorkflowTask()")
-			}
-
-			return err1
+			response, err = wtp.respondTaskCompletedAttempt(completedRequest, task)
+			return err
 		}, createDynamicServiceRetryPolicy(ctx), isServiceTransientError)
 
-	return
+	return response, err
+}
+
+func (wtp *workflowTaskPoller) respondTaskCompletedAttempt(completedRequest interface{}, task *s.PollForDecisionTaskResponse) (*s.RespondDecisionTaskCompletedResponse, error) {
+	ctx, cancel, opts := newChannelContext(context.Background(), wtp.featureFlags)
+	defer cancel()
+	var (
+		err       error
+		response  *s.RespondDecisionTaskCompletedResponse
+		operation string
+	)
+	switch request := completedRequest.(type) {
+	case *s.RespondDecisionTaskFailedRequest:
+		err = wtp.handleDecisionFailedRequest(ctx, task, request, opts...)
+		operation = "RespondDecisionTaskFailed"
+	case *s.RespondDecisionTaskCompletedRequest:
+		response, err = wtp.handleDecisionTaskCompletedRequest(ctx, task, request, opts...)
+		operation = "RespondDecisionTaskCompleted"
+	case *s.RespondQueryTaskCompletedRequest:
+		err = wtp.service.RespondQueryTaskCompleted(ctx, request, opts...)
+		operation = "RespondQueryTaskCompleted"
+	default:
+		// should not happen
+		panic("unknown request type from ProcessWorkflowTask()")
+	}
+
+	traceLog(func() {
+		if err != nil {
+			wtp.logger.Debug(fmt.Sprintf("%s failed.", operation), zap.Error(err))
+		}
+	})
+
+	return response, err
+}
+
+func (wtp *workflowTaskPoller) handleDecisionFailedRequest(ctx context.Context, task *s.PollForDecisionTaskResponse, request *s.RespondDecisionTaskFailedRequest, opts ...yarpc.CallOption) error {
+	// Only fail decision on first attempt, subsequent failure on the same decision task will timeout.
+	// This is to avoid spin on the failed decision task. Checking Attempt not nil for older server.
+	if task.Attempt != nil && task.GetAttempt() == 0 {
+		return wtp.service.RespondDecisionTaskFailed(ctx, request, opts...)
+	}
+	return nil
+}
+
+func (wtp *workflowTaskPoller) handleDecisionTaskCompletedRequest(ctx context.Context, task *s.PollForDecisionTaskResponse, request *s.RespondDecisionTaskCompletedRequest, opts ...yarpc.CallOption) (response *s.RespondDecisionTaskCompletedResponse, err error) {
+	if request.StickyAttributes == nil && !wtp.disableStickyExecution {
+		request.StickyAttributes = &s.StickyExecutionAttributes{
+			WorkerTaskList:                &s.TaskList{Name: common.StringPtr(getWorkerTaskList(wtp.stickyUUID))},
+			ScheduleToStartTimeoutSeconds: common.Int32Ptr(common.Int32Ceil(wtp.StickyScheduleToStartTimeout.Seconds())),
+		}
+	} else {
+		request.ReturnNewDecisionTask = common.BoolPtr(false)
+	}
+
+	if wtp.ldaTunnel != nil {
+		var activityTasks []*locallyDispatchedActivityTask
+		for _, decision := range request.Decisions {
+			attr := decision.ScheduleActivityTaskDecisionAttributes
+			if attr != nil && wtp.taskListName == attr.TaskList.GetName() {
+				// assume the activity type is in registry otherwise the activity would be failed and retried from server
+				activityTask := &locallyDispatchedActivityTask{
+					readyCh:                       make(chan bool, 1),
+					ActivityId:                    attr.ActivityId,
+					ActivityType:                  attr.ActivityType,
+					Input:                         attr.Input,
+					Header:                        attr.Header,
+					WorkflowDomain:                common.StringPtr(wtp.domain),
+					ScheduleToCloseTimeoutSeconds: attr.ScheduleToCloseTimeoutSeconds,
+					StartToCloseTimeoutSeconds:    attr.StartToCloseTimeoutSeconds,
+					HeartbeatTimeoutSeconds:       attr.HeartbeatTimeoutSeconds,
+					WorkflowExecution:             task.WorkflowExecution,
+					WorkflowType:                  task.WorkflowType,
+				}
+				if wtp.ldaTunnel.SendTask(activityTask) {
+					wtp.metricsScope.Counter(metrics.ActivityLocalDispatchSucceedCounter).Inc(1)
+					decision.ScheduleActivityTaskDecisionAttributes.RequestLocalDispatch = common.BoolPtr(true)
+					activityTasks = append(activityTasks, activityTask)
+				} else {
+					// all pollers are busy - no room to optimize
+					wtp.metricsScope.Counter(metrics.ActivityLocalDispatchFailedCounter).Inc(1)
+				}
+			}
+		}
+		defer func() {
+			for _, at := range activityTasks {
+				started := false
+				if response != nil && err == nil {
+					if adl, ok := response.ActivitiesToDispatchLocally[*at.ActivityId]; ok {
+						at.ScheduledTimestamp = adl.ScheduledTimestamp
+						at.StartedTimestamp = adl.StartedTimestamp
+						at.ScheduledTimestampOfThisAttempt = adl.ScheduledTimestampOfThisAttempt
+						at.TaskToken = adl.TaskToken
+						started = true
+					}
+				}
+				at.readyCh <- started
+			}
+		}()
+	}
+
+	return wtp.service.RespondDecisionTaskCompleted(ctx, request, opts...)
 }
 
 func newLocalActivityPoller(params workerExecutionParameters, laTunnel *localActivityTunnel) *localActivityTaskPoller {

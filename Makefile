@@ -217,7 +217,7 @@ $(THRIFT_GEN): $(THRIFT_FILES) $(BIN)/thriftrw $(BIN)/thriftrw-plugin-yarpc
 
 # mockery is quite noisy so it's worth being kinda precise with the files.
 # this needs to be both the files defining the generate command, AND the files that define the interfaces.
-$(BUILD)/generate: client/client.go encoded/encoded.go internal/internal_workflow_client.go $(BIN)/mockery
+$(BUILD)/generate: client/client.go encoded/encoded.go internal/internal_workflow_client.go internal/internal_public.go internal/internal_task_pollers.go $(BIN)/mockery
 	$Q $(BIN_PATH) go generate ./...
 	$Q touch $@
 

@@ -34,6 +34,8 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 )
 
+//go:generate mockery --name ServiceInvoker --inpackage --with-expecter --case snake --filename service_invoker_mock.go --boilerplate-file ../LICENSE
+
 type (
 	// RegistryActivityInfo
 	RegistryActivityInfo interface {

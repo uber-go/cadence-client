@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -1502,129 +1501,6 @@ func (t *testActivityDeadline) GetFunction() interface{} {
 
 func (t *testActivityDeadline) GetOptions() RegisterActivityOptions {
 	return RegisterActivityOptions{}
-}
-
-type deadlineTest struct {
-	actWaitDuration  time.Duration
-	ScheduleTS       time.Time
-	ScheduleDuration int32
-	StartTS          time.Time
-	StartDuration    int32
-	err              error
-}
-
-func (t *TaskHandlersTestSuite) TestActivityExecutionDeadline() {
-	deadlineTests := []deadlineTest{
-		{time.Duration(0), time.Now(), 3, time.Now(), 3, nil},
-		{time.Duration(0), time.Now(), 4, time.Now(), 3, nil},
-		{time.Duration(0), time.Now(), 3, time.Now(), 4, nil},
-		{time.Duration(0), time.Now().Add(-1 * time.Second), 1, time.Now(), 1, context.DeadlineExceeded},
-		{time.Duration(0), time.Now(), 1, time.Now().Add(-1 * time.Second), 1, context.DeadlineExceeded},
-		{time.Duration(0), time.Now().Add(-1 * time.Second), 1, time.Now().Add(-1 * time.Second), 1, context.DeadlineExceeded},
-		{time.Duration(1 * time.Second), time.Now(), 1, time.Now(), 1, context.DeadlineExceeded},
-		{time.Duration(1 * time.Second), time.Now(), 2, time.Now(), 1, context.DeadlineExceeded},
-		{time.Duration(1 * time.Second), time.Now(), 1, time.Now(), 2, context.DeadlineExceeded},
-	}
-	a := &testActivityDeadline{logger: t.logger}
-	registry := t.registry
-	registry.addActivityWithLock(a.ActivityType().Name, a)
-
-	mockCtrl := gomock.NewController(t.T())
-	mockService := workflowservicetest.NewMockClient(mockCtrl)
-
-	for i, d := range deadlineTests {
-		a.d = d.actWaitDuration
-		wep := workerExecutionParameters{
-			WorkerOptions: WorkerOptions{
-				Logger:        t.logger,
-				DataConverter: getDefaultDataConverter(),
-				Tracer:        opentracing.NoopTracer{},
-			},
-		}
-		ensureRequiredParams(&wep)
-		activityHandler := newActivityTaskHandler(mockService, wep, registry)
-		pats := &s.PollForActivityTaskResponse{
-			TaskToken: []byte("token"),
-			WorkflowExecution: &s.WorkflowExecution{
-				WorkflowId: common.StringPtr("wID"),
-				RunId:      common.StringPtr("rID")},
-			ActivityType:                    &s.ActivityType{Name: common.StringPtr("test")},
-			ActivityId:                      common.StringPtr(uuid.New()),
-			ScheduledTimestamp:              common.Int64Ptr(d.ScheduleTS.UnixNano()),
-			ScheduledTimestampOfThisAttempt: common.Int64Ptr(d.ScheduleTS.UnixNano()),
-			ScheduleToCloseTimeoutSeconds:   common.Int32Ptr(d.ScheduleDuration),
-			StartedTimestamp:                common.Int64Ptr(d.StartTS.UnixNano()),
-			StartToCloseTimeoutSeconds:      common.Int32Ptr(d.StartDuration),
-			WorkflowType: &s.WorkflowType{
-				Name: common.StringPtr("wType"),
-			},
-			WorkflowDomain: common.StringPtr("domain"),
-		}
-		td := fmt.Sprintf("testIndex: %v, testDetails: %v", i, d)
-		r, err := activityHandler.Execute(tasklist, pats)
-		t.logger.Info(fmt.Sprintf("test: %v, result: %v err: %v", td, r, err))
-		t.Equal(d.err, err, td)
-		if err != nil {
-			t.Nil(r, td)
-		}
-	}
-}
-
-func activityWithWorkerStop(ctx context.Context) error {
-	fmt.Println("Executing Activity with worker stop")
-	workerStopCh := GetWorkerStopChannel(ctx)
-
-	select {
-	case <-workerStopCh:
-		return nil
-	case <-time.NewTimer(time.Second * 5).C:
-		return fmt.Errorf("Activity failed to handle worker stop event")
-	}
-}
-
-func (t *TaskHandlersTestSuite) TestActivityExecutionWorkerStop() {
-	a := &testActivityDeadline{logger: t.logger}
-	registry := t.registry
-	registry.RegisterActivityWithOptions(
-		activityWithWorkerStop,
-		RegisterActivityOptions{Name: a.ActivityType().Name, DisableAlreadyRegisteredCheck: true},
-	)
-
-	mockCtrl := gomock.NewController(t.T())
-	mockService := workflowservicetest.NewMockClient(mockCtrl)
-	workerStopCh := make(chan struct{}, 1)
-	ctx, cancel := context.WithCancel(context.Background())
-	wep := workerExecutionParameters{
-		WorkerOptions: WorkerOptions{
-			Logger:        t.logger,
-			DataConverter: getDefaultDataConverter(),
-		},
-		UserContext:       ctx,
-		UserContextCancel: cancel,
-		WorkerStopChannel: workerStopCh,
-	}
-	activityHandler := newActivityTaskHandler(mockService, wep, registry)
-	pats := &s.PollForActivityTaskResponse{
-		TaskToken: []byte("token"),
-		WorkflowExecution: &s.WorkflowExecution{
-			WorkflowId: common.StringPtr("wID"),
-			RunId:      common.StringPtr("rID")},
-		ActivityType:                    &s.ActivityType{Name: common.StringPtr("test")},
-		ActivityId:                      common.StringPtr(uuid.New()),
-		ScheduledTimestamp:              common.Int64Ptr(time.Now().UnixNano()),
-		ScheduledTimestampOfThisAttempt: common.Int64Ptr(time.Now().UnixNano()),
-		ScheduleToCloseTimeoutSeconds:   common.Int32Ptr(1),
-		StartedTimestamp:                common.Int64Ptr(time.Now().UnixNano()),
-		StartToCloseTimeoutSeconds:      common.Int32Ptr(1),
-		WorkflowType: &s.WorkflowType{
-			Name: common.StringPtr("wType"),
-		},
-		WorkflowDomain: common.StringPtr("domain"),
-	}
-	close(workerStopCh)
-	r, err := activityHandler.Execute(tasklist, pats)
-	t.NoError(err)
-	t.NotNil(r)
 }
 
 // a regrettably-hacky func to use goleak to count leaking goroutines.

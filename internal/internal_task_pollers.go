@@ -27,6 +27,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.uber.org/yarpc"
 	"sync"
 	"time"
 
@@ -356,7 +357,7 @@ func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
 			func(response interface{}, startTime time.Time) (*workflowTask, error) {
 				wtp.logger.Debug("Force RespondDecisionTaskCompleted.", zap.Int64("TaskStartedEventID", task.task.GetStartedEventId()))
 				wtp.metricsScope.Counter(metrics.DecisionTaskForceCompleted).Inc(1)
-				heartbeatResponse, err := wtp.RespondTaskCompleted(response, nil, task.task, startTime)
+				heartbeatResponse, err := wtp.RespondTaskCompletedWithMetrics(response, nil, task.task, startTime)
 				if err != nil {
 					return nil, err
 				}
@@ -375,7 +376,7 @@ func (wtp *workflowTaskPoller) processWorkflowTask(task *workflowTask) error {
 		if errors.As(err, new(*decisionHeartbeatError)) {
 			return err
 		}
-		response, err = wtp.RespondTaskCompleted(completedRequest, err, task.task, startTime)
+		response, err = wtp.RespondTaskCompletedWithMetrics(completedRequest, err, task.task, startTime)
 		if err != nil {
 			return err
 		}
@@ -404,7 +405,7 @@ func (wtp *workflowTaskPoller) processResetStickinessTask(rst *resetStickinessTa
 	return nil
 }
 
-func (wtp *workflowTaskPoller) RespondTaskCompleted(completedRequest interface{}, taskErr error, task *s.PollForDecisionTaskResponse, startTime time.Time) (response *s.RespondDecisionTaskCompletedResponse, err error) {
+func (wtp *workflowTaskPoller) RespondTaskCompletedWithMetrics(completedRequest interface{}, taskErr error, task *s.PollForDecisionTaskResponse, startTime time.Time) (response *s.RespondDecisionTaskCompletedResponse, err error) {
 	metricsScope := wtp.metricsScope.GetTaggedScope(tagWorkflowType, task.WorkflowType.GetName())
 	if taskErr != nil {
 		metricsScope.Counter(metrics.DecisionExecutionFailedCounter).Inc(1)
@@ -444,7 +445,7 @@ func (wtp *workflowTaskPoller) respondTaskCompleted(completedRequest interface{}
 }
 
 func (wtp *workflowTaskPoller) respondTaskCompletedAttempt(completedRequest interface{}, task *s.PollForDecisionTaskResponse) (*s.RespondDecisionTaskCompletedResponse, error) {
-	ctx, cancel, _ := newChannelContext(context.Background(), wtp.featureFlags)
+	ctx, cancel, opts := newChannelContext(context.Background(), wtp.featureFlags)
 	defer cancel()
 	var (
 		err       error
@@ -453,13 +454,13 @@ func (wtp *workflowTaskPoller) respondTaskCompletedAttempt(completedRequest inte
 	)
 	switch request := completedRequest.(type) {
 	case *s.RespondDecisionTaskFailedRequest:
-		err = wtp.handleDecisionFailedRequest(ctx, task, request)
+		err = wtp.handleDecisionFailedRequest(ctx, task, request, opts...)
 		operation = "RespondDecisionTaskFailed"
 	case *s.RespondDecisionTaskCompletedRequest:
-		response, err = wtp.handleDecisionTaskCompletedRequest(ctx, task, request)
+		response, err = wtp.handleDecisionTaskCompletedRequest(ctx, task, request, opts...)
 		operation = "RespondDecisionTaskCompleted"
 	case *s.RespondQueryTaskCompletedRequest:
-		err = wtp.service.RespondQueryTaskCompleted(ctx, request, getYarpcCallOptions(wtp.featureFlags)...)
+		err = wtp.service.RespondQueryTaskCompleted(ctx, request, opts...)
 		operation = "RespondQueryTaskCompleted"
 	default:
 		// should not happen
@@ -467,22 +468,24 @@ func (wtp *workflowTaskPoller) respondTaskCompletedAttempt(completedRequest inte
 	}
 
 	traceLog(func() {
-		wtp.logger.Debug("Call failed.", zap.Error(err), zap.String("Operation", operation))
+		if err != nil {
+			wtp.logger.Debug(fmt.Sprintf("%s failed.", operation), zap.Error(err))
+		}
 	})
 
 	return response, err
 }
 
-func (wtp *workflowTaskPoller) handleDecisionFailedRequest(ctx context.Context, task *s.PollForDecisionTaskResponse, request *s.RespondDecisionTaskFailedRequest) error {
+func (wtp *workflowTaskPoller) handleDecisionFailedRequest(ctx context.Context, task *s.PollForDecisionTaskResponse, request *s.RespondDecisionTaskFailedRequest, opts ...yarpc.CallOption) error {
 	// Only fail decision on first attempt, subsequent failure on the same decision task will timeout.
 	// This is to avoid spin on the failed decision task. Checking Attempt not nil for older server.
 	if task.Attempt != nil && task.GetAttempt() == 0 {
-		return wtp.service.RespondDecisionTaskFailed(ctx, request, getYarpcCallOptions(wtp.featureFlags)...)
+		return wtp.service.RespondDecisionTaskFailed(ctx, request, opts...)
 	}
 	return nil
 }
 
-func (wtp *workflowTaskPoller) handleDecisionTaskCompletedRequest(ctx context.Context, task *s.PollForDecisionTaskResponse, request *s.RespondDecisionTaskCompletedRequest) (response *s.RespondDecisionTaskCompletedResponse, err error) {
+func (wtp *workflowTaskPoller) handleDecisionTaskCompletedRequest(ctx context.Context, task *s.PollForDecisionTaskResponse, request *s.RespondDecisionTaskCompletedRequest, opts ...yarpc.CallOption) (response *s.RespondDecisionTaskCompletedResponse, err error) {
 	if request.StickyAttributes == nil && !wtp.disableStickyExecution {
 		request.StickyAttributes = &s.StickyExecutionAttributes{
 			WorkerTaskList:                &s.TaskList{Name: common.StringPtr(getWorkerTaskList(wtp.stickyUUID))},
@@ -538,7 +541,7 @@ func (wtp *workflowTaskPoller) handleDecisionTaskCompletedRequest(ctx context.Co
 		}()
 	}
 
-	return wtp.service.RespondDecisionTaskCompleted(ctx, request, getYarpcCallOptions(wtp.featureFlags)...)
+	return wtp.service.RespondDecisionTaskCompleted(ctx, request, opts...)
 }
 
 func newLocalActivityPoller(params workerExecutionParameters, laTunnel *localActivityTunnel) *localActivityTaskPoller {

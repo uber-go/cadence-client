@@ -82,7 +82,7 @@ func TestRespondTaskCompleted_failed(t *testing.T) {
 			BinaryChecksum: common.StringPtr(getBinaryChecksum()),
 		}, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
-		res, err := poller.RespondTaskCompleted(nil, assert.AnError, &s.PollForDecisionTaskResponse{
+		res, err := poller.RespondTaskCompletedWithMetrics(nil, assert.AnError, &s.PollForDecisionTaskResponse{
 			TaskToken: testTaskToken,
 			Attempt:   common.Int64Ptr(0),
 		}, time.Now())
@@ -111,7 +111,7 @@ func TestRespondTaskCompleted_failed(t *testing.T) {
 	t.Run("fail skips sending for not the first attempt", func(t *testing.T) {
 		poller, _, _, _ := buildWorkflowTaskPoller(t)
 
-		res, err := poller.RespondTaskCompleted(nil, assert.AnError, &s.PollForDecisionTaskResponse{
+		res, err := poller.RespondTaskCompletedWithMetrics(nil, assert.AnError, &s.PollForDecisionTaskResponse{
 			Attempt: common.Int64Ptr(1),
 		}, time.Now())
 		assert.NoError(t, err)
@@ -122,8 +122,8 @@ func TestRespondTaskCompleted_failed(t *testing.T) {
 func TestRespondTaskCompleted_Unsupported(t *testing.T) {
 	poller, _, _, _ := buildWorkflowTaskPoller(t)
 
-	assert.Panics(t, func() {
-		_, _ = poller.RespondTaskCompleted(assert.AnError, nil, &s.PollForDecisionTaskResponse{}, time.Now())
+	assert.PanicsWithValue(t, "unknown request type from ProcessWorkflowTask()", func() {
+		_, _ = poller.RespondTaskCompletedWithMetrics(assert.AnError, nil, &s.PollForDecisionTaskResponse{}, time.Now())
 	})
 }
 
@@ -139,7 +139,7 @@ func TestProcessTask_failures(t *testing.T) {
 	})
 	t.Run("unsupported task type", func(t *testing.T) {
 		poller, _, _, _ := buildWorkflowTaskPoller(t)
-		assert.Panics(t, func() {
+		assert.PanicsWithValue(t, "unknown task type.", func() {
 			_ = poller.ProcessTask(10)
 		})
 	})

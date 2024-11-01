@@ -21,8 +21,6 @@
 // when adding any, make sure you update the files that it checks in the makefile
 //go:generate mockery --srcpkg . --name Client --output ../mocks --boilerplate-file ../LICENSE
 //go:generate mockery --srcpkg . --name DomainClient --output ../mocks --boilerplate-file ../LICENSE
-//go:generate mockery --srcpkg go.uber.org/cadence/internal --name HistoryEventIterator --output ../mocks --boilerplate-file ../LICENSE
-//go:generate mockery --srcpkg go.uber.org/cadence/internal --name WorkflowRun --output ../mocks --boilerplate-file ../LICENSE
 
 // Package client contains functions to create Cadence clients used to communicate to Cadence service.
 //

@@ -56,7 +56,7 @@ func TestAutoHearbeater_Run(t *testing.T) {
 		hearbeater := newHeartbeater(stopCh, invoker, logger, clock, activityType, workflowExecution)
 
 		close(stopCh)
-		
+
 		hearbeater.Run(context.Background(), time.Second)
 	})
 	t.Run("context done", func(t *testing.T) {

@@ -30,6 +30,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jonboulle/clockwork"
+
 	"go.uber.org/cadence/internal/common/debug"
 
 	"github.com/facebookgo/clock"
@@ -1675,7 +1677,7 @@ func (env *testWorkflowEnvironmentImpl) newTestActivityTaskHandler(taskList stri
 		return &activityExecutorWrapper{activityExecutor: ae, env: env}
 	}
 
-	taskHandler := newActivityTaskHandlerWithCustomProvider(env.service, params, registry, getActivity)
+	taskHandler := newActivityTaskHandlerWithCustomProvider(env.service, params, registry, getActivity, clockwork.NewRealClock())
 	return taskHandler
 }
 

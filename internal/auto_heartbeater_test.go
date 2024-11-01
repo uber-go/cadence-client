@@ -46,7 +46,7 @@ func TestAutoHearbeater_Run(t *testing.T) {
 	)
 
 	// Run is a sync function that is spawned in a goroutine normally.
-	// So instead of asserting the results we can verify that the function exists.
+	// So instead of asserting the results we can verify that the function exits.
 
 	t.Run("worker stop channel", func(t *testing.T) {
 		stopCh := make(chan struct{})

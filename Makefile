@@ -304,7 +304,7 @@ errcheck: $(BIN)/errcheck $(BUILD)/fmt ## (re)run errcheck
 	$(BIN)/errcheck ./...
 
 .PHONY: generate
-generate: ## run go-generate (build, lint, fmt all do this for you if needed)
+generate: ## run go-generate (build, lint, fmt, tests all do this for you if needed)
 	$(call remake,generate)
 
 .PHONY: tidy

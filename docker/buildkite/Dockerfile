@@ -1,4 +1,4 @@
-FROM golang:1.19.5
+FROM golang:1.21
 
 RUN mkdir -p /go/src/go.uber.org/cadence
 WORKDIR /go/src/go.uber.org/cadence

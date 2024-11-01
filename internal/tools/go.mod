@@ -1,6 +1,6 @@
 module go.uber.org/cadence/internal/tools
 
-go 1.19
+go 1.21
 
 require (
 	github.com/kisielk/errcheck v1.6.3

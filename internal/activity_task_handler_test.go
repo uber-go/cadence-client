@@ -308,7 +308,7 @@ func TestActivityTaskHandler_Execute_with_auto_heartbeat(t *testing.T) {
 	res, err := activityHandler.Execute(tasklist, pats)
 	require.NoError(t, err)
 	_, ok := res.(*s.RespondActivityTaskCompletedRequest)
-	require.True(t, ok, "response is not of type *s.RespondActivityTaskCompletedRequest")
+	require.True(t, ok, "response is not of type *s.RespondActivityTaskCompletedRequest but of type %T", res)
 }
 
 func activityWithWorkerStop(ctx context.Context) error {

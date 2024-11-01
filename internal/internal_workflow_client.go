@@ -41,6 +41,9 @@ import (
 	"go.uber.org/cadence/internal/common/metrics"
 )
 
+//go:generate mockery --name HistoryEventIterator --output ../mocks --boilerplate-file ../LICENSE
+//go:generate mockery --name WorkflowRun --output ../mocks --boilerplate-file ../LICENSE
+
 // Assert that structs do indeed implement the interfaces
 var _ Client = (*workflowClient)(nil)
 

@@ -217,7 +217,7 @@ $(THRIFT_GEN): $(THRIFT_FILES) $(BIN)/thriftrw $(BIN)/thriftrw-plugin-yarpc
 
 # mockery is quite noisy so it's worth being kinda precise with the files.
 # this needs to be both the files defining the generate command, AND the files that define the interfaces.
-$(BUILD)/generate: client/client.go encoded/encoded.go internal/internal_workflow_client.go internal/internal_public.go internal/internal_task_pollers.go $(BIN)/mockery
+$(BUILD)/generate: $(shell grep --files-with-matches -E '^//go:generate' $(ALL_SRC)) $(BIN)/mockery
 	$Q $(BIN_PATH) go generate ./...
 	$Q touch $@
 
@@ -303,7 +303,8 @@ errcheck: $(BIN)/errcheck $(BUILD)/fmt ## (re)run errcheck
 	$(BIN)/errcheck ./...
 
 .PHONY: generate
-generate: $(BUILD)/generate ## run go-generate
+generate: ## run go-generate (build, lint, fmt all do this for you if needed)
+	$(call remake,generate)
 
 .PHONY: tidy
 tidy:
@@ -372,7 +373,7 @@ UT_DIRS := $(filter-out $(INTEG_TEST_ROOT)%, $(sort $(dir $(filter %_test.go,$(A
 .PHONY: unit_test integ_test_sticky_off integ_test_sticky_on integ_test_grpc cover
 test: unit_test integ_test_sticky_off integ_test_sticky_on ## run all tests (requires a running cadence instance)
 
-unit_test: $(ALL_SRC) ## run all unit tests
+unit_test: $(BUILD)/fmt ## run all unit tests
 	$Q mkdir -p $(COVER_ROOT)
 	$Q echo "mode: atomic" > $(UT_COVER_FILE)
 	$Q FAIL=""; \
@@ -383,15 +384,15 @@ unit_test: $(ALL_SRC) ## run all unit tests
 	done; test -z "$$FAIL" || (echo "Failed packages; $$FAIL"; exit 1)
 	cat $(UT_COVER_FILE) > .build/cover.out;
 
-integ_test_sticky_off: $(ALL_SRC)
+integ_test_sticky_off: $(BUILD)/fmt
 	$Q mkdir -p $(COVER_ROOT)
 	STICKY_OFF=true go test $(TEST_ARG) ./test -coverprofile=$(INTEG_STICKY_OFF_COVER_FILE) -coverpkg=./...
 
-integ_test_sticky_on: $(ALL_SRC)
+integ_test_sticky_on: $(BUILD)/fmt
 	$Q mkdir -p $(COVER_ROOT)
 	STICKY_OFF=false go test $(TEST_ARG) ./test -coverprofile=$(INTEG_STICKY_ON_COVER_FILE) -coverpkg=./...
 
-integ_test_grpc: $(ALL_SRC)
+integ_test_grpc: $(BUILD)/fmt
 	$Q mkdir -p $(COVER_ROOT)
 	STICKY_OFF=false go test $(TEST_ARG) ./test -coverprofile=$(INTEG_GRPC_COVER_FILE) -coverpkg=./...
 

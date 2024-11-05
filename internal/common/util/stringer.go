@@ -158,32 +158,35 @@ func getData(e *s.HistoryEvent) interface{} {
 
 // DecisionToString convert Decision to string
 func DecisionToString(d *s.Decision) string {
-	var data interface{}
-	switch d.GetDecisionType() {
-	case s.DecisionTypeScheduleActivityTask:
-		data = d.ScheduleActivityTaskDecisionAttributes
-
-	case s.DecisionTypeRequestCancelActivityTask:
-		data = d.RequestCancelActivityTaskDecisionAttributes
-
-	case s.DecisionTypeStartTimer:
-		data = d.StartTimerDecisionAttributes
-
-	case s.DecisionTypeCancelTimer:
-		data = d.CancelTimerDecisionAttributes
-
-	case s.DecisionTypeCompleteWorkflowExecution:
-		data = d.CompleteWorkflowExecutionDecisionAttributes
-
-	case s.DecisionTypeFailWorkflowExecution:
-		data = d.FailWorkflowExecutionDecisionAttributes
-
-	case s.DecisionTypeRecordMarker:
-		data = d.RecordMarkerDecisionAttributes
-
-	default:
-		data = d
-	}
+	data := decisionGetData(d)
 
 	return d.GetDecisionType().String() + ": " + anyToString(data)
+}
+
+func decisionGetData(d *s.Decision) interface{} {
+	switch d.GetDecisionType() {
+	case s.DecisionTypeScheduleActivityTask:
+		return d.ScheduleActivityTaskDecisionAttributes
+
+	case s.DecisionTypeRequestCancelActivityTask:
+		return d.RequestCancelActivityTaskDecisionAttributes
+
+	case s.DecisionTypeStartTimer:
+		return d.StartTimerDecisionAttributes
+
+	case s.DecisionTypeCancelTimer:
+		return d.CancelTimerDecisionAttributes
+
+	case s.DecisionTypeCompleteWorkflowExecution:
+		return d.CompleteWorkflowExecutionDecisionAttributes
+
+	case s.DecisionTypeFailWorkflowExecution:
+		return d.FailWorkflowExecutionDecisionAttributes
+
+	case s.DecisionTypeRecordMarker:
+		return d.RecordMarkerDecisionAttributes
+
+	default:
+		return d
+	}
 }

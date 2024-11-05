@@ -78,12 +78,12 @@ func valueToString(v reflect.Value) string {
 
 // HistoryEventToString convert HistoryEvent to string
 func HistoryEventToString(e *s.HistoryEvent) string {
-	data := getData(e)
+	data := getHistoryEventData(e)
 
 	return e.GetEventType().String() + ": " + anyToString(data)
 }
 
-func getData(e *s.HistoryEvent) interface{} {
+func getHistoryEventData(e *s.HistoryEvent) interface{} {
 	switch e.GetEventType() {
 	case s.EventTypeWorkflowExecutionStarted:
 		return e.WorkflowExecutionStartedEventAttributes

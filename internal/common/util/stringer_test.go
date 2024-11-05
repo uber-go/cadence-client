@@ -142,7 +142,7 @@ func TestHistoryEventToString(t *testing.T) {
 
 // This just tests that we pick the right attibutes to return
 // the other attributes will be nil
-func Test_getData(t *testing.T) {
+func Test_getHistoryEventData(t *testing.T) {
 	cases := []struct {
 		event    *s.HistoryEvent
 		expected interface{}
@@ -316,7 +316,7 @@ func Test_getData(t *testing.T) {
 		name, err := tc.event.GetEventType().MarshalText()
 		require.NoError(t, err)
 		t.Run(string(name), func(t *testing.T) {
-			require.Equal(t, tc.expected, getData(tc.event))
+			require.Equal(t, tc.expected, getHistoryEventData(tc.event))
 		})
 	}
 }

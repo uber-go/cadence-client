@@ -27,6 +27,80 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_anyToString(t *testing.T) {
+	testCases := []struct {
+		name             string
+		thingToSerialize interface{}
+		expected         string
+	}{
+		{
+			name:             "nil",
+			thingToSerialize: nil,
+			expected:         "<nil>",
+		},
+		{
+			name:             "int",
+			thingToSerialize: 1,
+			expected:         "1",
+		},
+		{
+			name:             "string",
+			thingToSerialize: "test",
+			expected:         "test",
+		},
+		{
+			name: "struct",
+			thingToSerialize: struct {
+				A string
+				B int
+				C bool
+			}{A: "test", B: 1, C: true},
+			expected: "(A:test, B:1, C:true)",
+		},
+		{
+			name: "pointer",
+			thingToSerialize: &struct {
+				A string
+				B int
+				C bool
+			}{A: "test", B: 1, C: true},
+			expected: "(A:test, B:1, C:true)",
+		},
+		{
+			name:             "slice",
+			thingToSerialize: []int{1, 2, 3},
+			expected:         "[1 2 3]",
+		},
+		{
+			name:             "struct with slice",
+			thingToSerialize: struct{ A []int }{A: []int{1, 2, 3}},
+			expected:         "(A:[len=3])",
+		},
+		{
+			name:             "struct with blob",
+			thingToSerialize: struct{ A []byte }{A: []byte("blob-data")},
+			expected:         "(A:[blob-data])",
+		},
+		{
+			name:             "struct with struct",
+			thingToSerialize: struct{ A struct{ B int } }{A: struct{ B int }{B: 1}},
+			expected:         "(A:(B:1))",
+		},
+		{
+			name:             "struct with pointer",
+			thingToSerialize: struct{ A *int }{A: new(int)},
+			expected:         "(A:0)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := anyToString(tc.thingToSerialize)
+			require.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
 func Test_byteSliceToString(t *testing.T) {
 	data := []byte("blob-data")
 	v := reflect.ValueOf(data)

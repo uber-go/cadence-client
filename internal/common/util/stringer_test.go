@@ -24,7 +24,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/thriftrw/ptr"
+
+	s "go.uber.org/cadence/.gen/go/shared"
 )
 
 func Test_anyToString(t *testing.T) {
@@ -113,4 +117,210 @@ func Test_byteSliceToString(t *testing.T) {
 	strVal2 := valueToString(v2)
 
 	require.Equal(t, "[len=3]", strVal2)
+}
+
+func TestHistoryEventToString(t *testing.T) {
+	event := &s.HistoryEvent{
+		EventType: toPtr(s.EventTypeWorkflowExecutionStarted),
+		WorkflowExecutionStartedEventAttributes: &s.WorkflowExecutionStartedEventAttributes{
+			WorkflowType: &s.WorkflowType{
+				Name: toPtr("test-workflow"),
+			},
+			TaskList: &s.TaskList{
+				Name: toPtr("task-list"),
+			},
+			ExecutionStartToCloseTimeoutSeconds: ptr.Int32(60),
+		},
+	}
+
+	strVal := HistoryEventToString(event)
+
+	expected := `WorkflowExecutionStarted: (WorkflowType:(Name:test-workflow), TaskList:(Name:task-list), Input:[], ExecutionStartToCloseTimeoutSeconds:60, ContinuedFailureDetails:[], LastCompletionResult:[], PartitionConfig:map[])`
+
+	assert.Equal(t, expected, strVal)
+}
+
+// This just tests that we pick the right attibutes to return
+// the other attributes will be nil
+func Test_getData(t *testing.T) {
+	cases := []struct {
+		event    *s.HistoryEvent
+		expected interface{}
+	}{
+		{
+			event: &s.HistoryEvent{
+				EventType:                               toPtr(s.EventTypeWorkflowExecutionStarted),
+				WorkflowExecutionStartedEventAttributes: &s.WorkflowExecutionStartedEventAttributes{},
+			},
+			expected: &s.WorkflowExecutionStartedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: toPtr(s.EventTypeWorkflowExecutionCompleted),
+				WorkflowExecutionCompletedEventAttributes: &s.WorkflowExecutionCompletedEventAttributes{},
+			},
+			expected: &s.WorkflowExecutionCompletedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                              toPtr(s.EventTypeWorkflowExecutionFailed),
+				WorkflowExecutionFailedEventAttributes: &s.WorkflowExecutionFailedEventAttributes{},
+			},
+			expected: &s.WorkflowExecutionFailedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                                toPtr(s.EventTypeWorkflowExecutionTimedOut),
+				WorkflowExecutionTimedOutEventAttributes: &s.WorkflowExecutionTimedOutEventAttributes{},
+			},
+			expected: &s.WorkflowExecutionTimedOutEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                            toPtr(s.EventTypeDecisionTaskScheduled),
+				DecisionTaskScheduledEventAttributes: &s.DecisionTaskScheduledEventAttributes{},
+			},
+			expected: &s.DecisionTaskScheduledEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                          toPtr(s.EventTypeDecisionTaskStarted),
+				DecisionTaskStartedEventAttributes: &s.DecisionTaskStartedEventAttributes{},
+			},
+			expected: &s.DecisionTaskStartedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                            toPtr(s.EventTypeDecisionTaskCompleted),
+				DecisionTaskCompletedEventAttributes: &s.DecisionTaskCompletedEventAttributes{},
+			},
+			expected: &s.DecisionTaskCompletedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                           toPtr(s.EventTypeDecisionTaskTimedOut),
+				DecisionTaskTimedOutEventAttributes: &s.DecisionTaskTimedOutEventAttributes{},
+			},
+			expected: &s.DecisionTaskTimedOutEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                            toPtr(s.EventTypeActivityTaskScheduled),
+				ActivityTaskScheduledEventAttributes: &s.ActivityTaskScheduledEventAttributes{},
+			},
+			expected: &s.ActivityTaskScheduledEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                          toPtr(s.EventTypeActivityTaskStarted),
+				ActivityTaskStartedEventAttributes: &s.ActivityTaskStartedEventAttributes{},
+			},
+			expected: &s.ActivityTaskStartedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                            toPtr(s.EventTypeActivityTaskCompleted),
+				ActivityTaskCompletedEventAttributes: &s.ActivityTaskCompletedEventAttributes{},
+			},
+			expected: &s.ActivityTaskCompletedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                         toPtr(s.EventTypeActivityTaskFailed),
+				ActivityTaskFailedEventAttributes: &s.ActivityTaskFailedEventAttributes{},
+			},
+			expected: &s.ActivityTaskFailedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                           toPtr(s.EventTypeActivityTaskTimedOut),
+				ActivityTaskTimedOutEventAttributes: &s.ActivityTaskTimedOutEventAttributes{},
+			},
+			expected: &s.ActivityTaskTimedOutEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: toPtr(s.EventTypeActivityTaskCancelRequested),
+				ActivityTaskCancelRequestedEventAttributes: &s.ActivityTaskCancelRequestedEventAttributes{},
+			},
+			expected: &s.ActivityTaskCancelRequestedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: toPtr(s.EventTypeRequestCancelActivityTaskFailed),
+				RequestCancelActivityTaskFailedEventAttributes: &s.RequestCancelActivityTaskFailedEventAttributes{},
+			},
+			expected: &s.RequestCancelActivityTaskFailedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                           toPtr(s.EventTypeActivityTaskCanceled),
+				ActivityTaskCanceledEventAttributes: &s.ActivityTaskCanceledEventAttributes{},
+			},
+			expected: &s.ActivityTaskCanceledEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                   toPtr(s.EventTypeTimerStarted),
+				TimerStartedEventAttributes: &s.TimerStartedEventAttributes{},
+			},
+			expected: &s.TimerStartedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                 toPtr(s.EventTypeTimerFired),
+				TimerFiredEventAttributes: &s.TimerFiredEventAttributes{},
+			},
+			expected: &s.TimerFiredEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                        toPtr(s.EventTypeCancelTimerFailed),
+				CancelTimerFailedEventAttributes: &s.CancelTimerFailedEventAttributes{},
+			},
+			expected: &s.CancelTimerFailedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                    toPtr(s.EventTypeTimerCanceled),
+				TimerCanceledEventAttributes: &s.TimerCanceledEventAttributes{},
+			},
+			expected: &s.TimerCanceledEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType:                     toPtr(s.EventTypeMarkerRecorded),
+				MarkerRecordedEventAttributes: &s.MarkerRecordedEventAttributes{},
+			},
+			expected: &s.MarkerRecordedEventAttributes{},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: toPtr(s.EventTypeWorkflowExecutionTerminated),
+				WorkflowExecutionTerminatedEventAttributes: &s.WorkflowExecutionTerminatedEventAttributes{},
+			},
+			expected: &s.WorkflowExecutionTerminatedEventAttributes{},
+		},
+		// In the default case, we should return the event itself
+		{
+			event: &s.HistoryEvent{
+				EventType: toPtr(s.EventType(123456789)),
+			},
+			expected: &s.HistoryEvent{
+				EventType: toPtr(s.EventType(123456789)),
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		name, err := tc.event.GetEventType().MarshalText()
+		require.NoError(t, err)
+		t.Run(string(name), func(t *testing.T) {
+			require.Equal(t, tc.expected, getData(tc.event))
+		})
+	}
+}
+
+func toPtr[v any](x v) *v {
+	return &x
 }

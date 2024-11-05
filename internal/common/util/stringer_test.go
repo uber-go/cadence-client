@@ -140,9 +140,9 @@ func TestHistoryEventToString(t *testing.T) {
 	assert.Equal(t, expected, strVal)
 }
 
-// This just tests that we pick the right attibutes to return
+// This just tests that we pick the right attributes to return
 // the other attributes will be nil
-func Test_getData(t *testing.T) {
+func Test_getHistoryEventData(t *testing.T) {
 	cases := []struct {
 		event    *s.HistoryEvent
 		expected interface{}
@@ -316,7 +316,97 @@ func Test_getData(t *testing.T) {
 		name, err := tc.event.GetEventType().MarshalText()
 		require.NoError(t, err)
 		t.Run(string(name), func(t *testing.T) {
-			require.Equal(t, tc.expected, getData(tc.event))
+			require.Equal(t, tc.expected, getHistoryEventData(tc.event))
+		})
+	}
+}
+
+func TestDecisionToString(t *testing.T) {
+	decision := &s.Decision{
+		DecisionType: toPtr(s.DecisionTypeScheduleActivityTask),
+		ScheduleActivityTaskDecisionAttributes: &s.ScheduleActivityTaskDecisionAttributes{
+			ActivityId:   toPtr("activity-id"),
+			ActivityType: &s.ActivityType{Name: toPtr("activity-type")},
+		},
+	}
+
+	strVal := DecisionToString(decision)
+	expected := "ScheduleActivityTask: (ActivityId:activity-id, ActivityType:(Name:activity-type), Input:[])"
+	require.Equal(t, expected, strVal)
+}
+
+// This just tests that we pick the right attributes to return
+// the other attributes will be nil
+func Test_decisionGetData(t *testing.T) {
+	cases := []struct {
+		decision *s.Decision
+		expected interface{}
+	}{
+		{
+			decision: &s.Decision{
+				DecisionType:                           toPtr(s.DecisionTypeScheduleActivityTask),
+				ScheduleActivityTaskDecisionAttributes: &s.ScheduleActivityTaskDecisionAttributes{},
+			},
+			expected: &s.ScheduleActivityTaskDecisionAttributes{},
+		},
+		{
+			decision: &s.Decision{
+				DecisionType: toPtr(s.DecisionTypeRequestCancelActivityTask),
+				RequestCancelActivityTaskDecisionAttributes: &s.RequestCancelActivityTaskDecisionAttributes{},
+			},
+			expected: &s.RequestCancelActivityTaskDecisionAttributes{},
+		},
+		{
+			decision: &s.Decision{
+				DecisionType:                 toPtr(s.DecisionTypeStartTimer),
+				StartTimerDecisionAttributes: &s.StartTimerDecisionAttributes{},
+			},
+			expected: &s.StartTimerDecisionAttributes{},
+		},
+		{
+			decision: &s.Decision{
+				DecisionType:                  toPtr(s.DecisionTypeCancelTimer),
+				CancelTimerDecisionAttributes: &s.CancelTimerDecisionAttributes{},
+			},
+			expected: &s.CancelTimerDecisionAttributes{},
+		},
+		{
+			decision: &s.Decision{
+				DecisionType: toPtr(s.DecisionTypeCompleteWorkflowExecution),
+				CompleteWorkflowExecutionDecisionAttributes: &s.CompleteWorkflowExecutionDecisionAttributes{},
+			},
+			expected: &s.CompleteWorkflowExecutionDecisionAttributes{},
+		},
+		{
+			decision: &s.Decision{
+				DecisionType:                            toPtr(s.DecisionTypeFailWorkflowExecution),
+				FailWorkflowExecutionDecisionAttributes: &s.FailWorkflowExecutionDecisionAttributes{},
+			},
+			expected: &s.FailWorkflowExecutionDecisionAttributes{},
+		},
+		{
+			decision: &s.Decision{
+				DecisionType:                   toPtr(s.DecisionTypeRecordMarker),
+				RecordMarkerDecisionAttributes: &s.RecordMarkerDecisionAttributes{},
+			},
+			expected: &s.RecordMarkerDecisionAttributes{},
+		},
+		// In the default case, we should return the decision itself
+		{
+			decision: &s.Decision{
+				DecisionType: toPtr(s.DecisionType(123456789)),
+			},
+			expected: &s.Decision{
+				DecisionType: toPtr(s.DecisionType(123456789)),
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		name, err := tc.decision.GetDecisionType().MarshalText()
+		require.NoError(t, err)
+		t.Run(string(name), func(t *testing.T) {
+			require.Equal(t, tc.expected, decisionGetData(tc.decision))
 		})
 	}
 }

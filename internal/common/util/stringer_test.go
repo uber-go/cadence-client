@@ -140,7 +140,7 @@ func TestHistoryEventToString(t *testing.T) {
 	assert.Equal(t, expected, strVal)
 }
 
-// This just tests that we pick the right attibutes to return
+// This just tests that we pick the right attributes to return
 // the other attributes will be nil
 func Test_getHistoryEventData(t *testing.T) {
 	cases := []struct {
@@ -335,6 +335,8 @@ func TestDecisionToString(t *testing.T) {
 	require.Equal(t, expected, strVal)
 }
 
+// This just tests that we pick the right attributes to return
+// the other attributes will be nil
 func Test_decisionGetData(t *testing.T) {
 	cases := []struct {
 		decision *s.Decision

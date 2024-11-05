@@ -161,8 +161,8 @@ $(BIN)/mockery: internal/tools/go.mod
 	$(call go_build_tool,github.com/vektra/mockery/v2,mockery)
 
 # copyright header checker/writer.  only requires stdlib, so no other dependencies are needed.
-$(BIN)/copyright: internal/cmd/tools/copyright/licensegen.go
-	go build -mod=readonly -o $@ ./internal/cmd/tools/copyright/licensegen.go
+$(BIN)/copyright: internal/tools/licensegen.go
+	go build -mod=readonly -o $@ ./internal/tools/licensegen.go
 
 # ensures mod files are in sync for critical packages
 $(BUILD)/go_mod_check: go.mod internal/tools/go.mod

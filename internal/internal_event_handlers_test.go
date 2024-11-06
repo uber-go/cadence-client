@@ -695,6 +695,31 @@ func TestWorkflowExecutionEventHandler_ProcessEvent_no_error_events(t *testing.T
 	}
 }
 
+func TestSideEffect(t *testing.T) {
+	t.Run("replay", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		weh.workflowEnvironmentImpl.isReplay = true
+		weh.sideEffectResult[weh.counterID] = []byte("test")
+		weh.SideEffect(func() ([]byte, error) {
+			t.Error("side effect should not be called during replay")
+			t.Failed()
+			return nil, assert.AnError
+		}, func(result []byte, err error) {
+			assert.NoError(t, err)
+			assert.Equal(t, "test", string(result))
+		})
+	})
+	t.Run("success", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		weh.SideEffect(func() ([]byte, error) {
+			return []byte("test"), nil
+		}, func(result []byte, err error) {
+			assert.NoError(t, err)
+			assert.Equal(t, "test", string(result))
+		})
+	})
+}
+
 func testWorkflowExecutionEventHandler(t *testing.T, registry *registry) *workflowExecutionEventHandlerImpl {
 	return newWorkflowExecutionEventHandler(
 		testWorkflowInfo,

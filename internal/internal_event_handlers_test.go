@@ -720,6 +720,49 @@ func TestSideEffect(t *testing.T) {
 	})
 }
 
+func TestGetVersion_validation(t *testing.T) {
+	t.Run("version < minSupported", func(t *testing.T) {
+		assert.PanicsWithValue(t, `Workflow code removed support of version 1. for "test" changeID. The oldest supported version is 2`, func() {
+			validateVersion("test", 1, 2, 3)
+		})
+	})
+	t.Run("version > maxSupported", func(t *testing.T) {
+		assert.PanicsWithValue(t, `Workflow code is too old to support version 3 for "test" changeID. The maximum supported version is 2`, func() {
+			validateVersion("test", 3, 1, 2)
+		})
+	})
+	t.Run("success", func(t *testing.T) {
+		validateVersion("test", 2, 1, 3)
+	})
+}
+
+func TestGetVersion(t *testing.T) {
+	t.Run("version exists", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		weh.changeVersions = map[string]Version{
+			"test": 2,
+		}
+		res := weh.GetVersion("test", 1, 3)
+		assert.Equal(t, Version(2), res)
+	})
+	t.Run("version doesn't exist in replay", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		weh.isReplay = true
+		res := weh.GetVersion("test", DefaultVersion, 3)
+		assert.Equal(t, DefaultVersion, res)
+		require.Contains(t, weh.changeVersions, "test")
+		assert.Equal(t, DefaultVersion, weh.changeVersions["test"])
+	})
+	t.Run("version doesn't exist without replay", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		res := weh.GetVersion("test", DefaultVersion, 3)
+		assert.Equal(t, Version(3), res)
+		require.Contains(t, weh.changeVersions, "test")
+		assert.Equal(t, Version(3), weh.changeVersions["test"])
+		assert.Equal(t, []byte(`["test-3"]`), weh.workflowInfo.SearchAttributes.IndexedFields[CadenceChangeVersion], "ensure search attributes are updated")
+	})
+}
+
 func testWorkflowExecutionEventHandler(t *testing.T, registry *registry) *workflowExecutionEventHandlerImpl {
 	return newWorkflowExecutionEventHandler(
 		testWorkflowInfo,

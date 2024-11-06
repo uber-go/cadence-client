@@ -763,6 +763,83 @@ func TestGetVersion(t *testing.T) {
 	})
 }
 
+func TestMutableSideEffect(t *testing.T) {
+	t.Run("replay with existing value", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		weh.mutableSideEffect["test-id"] = []byte(`"existing-value"`)
+		weh.isReplay = true
+
+		result := weh.MutableSideEffect("test-id", func() interface{} {
+			t.Error("side effect function should not be called during replay with existing value")
+			return "new-value"
+		}, func(a, b interface{}) bool {
+			return a == b
+		})
+		var value string
+		err := result.Get(&value)
+		assert.NoError(t, err)
+		assert.Equal(t, "existing-value", value)
+	})
+
+	t.Run("replay without existing value", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		weh.isReplay = true
+		assert.PanicsWithValue(t, "Non deterministic workflow code change detected. MutableSideEffect API call doesn't have a correspondent event in the workflow history. MutableSideEffect ID: test-id", func() {
+			weh.MutableSideEffect("test-id", func() interface{} {
+				return "new-value"
+			}, func(a, b interface{}) bool {
+				return a == b
+			})
+		})
+	})
+	t.Run("non-replay without value", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+
+		result := weh.MutableSideEffect("test-id", func() interface{} {
+			return "existing-value"
+		}, func(a, b interface{}) bool {
+			return a == b
+		})
+
+		var value string
+		err := result.Get(&value)
+		assert.NoError(t, err)
+		assert.Equal(t, "existing-value", value)
+	})
+	t.Run("non-replay with equal value", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		weh.mutableSideEffect["test-id"] = []byte(`"existing-value"`)
+
+		result := weh.MutableSideEffect("test-id", func() interface{} {
+			return "existing-value"
+		}, func(a, b interface{}) bool {
+			return a == b
+		})
+
+		var value string
+		err := result.Get(&value)
+		assert.NoError(t, err)
+		assert.Equal(t, "existing-value", value)
+	})
+	t.Run("non-replay with different value", func(t *testing.T) {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		weh.mutableSideEffect["test-id"] = []byte(`"existing-value"`)
+
+		result := weh.MutableSideEffect("test-id", func() interface{} {
+			return "new-value"
+		}, func(a, b interface{}) bool {
+			return a == b
+		})
+
+		var value string
+		err := result.Get(&value)
+		assert.NoError(t, err)
+		assert.Equal(t, "new-value", value)
+		// the last symbol is a control symbol, so we need to check the value without it.
+		assert.Equal(t, []byte(`"new-value"`), weh.mutableSideEffect["test-id"][:len(weh.mutableSideEffect["test-id"])-1])
+	})
+}
+
 func testWorkflowExecutionEventHandler(t *testing.T, registry *registry) *workflowExecutionEventHandlerImpl {
 	return newWorkflowExecutionEventHandler(
 		testWorkflowInfo,
@@ -771,7 +848,7 @@ func testWorkflowExecutionEventHandler(t *testing.T, registry *registry) *workfl
 		true,
 		tally.NewTestScope("test", nil),
 		registry,
-		nil,
+		&defaultDataConverter{},
 		nil,
 		opentracing.NoopTracer{},
 		nil,

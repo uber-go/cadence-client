@@ -56,7 +56,7 @@ const (
 	scopeNameListClosedWorkflowExecutions          = CadenceMetricsPrefix + "ListClosedWorkflowExecutions"
 	scopeNameListOpenWorkflowExecutions            = CadenceMetricsPrefix + "ListOpenWorkflowExecutions"
 	scopeNameListWorkflowExecutions                = CadenceMetricsPrefix + "ListWorkflowExecutions"
-	scopeNameListArchivedWorkflowExecutions        = CadenceMetricsPrefix + "ListArchviedExecutions"
+	scopeNameListArchivedWorkflowExecutions        = CadenceMetricsPrefix + "ListArchivedWorkflowExecutions"
 	scopeNameScanWorkflowExecutions                = CadenceMetricsPrefix + "ScanWorkflowExecutions"
 	scopeNameCountWorkflowExecutions               = CadenceMetricsPrefix + "CountWorkflowExecutions"
 	scopeNamePollForActivityTask                   = CadenceMetricsPrefix + "PollForActivityTask"
@@ -90,6 +90,8 @@ const (
 	scopeNameListTaskListPartitions                = CadenceMetricsPrefix + "ListTaskListPartitions"
 	scopeNameGetClusterInfo                        = CadenceMetricsPrefix + "GetClusterInfo"
 	scopeRefreshWorkflowTasks                      = CadenceMetricsPrefix + "RefreshWorkflowTasks"
+	scopeNameGetTaskListsByDomain                  = CadenceMetricsPrefix + "GetTaskListsByDomain"
+	scopeRestartWorkflowExecution                  = CadenceMetricsPrefix + "RestartWorkflowExecution"
 )
 
 // NewWorkflowServiceWrapper creates a new wrapper to WorkflowService that will emit metrics for each service call.
@@ -414,8 +416,11 @@ func (w *workflowServiceMetricsWrapper) GetClusterInfo(ctx context.Context, opts
 	return result, err
 }
 
-func (w *workflowServiceMetricsWrapper) GetTaskListsByDomain(ctx context.Context, Request *shared.GetTaskListsByDomainRequest, opts ...yarpc.CallOption) (*shared.GetTaskListsByDomainResponse, error) {
-	panic("implement me")
+func (w *workflowServiceMetricsWrapper) GetTaskListsByDomain(ctx context.Context, request *shared.GetTaskListsByDomainRequest, opts ...yarpc.CallOption) (*shared.GetTaskListsByDomainResponse, error) {
+	scope := w.getOperationScope(scopeNameGetTaskListsByDomain)
+	result, err := w.service.GetTaskListsByDomain(ctx, request, opts...)
+	scope.handleError(err)
+	return result, err
 }
 
 func (w *workflowServiceMetricsWrapper) RefreshWorkflowTasks(ctx context.Context, request *shared.RefreshWorkflowTasksRequest, opts ...yarpc.CallOption) error {
@@ -426,7 +431,7 @@ func (w *workflowServiceMetricsWrapper) RefreshWorkflowTasks(ctx context.Context
 }
 
 func (w *workflowServiceMetricsWrapper) RestartWorkflowExecution(ctx context.Context, request *shared.RestartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.RestartWorkflowExecutionResponse, error) {
-	scope := w.getOperationScope(scopeRefreshWorkflowTasks)
+	scope := w.getOperationScope(scopeRestartWorkflowExecution)
 	resp, err := w.service.RestartWorkflowExecution(ctx, request, opts...)
 	scope.handleError(err)
 	return resp, err

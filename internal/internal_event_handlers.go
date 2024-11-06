@@ -979,8 +979,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskCompleted(event 
 		return
 	}
 	activity.handle(event.ActivityTaskCompletedEventAttributes.Result, nil)
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskFailed(event *m.HistoryEvent) {
@@ -994,7 +992,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskFailed(event *m.
 	attributes := event.ActivityTaskFailedEventAttributes
 	err := constructError(*attributes.Reason, attributes.Details, weh.GetDataConverter())
 	activity.handle(nil, err)
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskTimedOut(event *m.HistoryEvent) {
@@ -1017,7 +1014,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskTimedOut(event *
 		err = NewTimeoutError(attributes.GetTimeoutType(), details)
 	}
 	activity.handle(nil, err)
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskCanceled(event *m.HistoryEvent) {
@@ -1034,8 +1030,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskCanceled(event *
 		err := NewCanceledError(details)
 		activity.handle(nil, err)
 	}
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleTimerFired(event *m.HistoryEvent) {
@@ -1184,8 +1178,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleStartChildWorkflowExecutionF
 	}
 	childWorkflow.startedCallback(WorkflowExecution{}, err)
 	childWorkflow.handle(nil, err)
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionStarted(event *m.HistoryEvent) {
@@ -1203,8 +1195,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionStarte
 		RunID: childRunID,
 	}
 	childWorkflow.startedCallback(childWorkflowExecution, nil)
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionCompleted(event *m.HistoryEvent) {
@@ -1216,8 +1206,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionComple
 		return
 	}
 	childWorkflow.handle(attributes.Result, nil)
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionFailed(event *m.HistoryEvent) {
@@ -1231,8 +1219,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionFailed
 
 	err := constructError(attributes.GetReason(), attributes.Details, weh.GetDataConverter())
 	childWorkflow.handle(nil, err)
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionCanceled(event *m.HistoryEvent) {
@@ -1246,7 +1232,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionCancel
 	details := newEncodedValues(attributes.Details, weh.GetDataConverter())
 	err := NewCanceledError(details)
 	childWorkflow.handle(nil, err)
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTimedOut(event *m.HistoryEvent) {
@@ -1259,8 +1244,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTimedO
 	}
 	err := NewTimeoutError(attributes.GetTimeoutType())
 	childWorkflow.handle(nil, err)
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTerminated(event *m.HistoryEvent) {
@@ -1273,8 +1256,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTermin
 	}
 	err := newTerminatedError()
 	childWorkflow.handle(nil, err)
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleUpsertWorkflowSearchAttributes(event *m.HistoryEvent) {
@@ -1288,7 +1269,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflo
 	workflowID := attribute.WorkflowExecution.GetWorkflowId()
 	cancellationID := string(attribute.Control)
 	weh.decisionsHelper.handleRequestCancelExternalWorkflowExecutionInitiated(event.GetEventId(), workflowID, cancellationID)
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleExternalWorkflowExecutionCancelRequested(event *m.HistoryEvent) {
@@ -1305,8 +1285,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleExternalWorkflowExecutionCan
 		}
 		cancellation.handle(nil, nil)
 	}
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflowExecutionFailed(event *m.HistoryEvent) {
@@ -1324,8 +1302,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleRequestCancelExternalWorkflo
 		err := fmt.Errorf("cancel external workflow failed, %v", attributes.GetCause())
 		cancellation.handle(nil, err)
 	}
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecutionCompleted(event *m.HistoryEvent) {
@@ -1336,8 +1312,6 @@ func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecut
 		return
 	}
 	signal.handle(nil, nil)
-
-	return
 }
 
 func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecutionFailed(event *m.HistoryEvent) {
@@ -1357,6 +1331,4 @@ func (weh *workflowExecutionEventHandlerImpl) handleSignalExternalWorkflowExecut
 	}
 
 	signal.handle(nil, err)
-
-	return
 }

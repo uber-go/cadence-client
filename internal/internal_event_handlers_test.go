@@ -24,6 +24,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/opentracing/opentracing-go"
+	"github.com/uber-go/tally"
+	"go.uber.org/zap/zaptest"
+
 	"go.uber.org/cadence/internal/common"
 
 	"github.com/stretchr/testify/assert"
@@ -401,4 +405,314 @@ func TestProcessQuery_KnownQueryTypes(t *testing.T) {
 	result, err := weh.ProcessQuery(QueryTypeQueryTypes, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "[\"__open_sessions\",\"__query_types\",\"__stack_trace\",\"a\"]\n", string(result))
+}
+
+func TestWorkflowExecutionEventHandler_ProcessEvent_WorkflowExecutionStarted(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		testRegistry := newRegistry()
+		testRegistry.RegisterWorkflowWithOptions(func(ctx Context) error { return nil }, RegisterWorkflowOptions{Name: "test"})
+
+		weh := testWorkflowExecutionEventHandler(t, testRegistry)
+
+		testHeaderStruct := &s.Header{
+			Fields: map[string][]byte{
+				"test": []byte("test"),
+			},
+		}
+		testInput := []byte("testInput")
+		event := &s.HistoryEvent{
+			EventType: common.EventTypePtr(s.EventTypeWorkflowExecutionStarted),
+			WorkflowExecutionStartedEventAttributes: &s.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &s.WorkflowType{
+					Name: common.StringPtr("test"),
+				},
+				Input:  testInput,
+				Header: testHeaderStruct,
+			},
+		}
+
+		err := weh.ProcessEvent(event, false, false)
+		assert.NoError(t, err)
+	})
+	t.Run("error", func(t *testing.T) {
+		testRegistry := newRegistry()
+
+		weh := testWorkflowExecutionEventHandler(t, testRegistry)
+
+		event := &s.HistoryEvent{
+			EventType: common.EventTypePtr(s.EventTypeWorkflowExecutionStarted),
+			WorkflowExecutionStartedEventAttributes: &s.WorkflowExecutionStartedEventAttributes{
+				WorkflowType: &s.WorkflowType{
+					Name: common.StringPtr("test"),
+				},
+			},
+		}
+
+		err := weh.ProcessEvent(event, false, false)
+		assert.ErrorContains(t, err, errMsgUnknownWorkflowType)
+	})
+}
+
+func TestWorkflowExecutionEventHandler_ProcessEvent_Noops(t *testing.T) {
+	for _, tc := range []s.EventType{
+		s.EventTypeWorkflowExecutionCompleted,
+		s.EventTypeWorkflowExecutionTimedOut,
+		s.EventTypeWorkflowExecutionFailed,
+		s.EventTypeDecisionTaskScheduled,
+		s.EventTypeDecisionTaskTimedOut,
+		s.EventTypeDecisionTaskFailed,
+		s.EventTypeActivityTaskStarted,
+		s.EventTypeDecisionTaskCompleted,
+		s.EventTypeWorkflowExecutionCanceled,
+		s.EventTypeWorkflowExecutionContinuedAsNew,
+	} {
+		t.Run(tc.String(), func(t *testing.T) {
+			weh := testWorkflowExecutionEventHandler(t, newRegistry())
+
+			event := &s.HistoryEvent{
+				EventType: common.EventTypePtr(tc),
+			}
+
+			err := weh.ProcessEvent(event, false, false)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestWorkflowExecutionEventHandler_ProcessEvent_nil(t *testing.T) {
+	weh := testWorkflowExecutionEventHandler(t, newRegistry())
+
+	err := weh.ProcessEvent(nil, false, false)
+	assert.ErrorContains(t, err, "nil event provided")
+}
+
+func TestWorkflowExecutionEventHandler_ProcessEvent_no_error_events(t *testing.T) {
+	for _, tc := range []struct {
+		event          *s.HistoryEvent
+		prepareHandler func(*testing.T, *workflowExecutionEventHandlerImpl)
+	}{
+		{
+			event: &s.HistoryEvent{
+				EventType: s.EventType(-1).Ptr(),
+			},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: s.EventTypeActivityTaskCompleted.Ptr(),
+				EventId:   common.Int64Ptr(2),
+				ActivityTaskCompletedEventAttributes: &s.ActivityTaskCompletedEventAttributes{
+					Result:           []byte("test"),
+					ScheduledEventId: common.Int64Ptr(1),
+				},
+			},
+			prepareHandler: func(t *testing.T, impl *workflowExecutionEventHandlerImpl) {
+				decision := impl.decisionsHelper.scheduleActivityTask(&s.ScheduleActivityTaskDecisionAttributes{
+					ActivityId: common.StringPtr("test-activity"),
+				})
+				decision.setData(&scheduledActivity{
+					handled: true,
+				})
+				impl.decisionsHelper.getDecisions(true)
+				impl.decisionsHelper.handleActivityTaskScheduled(1, "test-activity")
+			},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: s.EventTypeActivityTaskFailed.Ptr(),
+				EventId:   common.Int64Ptr(3),
+				ActivityTaskFailedEventAttributes: &s.ActivityTaskFailedEventAttributes{
+					Reason:           common.StringPtr("test-reason"),
+					ScheduledEventId: common.Int64Ptr(2),
+				},
+			},
+			prepareHandler: func(t *testing.T, impl *workflowExecutionEventHandlerImpl) {
+				decision := impl.decisionsHelper.scheduleActivityTask(&s.ScheduleActivityTaskDecisionAttributes{
+					ActivityId: common.StringPtr("test-activity"),
+				})
+				decision.setData(&scheduledActivity{
+					handled: false,
+					callback: func(result []byte, err error) {
+						var customErr *CustomError
+						assert.ErrorAs(t, err, &customErr)
+						assert.Equal(t, customErr.reason, "test-reason")
+					},
+				})
+				impl.decisionsHelper.getDecisions(true)
+				impl.decisionsHelper.handleActivityTaskScheduled(2, "test-activity")
+			},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: s.EventTypeActivityTaskCanceled.Ptr(),
+				EventId:   common.Int64Ptr(4),
+				ActivityTaskCanceledEventAttributes: &s.ActivityTaskCanceledEventAttributes{
+					Details:          []byte("test-details"),
+					ScheduledEventId: common.Int64Ptr(3),
+				},
+			},
+			prepareHandler: func(t *testing.T, impl *workflowExecutionEventHandlerImpl) {
+				decision := impl.decisionsHelper.scheduleActivityTask(&s.ScheduleActivityTaskDecisionAttributes{
+					ActivityId: common.StringPtr("test-activity"),
+				})
+				decision.setData(&scheduledActivity{
+					handled: false,
+					callback: func(result []byte, err error) {
+						var canceledErr *CanceledError
+						assert.ErrorAs(t, err, &canceledErr)
+					},
+				})
+				impl.decisionsHelper.getDecisions(true)
+				impl.decisionsHelper.handleActivityTaskScheduled(3, "test-activity")
+				decision.cancel()
+				decision.handleDecisionSent()
+			},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: s.EventTypeTimerCanceled.Ptr(),
+				EventId:   common.Int64Ptr(5),
+				TimerCanceledEventAttributes: &s.TimerCanceledEventAttributes{
+					TimerId:        common.StringPtr("test-timer"),
+					StartedEventId: common.Int64Ptr(4),
+				},
+			},
+			prepareHandler: func(t *testing.T, impl *workflowExecutionEventHandlerImpl) {
+				decision := impl.decisionsHelper.startTimer(&s.StartTimerDecisionAttributes{
+					TimerId: common.StringPtr("test-timer"),
+				})
+				decision.setData(&scheduledTimer{
+					callback: func(result []byte, err error) {
+						var canceledErr *CanceledError
+						assert.ErrorAs(t, err, &canceledErr)
+					},
+				})
+				impl.decisionsHelper.getDecisions(true)
+				impl.decisionsHelper.handleTimerStarted("test-timer")
+				decision.cancel()
+				decision.handleDecisionSent()
+			},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: s.EventTypeCancelTimerFailed.Ptr(),
+				EventId:   common.Int64Ptr(6),
+				CancelTimerFailedEventAttributes: &s.CancelTimerFailedEventAttributes{
+					TimerId: common.StringPtr("test-timer"),
+					Cause:   common.StringPtr("test-cause"),
+				},
+			},
+			prepareHandler: func(t *testing.T, impl *workflowExecutionEventHandlerImpl) {
+				decision := impl.decisionsHelper.startTimer(&s.StartTimerDecisionAttributes{
+					TimerId: common.StringPtr("test-timer"),
+				})
+				decision.setData(&scheduledTimer{
+					callback: func(result []byte, err error) {
+						var customErr *CustomError
+						assert.ErrorAs(t, err, &customErr)
+						assert.Equal(t, customErr.reason, "test-cause")
+					},
+				})
+				impl.decisionsHelper.getDecisions(true)
+				impl.decisionsHelper.handleTimerStarted("test-timer")
+				decision.cancel()
+				decision.handleDecisionSent()
+			},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: s.EventTypeWorkflowExecutionCancelRequested.Ptr(),
+				EventId:   common.Int64Ptr(7),
+				WorkflowExecutionCancelRequestedEventAttributes: &s.WorkflowExecutionCancelRequestedEventAttributes{
+					Cause: common.StringPtr("test-cause"),
+				},
+			},
+			prepareHandler: func(t *testing.T, impl *workflowExecutionEventHandlerImpl) {
+				cancelCalled := false
+				t.Cleanup(func() {
+					if !cancelCalled {
+						t.Error("cancelWorkflow not called")
+						t.FailNow()
+					}
+				})
+				impl.cancelHandler = func() {
+					cancelCalled = true
+				}
+			},
+		},
+		{
+			event: &s.HistoryEvent{
+				EventType: s.EventTypeRequestCancelExternalWorkflowExecutionInitiated.Ptr(),
+				EventId:   common.Int64Ptr(8),
+				RequestCancelExternalWorkflowExecutionInitiatedEventAttributes: &s.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes{
+					DecisionTaskCompletedEventId: common.Int64Ptr(7),
+					Domain:                       common.StringPtr(testDomain),
+					WorkflowExecution: &s.WorkflowExecution{
+						WorkflowId: common.StringPtr("wid"),
+					},
+					ChildWorkflowOnly: common.BoolPtr(true),
+				},
+			},
+			prepareHandler: func(t *testing.T, impl *workflowExecutionEventHandlerImpl) {
+				decision := impl.decisionsHelper.startChildWorkflowExecution(&s.StartChildWorkflowExecutionDecisionAttributes{
+					Domain:     common.StringPtr(testDomain),
+					WorkflowId: common.StringPtr("wid"),
+				})
+				decision.setData(&scheduledChildWorkflow{
+					handled: true,
+				})
+				impl.decisionsHelper.getDecisions(true)
+				impl.decisionsHelper.handleStartChildWorkflowExecutionInitiated("wid")
+				impl.decisionsHelper.handleChildWorkflowExecutionStarted("wid")
+				decision = impl.decisionsHelper.requestCancelExternalWorkflowExecution(testDomain, "wid", "", "", true)
+				decision.setData(&scheduledCancellation{
+					callback: func(result []byte, err error) {
+						var canceledErr *CanceledError
+						assert.ErrorAs(t, err, &canceledErr)
+					},
+				})
+				impl.decisionsHelper.getDecisions(true)
+				impl.decisionsHelper.handleRequestCancelExternalWorkflowExecutionInitiated(7, "wid", "")
+				decision.handleDecisionSent()
+			},
+		},
+	} {
+		t.Run(tc.event.EventType.String(), func(t *testing.T) {
+			weh := testWorkflowExecutionEventHandler(t, newRegistry())
+			if tc.prepareHandler != nil {
+				tc.prepareHandler(t, weh)
+			}
+
+			// EventHandle handles all internal failures as panics.
+			// make sure we don't fail event processing.
+			// This can happen if there is a panic inside the handler.
+			weh.completeHandler = func(result []byte, err error) {
+				assert.NoError(t, err)
+			}
+
+			err := weh.ProcessEvent(tc.event, false, false)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func testWorkflowExecutionEventHandler(t *testing.T, registry *registry) *workflowExecutionEventHandlerImpl {
+	return newWorkflowExecutionEventHandler(
+		testWorkflowInfo,
+		func(result []byte, err error) {},
+		zaptest.NewLogger(t),
+		true,
+		tally.NewTestScope("test", nil),
+		registry,
+		nil,
+		nil,
+		opentracing.NoopTracer{},
+		nil,
+	).(*workflowExecutionEventHandlerImpl)
+}
+
+var testWorkflowInfo = &WorkflowInfo{
+	WorkflowType: WorkflowType{
+		Name: "test",
+		Path: "",
+	},
 }

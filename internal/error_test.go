@@ -460,7 +460,7 @@ func Test_SignalExternalWorkflowExecutionFailedError(t *testing.T) {
 		InitiatedEventId: common.Int64Ptr(initiatedEventID),
 		Cause:            shared.SignalExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution.Ptr(),
 	})
-	require.NoError(t, weh.handleSignalExternalWorkflowExecutionFailed(event))
+	weh.handleSignalExternalWorkflowExecutionFailed(event)
 	_, ok := actualErr.(*UnknownExternalWorkflowExecutionError)
 	require.True(t, ok)
 }

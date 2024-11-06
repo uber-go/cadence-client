@@ -28,15 +28,25 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"go.uber.org/cadence/.gen/go/shared"
 )
 
+//go:generate mockery --name ServiceInvoker --inpackage --with-expecter --case snake --filename service_invoker_mock.go --boilerplate-file ../LICENSE
+
 type (
+	// RegistryActivityInfo
+	RegistryActivityInfo interface {
+		ActivityType() ActivityType
+		GetFunction() interface{}
+	}
+
 	// ActivityType identifies a activity type.
 	ActivityType struct {
 		Name string
+		Path string
 	}
 
 	// ActivityInfo contains information about currently executing activity.
@@ -140,23 +150,24 @@ type (
 // "<structure name>_" prefix.
 //
 // Examples:
-//	func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
-//	func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error)
-//	func sampleActivity(ctx context.Context) (err error)
-//	func sampleActivity() (result string, err error)
-//	func sampleActivity(arg1 bool) (result int, err error)
-//	func sampleActivity(arg1 bool) (err error)
 //
-//  type Activities struct {
-//     // fields
-//  }
-//  func (a *Activities) SampleActivity1(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error) {
-//    ...
-//  }
+//		func sampleActivity(ctx context.Context, input []byte) (result []byte, err error)
+//		func sampleActivity(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error)
+//		func sampleActivity(ctx context.Context) (err error)
+//		func sampleActivity() (result string, err error)
+//		func sampleActivity(arg1 bool) (result int, err error)
+//		func sampleActivity(arg1 bool) (err error)
 //
-//  func (a *Activities) SampleActivity2(ctx context.Context, arg1 int, arg2 *customerStruct) (result string, err error) {
-//    ...
-//  }
+//	 type Activities struct {
+//	    // fields
+//	 }
+//	 func (a *Activities) SampleActivity1(ctx context.Context, arg1 int, arg2 string) (result *customerStruct, err error) {
+//	   ...
+//	 }
+//
+//	 func (a *Activities) SampleActivity2(ctx context.Context, arg1 int, arg2 *customerStruct) (result string, err error) {
+//	   ...
+//	 }
 //
 // Serialization of all primitive types, structures is supported ... except channels, functions, variadic, unsafe pointer.
 // This method calls panic if activityFunc doesn't comply with the expected format.
@@ -170,11 +181,15 @@ func RegisterActivity(activityFunc interface{}) {
 // The public form is: activity.RegisterWithOptions(...)
 // The user can use options to provide an external name for the activity or leave it empty if no
 // external name is required. This can be used as
-//  activity.RegisterWithOptions(barActivity, RegisterActivityOptions{})
-//  activity.RegisterWithOptions(barActivity, RegisterActivityOptions{Name: "barExternal"})
+//
+//	activity.RegisterWithOptions(barActivity, RegisterActivityOptions{})
+//	activity.RegisterWithOptions(barActivity, RegisterActivityOptions{Name: "barExternal"})
+//
 // When registering the structure that implements activities the name is used as a prefix that is
 // prepended to the activity method name.
-//  activity.RegisterWithOptions(&Activities{ ... }, RegisterActivityOptions{Name: "MyActivities_"})
+//
+//	activity.RegisterWithOptions(&Activities{ ... }, RegisterActivityOptions{Name: "MyActivities_"})
+//
 // To override each name of activities defined through a structure register the methods one by one:
 // activities := &Activities{ ... }
 // activity.RegisterWithOptions(activities.SampleActivity1, RegisterActivityOptions{Name: "Sample1"})
@@ -253,9 +268,11 @@ func GetWorkerStopChannel(ctx context.Context) <-chan struct{} {
 // RecordActivityHeartbeat sends heartbeat for the currently executing activity
 // If the activity is either cancelled (or) workflow/activity doesn't exist then we would cancel
 // the context with error context.Canceled.
-//  TODO: we don't have a way to distinguish between the two cases when context is cancelled because
-//  context doesn't support overriding value of ctx.Error.
-//  TODO: Implement automatic heartbeating with cancellation through ctx.
+//
+//	TODO: we don't have a way to distinguish between the two cases when context is cancelled because
+//	context doesn't support overriding value of ctx.Error.
+//	TODO: Implement automatic heartbeating with cancellation through ctx.
+//
 // details - the details that you provided here can be seen in the workflow when it receives TimeoutError, you
 // can check error TimeoutType()/Details().
 func RecordActivityHeartbeat(ctx context.Context, details ...interface{}) {
@@ -327,6 +344,7 @@ func WithActivityTask(
 		deadline = startToCloseDeadline
 	}
 
+	// keep in sync with local activity logger tags
 	logger = logger.With(
 		zapcore.Field{Key: tagActivityID, Type: zapcore.StringType, String: *task.ActivityId},
 		zapcore.Field{Key: tagActivityType, Type: zapcore.StringType, String: *task.ActivityType.Name},

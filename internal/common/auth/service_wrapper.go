@@ -22,9 +22,12 @@ package auth
 
 import (
 	"context"
+
+	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/yarpc"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/yarpc"
 )
 
 const (
@@ -43,11 +46,12 @@ type AuthorizationProvider interface {
 }
 
 type JWTClaims struct {
+	jwt.RegisteredClaims
+
 	Sub    string
 	Name   string
 	Groups string // separated by space
 	Admin  bool
-	Iat    int64
 	TTL    int64
 }
 
@@ -339,6 +343,16 @@ func (w *workflowServiceAuthWrapper) SignalWithStartWorkflowExecution(ctx contex
 	return result, err
 }
 
+func (w *workflowServiceAuthWrapper) SignalWithStartWorkflowExecutionAsync(ctx context.Context, request *shared.SignalWithStartWorkflowExecutionAsyncRequest, opts ...yarpc.CallOption) (*shared.SignalWithStartWorkflowExecutionAsyncResponse, error) {
+	tokenHeader, err := w.getYarpcJWTHeader()
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, *tokenHeader)
+	result, err := w.service.SignalWithStartWorkflowExecutionAsync(ctx, request, opts...)
+	return result, err
+}
+
 func (w *workflowServiceAuthWrapper) StartWorkflowExecution(ctx context.Context, request *shared.StartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionResponse, error) {
 	tokenHeader, err := w.getYarpcJWTHeader()
 	if err != nil {
@@ -346,6 +360,16 @@ func (w *workflowServiceAuthWrapper) StartWorkflowExecution(ctx context.Context,
 	}
 	opts = append(opts, *tokenHeader)
 	result, err := w.service.StartWorkflowExecution(ctx, request, opts...)
+	return result, err
+}
+
+func (w *workflowServiceAuthWrapper) StartWorkflowExecutionAsync(ctx context.Context, request *shared.StartWorkflowExecutionAsyncRequest, opts ...yarpc.CallOption) (*shared.StartWorkflowExecutionAsyncResponse, error) {
+	tokenHeader, err := w.getYarpcJWTHeader()
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, *tokenHeader)
+	result, err := w.service.StartWorkflowExecutionAsync(ctx, request, opts...)
 	return result, err
 }
 
@@ -467,4 +491,13 @@ func (w *workflowServiceAuthWrapper) RefreshWorkflowTasks(ctx context.Context, r
 	opts = append(opts, *tokenHeader)
 	err = w.service.RefreshWorkflowTasks(ctx, request, opts...)
 	return err
+}
+
+func (w *workflowServiceAuthWrapper) RestartWorkflowExecution(ctx context.Context, request *shared.RestartWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.RestartWorkflowExecutionResponse, error) {
+	tokenHeader, err := w.getYarpcJWTHeader()
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, *tokenHeader)
+	return w.service.RestartWorkflowExecution(ctx, request, opts...)
 }

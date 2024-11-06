@@ -41,6 +41,14 @@ func Test_linearRecommender_Recommend(t *testing.T) {
 		},
 	}
 
+	highUpperValue := fields{
+		lower: 5,
+		upper: 100,
+		targetUsages: map[UsageType]MilliUsage{
+			PollerUtilizationRate: 500,
+		},
+	}
+
 	tests := []struct {
 		name   string
 		fields fields
@@ -112,6 +120,17 @@ func Test_linearRecommender_Recommend(t *testing.T) {
 				},
 			},
 			want: ResourceUnit(15),
+		},
+		{
+			name:   "over utilized, since we do not how many tasks are in the queue (because poller usage at 100%), scale up to max",
+			fields: highUpperValue,
+			args: args{
+				currentResource: 10,
+				currentUsages: map[UsageType]MilliUsage{
+					PollerUtilizationRate: 1000,
+				},
+			},
+			want: ResourceUnit(100),
 		},
 	}
 	for _, tt := range tests {

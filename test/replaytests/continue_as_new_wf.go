@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2020 Uber Technologies Inc.
+// Copyright (c) 2021 Uber Technologies Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,15 +18,30 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:build tools
-// +build tools
-
-package cadence
+package replaytests
 
 import (
-	_ "github.com/kisielk/errcheck"
-	_ "go.uber.org/thriftrw"
-	_ "go.uber.org/yarpc/encoding/thrift/thriftrw-plugin-yarpc"
-	_ "golang.org/x/lint/golint"
-	_ "honnef.co/go/tools/cmd/staticcheck"
+	"go.uber.org/zap"
+
+	"go.uber.org/cadence/workflow"
 )
+
+// ContinueAsNewWorkflow is a sample Cadence workflows that can receive a signal
+func ContinueAsNewWorkflow(ctx workflow.Context) error {
+	selector := workflow.NewSelector(ctx)
+	var signalResult string
+	signalName := "helloWorldSignal"
+	for {
+		signalChan := workflow.GetSignalChannel(ctx, signalName)
+		selector.AddReceive(signalChan, func(c workflow.Channel, more bool) {
+			c.Receive(ctx, &signalResult)
+			workflow.GetLogger(ctx).Info("Received age signalResult from signal!", zap.String("signal", signalName), zap.String("value", signalResult))
+		})
+		workflow.GetLogger(ctx).Info("Waiting for signal on channel.. " + signalName)
+		// Wait for signal
+		selector.Select(ctx)
+		if signalResult == "kill" {
+			return nil
+		}
+	}
+}

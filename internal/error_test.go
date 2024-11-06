@@ -26,9 +26,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
+
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
-	"go.uber.org/zap/zaptest"
 )
 
 const (
@@ -459,7 +460,7 @@ func Test_SignalExternalWorkflowExecutionFailedError(t *testing.T) {
 		InitiatedEventId: common.Int64Ptr(initiatedEventID),
 		Cause:            shared.SignalExternalWorkflowExecutionFailedCauseUnknownExternalWorkflowExecution.Ptr(),
 	})
-	require.NoError(t, weh.handleSignalExternalWorkflowExecutionFailed(event))
+	weh.handleSignalExternalWorkflowExecutionFailed(event)
 	_, ok := actualErr.(*UnknownExternalWorkflowExecutionError)
 	require.True(t, ok)
 }

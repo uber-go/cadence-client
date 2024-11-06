@@ -28,23 +28,29 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
 
+	"go.uber.org/cadence/internal/common/debug"
+
+	"github.com/shirou/gopsutil/cpu"
 	"github.com/uber-go/tally"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"golang.org/x/time/rate"
+
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/backoff"
 	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/cadence/internal/common/util"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"golang.org/x/time/rate"
 )
 
 const (
 	retryPollOperationInitialInterval = 20 * time.Millisecond
 	retryPollOperationMaxInterval     = 10 * time.Second
+	hardwareMetricsCollectInterval    = 30 * time.Second
 )
 
 var (
@@ -53,13 +59,15 @@ var (
 
 var errShutdown = errors.New("worker shutting down")
 
+var collectHardwareUsageOnce sync.Once
+
 type (
 	// resultHandler that returns result
 	resultHandler   func(result []byte, err error)
 	laResultHandler func(lar *localActivityResultWrapper)
 
 	localActivityResultWrapper struct {
-		err     error
+		err     error // internal error type, possibly containing encoded user-error data
 		result  []byte
 		attempt int32
 		backoff time.Duration
@@ -98,10 +106,13 @@ type (
 	// WorkflowDefinition wraps the code that can execute a workflow.
 	workflowDefinition interface {
 		Execute(env workflowEnvironment, header *shared.Header, input []byte)
-		// Called for each non timed out startDecision event.
+		// OnDecisionTaskStarted is called for each non timed out startDecision event.
 		// Executed after all history events since the previous decision are applied to workflowDefinition
 		OnDecisionTaskStarted()
 		StackTrace() string // Stack trace of all coroutines owned by the Dispatcher instance
+
+		// KnownQueryTypes returns a list of known query types of the workflowOptions with BuiltinQueryTypes
+		KnownQueryTypes() []string
 		Close()
 	}
 
@@ -117,6 +128,8 @@ type (
 		workerType        string
 		shutdownTimeout   time.Duration
 		userContextCancel context.CancelFunc
+		host              string
+		pollerTracker     debug.PollerTracker
 	}
 
 	// baseWorker that wraps worker activities.
@@ -168,16 +181,15 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 	}
 
 	bw := &baseWorker{
-		options:          options,
-		shutdownCh:       make(chan struct{}),
-		taskLimiter:      rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
-		retrier:          backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
-		logger:           logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
-		metricsScope:     tagScope(metricsScope, tagWorkerType, options.workerType),
-		pollerRequestCh:  make(chan struct{}, options.maxConcurrentTask),
-		pollerAutoScaler: pollerAS,
-		taskQueueCh:      make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
-
+		options:              options,
+		shutdownCh:           make(chan struct{}),
+		taskLimiter:          rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
+		retrier:              backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
+		logger:               logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
+		metricsScope:         tagScope(metricsScope, tagWorkerType, options.workerType),
+		pollerRequestCh:      make(chan struct{}, options.maxConcurrentTask),
+		pollerAutoScaler:     pollerAS,
+		taskQueueCh:          make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
 		limiterContext:       ctx,
 		limiterContextCancel: cancel,
 		sessionTokenBucket:   sessionTokenBucket,
@@ -185,7 +197,6 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 	if options.pollerRate > 0 {
 		bw.pollLimiter = rate.NewLimiter(rate.Limit(options.pollerRate), 1)
 	}
-
 	return bw
 }
 
@@ -209,6 +220,11 @@ func (bw *baseWorker) Start() {
 	bw.shutdownWG.Add(1)
 	go bw.runTaskDispatcher()
 
+	// We want the emit function run once per host instead of run once per worker
+	// since the emit function is host level metric.
+	bw.shutdownWG.Add(1)
+	go bw.emitHardwareUsage()
+
 	bw.isWorkerStarted = true
 	traceLog(func() {
 		bw.logger.Info("Started Worker",
@@ -230,6 +246,8 @@ func (bw *baseWorker) isShutdown() bool {
 
 func (bw *baseWorker) runPoller() {
 	defer bw.shutdownWG.Done()
+	defer bw.options.pollerTracker.Start().Stop()
+
 	bw.metricsScope.Counter(metrics.PollerStartCounter).Inc(1)
 
 	for {
@@ -237,6 +255,10 @@ func (bw *baseWorker) runPoller() {
 		case <-bw.shutdownCh:
 			return
 		case <-bw.pollerRequestCh:
+			bw.metricsScope.Gauge(metrics.ConcurrentTaskQuota).Update(float64(cap(bw.pollerRequestCh)))
+			// This metric is used to monitor how many poll requests have been allocated
+			// and can be used to approximate number of concurrent task running (not pinpoint accurate)
+			bw.metricsScope.Gauge(metrics.PollerRequestBufferUsage).Update(float64(cap(bw.pollerRequestCh) - len(bw.pollerRequestCh)))
 			if bw.sessionTokenBucket != nil {
 				bw.sessionTokenBucket.waitForAvailableToken()
 			}
@@ -400,4 +422,54 @@ func (bw *baseWorker) Stop() {
 		bw.options.userContextCancel()
 	}
 	return
+}
+
+func (bw *baseWorker) emitHardwareUsage() {
+	defer func() {
+		if p := recover(); p != nil {
+			bw.metricsScope.Counter(metrics.WorkerPanicCounter).Inc(1)
+			topLine := fmt.Sprintf("base worker for %s [panic]:", bw.options.workerType)
+			st := getStackTraceRaw(topLine, 7, 0)
+			bw.logger.Error("Unhandled panic in hardware emitting.",
+				zap.String(tagPanicError, fmt.Sprintf("%v", p)),
+				zap.String(tagPanicStack, st))
+		}
+	}()
+	defer bw.shutdownWG.Done()
+	collectHardwareUsageOnce.Do(
+		func() {
+			ticker := time.NewTicker(hardwareMetricsCollectInterval)
+			for {
+				select {
+				case <-bw.shutdownCh:
+					ticker.Stop()
+					return
+				case <-ticker.C:
+					host := bw.options.host
+					scope := bw.metricsScope.Tagged(map[string]string{clientHostTag: host})
+
+					cpuPercent, err := cpu.Percent(0, false)
+					if err != nil {
+						bw.logger.Warn("Failed to get cpu percent", zap.Error(err))
+						return
+					}
+					cpuCores, err := cpu.Counts(false)
+					if err != nil {
+						bw.logger.Warn("Failed to get number of cpu cores", zap.Error(err))
+						return
+					}
+					scope.Gauge(metrics.NumCPUCores).Update(float64(cpuCores))
+					scope.Gauge(metrics.CPUPercentage).Update(cpuPercent[0])
+
+					var memStats runtime.MemStats
+					runtime.ReadMemStats(&memStats)
+
+					scope.Gauge(metrics.NumGoRoutines).Update(float64(runtime.NumGoroutine()))
+					scope.Gauge(metrics.TotalMemory).Update(float64(memStats.Sys))
+					scope.Gauge(metrics.MemoryUsedHeap).Update(float64(memStats.HeapInuse))
+					scope.Gauge(metrics.MemoryUsedStack).Update(float64(memStats.StackInuse))
+				}
+			}
+		})
+
 }

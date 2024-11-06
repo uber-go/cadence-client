@@ -25,10 +25,12 @@ package workflowservicetest
 
 import (
 	context "context"
+
 	gomock "github.com/golang/mock/gomock"
+	yarpc "go.uber.org/yarpc"
+
 	workflowserviceclient "go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	shared "go.uber.org/cadence/.gen/go/shared"
-	yarpc "go.uber.org/yarpc"
 )
 
 // MockClient implements a gomock-compatible mock client for service
@@ -46,8 +48,8 @@ type _MockClientRecorder struct {
 
 // Build a new mock client for service WorkflowService.
 //
-// 	mockCtrl := gomock.NewController(t)
-// 	client := workflowservicetest.NewMockClient(mockCtrl)
+//	mockCtrl := gomock.NewController(t)
+//	client := workflowservicetest.NewMockClient(mockCtrl)
 //
 // Use EXPECT() to set expectations on the mock.
 func NewMockClient(ctrl *gomock.Controller) *MockClient {
@@ -66,8 +68,8 @@ func (m *MockClient) EXPECT() *_MockClientRecorder {
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().CountWorkflowExecutions(gomock.Any(), ...).Return(...)
-// 	... := client.CountWorkflowExecutions(...)
+//	client.EXPECT().CountWorkflowExecutions(gomock.Any(), ...).Return(...)
+//	... := client.CountWorkflowExecutions(...)
 func (m *MockClient) CountWorkflowExecutions(
 	ctx context.Context,
 	_CountRequest *shared.CountWorkflowExecutionsRequest,
@@ -99,8 +101,8 @@ func (mr *_MockClientRecorder) CountWorkflowExecutions(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().DeprecateDomain(gomock.Any(), ...).Return(...)
-// 	... := client.DeprecateDomain(...)
+//	client.EXPECT().DeprecateDomain(gomock.Any(), ...).Return(...)
+//	... := client.DeprecateDomain(...)
 func (m *MockClient) DeprecateDomain(
 	ctx context.Context,
 	_DeprecateRequest *shared.DeprecateDomainRequest,
@@ -130,8 +132,8 @@ func (mr *_MockClientRecorder) DeprecateDomain(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().DescribeDomain(gomock.Any(), ...).Return(...)
-// 	... := client.DescribeDomain(...)
+//	client.EXPECT().DescribeDomain(gomock.Any(), ...).Return(...)
+//	... := client.DescribeDomain(...)
 func (m *MockClient) DescribeDomain(
 	ctx context.Context,
 	_DescribeRequest *shared.DescribeDomainRequest,
@@ -163,8 +165,8 @@ func (mr *_MockClientRecorder) DescribeDomain(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().DescribeTaskList(gomock.Any(), ...).Return(...)
-// 	... := client.DescribeTaskList(...)
+//	client.EXPECT().DescribeTaskList(gomock.Any(), ...).Return(...)
+//	... := client.DescribeTaskList(...)
 func (m *MockClient) DescribeTaskList(
 	ctx context.Context,
 	_Request *shared.DescribeTaskListRequest,
@@ -196,8 +198,8 @@ func (mr *_MockClientRecorder) DescribeTaskList(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().DescribeWorkflowExecution(gomock.Any(), ...).Return(...)
-// 	... := client.DescribeWorkflowExecution(...)
+//	client.EXPECT().DescribeWorkflowExecution(gomock.Any(), ...).Return(...)
+//	... := client.DescribeWorkflowExecution(...)
 func (m *MockClient) DescribeWorkflowExecution(
 	ctx context.Context,
 	_DescribeRequest *shared.DescribeWorkflowExecutionRequest,
@@ -229,8 +231,8 @@ func (mr *_MockClientRecorder) DescribeWorkflowExecution(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().GetClusterInfo(gomock.Any(), ...).Return(...)
-// 	... := client.GetClusterInfo(...)
+//	client.EXPECT().GetClusterInfo(gomock.Any(), ...).Return(...)
+//	... := client.GetClusterInfo(...)
 func (m *MockClient) GetClusterInfo(
 	ctx context.Context,
 	opts ...yarpc.CallOption,
@@ -260,8 +262,8 @@ func (mr *_MockClientRecorder) GetClusterInfo(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().GetSearchAttributes(gomock.Any(), ...).Return(...)
-// 	... := client.GetSearchAttributes(...)
+//	client.EXPECT().GetSearchAttributes(gomock.Any(), ...).Return(...)
+//	... := client.GetSearchAttributes(...)
 func (m *MockClient) GetSearchAttributes(
 	ctx context.Context,
 	opts ...yarpc.CallOption,
@@ -291,8 +293,8 @@ func (mr *_MockClientRecorder) GetSearchAttributes(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().GetTaskListsByDomain(gomock.Any(), ...).Return(...)
-// 	... := client.GetTaskListsByDomain(...)
+//	client.EXPECT().GetTaskListsByDomain(gomock.Any(), ...).Return(...)
+//	... := client.GetTaskListsByDomain(...)
 func (m *MockClient) GetTaskListsByDomain(
 	ctx context.Context,
 	_Request *shared.GetTaskListsByDomainRequest,
@@ -324,8 +326,8 @@ func (mr *_MockClientRecorder) GetTaskListsByDomain(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), ...).Return(...)
-// 	... := client.GetWorkflowExecutionHistory(...)
+//	client.EXPECT().GetWorkflowExecutionHistory(gomock.Any(), ...).Return(...)
+//	... := client.GetWorkflowExecutionHistory(...)
 func (m *MockClient) GetWorkflowExecutionHistory(
 	ctx context.Context,
 	_GetRequest *shared.GetWorkflowExecutionHistoryRequest,
@@ -357,8 +359,8 @@ func (mr *_MockClientRecorder) GetWorkflowExecutionHistory(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().ListArchivedWorkflowExecutions(gomock.Any(), ...).Return(...)
-// 	... := client.ListArchivedWorkflowExecutions(...)
+//	client.EXPECT().ListArchivedWorkflowExecutions(gomock.Any(), ...).Return(...)
+//	... := client.ListArchivedWorkflowExecutions(...)
 func (m *MockClient) ListArchivedWorkflowExecutions(
 	ctx context.Context,
 	_ListRequest *shared.ListArchivedWorkflowExecutionsRequest,
@@ -390,8 +392,8 @@ func (mr *_MockClientRecorder) ListArchivedWorkflowExecutions(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().ListClosedWorkflowExecutions(gomock.Any(), ...).Return(...)
-// 	... := client.ListClosedWorkflowExecutions(...)
+//	client.EXPECT().ListClosedWorkflowExecutions(gomock.Any(), ...).Return(...)
+//	... := client.ListClosedWorkflowExecutions(...)
 func (m *MockClient) ListClosedWorkflowExecutions(
 	ctx context.Context,
 	_ListRequest *shared.ListClosedWorkflowExecutionsRequest,
@@ -423,8 +425,8 @@ func (mr *_MockClientRecorder) ListClosedWorkflowExecutions(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().ListDomains(gomock.Any(), ...).Return(...)
-// 	... := client.ListDomains(...)
+//	client.EXPECT().ListDomains(gomock.Any(), ...).Return(...)
+//	... := client.ListDomains(...)
 func (m *MockClient) ListDomains(
 	ctx context.Context,
 	_ListRequest *shared.ListDomainsRequest,
@@ -456,8 +458,8 @@ func (mr *_MockClientRecorder) ListDomains(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().ListOpenWorkflowExecutions(gomock.Any(), ...).Return(...)
-// 	... := client.ListOpenWorkflowExecutions(...)
+//	client.EXPECT().ListOpenWorkflowExecutions(gomock.Any(), ...).Return(...)
+//	... := client.ListOpenWorkflowExecutions(...)
 func (m *MockClient) ListOpenWorkflowExecutions(
 	ctx context.Context,
 	_ListRequest *shared.ListOpenWorkflowExecutionsRequest,
@@ -489,8 +491,8 @@ func (mr *_MockClientRecorder) ListOpenWorkflowExecutions(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().ListTaskListPartitions(gomock.Any(), ...).Return(...)
-// 	... := client.ListTaskListPartitions(...)
+//	client.EXPECT().ListTaskListPartitions(gomock.Any(), ...).Return(...)
+//	... := client.ListTaskListPartitions(...)
 func (m *MockClient) ListTaskListPartitions(
 	ctx context.Context,
 	_Request *shared.ListTaskListPartitionsRequest,
@@ -522,8 +524,8 @@ func (mr *_MockClientRecorder) ListTaskListPartitions(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().ListWorkflowExecutions(gomock.Any(), ...).Return(...)
-// 	... := client.ListWorkflowExecutions(...)
+//	client.EXPECT().ListWorkflowExecutions(gomock.Any(), ...).Return(...)
+//	... := client.ListWorkflowExecutions(...)
 func (m *MockClient) ListWorkflowExecutions(
 	ctx context.Context,
 	_ListRequest *shared.ListWorkflowExecutionsRequest,
@@ -555,8 +557,8 @@ func (mr *_MockClientRecorder) ListWorkflowExecutions(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().PollForActivityTask(gomock.Any(), ...).Return(...)
-// 	... := client.PollForActivityTask(...)
+//	client.EXPECT().PollForActivityTask(gomock.Any(), ...).Return(...)
+//	... := client.PollForActivityTask(...)
 func (m *MockClient) PollForActivityTask(
 	ctx context.Context,
 	_PollRequest *shared.PollForActivityTaskRequest,
@@ -588,8 +590,8 @@ func (mr *_MockClientRecorder) PollForActivityTask(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().PollForDecisionTask(gomock.Any(), ...).Return(...)
-// 	... := client.PollForDecisionTask(...)
+//	client.EXPECT().PollForDecisionTask(gomock.Any(), ...).Return(...)
+//	... := client.PollForDecisionTask(...)
 func (m *MockClient) PollForDecisionTask(
 	ctx context.Context,
 	_PollRequest *shared.PollForDecisionTaskRequest,
@@ -621,8 +623,8 @@ func (mr *_MockClientRecorder) PollForDecisionTask(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().QueryWorkflow(gomock.Any(), ...).Return(...)
-// 	... := client.QueryWorkflow(...)
+//	client.EXPECT().QueryWorkflow(gomock.Any(), ...).Return(...)
+//	... := client.QueryWorkflow(...)
 func (m *MockClient) QueryWorkflow(
 	ctx context.Context,
 	_QueryRequest *shared.QueryWorkflowRequest,
@@ -654,8 +656,8 @@ func (mr *_MockClientRecorder) QueryWorkflow(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), ...).Return(...)
-// 	... := client.RecordActivityTaskHeartbeat(...)
+//	client.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), ...).Return(...)
+//	... := client.RecordActivityTaskHeartbeat(...)
 func (m *MockClient) RecordActivityTaskHeartbeat(
 	ctx context.Context,
 	_HeartbeatRequest *shared.RecordActivityTaskHeartbeatRequest,
@@ -687,8 +689,8 @@ func (mr *_MockClientRecorder) RecordActivityTaskHeartbeat(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RecordActivityTaskHeartbeatByID(gomock.Any(), ...).Return(...)
-// 	... := client.RecordActivityTaskHeartbeatByID(...)
+//	client.EXPECT().RecordActivityTaskHeartbeatByID(gomock.Any(), ...).Return(...)
+//	... := client.RecordActivityTaskHeartbeatByID(...)
 func (m *MockClient) RecordActivityTaskHeartbeatByID(
 	ctx context.Context,
 	_HeartbeatRequest *shared.RecordActivityTaskHeartbeatByIDRequest,
@@ -720,8 +722,8 @@ func (mr *_MockClientRecorder) RecordActivityTaskHeartbeatByID(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RefreshWorkflowTasks(gomock.Any(), ...).Return(...)
-// 	... := client.RefreshWorkflowTasks(...)
+//	client.EXPECT().RefreshWorkflowTasks(gomock.Any(), ...).Return(...)
+//	... := client.RefreshWorkflowTasks(...)
 func (m *MockClient) RefreshWorkflowTasks(
 	ctx context.Context,
 	_Request *shared.RefreshWorkflowTasksRequest,
@@ -751,8 +753,8 @@ func (mr *_MockClientRecorder) RefreshWorkflowTasks(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RegisterDomain(gomock.Any(), ...).Return(...)
-// 	... := client.RegisterDomain(...)
+//	client.EXPECT().RegisterDomain(gomock.Any(), ...).Return(...)
+//	... := client.RegisterDomain(...)
 func (m *MockClient) RegisterDomain(
 	ctx context.Context,
 	_RegisterRequest *shared.RegisterDomainRequest,
@@ -782,8 +784,8 @@ func (mr *_MockClientRecorder) RegisterDomain(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RequestCancelWorkflowExecution(gomock.Any(), ...).Return(...)
-// 	... := client.RequestCancelWorkflowExecution(...)
+//	client.EXPECT().RequestCancelWorkflowExecution(gomock.Any(), ...).Return(...)
+//	... := client.RequestCancelWorkflowExecution(...)
 func (m *MockClient) RequestCancelWorkflowExecution(
 	ctx context.Context,
 	_CancelRequest *shared.RequestCancelWorkflowExecutionRequest,
@@ -813,8 +815,8 @@ func (mr *_MockClientRecorder) RequestCancelWorkflowExecution(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().ResetStickyTaskList(gomock.Any(), ...).Return(...)
-// 	... := client.ResetStickyTaskList(...)
+//	client.EXPECT().ResetStickyTaskList(gomock.Any(), ...).Return(...)
+//	... := client.ResetStickyTaskList(...)
 func (m *MockClient) ResetStickyTaskList(
 	ctx context.Context,
 	_ResetRequest *shared.ResetStickyTaskListRequest,
@@ -846,8 +848,8 @@ func (mr *_MockClientRecorder) ResetStickyTaskList(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().ResetWorkflowExecution(gomock.Any(), ...).Return(...)
-// 	... := client.ResetWorkflowExecution(...)
+//	client.EXPECT().ResetWorkflowExecution(gomock.Any(), ...).Return(...)
+//	... := client.ResetWorkflowExecution(...)
 func (m *MockClient) ResetWorkflowExecution(
 	ctx context.Context,
 	_ResetRequest *shared.ResetWorkflowExecutionRequest,
@@ -879,8 +881,8 @@ func (mr *_MockClientRecorder) ResetWorkflowExecution(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RespondActivityTaskCanceled(gomock.Any(), ...).Return(...)
-// 	... := client.RespondActivityTaskCanceled(...)
+//	client.EXPECT().RespondActivityTaskCanceled(gomock.Any(), ...).Return(...)
+//	... := client.RespondActivityTaskCanceled(...)
 func (m *MockClient) RespondActivityTaskCanceled(
 	ctx context.Context,
 	_CanceledRequest *shared.RespondActivityTaskCanceledRequest,
@@ -910,8 +912,8 @@ func (mr *_MockClientRecorder) RespondActivityTaskCanceled(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RespondActivityTaskCanceledByID(gomock.Any(), ...).Return(...)
-// 	... := client.RespondActivityTaskCanceledByID(...)
+//	client.EXPECT().RespondActivityTaskCanceledByID(gomock.Any(), ...).Return(...)
+//	... := client.RespondActivityTaskCanceledByID(...)
 func (m *MockClient) RespondActivityTaskCanceledByID(
 	ctx context.Context,
 	_CanceledRequest *shared.RespondActivityTaskCanceledByIDRequest,
@@ -941,8 +943,8 @@ func (mr *_MockClientRecorder) RespondActivityTaskCanceledByID(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RespondActivityTaskCompleted(gomock.Any(), ...).Return(...)
-// 	... := client.RespondActivityTaskCompleted(...)
+//	client.EXPECT().RespondActivityTaskCompleted(gomock.Any(), ...).Return(...)
+//	... := client.RespondActivityTaskCompleted(...)
 func (m *MockClient) RespondActivityTaskCompleted(
 	ctx context.Context,
 	_CompleteRequest *shared.RespondActivityTaskCompletedRequest,
@@ -972,8 +974,8 @@ func (mr *_MockClientRecorder) RespondActivityTaskCompleted(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), ...).Return(...)
-// 	... := client.RespondActivityTaskCompletedByID(...)
+//	client.EXPECT().RespondActivityTaskCompletedByID(gomock.Any(), ...).Return(...)
+//	... := client.RespondActivityTaskCompletedByID(...)
 func (m *MockClient) RespondActivityTaskCompletedByID(
 	ctx context.Context,
 	_CompleteRequest *shared.RespondActivityTaskCompletedByIDRequest,
@@ -1003,8 +1005,8 @@ func (mr *_MockClientRecorder) RespondActivityTaskCompletedByID(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RespondActivityTaskFailed(gomock.Any(), ...).Return(...)
-// 	... := client.RespondActivityTaskFailed(...)
+//	client.EXPECT().RespondActivityTaskFailed(gomock.Any(), ...).Return(...)
+//	... := client.RespondActivityTaskFailed(...)
 func (m *MockClient) RespondActivityTaskFailed(
 	ctx context.Context,
 	_FailRequest *shared.RespondActivityTaskFailedRequest,
@@ -1034,8 +1036,8 @@ func (mr *_MockClientRecorder) RespondActivityTaskFailed(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RespondActivityTaskFailedByID(gomock.Any(), ...).Return(...)
-// 	... := client.RespondActivityTaskFailedByID(...)
+//	client.EXPECT().RespondActivityTaskFailedByID(gomock.Any(), ...).Return(...)
+//	... := client.RespondActivityTaskFailedByID(...)
 func (m *MockClient) RespondActivityTaskFailedByID(
 	ctx context.Context,
 	_FailRequest *shared.RespondActivityTaskFailedByIDRequest,
@@ -1065,8 +1067,8 @@ func (mr *_MockClientRecorder) RespondActivityTaskFailedByID(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), ...).Return(...)
-// 	... := client.RespondDecisionTaskCompleted(...)
+//	client.EXPECT().RespondDecisionTaskCompleted(gomock.Any(), ...).Return(...)
+//	... := client.RespondDecisionTaskCompleted(...)
 func (m *MockClient) RespondDecisionTaskCompleted(
 	ctx context.Context,
 	_CompleteRequest *shared.RespondDecisionTaskCompletedRequest,
@@ -1098,8 +1100,8 @@ func (mr *_MockClientRecorder) RespondDecisionTaskCompleted(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RespondDecisionTaskFailed(gomock.Any(), ...).Return(...)
-// 	... := client.RespondDecisionTaskFailed(...)
+//	client.EXPECT().RespondDecisionTaskFailed(gomock.Any(), ...).Return(...)
+//	... := client.RespondDecisionTaskFailed(...)
 func (m *MockClient) RespondDecisionTaskFailed(
 	ctx context.Context,
 	_FailedRequest *shared.RespondDecisionTaskFailedRequest,
@@ -1129,8 +1131,8 @@ func (mr *_MockClientRecorder) RespondDecisionTaskFailed(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().RespondQueryTaskCompleted(gomock.Any(), ...).Return(...)
-// 	... := client.RespondQueryTaskCompleted(...)
+//	client.EXPECT().RespondQueryTaskCompleted(gomock.Any(), ...).Return(...)
+//	... := client.RespondQueryTaskCompleted(...)
 func (m *MockClient) RespondQueryTaskCompleted(
 	ctx context.Context,
 	_CompleteRequest *shared.RespondQueryTaskCompletedRequest,
@@ -1156,12 +1158,45 @@ func (mr *_MockClientRecorder) RespondQueryTaskCompleted(
 	return mr.mock.ctrl.RecordCall(mr.mock, "RespondQueryTaskCompleted", args...)
 }
 
+// RestartWorkflowExecution responds to a RestartWorkflowExecution call based on the mock expectations. This
+// call will fail if the mock does not expect this call. Use EXPECT to expect
+// a call to this function.
+//
+//	client.EXPECT().RestartWorkflowExecution(gomock.Any(), ...).Return(...)
+//	... := client.RestartWorkflowExecution(...)
+func (m *MockClient) RestartWorkflowExecution(
+	ctx context.Context,
+	_RestartRequest *shared.RestartWorkflowExecutionRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.RestartWorkflowExecutionResponse, err error) {
+
+	args := []interface{}{ctx, _RestartRequest}
+	for _, o := range opts {
+		args = append(args, o)
+	}
+	i := 0
+	ret := m.ctrl.Call(m, "RestartWorkflowExecution", args...)
+	success, _ = ret[i].(*shared.RestartWorkflowExecutionResponse)
+	i++
+	err, _ = ret[i].(error)
+	return
+}
+
+func (mr *_MockClientRecorder) RestartWorkflowExecution(
+	ctx interface{},
+	_RestartRequest interface{},
+	opts ...interface{},
+) *gomock.Call {
+	args := append([]interface{}{ctx, _RestartRequest}, opts...)
+	return mr.mock.ctrl.RecordCall(mr.mock, "RestartWorkflowExecution", args...)
+}
+
 // ScanWorkflowExecutions responds to a ScanWorkflowExecutions call based on the mock expectations. This
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().ScanWorkflowExecutions(gomock.Any(), ...).Return(...)
-// 	... := client.ScanWorkflowExecutions(...)
+//	client.EXPECT().ScanWorkflowExecutions(gomock.Any(), ...).Return(...)
+//	... := client.ScanWorkflowExecutions(...)
 func (m *MockClient) ScanWorkflowExecutions(
 	ctx context.Context,
 	_ListRequest *shared.ListWorkflowExecutionsRequest,
@@ -1193,8 +1228,8 @@ func (mr *_MockClientRecorder) ScanWorkflowExecutions(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), ...).Return(...)
-// 	... := client.SignalWithStartWorkflowExecution(...)
+//	client.EXPECT().SignalWithStartWorkflowExecution(gomock.Any(), ...).Return(...)
+//	... := client.SignalWithStartWorkflowExecution(...)
 func (m *MockClient) SignalWithStartWorkflowExecution(
 	ctx context.Context,
 	_SignalWithStartRequest *shared.SignalWithStartWorkflowExecutionRequest,
@@ -1222,12 +1257,45 @@ func (mr *_MockClientRecorder) SignalWithStartWorkflowExecution(
 	return mr.mock.ctrl.RecordCall(mr.mock, "SignalWithStartWorkflowExecution", args...)
 }
 
+// SignalWithStartWorkflowExecutionAsync responds to a SignalWithStartWorkflowExecutionAsync call based on the mock expectations. This
+// call will fail if the mock does not expect this call. Use EXPECT to expect
+// a call to this function.
+//
+//	client.EXPECT().SignalWithStartWorkflowExecutionAsync(gomock.Any(), ...).Return(...)
+//	... := client.SignalWithStartWorkflowExecutionAsync(...)
+func (m *MockClient) SignalWithStartWorkflowExecutionAsync(
+	ctx context.Context,
+	_SignalWithStartRequest *shared.SignalWithStartWorkflowExecutionAsyncRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.SignalWithStartWorkflowExecutionAsyncResponse, err error) {
+
+	args := []interface{}{ctx, _SignalWithStartRequest}
+	for _, o := range opts {
+		args = append(args, o)
+	}
+	i := 0
+	ret := m.ctrl.Call(m, "SignalWithStartWorkflowExecutionAsync", args...)
+	success, _ = ret[i].(*shared.SignalWithStartWorkflowExecutionAsyncResponse)
+	i++
+	err, _ = ret[i].(error)
+	return
+}
+
+func (mr *_MockClientRecorder) SignalWithStartWorkflowExecutionAsync(
+	ctx interface{},
+	_SignalWithStartRequest interface{},
+	opts ...interface{},
+) *gomock.Call {
+	args := append([]interface{}{ctx, _SignalWithStartRequest}, opts...)
+	return mr.mock.ctrl.RecordCall(mr.mock, "SignalWithStartWorkflowExecutionAsync", args...)
+}
+
 // SignalWorkflowExecution responds to a SignalWorkflowExecution call based on the mock expectations. This
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().SignalWorkflowExecution(gomock.Any(), ...).Return(...)
-// 	... := client.SignalWorkflowExecution(...)
+//	client.EXPECT().SignalWorkflowExecution(gomock.Any(), ...).Return(...)
+//	... := client.SignalWorkflowExecution(...)
 func (m *MockClient) SignalWorkflowExecution(
 	ctx context.Context,
 	_SignalRequest *shared.SignalWorkflowExecutionRequest,
@@ -1257,8 +1325,8 @@ func (mr *_MockClientRecorder) SignalWorkflowExecution(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().StartWorkflowExecution(gomock.Any(), ...).Return(...)
-// 	... := client.StartWorkflowExecution(...)
+//	client.EXPECT().StartWorkflowExecution(gomock.Any(), ...).Return(...)
+//	... := client.StartWorkflowExecution(...)
 func (m *MockClient) StartWorkflowExecution(
 	ctx context.Context,
 	_StartRequest *shared.StartWorkflowExecutionRequest,
@@ -1286,12 +1354,45 @@ func (mr *_MockClientRecorder) StartWorkflowExecution(
 	return mr.mock.ctrl.RecordCall(mr.mock, "StartWorkflowExecution", args...)
 }
 
+// StartWorkflowExecutionAsync responds to a StartWorkflowExecutionAsync call based on the mock expectations. This
+// call will fail if the mock does not expect this call. Use EXPECT to expect
+// a call to this function.
+//
+//	client.EXPECT().StartWorkflowExecutionAsync(gomock.Any(), ...).Return(...)
+//	... := client.StartWorkflowExecutionAsync(...)
+func (m *MockClient) StartWorkflowExecutionAsync(
+	ctx context.Context,
+	_StartRequest *shared.StartWorkflowExecutionAsyncRequest,
+	opts ...yarpc.CallOption,
+) (success *shared.StartWorkflowExecutionAsyncResponse, err error) {
+
+	args := []interface{}{ctx, _StartRequest}
+	for _, o := range opts {
+		args = append(args, o)
+	}
+	i := 0
+	ret := m.ctrl.Call(m, "StartWorkflowExecutionAsync", args...)
+	success, _ = ret[i].(*shared.StartWorkflowExecutionAsyncResponse)
+	i++
+	err, _ = ret[i].(error)
+	return
+}
+
+func (mr *_MockClientRecorder) StartWorkflowExecutionAsync(
+	ctx interface{},
+	_StartRequest interface{},
+	opts ...interface{},
+) *gomock.Call {
+	args := append([]interface{}{ctx, _StartRequest}, opts...)
+	return mr.mock.ctrl.RecordCall(mr.mock, "StartWorkflowExecutionAsync", args...)
+}
+
 // TerminateWorkflowExecution responds to a TerminateWorkflowExecution call based on the mock expectations. This
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().TerminateWorkflowExecution(gomock.Any(), ...).Return(...)
-// 	... := client.TerminateWorkflowExecution(...)
+//	client.EXPECT().TerminateWorkflowExecution(gomock.Any(), ...).Return(...)
+//	... := client.TerminateWorkflowExecution(...)
 func (m *MockClient) TerminateWorkflowExecution(
 	ctx context.Context,
 	_TerminateRequest *shared.TerminateWorkflowExecutionRequest,
@@ -1321,8 +1422,8 @@ func (mr *_MockClientRecorder) TerminateWorkflowExecution(
 // call will fail if the mock does not expect this call. Use EXPECT to expect
 // a call to this function.
 //
-// 	client.EXPECT().UpdateDomain(gomock.Any(), ...).Return(...)
-// 	... := client.UpdateDomain(...)
+//	client.EXPECT().UpdateDomain(gomock.Any(), ...).Return(...)
+//	... := client.UpdateDomain(...)
 func (m *MockClient) UpdateDomain(
 	ctx context.Context,
 	_UpdateRequest *shared.UpdateDomainRequest,

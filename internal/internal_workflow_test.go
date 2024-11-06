@@ -31,8 +31,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/cadence/internal/common/metrics"
 	"go.uber.org/zap/zaptest"
+
+	"go.uber.org/cadence/internal/common/metrics"
 )
 
 type WorkflowUnitTest struct {
@@ -75,7 +76,32 @@ func helloWorldAct(ctx context.Context) (string, error) {
 	return "test", nil
 }
 
-func helloWorldActivityWorkflow(ctx Context, input string) (result string, err error) {
+type key int
+
+const unitTestKey key = 1
+
+func singleActivityWorkflowWithOptions(s *WorkflowUnitTest, ao ActivityOptions) error {
+	helloWorldActivityWorkflow := func(ctx Context, input string) (result string, err error) {
+		ctx1 := WithActivityOptions(ctx, ao)
+		f := ExecuteActivity(ctx1, helloWorldAct)
+		var r1 string
+		err = f.Get(ctx, &r1)
+		if err != nil {
+			return "", err
+		}
+		return r1, nil
+	}
+
+	env := newTestWorkflowEnv(s.T())
+	ctx := context.WithValue(context.Background(), unitTestKey, s)
+	env.SetWorkerOptions(WorkerOptions{BackgroundActivityContext: ctx})
+	env.RegisterActivity(helloWorldAct)
+	env.ExecuteWorkflow(helloWorldActivityWorkflow, "Hello")
+	s.True(env.IsWorkflowCompleted())
+	return env.GetWorkflowError()
+}
+
+func (s *WorkflowUnitTest) Test_SingleActivityWorkflow() {
 	ao := ActivityOptions{
 		ScheduleToStartTimeout: 10 * time.Second,
 		StartToCloseTimeout:    5 * time.Second,
@@ -83,28 +109,55 @@ func helloWorldActivityWorkflow(ctx Context, input string) (result string, err e
 		ActivityID:             "id1",
 		TaskList:               tasklist,
 	}
-	ctx1 := WithActivityOptions(ctx, ao)
-	f := ExecuteActivity(ctx1, helloWorldAct)
-	var r1 string
-	err = f.Get(ctx, &r1)
-	if err != nil {
-		return "", err
-	}
-	return r1, nil
+	err := singleActivityWorkflowWithOptions(s, ao)
+	s.NoError(err)
 }
 
-type key int
+func (s *WorkflowUnitTest) Test_SingleActivityWorkflowIsErrorMessagesMatched() {
+	testCases := []struct {
+		name                   string
+		ScheduleToStartTimeout time.Duration
+		StartToCloseTimeout    time.Duration
+		ScheduleToCloseTimeout time.Duration
+		expectedErrorMessage   string
+	}{
+		{
+			name:                   "ZeroScheduleToStartTimeout",
+			ScheduleToStartTimeout: 0 * time.Second,
+			StartToCloseTimeout:    5 * time.Second,
+			ScheduleToCloseTimeout: 0 * time.Second,
+			expectedErrorMessage:   "missing or negative ScheduleToStartTimeoutSeconds",
+		},
+		{
+			name:                   "ZeroStartToCloseTimeout",
+			ScheduleToStartTimeout: 10 * time.Second,
+			StartToCloseTimeout:    0 * time.Second,
+			ScheduleToCloseTimeout: 0 * time.Second,
+			expectedErrorMessage:   "missing or negative StartToCloseTimeoutSeconds",
+		},
+		{
+			name:                   "NegativeScheduleToCloseTimeout",
+			ScheduleToStartTimeout: 10 * time.Second,
+			StartToCloseTimeout:    5 * time.Second,
+			ScheduleToCloseTimeout: -1 * time.Second,
+			expectedErrorMessage:   "invalid negative ScheduleToCloseTimeoutSeconds",
+		},
+	}
 
-const unitTestKey key = 1
-
-func (s *WorkflowUnitTest) Test_SingleActivityWorkflow() {
-	env := newTestWorkflowEnv(s.T())
-	ctx := context.WithValue(context.Background(), unitTestKey, s)
-	env.SetWorkerOptions(WorkerOptions{BackgroundActivityContext: ctx})
-	env.RegisterActivity(helloWorldAct)
-	env.ExecuteWorkflow(helloWorldActivityWorkflow, "Hello")
-	s.True(env.IsWorkflowCompleted())
-	s.NoError(env.GetWorkflowError())
+	for _, testCase := range testCases {
+		ao := ActivityOptions{
+			ScheduleToStartTimeout: testCase.ScheduleToStartTimeout,
+			StartToCloseTimeout:    testCase.StartToCloseTimeout,
+			ScheduleToCloseTimeout: testCase.ScheduleToCloseTimeout,
+			HeartbeatTimeout:       2 * time.Second,
+			ActivityID:             "id1",
+			TaskList:               tasklist,
+		}
+		s.Run(testCase.name, func() {
+			err := singleActivityWorkflowWithOptions(s, ao)
+			s.ErrorContains(err, testCase.expectedErrorMessage)
+		})
+	}
 }
 
 func splitJoinActivityWorkflow(ctx Context, testPanic bool) (result string, err error) {
@@ -510,14 +563,14 @@ func signalWorkflowTest(ctx Context) ([]byte, error) {
 	s.Select(ctx)
 
 	// Check un handled signals.
-	list := getWorkflowEnvOptions(ctx).getUnhandledSignals()
+	list := getWorkflowEnvOptions(ctx).getUnhandledSignalNames()
 	if len(list) != 1 || list[0] != "testSig3" {
 		panic("expecting one unhandled signal")
 	}
 	ch3 := GetSignalChannel(ctx, "testSig3")
 	ch3.Receive(ctx, &v)
 	result += v
-	list = getWorkflowEnvOptions(ctx).getUnhandledSignals()
+	list = getWorkflowEnvOptions(ctx).getUnhandledSignalNames()
 	if len(list) != 0 {
 		panic("expecting no unhandled signals")
 	}
@@ -1254,4 +1307,40 @@ func (t *tracingInterceptor) ExecuteWorkflow(ctx Context, workflowType string, a
 	result := t.Next.ExecuteWorkflow(ctx, workflowType, args...)
 	t.trace = append(t.trace, "ExecuteWorkflow "+workflowType+" end")
 	return result
+}
+
+type WorkflowOptionTest struct {
+	suite.Suite
+}
+
+func TestWorkflowOption(t *testing.T) {
+	suite.Run(t, new(WorkflowOptionTest))
+}
+
+func (t *WorkflowOptionTest) TestKnowQueryType_NoHandlers() {
+	wo := workflowOptions{queryHandlers: make(map[string]func([]byte) ([]byte, error))}
+	t.ElementsMatch(
+		[]string{
+			QueryTypeStackTrace,
+			QueryTypeOpenSessions,
+			QueryTypeQueryTypes,
+		},
+		wo.KnownQueryTypes())
+}
+
+func (t *WorkflowOptionTest) TestKnowQueryType_WithHandlers() {
+	wo := workflowOptions{queryHandlers: map[string]func([]byte) ([]byte, error){
+		"a": nil,
+		"b": nil,
+	}}
+
+	t.ElementsMatch(
+		[]string{
+			QueryTypeStackTrace,
+			QueryTypeOpenSessions,
+			QueryTypeQueryTypes,
+			"a",
+			"b",
+		},
+		wo.KnownQueryTypes())
 }

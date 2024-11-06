@@ -23,6 +23,7 @@ package test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -33,14 +34,17 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber-go/tally"
+	"go.uber.org/goleak"
+	"go.uber.org/zap/zaptest"
+
 	"go.uber.org/cadence"
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/client"
 	"go.uber.org/cadence/interceptors"
+	"go.uber.org/cadence/internal"
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
-	"go.uber.org/goleak"
-	"go.uber.org/zap/zaptest"
 )
 
 type IntegrationTestSuite struct {
@@ -109,12 +113,13 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 		})
 	ts.domainClient = client.NewDomainClient(ts.rpcClient.Interface, &client.Options{})
 	ts.registerDomain()
+	internal.StartVersionMetrics(tally.NoopScope)
 }
 
 func (ts *IntegrationTestSuite) TearDownSuite() {
 	ts.Assertions = require.New(ts.T())
 	ts.rpcClient.Close()
-
+	close(internal.StopMetrics)
 	// allow the pollers to shut down, and ensure there are no goroutine leaks.
 	// this will wait for up to 1 minute for leaks to subside, but exit relatively quickly if possible.
 	max := time.After(time.Minute)
@@ -144,18 +149,24 @@ func (ts *IntegrationTestSuite) SetupTest() {
 	ts.seq++
 	ts.activities.clearInvoked()
 	ts.taskListName = fmt.Sprintf("tl-%v", ts.seq)
-	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, worker.Options{
-		DisableStickyExecution: ts.config.IsStickyOff,
-		Logger:                 zaptest.NewLogger(ts.T()),
-		ContextPropagators:     []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
-	})
 	ts.tracer = newtracingInterceptorFactory()
+}
+
+func (ts *IntegrationTestSuite) BeforeTest(suiteName, testName string) {
 	options := worker.Options{
 		DisableStickyExecution:            ts.config.IsStickyOff,
 		Logger:                            zaptest.NewLogger(ts.T()),
 		WorkflowInterceptorChainFactories: []interceptors.WorkflowInterceptorFactory{ts.tracer},
 		ContextPropagators:                []workflow.ContextPropagator{NewStringMapPropagator([]string{testContextKey})},
 	}
+
+	if testName == "TestNonDeterministicWorkflowQuery" || testName == "TestNonDeterministicWorkflowFailPolicy" {
+		options.NonDeterministicWorkflowPolicy = worker.NonDeterministicWorkflowPolicyFailWorkflow
+
+		// disable sticky executon so each workflow yield will require rerunning it from beginning
+		options.DisableStickyExecution = true
+	}
+
 	ts.worker = worker.New(ts.rpcClient.Interface, domainName, ts.taskListName, options)
 	ts.registerWorkflowsAndActivities(ts.worker)
 	ts.Nil(ts.worker.Start())
@@ -266,7 +277,7 @@ func (ts *IntegrationTestSuite) TestStackTraceQuery() {
 	ts.NoError(err)
 	ts.NotNil(value)
 	var trace string
-	ts.Nil(value.Get(&trace))
+	ts.NoError(value.Get(&trace))
 	ts.True(strings.Contains(trace, "go.uber.org/cadence/test.(*Workflows).Basic"))
 }
 
@@ -299,7 +310,7 @@ func (ts *IntegrationTestSuite) TestConsistentQuery() {
 	ts.NotNil(value.QueryResult)
 	ts.Nil(value.QueryRejected)
 	var queryResult string
-	ts.Nil(value.QueryResult.Get(&queryResult))
+	ts.NoError(value.QueryResult.Get(&queryResult))
 	ts.Equal("signal-input", queryResult)
 }
 
@@ -419,6 +430,8 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyTerminate() {
 	var childWorkflowID string
 	err := ts.executeWorkflow("test-childwf-parent-close-policy", ts.workflows.ChildWorkflowSuccessWithParentClosePolicyTerminate, &childWorkflowID)
 	ts.NoError(err)
+	// Need to wait for child workflow to finish as well otherwise test becomes flaky
+	ts.waitForWorkflowFinish(childWorkflowID, "")
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
 	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() > 0)
@@ -430,7 +443,7 @@ func (ts *IntegrationTestSuite) TestChildWFWithParentClosePolicyAbandon() {
 	ts.NoError(err)
 	resp, err := ts.libClient.DescribeWorkflowExecution(context.Background(), childWorkflowID, "")
 	ts.NoError(err)
-	ts.True(resp.WorkflowExecutionInfo.GetCloseTime() == 0)
+	ts.Zerof(resp.WorkflowExecutionInfo.GetCloseTime(), "Expected close time to be zero, got %d. Describe response: %#v", resp.WorkflowExecutionInfo.GetCloseTime(), resp)
 }
 
 func (ts *IntegrationTestSuite) TestChildWFCancel() {
@@ -503,6 +516,33 @@ func (ts *IntegrationTestSuite) TestDomainUpdate() {
 	domain, err := ts.domainClient.Describe(ctx, name)
 	ts.NoError(err)
 	ts.Equal(description, *domain.DomainInfo.Description)
+}
+
+func (ts *IntegrationTestSuite) TestNonDeterministicWorkflowFailPolicy() {
+	err := ts.executeWorkflow("test-nondeterminism-failpolicy", ts.workflows.NonDeterminismSimulatorWorkflow, nil)
+	var customErr *internal.CustomError
+	ok := errors.As(err, &customErr)
+	ts.Truef(ok, "expected CustomError but got %T", err)
+	ts.Equal("NonDeterministicWorkflowPolicyFailWorkflow", customErr.Reason())
+}
+
+func (ts *IntegrationTestSuite) TestNonDeterministicWorkflowQuery() {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	run, err := ts.libClient.ExecuteWorkflow(ctx, ts.startWorkflowOptions("test-nondeterministic-query"), ts.workflows.NonDeterminismSimulatorWorkflow)
+	ts.Nil(err)
+	err = run.Get(ctx, nil)
+	var customErr *internal.CustomError
+	ok := errors.As(err, &customErr)
+	ts.Truef(ok, "expected CustomError but got %T", err)
+	ts.Equal("NonDeterministicWorkflowPolicyFailWorkflow", customErr.Reason())
+
+	// query failed workflow should still work
+	value, err := ts.libClient.QueryWorkflow(ctx, "test-nondeterministic-query", run.GetRunID(), "__stack_trace")
+	ts.NoError(err)
+	ts.NotNil(value)
+	var trace string
+	ts.NoError(value.Get(&trace))
 }
 
 func (ts *IntegrationTestSuite) registerDomain() {
@@ -579,6 +619,13 @@ func (ts *IntegrationTestSuite) startWorkflowOptions(wfID string) client.StartWo
 func (ts *IntegrationTestSuite) registerWorkflowsAndActivities(w worker.Worker) {
 	ts.workflows.register(w)
 	ts.activities.register(w)
+}
+
+func (ts *IntegrationTestSuite) waitForWorkflowFinish(wid string, runId string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	wfRun := ts.libClient.GetWorkflow(ctx, wid, runId)
+	return wfRun.Get(ctx, nil)
 }
 
 var _ interceptors.WorkflowInterceptorFactory = (*tracingInterceptorFactory)(nil)

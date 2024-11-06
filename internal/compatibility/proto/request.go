@@ -21,8 +21,9 @@
 package proto
 
 import (
-	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/cadence/.gen/go/shared"
+
+	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 )
 
 func CountWorkflowExecutionsRequest(t *shared.CountWorkflowExecutionsRequest) *apiv1.CountWorkflowExecutionsRequest {
@@ -409,10 +410,21 @@ func SignalWithStartWorkflowExecutionRequest(t *shared.SignalWithStartWorkflowEx
 			Header:                       Header(t.Header),
 			DelayStart:                   secondsToDuration(t.DelayStartSeconds),
 			JitterStart:                  secondsToDuration(t.JitterStartSeconds),
+			FirstRunAt:                   unixNanoToTime(t.FirstRunAtTimestamp),
 		},
 		SignalName:  t.GetSignalName(),
 		SignalInput: Payload(t.SignalInput),
 		Control:     t.Control,
+	}
+}
+
+func SignalWithStartWorkflowExecutionAsyncRequest(t *shared.SignalWithStartWorkflowExecutionAsyncRequest) *apiv1.SignalWithStartWorkflowExecutionAsyncRequest {
+	if t == nil {
+		return nil
+	}
+
+	return &apiv1.SignalWithStartWorkflowExecutionAsyncRequest{
+		Request: SignalWithStartWorkflowExecutionRequest(t.GetRequest()),
 	}
 }
 
@@ -453,6 +465,16 @@ func StartWorkflowExecutionRequest(t *shared.StartWorkflowExecutionRequest) *api
 		Header:                       Header(t.Header),
 		DelayStart:                   secondsToDuration(t.DelayStartSeconds),
 		JitterStart:                  secondsToDuration(t.JitterStartSeconds),
+		FirstRunAt:                   unixNanoToTime(t.FirstRunAtTimestamp),
+	}
+}
+
+func StartWorkflowExecutionAsyncRequest(t *shared.StartWorkflowExecutionAsyncRequest) *apiv1.StartWorkflowExecutionAsyncRequest {
+	if t == nil {
+		return nil
+	}
+	return &apiv1.StartWorkflowExecutionAsyncRequest{
+		Request: StartWorkflowExecutionRequest(t.GetRequest()),
 	}
 }
 
@@ -621,5 +643,19 @@ func RefreshWorkflowTasksRequest(r *shared.RefreshWorkflowTasksRequest) *apiv1.R
 		Domain:            r.GetDomain(),
 		WorkflowExecution: WorkflowExecution(r.Execution),
 	}
+	return &request
+}
+
+func RestartWorkflowExecutionRequest(r *shared.RestartWorkflowExecutionRequest) *apiv1.RestartWorkflowExecutionRequest {
+	if r == nil {
+		return nil
+	}
+	request := apiv1.RestartWorkflowExecutionRequest{
+		Domain:            r.GetDomain(),
+		WorkflowExecution: WorkflowExecution(r.GetWorkflowExecution()),
+		Identity:          r.GetIdentity(),
+		Reason:            r.GetReason(),
+	}
+
 	return &request
 }

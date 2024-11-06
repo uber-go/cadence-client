@@ -21,8 +21,9 @@
 package thrift
 
 import (
-	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/cadence/.gen/go/shared"
+
+	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 )
 
 func CountWorkflowExecutionsResponse(t *apiv1.CountWorkflowExecutionsResponse) *shared.CountWorkflowExecutionsResponse {
@@ -222,6 +223,7 @@ func PollForDecisionTaskResponse(t *apiv1.PollForDecisionTaskResponse) *shared.P
 		StartedTimestamp:          timeToUnixNano(t.StartedTime),
 		Queries:                   WorkflowQueryMap(t.Queries),
 		NextEventId:               &t.NextEventId,
+		TotalHistoryBytes:         &t.TotalHistoryBytes,
 	}
 }
 
@@ -291,6 +293,13 @@ func SignalWithStartWorkflowExecutionResponse(t *apiv1.SignalWithStartWorkflowEx
 	}
 }
 
+func SignalWithStartWorkflowExecutionAsyncResponse(t *apiv1.SignalWithStartWorkflowExecutionAsyncResponse) *shared.SignalWithStartWorkflowExecutionAsyncResponse {
+	if t == nil {
+		return nil
+	}
+	return &shared.SignalWithStartWorkflowExecutionAsyncResponse{}
+}
+
 func StartWorkflowExecutionResponse(t *apiv1.StartWorkflowExecutionResponse) *shared.StartWorkflowExecutionResponse {
 	if t == nil {
 		return nil
@@ -298,6 +307,13 @@ func StartWorkflowExecutionResponse(t *apiv1.StartWorkflowExecutionResponse) *sh
 	return &shared.StartWorkflowExecutionResponse{
 		RunId: &t.RunId,
 	}
+}
+
+func StartWorkflowExecutionAsyncResponse(t *apiv1.StartWorkflowExecutionAsyncResponse) *shared.StartWorkflowExecutionAsyncResponse {
+	if t == nil {
+		return nil
+	}
+	return &shared.StartWorkflowExecutionAsyncResponse{}
 }
 
 func UpdateDomainResponse(t *apiv1.UpdateDomainResponse) *shared.UpdateDomainResponse {
@@ -328,5 +344,15 @@ func UpdateDomainResponse(t *apiv1.UpdateDomainResponse) *shared.UpdateDomainRes
 		},
 		FailoverVersion: &t.Domain.FailoverVersion,
 		IsGlobalDomain:  &t.Domain.IsGlobalDomain,
+	}
+}
+
+func RestartWorkflowExecutionResponse(t *apiv1.RestartWorkflowExecutionResponse) *shared.RestartWorkflowExecutionResponse {
+	if t == nil {
+		return nil
+	}
+
+	return &shared.RestartWorkflowExecutionResponse{
+		RunId: &t.RunId,
 	}
 }

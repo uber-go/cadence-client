@@ -26,9 +26,12 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/cadence/internal/common/debug"
 
 	"github.com/golang/mock/gomock"
 	"github.com/opentracing/opentracing-go"
@@ -36,12 +39,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-go/tally"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
-	"go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+
+	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
+	"go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common"
 )
 
 func testInternalWorkerRegister(r *registry) {
@@ -195,7 +199,7 @@ func testActivityMultipleArgsWithStruct(ctx context.Context, i int, s testActivi
 }
 
 func (s *internalWorkerTestSuite) TestCreateWorker() {
-	worker := createWorkerWithThrottle(s.T(), s.service, float64(500.0), WorkerOptions{})
+	worker := createWorkerWithThrottle(s.T(), s.service, 500, WorkerOptions{})
 	err := worker.Start()
 	require.NoError(s.T(), err)
 	time.Sleep(time.Millisecond * 200)
@@ -226,6 +230,24 @@ func (s *internalWorkerTestSuite) TestCreateWorker_WithAutoScaler() {
 	worker.Stop()
 }
 
+func (s *internalWorkerTestSuite) TestCreateWorker_WithStrictNonDeterminism() {
+	worker := createWorkerWithStrictNonDeterminismDisabled(s.T(), s.service)
+	err := worker.Start()
+	require.NoError(s.T(), err)
+	time.Sleep(time.Millisecond * 200)
+	worker.Stop()
+}
+
+func (s *internalWorkerTestSuite) TestCreateWorker_WithHost() {
+	worker := createWorkerWithHost(s.T(), s.service)
+	err := worker.Start()
+	require.NoError(s.T(), err)
+	time.Sleep(time.Millisecond * 200)
+	assert.Equal(s.T(), "test_host", worker.activityWorker.worker.options.host)
+	assert.Equal(s.T(), "test_host", worker.workflowWorker.worker.options.host)
+	worker.Stop()
+}
+
 func (s *internalWorkerTestSuite) TestCreateWorkerRun() {
 	// Create service endpoint
 	mockCtrl := gomock.NewController(s.T())
@@ -250,8 +272,9 @@ func (s *internalWorkerTestSuite) TestNoActivitiesOrWorkflows() {
 	w := createWorker(s.T(), s.service)
 	w.registry = newRegistry()
 	assert.Empty(t, w.registry.getRegisteredActivities())
-	assert.Empty(t, w.registry.getRegisteredWorkflowTypes())
+	assert.Empty(t, w.registry.GetRegisteredWorkflowTypes())
 	assert.NoError(t, w.Start())
+	w.Stop()
 }
 
 func (s *internalWorkerTestSuite) TestWorkerStartFailsWithInvalidDomain() {
@@ -337,7 +360,7 @@ func createWorker(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{})
 }
 
 func createShadowWorker(
@@ -345,7 +368,7 @@ func createShadowWorker(
 	service *workflowservicetest.MockClient,
 	shadowOptions *ShadowOptions,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{
 		EnableShadowWorker: true,
 		ShadowOptions:      *shadowOptions,
 	})
@@ -392,11 +415,12 @@ func createWorkerWithThrottle(
 	workerOptions.EnableSessionWorker = true
 
 	// Start Worker.
-	worker := NewWorker(
+	worker, err := NewWorker(
 		service,
 		domain,
 		"testGroupName2",
 		workerOptions)
+	require.NoError(t, err)
 	return worker
 }
 
@@ -404,14 +428,28 @@ func createWorkerWithDataConverter(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0.0), WorkerOptions{DataConverter: newTestDataConverter()})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{DataConverter: newTestDataConverter()})
 }
 
 func createWorkerWithAutoscaler(
 	t *testing.T,
 	service *workflowservicetest.MockClient,
 ) *aggregatedWorker {
-	return createWorkerWithThrottle(t, service, float64(0), WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{FeatureFlags: FeatureFlags{PollerAutoScalerEnabled: true}})
+}
+
+func createWorkerWithStrictNonDeterminismDisabled(
+	t *testing.T,
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{WorkerBugPorts: WorkerBugPorts{DisableStrictNonDeterminismCheck: true}})
+}
+
+func createWorkerWithHost(
+	t *testing.T,
+	service *workflowservicetest.MockClient,
+) *aggregatedWorker {
+	return createWorkerWithThrottle(t, service, 0, WorkerOptions{Host: "test_host"})
 }
 
 func (s *internalWorkerTestSuite) testCompleteActivityHelper(opt *ClientOptions) {
@@ -798,14 +836,55 @@ func testWorkflowReturnStructPtrPtr(ctx Context, arg1 int) (result **testWorkflo
 
 func TestRegisterVariousWorkflowTypes(t *testing.T) {
 	r := newRegistry()
-	r.RegisterWorkflow(testWorkflowSample)
-	r.RegisterWorkflow(testWorkflowMultipleArgs)
-	r.RegisterWorkflow(testWorkflowNoArgs)
-	r.RegisterWorkflow(testWorkflowReturnInt)
-	r.RegisterWorkflow(testWorkflowReturnString)
-	r.RegisterWorkflow(testWorkflowReturnStruct)
-	r.RegisterWorkflow(testWorkflowReturnStructPtr)
-	r.RegisterWorkflow(testWorkflowReturnStructPtrPtr)
+	w := &aggregatedWorker{registry: r}
+	w.RegisterWorkflowWithOptions(testWorkflowSample, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowMultipleArgs, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowNoArgs, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnInt, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnString, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnStruct, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnStructPtr, RegisterWorkflowOptions{EnableShortName: true})
+	w.RegisterWorkflowWithOptions(testWorkflowReturnStructPtrPtr, RegisterWorkflowOptions{EnableShortName: true})
+
+	wfs := w.GetRegisteredWorkflows()
+	var wfNames []string
+	for _, wf := range wfs {
+		wfNames = append(wfNames, wf.WorkflowType().Name)
+	}
+	assert.Equal(t, 8, len(wfs))
+	assert.Contains(t, wfNames, "testWorkflowSample")
+	assert.Contains(t, wfNames, "testWorkflowMultipleArgs")
+	assert.Contains(t, wfNames, "testWorkflowNoArgs")
+	assert.Contains(t, wfNames, "testWorkflowReturnInt")
+	assert.Contains(t, wfNames, "testWorkflowReturnString")
+	assert.Contains(t, wfNames, "testWorkflowReturnString")
+	assert.Contains(t, wfNames, "testWorkflowReturnStructPtr")
+	assert.Contains(t, wfNames, "testWorkflowReturnStructPtrPtr")
+
+	// sample assertion on workflow func
+	var sampleFunc interface{}
+	for _, wf := range wfs {
+		if wf.WorkflowType().Name == "testWorkflowSample" {
+			sampleFunc = wf.GetFunction()
+			break
+		}
+	}
+	assert.Equal(t, getFunctionName(testWorkflowSample), runtime.FuncForPC(reflect.ValueOf(sampleFunc).Pointer()).Name())
+}
+
+func TestRegisterActivityWithOptions(t *testing.T) {
+	r := newRegistry()
+	w := &aggregatedWorker{registry: r}
+	w.RegisterActivityWithOptions(testActivityMultipleArgs, RegisterActivityOptions{EnableShortName: true})
+
+	a := w.GetRegisteredActivities()
+	assert.Equal(t, 1, len(a))
+	assert.Contains(t, a[0].ActivityType().Name, "testActivityMultipleArgs")
+
+	// assert activity function
+	fn := a[0].GetFunction()
+	assert.Equal(t, reflect.Func, reflect.ValueOf(fn).Kind())
+	assert.Equal(t, getFunctionName(testActivityMultipleArgs), runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }
 
 type testErrorDetails struct {
@@ -998,7 +1077,8 @@ func TestActivityNilArgs(t *testing.T) {
 func TestWorkerOptionDefaults(t *testing.T) {
 	domain := "worker-options-test"
 	taskList := "worker-options-tl"
-	aggWorker := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
+	aggWorker, err := newAggregatedWorker(nil, domain, taskList, WorkerOptions{})
+	require.NoError(t, err)
 	decisionWorker := aggWorker.workflowWorker
 	require.True(t, decisionWorker.executionParameters.Identity != "")
 	require.NotNil(t, decisionWorker.executionParameters.Logger)
@@ -1022,7 +1102,12 @@ func TestWorkerOptionDefaults(t *testing.T) {
 			Tracer:                                  opentracing.NoopTracer{},
 			Logger:                                  decisionWorker.executionParameters.Logger,
 			MetricsScope:                            decisionWorker.executionParameters.MetricsScope,
-			Identity:                                decisionWorker.executionParameters.Identity},
+			Identity:                                decisionWorker.executionParameters.Identity,
+			WorkerStats: debug.WorkerStats{
+				PollerTracker:   debug.NewNoopPollerTracker(),
+				ActivityTracker: debug.NewNoopActivityTracker(),
+			},
+		},
 		UserContext: decisionWorker.executionParameters.UserContext,
 	}
 
@@ -1034,6 +1119,7 @@ func TestWorkerOptionDefaults(t *testing.T) {
 	require.NotNil(t, activityWorker.executionParameters.MetricsScope)
 	require.Nil(t, activityWorker.executionParameters.ContextPropagators)
 	assertWorkerExecutionParamsEqual(t, expected, activityWorker.executionParameters)
+	assert.Equal(t, expected.WorkerStats, aggWorker.GetWorkerStats())
 }
 
 func TestWorkerOptionNonDefaults(t *testing.T) {
@@ -1056,11 +1142,12 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 		DataConverter:                           &defaultDataConverter{},
 		BackgroundActivityContext:               context.Background(),
 		Logger:                                  zap.NewNop(),
-		MetricsScope:                            tally.NoopScope,
-		Tracer:                                  opentracing.NoopTracer{},
+		MetricsScope:                            tally.NewTestScope("", nil),
+		Tracer:                                  opentracing.GlobalTracer(),
 	}
 
-	aggWorker := newAggregatedWorker(nil, domain, taskList, options)
+	aggWorker, err := newAggregatedWorker(nil, domain, taskList, options)
+	require.NoError(t, err)
 	decisionWorker := aggWorker.workflowWorker
 	require.True(t, len(decisionWorker.executionParameters.ContextPropagators) > 0)
 
@@ -1081,7 +1168,12 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 			Tracer:                                  options.Tracer,
 			Logger:                                  options.Logger,
 			MetricsScope:                            options.MetricsScope,
-			Identity:                                options.Identity},
+			Identity:                                options.Identity,
+			WorkerStats: debug.WorkerStats{
+				PollerTracker:   debug.NewNoopPollerTracker(),
+				ActivityTracker: debug.NewNoopActivityTracker(),
+			},
+		},
 	}
 
 	assertWorkerExecutionParamsEqual(t, expected, decisionWorker.executionParameters)
@@ -1089,6 +1181,7 @@ func TestWorkerOptionNonDefaults(t *testing.T) {
 	activityWorker := aggWorker.activityWorker
 	require.True(t, len(activityWorker.executionParameters.ContextPropagators) > 0)
 	assertWorkerExecutionParamsEqual(t, expected, activityWorker.executionParameters)
+	assert.Equal(t, expected.WorkerStats, aggWorker.GetWorkerStats())
 }
 
 func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParameters, paramsB workerExecutionParameters) {
@@ -1108,6 +1201,8 @@ func assertWorkerExecutionParamsEqual(t *testing.T, paramsA workerExecutionParam
 	require.Equal(t, paramsA.NonDeterministicWorkflowPolicy, paramsB.NonDeterministicWorkflowPolicy)
 	require.Equal(t, paramsA.EnableLoggingInReplay, paramsB.EnableLoggingInReplay)
 	require.Equal(t, paramsA.DisableStickyExecution, paramsB.DisableStickyExecution)
+	require.Equal(t, paramsA.WorkerStats.PollerTracker, paramsB.WorkerStats.PollerTracker)
+	require.Equal(t, paramsA.WorkerStats.ActivityTracker, paramsB.WorkerStats.ActivityTracker)
 }
 
 /*
@@ -1297,7 +1392,7 @@ func Test_augmentWorkerOptions(t *testing.T) {
 				MaxConcurrentDecisionTaskExecutionSize:  1000,
 				WorkerDecisionTasksPerSecond:            100000,
 				MaxConcurrentDecisionTaskPollers:        2,
-				MinConcurrentDecisionTaskPollers:        1,
+				MinConcurrentDecisionTaskPollers:        2,
 				PollerAutoScalerCooldown:                time.Minute,
 				PollerAutoScalerTargetUtilization:       0.6,
 				PollerAutoScalerDryRun:                  false,
@@ -1327,7 +1422,7 @@ func Test_augmentWorkerOptions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, augmentWorkerOptions(tt.args.options), "augmentWorkerOptions(%v)", tt.args.options)
+			assert.Equalf(t, tt.want, AugmentWorkerOptions(tt.args.options), "AugmentWorkerOptions(%v)", tt.args.options)
 		})
 	}
 }

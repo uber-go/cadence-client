@@ -18,6 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// when adding any, make sure you update the files that it checks in the makefile
+//go:generate mockery --srcpkg . --name Client --output ../mocks --boilerplate-file ../LICENSE
+//go:generate mockery --srcpkg . --name DomainClient --output ../mocks --boilerplate-file ../LICENSE
+
 // Package client contains functions to create Cadence clients used to communicate to Cadence service.
 //
 // Use these to perform CRUD on domains and start or query workflow executions.
@@ -43,6 +47,10 @@ const (
 	// QueryTypeOpenSessions is the build in query type for Client.QueryWorkflow() call. Use this query type to get all open
 	// sessions in the workflow. The result will be a list of SessionInfo encoded in the encoded.Value.
 	QueryTypeOpenSessions string = internal.QueryTypeOpenSessions
+
+	// QueryTypeQueryTypes is the build in query type for Client.QueryWorkflow() call. Use this query type to list
+	// all query types of the workflow. The result will be a string encoded in the EncodedValue.
+	QueryTypeQueryTypes string = internal.QueryTypeQueryTypes
 )
 
 type (
@@ -73,6 +81,11 @@ type (
 	// ParentClosePolicy defines the behavior performed on a child workflow when its parent is closed
 	ParentClosePolicy = internal.ParentClosePolicy
 
+	// CancelOption values are functional options for the CancelWorkflow method.
+	// Supported values can be created with:
+	//  - WithCancelReason(...)
+	CancelOption = internal.Option
+
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.
 	Client interface {
@@ -88,6 +101,15 @@ type (
 		//	- WorkflowExecutionAlreadyStartedError
 		//	- InternalServiceError
 		StartWorkflow(ctx context.Context, options StartWorkflowOptions, workflowFunc interface{}, args ...interface{}) (*workflow.Execution, error)
+
+		// StartWorkflowAsync behaves like StartWorkflow except that the request is first queued and then processed asynchronously.
+		// See StartWorkflow for parameter details.
+		// The returned AsyncWorkflowExecution doesn't contain run ID, because the workflow hasn't started yet.
+		// The errors it can return:
+		//	- EntityNotExistsError, if domain does not exists
+		//	- BadRequestError
+		//	- InternalServiceError
+		StartWorkflowAsync(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*workflow.ExecutionAsync, error)
 
 		// ExecuteWorkflow starts a workflow execution and return a WorkflowRun instance and error
 		// The user can use this to start using a function or workflow type name.
@@ -154,6 +176,15 @@ type (
 		SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
 			options StartWorkflowOptions, workflowFunc interface{}, workflowArgs ...interface{}) (*workflow.Execution, error)
 
+		// SignalWithStartWorkflowAsync behaves like SignalWithStartWorkflow except that the request is first queued and then processed asynchronously.
+		// See SignalWithStartWorkflow for parameter details.
+		// The errors it can return:
+		//  - EntityNotExistsError, if domain does not exist
+		//  - BadRequestError
+		//	- InternalServiceError
+		SignalWithStartWorkflowAsync(ctx context.Context, workflowID string, signalName string, signalArg interface{},
+			options StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (*workflow.ExecutionAsync, error)
+
 		// CancelWorkflow cancels a workflow in execution
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
@@ -162,7 +193,7 @@ type (
 		//	- BadRequestError
 		//	- InternalServiceError
 		//	- WorkflowExecutionAlreadyCompletedError
-		CancelWorkflow(ctx context.Context, workflowID string, runID string) error
+		CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...CancelOption) error
 
 		// TerminateWorkflow terminates a workflow execution.
 		// workflowID is required, other parameters are optional.
@@ -447,8 +478,9 @@ var _ internal.DomainClient = DomainClient(nil)
 // User had Activity.RecordHeartbeat(ctx, "my-heartbeat") and then got response from calling Client.DescribeWorkflowExecution.
 // The response contains binary field PendingActivityInfo.HeartbeatDetails,
 // which can be decoded by using:
-//   var result string // This need to be same type as the one passed to RecordHeartbeat
-//   NewValue(data).Get(&result)
+//
+//	var result string // This need to be same type as the one passed to RecordHeartbeat
+//	NewValue(data).Get(&result)
 func NewValue(data []byte) encoded.Value {
 	return internal.NewValue(data)
 }
@@ -457,9 +489,10 @@ func NewValue(data []byte) encoded.Value {
 // User had Activity.RecordHeartbeat(ctx, "my-heartbeat", 123) and then got response from calling Client.DescribeWorkflowExecution.
 // The response contains binary field PendingActivityInfo.HeartbeatDetails,
 // which can be decoded by using:
-//   var result1 string
-//   var result2 int // These need to be same type as those arguments passed to RecordHeartbeat
-//   NewValues(data).Get(&result1, &result2)
+//
+//	var result1 string
+//	var result2 int // These need to be same type as those arguments passed to RecordHeartbeat
+//	NewValues(data).Get(&result1, &result2)
 func NewValues(data []byte) encoded.Values {
 	return internal.NewValues(data)
 }
@@ -513,4 +546,11 @@ func IsWorkflowError(err error) bool {
 		return true
 	}
 	return false
+}
+
+// WithCancelReason can be passed to Client.CancelWorkflow to provide an explicit cancellation reason,
+// which will be recorded in the cancellation event in the workflow's history, similar to termination reasons.
+// This is purely informational, and does not influence Cadence behavior at all.
+func WithCancelReason(reason string) CancelOption {
+	return internal.WithCancelReason(reason)
 }

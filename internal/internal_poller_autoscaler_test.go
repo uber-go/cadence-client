@@ -21,15 +21,17 @@
 package internal
 
 import (
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/atomic"
-	s "go.uber.org/cadence/.gen/go/shared"
-	"go.uber.org/cadence/internal/common/autoscaler"
-	"go.uber.org/zap/zaptest"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/atomic"
+	"go.uber.org/zap/zaptest"
+
+	s "go.uber.org/cadence/.gen/go/shared"
+	"go.uber.org/cadence/internal/common/autoscaler"
 )
 
 func Test_pollerAutoscaler(t *testing.T) {
@@ -59,7 +61,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 				taskPoll:           0,
 				unrelated:          0,
 				initialPollerCount: 10,
-				minPollerCount:     1,
+				minPollerCount:     2,
 				maxPollerCount:     10,
 				targetMilliUsage:   500,
 				cooldownTime:       coolDownTime,
@@ -114,7 +116,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 				autoScalerEpoch:    1,
 				isDryRun:           false,
 			},
-			want: 4,
+			want: 10,
 		},
 		{
 			name: "over utilized, scale up to max",

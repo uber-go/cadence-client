@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
+
 	"go.uber.org/cadence/.gen/go/shared"
 )
 
@@ -197,13 +198,14 @@ func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 
 // NewDisconnectedContext returns a new context that won't propagate parent's cancellation to the new child context.
 // One common use case is to do cleanup work after workflow is cancelled.
-//  err := workflow.ExecuteActivity(ctx, ActivityFoo).Get(ctx, &activityFooResult)
-//  if err != nil && cadence.IsCanceledError(ctx.Err()) {
-//    // activity failed, and workflow context is canceled
-//    disconnectedCtx, _ := workflow.newDisconnectedContext(ctx);
-//    workflow.ExecuteActivity(disconnectedCtx, handleCancellationActivity).Get(disconnectedCtx, nil)
-//    return err // workflow return CanceledError
-//  }
+//
+//	err := workflow.ExecuteActivity(ctx, ActivityFoo).Get(ctx, &activityFooResult)
+//	if err != nil && cadence.IsCanceledError(ctx.Err()) {
+//	  // activity failed, and workflow context is canceled
+//	  disconnectedCtx, _ := workflow.newDisconnectedContext(ctx);
+//	  workflow.ExecuteActivity(disconnectedCtx, handleCancellationActivity).Get(disconnectedCtx, nil)
+//	  return err // workflow return CanceledError
+//	}
 func NewDisconnectedContext(parent Context) (ctx Context, cancel CancelFunc) {
 	c := newCancelCtx(parent)
 	return c, func() { c.cancel(true, ErrCanceled) }
@@ -230,10 +232,7 @@ func propagateCancel(parent Context, child canceler) {
 			child.cancel(false, p.err)
 		} else {
 			p.childrenLock.Lock()
-			if p.children == nil {
-				p.children = make(map[canceler]bool)
-			}
-			p.children[child] = true
+			p.children = append(p.children, child)
 			p.childrenLock.Unlock()
 			p.cancelLock.Unlock()
 		}
@@ -258,7 +257,7 @@ func parentCancelCtx(parent Context) (*cancelCtx, bool) {
 		case *cancelCtx:
 			return c, true
 		// TODO: Uncomment once timer story is implemented
-		//case *timerCtx:
+		// case *timerCtx:
 		//	return c.cancelCtx, true
 		case *valueCtx:
 			parent = c.Context
@@ -278,8 +277,29 @@ func removeChild(parent Context, child canceler) {
 	p.childrenLock.Lock()
 	defer p.childrenLock.Unlock()
 	if p.children != nil {
-		delete(p.children, child)
+		removeChildFromSlice(p.children, child)
 	}
+}
+
+// Helper to remove a child from a context's canceler list.
+// There should only ever be one instance per list due to code elsewhere,
+// but this func does not check or enforce that.
+func removeChildFromSlice(children []canceler, child canceler) []canceler {
+	// This maintains the original order, mostly because it makes behavior easier to reason about
+	// in case that becomes necessary (e.g. bug hunting).
+	// Out-of-order (move last item into the gap) is equally correct and slightly more efficient,
+	// but this likely cannot be changed without changing the order of code execution.
+	found := -1
+	for idx, c := range children {
+		if c == child {
+			found = idx
+			break
+		}
+	}
+	if found >= 0 {
+		children = append(children[:found], children[found+1:]...)
+	}
+	return children
 }
 
 // A canceler is a context type that can be canceled directly.  The
@@ -300,8 +320,8 @@ type cancelCtx struct {
 	canceled   bool
 
 	childrenLock sync.Mutex
-	children     map[canceler]bool // set to nil by the first cancel call
-	err          error             // set to non-nil by the first cancel call
+	children     []canceler
+	err          error // set to non-nil by the first cancel call
 }
 
 func (c *cancelCtx) Done() Channel {
@@ -320,11 +340,9 @@ func (c *cancelCtx) getChildren() []canceler {
 	c.childrenLock.Lock()
 	defer c.childrenLock.Unlock()
 
-	out := []canceler{}
-	for key := range c.children {
-		out = append(out, key)
-	}
-	return out
+	dup := make([]canceler, len(c.children))
+	copy(dup, c.children)
+	return dup
 }
 
 // cancel closes c.done, cancels each of c's children, and, if
@@ -374,7 +392,7 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 //
 // Canceling this context releases resources associated with it, so code should
 // call cancel as soon as the operations running in this Context complete.
-//func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc) {
+// func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc) {
 //	if cur, ok := parent.Deadline(); ok && cur.Before(deadline) {
 //		// The current deadline is already sooner than the new one.
 //		return WithCancel(parent)
@@ -395,27 +413,27 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 //		})
 //	}
 //	return c, func() { c.cancel(true, Canceled) }
-//}
+// }
 //
-//// A timerCtx carries a timer and a deadline.  It embeds a cancelCtx to
-//// implement Done and Err.  It implements cancel by stopping its timer then
-//// delegating to cancelCtx.cancel.
-//type timerCtx struct {
+// // A timerCtx carries a timer and a deadline.  It embeds a cancelCtx to
+// // implement Done and Err.  It implements cancel by stopping its timer then
+// // delegating to cancelCtx.cancel.
+// type timerCtx struct {
 //	*cancelCtx
 //	timer *time.Timer // Under cancelCtx.mu.
 //
 //	deadline time.Time
-//}
+// }
 //
-//func (c *timerCtx) Deadline() (deadline time.Time, ok bool) {
+// func (c *timerCtx) Deadline() (deadline time.Time, ok bool) {
 //	return c.deadline, true
-//}
+// }
 //
-//func (c *timerCtx) String() string {
+// func (c *timerCtx) String() string {
 //	return fmt.Sprintf("%v.WithDeadline(%s [%s])", c.cancelCtx.Context, c.deadline, c.deadline.Sub(time.Now()))
-//}
+// }
 //
-//func (c *timerCtx) cancel(removeFromParent bool, err error) {
+// func (c *timerCtx) cancel(removeFromParent bool, err error) {
 //	c.cancelCtx.cancel(false, err)
 //	if removeFromParent {
 //		// Remove this timerCtx from its parent cancelCtx's children.
@@ -425,7 +443,7 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 //		c.timer.Stop()
 //		c.timer = nil
 //	}
-//}
+// }
 //
 // WithTimeout returns WithDeadline(parent, time.Now().Add(timeout)).
 //
@@ -437,9 +455,9 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 // 		defer cancel()  // releases resources if slowOperation completes before timeout elapses
 // 		return slowOperation(ctx)
 // 	}
-//func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc) {
+// func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc) {
 //	return WithDeadline(parent, time.Now().Add(timeout))
-//}
+// }
 
 // WithValue returns a copy of parent in which the value associated with key is
 // val.

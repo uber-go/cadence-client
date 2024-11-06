@@ -24,10 +24,11 @@
 package workflowservicefx
 
 import (
-	workflowserviceserver "go.uber.org/cadence/.gen/go/cadence/workflowserviceserver"
 	fx "go.uber.org/fx"
 	transport "go.uber.org/yarpc/api/transport"
 	thrift "go.uber.org/yarpc/encoding/thrift"
+
+	workflowserviceserver "go.uber.org/cadence/.gen/go/cadence/workflowserviceserver"
 )
 
 // ServerParams defines the dependencies for the WorkflowService server.
@@ -51,12 +52,12 @@ type ServerResult struct {
 // Server provides procedures for WorkflowService to an Fx application. It expects a
 // workflowservicefx.Interface to be present in the container.
 //
-// 	fx.Provide(
-// 		func(h *MyWorkflowServiceHandler) workflowserviceserver.Interface {
-// 			return h
-// 		},
-// 		workflowservicefx.Server(),
-// 	)
+//	fx.Provide(
+//		func(h *MyWorkflowServiceHandler) workflowserviceserver.Interface {
+//			return h
+//		},
+//		workflowservicefx.Server(),
+//	)
 func Server(opts ...thrift.RegisterOption) interface{} {
 	return func(p ServerParams) ServerResult {
 		procedures := workflowserviceserver.New(p.Handler, opts...)

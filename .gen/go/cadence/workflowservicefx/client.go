@@ -24,12 +24,13 @@
 package workflowservicefx
 
 import (
-	workflowserviceclient "go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	fx "go.uber.org/fx"
 	yarpc "go.uber.org/yarpc"
 	transport "go.uber.org/yarpc/api/transport"
 	restriction "go.uber.org/yarpc/api/x/restriction"
 	thrift "go.uber.org/yarpc/encoding/thrift"
+
+	workflowserviceclient "go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 )
 
 // Params defines the dependencies for the WorkflowService client.
@@ -55,10 +56,10 @@ type Result struct {
 // Client provides a WorkflowService client to an Fx application using the given name
 // for routing.
 //
-// 	fx.Provide(
-// 		workflowservicefx.Client("..."),
-// 		newHandler,
-// 	)
+//	fx.Provide(
+//		workflowservicefx.Client("..."),
+//		newHandler,
+//	)
 func Client(name string, opts ...thrift.ClientOption) interface{} {
 	return func(p Params) Result {
 		cc := p.Provider.ClientConfig(name)

@@ -51,3 +51,15 @@ func callOptions() []interface{} {
 		gomock.Any(), // feature flags
 	}
 }
+
+// this is the mock for yarpcCallOptions, as gomock requires the num of arguments to be the same.
+// see getYarpcCallOptions for the default case.
+func callOptionsWithIsolationGroupHeader() []interface{} {
+	return []interface{}{
+		gomock.Any(), // library version
+		gomock.Any(), // feature version
+		gomock.Any(), // client name
+		gomock.Any(), // feature flags
+		gomock.Any(), // isolation group header
+	}
+}

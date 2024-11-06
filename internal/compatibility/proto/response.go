@@ -21,8 +21,9 @@
 package proto
 
 import (
-	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/cadence/.gen/go/shared"
+
+	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 )
 
 func CountWorkflowExecutionsResponse(t *shared.CountWorkflowExecutionsResponse) *apiv1.CountWorkflowExecutionsResponse {
@@ -222,6 +223,7 @@ func PollForDecisionTaskResponse(t *shared.PollForDecisionTaskResponse) *apiv1.P
 		StartedTime:               unixNanoToTime(t.StartedTimestamp),
 		Queries:                   WorkflowQueryMap(t.Queries),
 		NextEventId:               t.GetNextEventId(),
+		TotalHistoryBytes:         t.GetTotalHistoryBytes(),
 	}
 }
 

@@ -28,11 +28,13 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
+	"go.uber.org/zap"
+
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/auth"
+	"go.uber.org/cadence/internal/common/isolationgroup"
 	"go.uber.org/cadence/internal/common/metrics"
-	"go.uber.org/zap"
 )
 
 const (
@@ -43,9 +45,36 @@ const (
 	// QueryTypeOpenSessions is the build in query type for Client.QueryWorkflow() call. Use this query type to get all open
 	// sessions in the workflow. The result will be a list of SessionInfo encoded in the EncodedValue.
 	QueryTypeOpenSessions string = "__open_sessions"
+
+	// QueryTypeQueryTypes is the build in query type for Client.QueryWorkflow() call. Use this query type to list
+	// all query types of the workflow. The result will be a string encoded in the EncodedValue.
+	QueryTypeQueryTypes string = "__query_types"
 )
 
+// BuiltinQueryTypes returns a list of built-in query types
+func BuiltinQueryTypes() []string {
+	return []string{
+		QueryTypeOpenSessions,
+		QueryTypeStackTrace,
+		QueryTypeQueryTypes,
+	}
+}
+
+type Option interface{ private() }
+
+type CancelReason string
+
+func (CancelReason) private() {}
+
+// WithCancelReason can be passed to Client.CancelWorkflow to provide an explicit cancellation reason,
+// which will be recorded in the cancellation event in the workflow's history, similar to termination reasons.
+// This is purely informational, and does not influence Cadence behavior at all.
+func WithCancelReason(reason string) Option {
+	return CancelReason(reason)
+}
+
 type (
+
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.
 	Client interface {
@@ -63,6 +92,15 @@ type (
 		// The current timeout resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
 		// subjected to change in the future.
 		StartWorkflow(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*WorkflowExecution, error)
+
+		// StartWorkflowAsync behaves like StartWorkflow except that the request is first queued and then processed asynchronously.
+		// See StartWorkflow for parameter details.
+		// The returned AsyncWorkflowExecution doesn't contain run ID, because the workflow hasn't started yet.
+		// The errors it can return:
+		//	- EntityNotExistsError, if domain does not exists
+		//	- BadRequestError
+		//	- InternalServiceError
+		StartWorkflowAsync(ctx context.Context, options StartWorkflowOptions, workflow interface{}, args ...interface{}) (*WorkflowExecutionAsync, error)
 
 		// ExecuteWorkflow starts a workflow execution and return a WorkflowRun instance and error
 		// The user can use this to start using a function or workflow type name.
@@ -131,6 +169,15 @@ type (
 		SignalWithStartWorkflow(ctx context.Context, workflowID string, signalName string, signalArg interface{},
 			options StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (*WorkflowExecution, error)
 
+		// SignalWithStartWorkflowAsync behaves like SignalWithStartWorkflow except that the request is first queued and then processed asynchronously.
+		// See SignalWithStartWorkflow for parameter details.
+		// The errors it can return:
+		//  - EntityNotExistsError, if domain does not exist
+		//  - BadRequestError
+		//	- InternalServiceError
+		SignalWithStartWorkflowAsync(ctx context.Context, workflowID string, signalName string, signalArg interface{},
+			options StartWorkflowOptions, workflow interface{}, workflowArgs ...interface{}) (*WorkflowExecutionAsync, error)
+
 		// CancelWorkflow cancels a workflow in execution
 		// - workflow ID of the workflow.
 		// - runID can be default(empty string). if empty string then it will pick the running execution of that workflow ID.
@@ -139,7 +186,7 @@ type (
 		//	- BadRequestError
 		//	- InternalServiceError
 		//	- WorkflowExecutionAlreadyCompletedError
-		CancelWorkflow(ctx context.Context, workflowID string, runID string) error
+		CancelWorkflow(ctx context.Context, workflowID string, runID string, opts ...Option) error
 
 		// TerminateWorkflow terminates a workflow execution.
 		// workflowID is required, other parameters are optional.
@@ -343,6 +390,7 @@ type (
 	ClientOptions struct {
 		MetricsScope       tally.Scope
 		Identity           string
+		IsolationGroup     string
 		DataConverter      DataConverter
 		Tracer             opentracing.Tracer
 		ContextPropagators []ContextPropagator
@@ -418,6 +466,11 @@ type (
 		// This works with CronSchedule and with DelayStart.
 		// Optional: defaulted to 0 seconds
 		JitterStart time.Duration
+
+		// FirstRunAt - Specific time (in RFC 3339 format) to let the first run of the workflow to start at,
+		// This will only be used and override DelayStart and JitterStart if provided in the first run
+		// Optional: defaulted to Unix epoch time
+		FirstRunAt time.Time
 	}
 
 	// RetryPolicy defines the retry policy.
@@ -563,6 +616,9 @@ func NewClient(service workflowserviceclient.Interface, domain string, options *
 	if options != nil && options.Authorization != nil {
 		service = auth.NewWorkflowServiceWrapper(service, options.Authorization)
 	}
+	if options != nil && options.IsolationGroup != "" {
+		service = isolationgroup.NewWorkflowServiceWrapper(service, options.IsolationGroup)
+	}
 	service = metrics.NewWorkflowServiceWrapper(service, metricScope)
 	return &workflowClient{
 		workflowService:    service,
@@ -638,8 +694,9 @@ func (p ParentClosePolicy) toThriftPtr() *s.ParentClosePolicy {
 // User had Activity.RecordHeartbeat(ctx, "my-heartbeat") and then got response from calling Client.DescribeWorkflowExecution.
 // The response contains binary field PendingActivityInfo.HeartbeatDetails,
 // which can be decoded by using:
-//   var result string // This need to be same type as the one passed to RecordHeartbeat
-//   NewValue(data).Get(&result)
+//
+//	var result string // This need to be same type as the one passed to RecordHeartbeat
+//	NewValue(data).Get(&result)
 func NewValue(data []byte) Value {
 	return newEncodedValue(data, nil)
 }
@@ -648,9 +705,10 @@ func NewValue(data []byte) Value {
 // User had Activity.RecordHeartbeat(ctx, "my-heartbeat", 123) and then got response from calling Client.DescribeWorkflowExecution.
 // The response contains binary field PendingActivityInfo.HeartbeatDetails,
 // which can be decoded by using:
-//   var result1 string
-//   var result2 int // These need to be same type as those arguments passed to RecordHeartbeat
-//   NewValues(data).Get(&result1, &result2)
+//
+//	var result1 string
+//	var result2 int // These need to be same type as those arguments passed to RecordHeartbeat
+//	NewValues(data).Get(&result1, &result2)
 func NewValues(data []byte) Values {
 	return newEncodedValues(data, nil)
 }

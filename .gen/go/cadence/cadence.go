@@ -26,12 +26,14 @@ package cadence
 import (
 	errors "errors"
 	fmt "fmt"
-	shared "go.uber.org/cadence/.gen/go/shared"
+	strings "strings"
+
 	multierr "go.uber.org/multierr"
 	thriftreflect "go.uber.org/thriftrw/thriftreflect"
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
-	strings "strings"
+
+	shared "go.uber.org/cadence/.gen/go/shared"
 )
 
 // ThriftModule represents the IDL file used to generate this package.
@@ -39,14 +41,14 @@ var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "cadence",
 	Package:  "go.uber.org/cadence/.gen/go/cadence",
 	FilePath: "cadence.thrift",
-	SHA1:     "7ffaa374f3d1d097d8a6ec871a4be395f50d9bba",
+	SHA1:     "d3aed495096c071e130c4dd03f2ff16c7a9a2022",
 	Includes: []*thriftreflect.ThriftModule{
 		shared.ThriftModule,
 	},
 	Raw: rawIDL,
 }
 
-const rawIDL = "// Copyright (c) 2017 Uber Technologies, Inc.\n//\n// Permission is hereby granted, free of charge, to any person obtaining a copy\n// of this software and associated documentation files (the \"Software\"), to deal\n// in the Software without restriction, including without limitation the rights\n// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n// copies of the Software, and to permit persons to whom the Software is\n// furnished to do so, subject to the following conditions:\n//\n// The above copyright notice and this permission notice shall be included in\n// all copies or substantial portions of the Software.\n//\n// THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\n// THE SOFTWARE.\n\ninclude \"shared.thrift\"\n\nnamespace java com.uber.cadence\n\n/**\n* WorkflowService API is exposed to provide support for long running applications.  Application is expected to call\n* StartWorkflowExecution to create an instance for each instance of long running workflow.  Such applications are expected\n* to have a worker which regularly polls for DecisionTask and ActivityTask from the WorkflowService.  For each\n* DecisionTask, application is expected to process the history of events for that session and respond back with next\n* decisions.  For each ActivityTask, application is expected to execute the actual logic for that task and respond back\n* with completion or failure.  Worker is expected to regularly heartbeat while activity task is running.\n**/\nservice WorkflowService {\n  /**\n  * RegisterDomain creates a new domain which can be used as a container for all resources.  Domain is a top level\n  * entity within Cadence, used as a container for all resources like workflow executions, tasklists, etc.  Domain\n  * acts as a sandbox and provides isolation for all resources within the domain.  All resources belongs to exactly one\n  * domain.\n  **/\n  void RegisterDomain(1: shared.RegisterDomainRequest registerRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.DomainAlreadyExistsError domainExistsError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * DescribeDomain returns the information and configuration for a registered domain.\n  **/\n  shared.DescribeDomainResponse DescribeDomain(1: shared.DescribeDomainRequest describeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n    * ListDomains returns the information and configuration for all domains.\n    **/\n    shared.ListDomainsResponse ListDomains(1: shared.ListDomainsRequest listRequest)\n      throws (\n        1: shared.BadRequestError badRequestError,\n        3: shared.EntityNotExistsError entityNotExistError,\n        4: shared.ServiceBusyError serviceBusyError,\n        5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      )\n\n  /**\n  * UpdateDomain is used to update the information and configuration for a registered domain.\n  **/\n  shared.UpdateDomainResponse UpdateDomain(1: shared.UpdateDomainRequest updateRequest)\n      throws (\n        1: shared.BadRequestError badRequestError,\n        3: shared.EntityNotExistsError entityNotExistError,\n        4: shared.ServiceBusyError serviceBusyError,\n        5: shared.DomainNotActiveError domainNotActiveError,\n        6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      )\n\n  /**\n  * DeprecateDomain us used to update status of a registered domain to DEPRECATED.  Once the domain is deprecated\n  * it cannot be used to start new workflow executions.  Existing workflow executions will continue to run on\n  * deprecated domains.\n  **/\n  void DeprecateDomain(1: shared.DeprecateDomainRequest deprecateRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * StartWorkflowExecution starts a new long running workflow instance.  It will create the instance with\n  * 'WorkflowExecutionStarted' event in history and also schedule the first DecisionTask for the worker to make the\n  * first decision for this instance.  It will return 'WorkflowExecutionAlreadyStartedError', if an instance already\n  * exists with same workflowId.\n  **/\n  shared.StartWorkflowExecutionResponse StartWorkflowExecution(1: shared.StartWorkflowExecutionRequest startRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.WorkflowExecutionAlreadyStartedError sessionAlreadyExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.EntityNotExistsError entityNotExistError,\n      8: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * Returns the history of specified workflow execution.  It fails with 'EntityNotExistError' if speficied workflow\n  * execution in unknown to the service.\n  **/\n  shared.GetWorkflowExecutionHistoryResponse GetWorkflowExecutionHistory(1: shared.GetWorkflowExecutionHistoryRequest getRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * PollForDecisionTask is called by application worker to process DecisionTask from a specific taskList.  A\n  * DecisionTask is dispatched to callers for active workflow executions, with pending decisions.\n  * Application is then expected to call 'RespondDecisionTaskCompleted' API when it is done processing the DecisionTask.\n  * It will also create a 'DecisionTaskStarted' event in the history for that session before handing off DecisionTask to\n  * application worker.\n  **/\n  shared.PollForDecisionTaskResponse PollForDecisionTask(1: shared.PollForDecisionTaskRequest pollRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.ServiceBusyError serviceBusyError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.EntityNotExistsError entityNotExistError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * RespondDecisionTaskCompleted is called by application worker to complete a DecisionTask handed as a result of\n  * 'PollForDecisionTask' API call.  Completing a DecisionTask will result in new events for the workflow execution and\n  * potentially new ActivityTask being created for corresponding decisions.  It will also create a DecisionTaskCompleted\n  * event in the history for that session.  Use the 'taskToken' provided as response of PollForDecisionTask API call\n  * for completing the DecisionTask.\n  * The response could contain a new decision task if there is one or if the request asking for one.\n  **/\n  shared.RespondDecisionTaskCompletedResponse RespondDecisionTaskCompleted(1: shared.RespondDecisionTaskCompletedRequest completeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondDecisionTaskFailed is called by application worker to indicate failure.  This results in\n  * DecisionTaskFailedEvent written to the history and a new DecisionTask created.  This API can be used by client to\n  * either clear sticky tasklist or report any panics during DecisionTask processing.  Cadence will only append first\n  * DecisionTaskFailed event to the history of workflow execution for consecutive failures.\n  **/\n  void RespondDecisionTaskFailed(1: shared.RespondDecisionTaskFailedRequest failedRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * PollForActivityTask is called by application worker to process ActivityTask from a specific taskList.  ActivityTask\n  * is dispatched to callers whenever a ScheduleTask decision is made for a workflow execution.\n  * Application is expected to call 'RespondActivityTaskCompleted' or 'RespondActivityTaskFailed' once it is done\n  * processing the task.\n  * Application also needs to call 'RecordActivityTaskHeartbeat' API within 'heartbeatTimeoutSeconds' interval to\n  * prevent the task from getting timed out.  An event 'ActivityTaskStarted' event is also written to workflow execution\n  * history before the ActivityTask is dispatched to application worker.\n  **/\n  shared.PollForActivityTaskResponse PollForActivityTask(1: shared.PollForActivityTaskRequest pollRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.ServiceBusyError serviceBusyError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.EntityNotExistsError entityNotExistError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * RecordActivityTaskHeartbeat is called by application worker while it is processing an ActivityTask.  If worker fails\n  * to heartbeat within 'heartbeatTimeoutSeconds' interval for the ActivityTask, then it will be marked as timedout and\n  * 'ActivityTaskTimedOut' event will be written to the workflow history.  Calling 'RecordActivityTaskHeartbeat' will\n  * fail with 'EntityNotExistsError' in such situations.  Use the 'taskToken' provided as response of\n  * PollForActivityTask API call for heartbeating.\n  **/\n  shared.RecordActivityTaskHeartbeatResponse RecordActivityTaskHeartbeat(1: shared.RecordActivityTaskHeartbeatRequest heartbeatRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RecordActivityTaskHeartbeatByID is called by application worker while it is processing an ActivityTask.  If worker fails\n  * to heartbeat within 'heartbeatTimeoutSeconds' interval for the ActivityTask, then it will be marked as timedout and\n  * 'ActivityTaskTimedOut' event will be written to the workflow history.  Calling 'RecordActivityTaskHeartbeatByID' will\n  * fail with 'EntityNotExistsError' in such situations.  Instead of using 'taskToken' like in RecordActivityTaskHeartbeat,\n  * use Domain, WorkflowID and ActivityID\n  **/\n  shared.RecordActivityTaskHeartbeatResponse RecordActivityTaskHeartbeatByID(1: shared.RecordActivityTaskHeartbeatByIDRequest heartbeatRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskCompleted is called by application worker when it is done processing an ActivityTask.  It will\n  * result in a new 'ActivityTaskCompleted' event being written to the workflow history and a new DecisionTask\n  * created for the workflow so new decisions could be made.  Use the 'taskToken' provided as response of\n  * PollForActivityTask API call for completion. It fails with 'EntityNotExistsError' if the taskToken is not valid\n  * anymore due to activity timeout.\n  **/\n  void  RespondActivityTaskCompleted(1: shared.RespondActivityTaskCompletedRequest completeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskCompletedByID is called by application worker when it is done processing an ActivityTask.\n  * It will result in a new 'ActivityTaskCompleted' event being written to the workflow history and a new DecisionTask\n  * created for the workflow so new decisions could be made.  Similar to RespondActivityTaskCompleted but use Domain,\n  * WorkflowID and ActivityID instead of 'taskToken' for completion. It fails with 'EntityNotExistsError'\n  * if the these IDs are not valid anymore due to activity timeout.\n  **/\n  void  RespondActivityTaskCompletedByID(1: shared.RespondActivityTaskCompletedByIDRequest completeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskFailed is called by application worker when it is done processing an ActivityTask.  It will\n  * result in a new 'ActivityTaskFailed' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made.  Use the 'taskToken' provided as response of\n  * PollForActivityTask API call for completion. It fails with 'EntityNotExistsError' if the taskToken is not valid\n  * anymore due to activity timeout.\n  **/\n  void  RespondActivityTaskFailed(1: shared.RespondActivityTaskFailedRequest failRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskFailedByID is called by application worker when it is done processing an ActivityTask.\n  * It will result in a new 'ActivityTaskFailed' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made.  Similar to RespondActivityTaskFailed but use\n  * Domain, WorkflowID and ActivityID instead of 'taskToken' for completion. It fails with 'EntityNotExistsError'\n  * if the these IDs are not valid anymore due to activity timeout.\n  **/\n  void  RespondActivityTaskFailedByID(1: shared.RespondActivityTaskFailedByIDRequest failRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskCanceled is called by application worker when it is successfully canceled an ActivityTask.  It will\n  * result in a new 'ActivityTaskCanceled' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made.  Use the 'taskToken' provided as response of\n  * PollForActivityTask API call for completion. It fails with 'EntityNotExistsError' if the taskToken is not valid\n  * anymore due to activity timeout.\n  **/\n  void RespondActivityTaskCanceled(1: shared.RespondActivityTaskCanceledRequest canceledRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskCanceledByID is called by application worker when it is successfully canceled an ActivityTask.\n  * It will result in a new 'ActivityTaskCanceled' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made.  Similar to RespondActivityTaskCanceled but use\n  * Domain, WorkflowID and ActivityID instead of 'taskToken' for completion. It fails with 'EntityNotExistsError'\n  * if the these IDs are not valid anymore due to activity timeout.\n  **/\n  void RespondActivityTaskCanceledByID(1: shared.RespondActivityTaskCanceledByIDRequest canceledRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RequestCancelWorkflowExecution is called by application worker when it wants to request cancellation of a workflow instance.\n  * It will result in a new 'WorkflowExecutionCancelRequested' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made. It fails with 'EntityNotExistsError' if the workflow is not valid\n  * anymore due to completion or doesn't exist.\n  **/\n  void RequestCancelWorkflowExecution(1: shared.RequestCancelWorkflowExecutionRequest cancelRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.CancellationAlreadyRequestedError cancellationAlreadyRequestedError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.LimitExceededError limitExceededError,\n      8: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      9: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * SignalWorkflowExecution is used to send a signal event to running workflow execution.  This results in\n  * WorkflowExecutionSignaled event recorded in the history and a decision task being created for the execution.\n  **/\n  void SignalWorkflowExecution(1: shared.SignalWorkflowExecutionRequest signalRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * SignalWithStartWorkflowExecution is used to ensure sending signal to a workflow.\n  * If the workflow is running, this results in WorkflowExecutionSignaled event being recorded in the history\n  * and a decision task being created for the execution.\n  * If the workflow is not running or not found, this results in WorkflowExecutionStarted and WorkflowExecutionSignaled\n  * events being recorded in history, and a decision task being created for the execution\n  **/\n  shared.StartWorkflowExecutionResponse SignalWithStartWorkflowExecution(1: shared.SignalWithStartWorkflowExecutionRequest signalWithStartRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.WorkflowExecutionAlreadyStartedError workflowAlreadyStartedError,\n      8: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n    * ResetWorkflowExecution reset an existing workflow execution to DecisionTaskCompleted event(exclusive).\n    * And it will immediately terminating the current execution instance.\n    **/\n  shared.ResetWorkflowExecutionResponse ResetWorkflowExecution(1: shared.ResetWorkflowExecutionRequest resetRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * TerminateWorkflowExecution terminates an existing workflow execution by recording WorkflowExecutionTerminated event\n  * in the history and immediately terminating the execution instance.\n  **/\n  void TerminateWorkflowExecution(1: shared.TerminateWorkflowExecutionRequest terminateRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific domain.\n  **/\n  shared.ListOpenWorkflowExecutionsResponse ListOpenWorkflowExecutions(1: shared.ListOpenWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific domain.\n  **/\n  shared.ListClosedWorkflowExecutionsResponse ListClosedWorkflowExecutions(1: shared.ListClosedWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * ListWorkflowExecutions is a visibility API to list workflow executions in a specific domain.\n  **/\n  shared.ListWorkflowExecutionsResponse ListWorkflowExecutions(1: shared.ListWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * ListArchivedWorkflowExecutions is a visibility API to list archived workflow executions in a specific domain.\n  **/\n  shared.ListArchivedWorkflowExecutionsResponse ListArchivedWorkflowExecutions(1: shared.ListArchivedWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific domain without order.\n  **/\n  shared.ListWorkflowExecutionsResponse ScanWorkflowExecutions(1: shared.ListWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * CountWorkflowExecutions is a visibility API to count of workflow executions in a specific domain.\n  **/\n  shared.CountWorkflowExecutionsResponse CountWorkflowExecutions(1: shared.CountWorkflowExecutionsRequest countRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs\n  **/\n  shared.GetSearchAttributesResponse GetSearchAttributes()\n    throws (\n      2: shared.ServiceBusyError serviceBusyError,\n      3: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * RespondQueryTaskCompleted is called by application worker to complete a QueryTask (which is a DecisionTask for query)\n  * as a result of 'PollForDecisionTask' API call. Completing a QueryTask will unblock the client call to 'QueryWorkflow'\n  * API and return the query result to client as a response to 'QueryWorkflow' API call.\n  **/\n  void RespondQueryTaskCompleted(1: shared.RespondQueryTaskCompletedRequest completeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * Reset the sticky tasklist related information in mutable state of a given workflow.\n  * Things cleared are:\n  * 1. StickyTaskList\n  * 2. StickyScheduleToStartTimeout\n  * 3. ClientLibraryVersion\n  * 4. ClientFeatureVersion\n  * 5. ClientImpl\n  **/\n  shared.ResetStickyTaskListResponse ResetStickyTaskList(1: shared.ResetStickyTaskListRequest resetRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * QueryWorkflow returns query result for a specified workflow execution\n  **/\n  shared.QueryWorkflowResponse QueryWorkflow(1: shared.QueryWorkflowRequest queryRequest)\n\tthrows (\n\t  1: shared.BadRequestError badRequestError,\n\t  3: shared.EntityNotExistsError entityNotExistError,\n\t  4: shared.QueryFailedError queryFailedError,\n\t  5: shared.LimitExceededError limitExceededError,\n\t  6: shared.ServiceBusyError serviceBusyError,\n\t  7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n\t)\n\n  /**\n  * DescribeWorkflowExecution returns information about the specified workflow execution.\n  **/\n  shared.DescribeWorkflowExecutionResponse DescribeWorkflowExecution(1: shared.DescribeWorkflowExecutionRequest describeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * DescribeTaskList returns information about the target tasklist, right now this API returns the\n  * pollers which polled this tasklist in last few minutes.\n  **/\n  shared.DescribeTaskListResponse DescribeTaskList(1: shared.DescribeTaskListRequest request)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * GetClusterInfo returns information about cadence cluster\n  **/\n  shared.ClusterInfo GetClusterInfo()\n    throws (\n      1: shared.InternalServiceError internalServiceError,\n      2: shared.ServiceBusyError serviceBusyError,\n    )\n\n  /**\n  * GetTaskListsByDomain returns the list of all the task lists for a domainName.\n  **/\n  shared.GetTaskListsByDomainResponse GetTaskListsByDomain(1: shared.GetTaskListsByDomainRequest request)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      2: shared.EntityNotExistsError entityNotExistError,\n      3: shared.LimitExceededError limitExceededError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n   /**\n   * ReapplyEvents applies stale events to the current workflow and current run\n   **/\n  shared.ListTaskListPartitionsResponse ListTaskListPartitions(1: shared.ListTaskListPartitionsRequest request)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n    )\n\n  /**\n  * RefreshWorkflowTasks refreshes all tasks of a workflow\n  **/\n  void RefreshWorkflowTasks(1: shared.RefreshWorkflowTasksRequest request)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      2: shared.DomainNotActiveError domainNotActiveError,\n      3: shared.ServiceBusyError serviceBusyError,\n      4: shared.EntityNotExistsError entityNotExistError,\n    )\n}\n"
+const rawIDL = "// Copyright (c) 2017 Uber Technologies, Inc.\n//\n// Permission is hereby granted, free of charge, to any person obtaining a copy\n// of this software and associated documentation files (the \"Software\"), to deal\n// in the Software without restriction, including without limitation the rights\n// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n// copies of the Software, and to permit persons to whom the Software is\n// furnished to do so, subject to the following conditions:\n//\n// The above copyright notice and this permission notice shall be included in\n// all copies or substantial portions of the Software.\n//\n// THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\n// THE SOFTWARE.\n\ninclude \"shared.thrift\"\n\nnamespace java com.uber.cadence\n\n/**\n* WorkflowService API is exposed to provide support for long running applications.  Application is expected to call\n* StartWorkflowExecution to create an instance for each instance of long running workflow.  Such applications are expected\n* to have a worker which regularly polls for DecisionTask and ActivityTask from the WorkflowService.  For each\n* DecisionTask, application is expected to process the history of events for that session and respond back with next\n* decisions.  For each ActivityTask, application is expected to execute the actual logic for that task and respond back\n* with completion or failure.  Worker is expected to regularly heartbeat while activity task is running.\n**/\nservice WorkflowService {\n  /**\n  * RegisterDomain creates a new domain which can be used as a container for all resources.  Domain is a top level\n  * entity within Cadence, used as a container for all resources like workflow executions, tasklists, etc.  Domain\n  * acts as a sandbox and provides isolation for all resources within the domain.  All resources belongs to exactly one\n  * domain.\n  **/\n  void RegisterDomain(1: shared.RegisterDomainRequest registerRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.DomainAlreadyExistsError domainExistsError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * DescribeDomain returns the information and configuration for a registered domain.\n  **/\n  shared.DescribeDomainResponse DescribeDomain(1: shared.DescribeDomainRequest describeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n    * ListDomains returns the information and configuration for all domains.\n    **/\n    shared.ListDomainsResponse ListDomains(1: shared.ListDomainsRequest listRequest)\n      throws (\n        1: shared.BadRequestError badRequestError,\n        3: shared.EntityNotExistsError entityNotExistError,\n        4: shared.ServiceBusyError serviceBusyError,\n        5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      )\n\n  /**\n  * UpdateDomain is used to update the information and configuration for a registered domain.\n  **/\n  shared.UpdateDomainResponse UpdateDomain(1: shared.UpdateDomainRequest updateRequest)\n      throws (\n        1: shared.BadRequestError badRequestError,\n        3: shared.EntityNotExistsError entityNotExistError,\n        4: shared.ServiceBusyError serviceBusyError,\n        5: shared.DomainNotActiveError domainNotActiveError,\n        6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      )\n\n  /**\n  * DeprecateDomain us used to update status of a registered domain to DEPRECATED.  Once the domain is deprecated\n  * it cannot be used to start new workflow executions.  Existing workflow executions will continue to run on\n  * deprecated domains.\n  **/\n  void DeprecateDomain(1: shared.DeprecateDomainRequest deprecateRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * RestartWorkflowExecution restarts a previous workflow\n  * If the workflow is currently running it will terminate and restart\n  **/\n  shared.RestartWorkflowExecutionResponse RestartWorkflowExecution(1: shared.RestartWorkflowExecutionRequest restartRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      2: shared.ServiceBusyError serviceBusyError,\n      3: shared.DomainNotActiveError domainNotActiveError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.EntityNotExistsError entityNotExistError,\n      6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n  /**\n  * StartWorkflowExecution starts a new long running workflow instance.  It will create the instance with\n  * 'WorkflowExecutionStarted' event in history and also schedule the first DecisionTask for the worker to make the\n  * first decision for this instance.  It will return 'WorkflowExecutionAlreadyStartedError', if an instance already\n  * exists with same workflowId.\n  **/\n  shared.StartWorkflowExecutionResponse StartWorkflowExecution(1: shared.StartWorkflowExecutionRequest startRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.WorkflowExecutionAlreadyStartedError sessionAlreadyExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.EntityNotExistsError entityNotExistError,\n      8: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n  /**\n  * StartWorkflowExecutionAsync starts a new long running workflow instance asynchronously. It will push a StartWorkflowExecutionRequest to a queue\n  * and immediately return a response. The request will be processed by a separate consumer eventually.\n  **/\n  shared.StartWorkflowExecutionAsyncResponse StartWorkflowExecutionAsync(1: shared.StartWorkflowExecutionAsyncRequest startRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.WorkflowExecutionAlreadyStartedError sessionAlreadyExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.EntityNotExistsError entityNotExistError,\n      8: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n  /**\n  * Returns the history of specified workflow execution.  It fails with 'EntityNotExistError' if speficied workflow\n  * execution in unknown to the service.\n  **/\n  shared.GetWorkflowExecutionHistoryResponse GetWorkflowExecutionHistory(1: shared.GetWorkflowExecutionHistoryRequest getRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * PollForDecisionTask is called by application worker to process DecisionTask from a specific taskList.  A\n  * DecisionTask is dispatched to callers for active workflow executions, with pending decisions.\n  * Application is then expected to call 'RespondDecisionTaskCompleted' API when it is done processing the DecisionTask.\n  * It will also create a 'DecisionTaskStarted' event in the history for that session before handing off DecisionTask to\n  * application worker.\n  **/\n  shared.PollForDecisionTaskResponse PollForDecisionTask(1: shared.PollForDecisionTaskRequest pollRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.ServiceBusyError serviceBusyError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.EntityNotExistsError entityNotExistError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * RespondDecisionTaskCompleted is called by application worker to complete a DecisionTask handed as a result of\n  * 'PollForDecisionTask' API call.  Completing a DecisionTask will result in new events for the workflow execution and\n  * potentially new ActivityTask being created for corresponding decisions.  It will also create a DecisionTaskCompleted\n  * event in the history for that session.  Use the 'taskToken' provided as response of PollForDecisionTask API call\n  * for completing the DecisionTask.\n  * The response could contain a new decision task if there is one or if the request asking for one.\n  **/\n  shared.RespondDecisionTaskCompletedResponse RespondDecisionTaskCompleted(1: shared.RespondDecisionTaskCompletedRequest completeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondDecisionTaskFailed is called by application worker to indicate failure.  This results in\n  * DecisionTaskFailedEvent written to the history and a new DecisionTask created.  This API can be used by client to\n  * either clear sticky tasklist or report any panics during DecisionTask processing.  Cadence will only append first\n  * DecisionTaskFailed event to the history of workflow execution for consecutive failures.\n  **/\n  void RespondDecisionTaskFailed(1: shared.RespondDecisionTaskFailedRequest failedRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * PollForActivityTask is called by application worker to process ActivityTask from a specific taskList.  ActivityTask\n  * is dispatched to callers whenever a ScheduleTask decision is made for a workflow execution.\n  * Application is expected to call 'RespondActivityTaskCompleted' or 'RespondActivityTaskFailed' once it is done\n  * processing the task.\n  * Application also needs to call 'RecordActivityTaskHeartbeat' API within 'heartbeatTimeoutSeconds' interval to\n  * prevent the task from getting timed out.  An event 'ActivityTaskStarted' event is also written to workflow execution\n  * history before the ActivityTask is dispatched to application worker.\n  **/\n  shared.PollForActivityTaskResponse PollForActivityTask(1: shared.PollForActivityTaskRequest pollRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.ServiceBusyError serviceBusyError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.EntityNotExistsError entityNotExistError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * RecordActivityTaskHeartbeat is called by application worker while it is processing an ActivityTask.  If worker fails\n  * to heartbeat within 'heartbeatTimeoutSeconds' interval for the ActivityTask, then it will be marked as timedout and\n  * 'ActivityTaskTimedOut' event will be written to the workflow history.  Calling 'RecordActivityTaskHeartbeat' will\n  * fail with 'EntityNotExistsError' in such situations.  Use the 'taskToken' provided as response of\n  * PollForActivityTask API call for heartbeating.\n  **/\n  shared.RecordActivityTaskHeartbeatResponse RecordActivityTaskHeartbeat(1: shared.RecordActivityTaskHeartbeatRequest heartbeatRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RecordActivityTaskHeartbeatByID is called by application worker while it is processing an ActivityTask.  If worker fails\n  * to heartbeat within 'heartbeatTimeoutSeconds' interval for the ActivityTask, then it will be marked as timedout and\n  * 'ActivityTaskTimedOut' event will be written to the workflow history.  Calling 'RecordActivityTaskHeartbeatByID' will\n  * fail with 'EntityNotExistsError' in such situations.  Instead of using 'taskToken' like in RecordActivityTaskHeartbeat,\n  * use Domain, WorkflowID and ActivityID\n  **/\n  shared.RecordActivityTaskHeartbeatResponse RecordActivityTaskHeartbeatByID(1: shared.RecordActivityTaskHeartbeatByIDRequest heartbeatRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskCompleted is called by application worker when it is done processing an ActivityTask.  It will\n  * result in a new 'ActivityTaskCompleted' event being written to the workflow history and a new DecisionTask\n  * created for the workflow so new decisions could be made.  Use the 'taskToken' provided as response of\n  * PollForActivityTask API call for completion. It fails with 'EntityNotExistsError' if the taskToken is not valid\n  * anymore due to activity timeout.\n  **/\n  void  RespondActivityTaskCompleted(1: shared.RespondActivityTaskCompletedRequest completeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskCompletedByID is called by application worker when it is done processing an ActivityTask.\n  * It will result in a new 'ActivityTaskCompleted' event being written to the workflow history and a new DecisionTask\n  * created for the workflow so new decisions could be made.  Similar to RespondActivityTaskCompleted but use Domain,\n  * WorkflowID and ActivityID instead of 'taskToken' for completion. It fails with 'EntityNotExistsError'\n  * if the these IDs are not valid anymore due to activity timeout.\n  **/\n  void  RespondActivityTaskCompletedByID(1: shared.RespondActivityTaskCompletedByIDRequest completeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskFailed is called by application worker when it is done processing an ActivityTask.  It will\n  * result in a new 'ActivityTaskFailed' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made.  Use the 'taskToken' provided as response of\n  * PollForActivityTask API call for completion. It fails with 'EntityNotExistsError' if the taskToken is not valid\n  * anymore due to activity timeout.\n  **/\n  void  RespondActivityTaskFailed(1: shared.RespondActivityTaskFailedRequest failRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskFailedByID is called by application worker when it is done processing an ActivityTask.\n  * It will result in a new 'ActivityTaskFailed' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made.  Similar to RespondActivityTaskFailed but use\n  * Domain, WorkflowID and ActivityID instead of 'taskToken' for completion. It fails with 'EntityNotExistsError'\n  * if the these IDs are not valid anymore due to activity timeout.\n  **/\n  void  RespondActivityTaskFailedByID(1: shared.RespondActivityTaskFailedByIDRequest failRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskCanceled is called by application worker when it is successfully canceled an ActivityTask.  It will\n  * result in a new 'ActivityTaskCanceled' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made.  Use the 'taskToken' provided as response of\n  * PollForActivityTask API call for completion. It fails with 'EntityNotExistsError' if the taskToken is not valid\n  * anymore due to activity timeout.\n  **/\n  void RespondActivityTaskCanceled(1: shared.RespondActivityTaskCanceledRequest canceledRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RespondActivityTaskCanceledByID is called by application worker when it is successfully canceled an ActivityTask.\n  * It will result in a new 'ActivityTaskCanceled' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made.  Similar to RespondActivityTaskCanceled but use\n  * Domain, WorkflowID and ActivityID instead of 'taskToken' for completion. It fails with 'EntityNotExistsError'\n  * if the these IDs are not valid anymore due to activity timeout.\n  **/\n  void RespondActivityTaskCanceledByID(1: shared.RespondActivityTaskCanceledByIDRequest canceledRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.DomainNotActiveError domainNotActiveError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ServiceBusyError serviceBusyError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * RequestCancelWorkflowExecution is called by application worker when it wants to request cancellation of a workflow instance.\n  * It will result in a new 'WorkflowExecutionCancelRequested' event being written to the workflow history and a new DecisionTask\n  * created for the workflow instance so new decisions could be made. It fails with 'EntityNotExistsError' if the workflow is not valid\n  * anymore due to completion or doesn't exist.\n  **/\n  void RequestCancelWorkflowExecution(1: shared.RequestCancelWorkflowExecutionRequest cancelRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.CancellationAlreadyRequestedError cancellationAlreadyRequestedError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.LimitExceededError limitExceededError,\n      8: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      9: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * SignalWorkflowExecution is used to send a signal event to running workflow execution.  This results in\n  * WorkflowExecutionSignaled event recorded in the history and a decision task being created for the execution.\n  **/\n  void SignalWorkflowExecution(1: shared.SignalWorkflowExecutionRequest signalRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * SignalWithStartWorkflowExecution is used to ensure sending signal to a workflow.\n  * If the workflow is running, this results in WorkflowExecutionSignaled event being recorded in the history\n  * and a decision task being created for the execution.\n  * If the workflow is not running or not found, this results in WorkflowExecutionStarted and WorkflowExecutionSignaled\n  * events being recorded in history, and a decision task being created for the execution\n  **/\n  shared.StartWorkflowExecutionResponse SignalWithStartWorkflowExecution(1: shared.SignalWithStartWorkflowExecutionRequest signalWithStartRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.WorkflowExecutionAlreadyStartedError workflowAlreadyStartedError,\n      8: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * SignalWithStartWorkflowExecutionAsync is used to ensure sending signal to a workflow asynchronously.  It will push a SignalWithStartWorkflowExecutionRequest to a queue\n  * and immediately return a response. The request will be processed by a separate consumer eventually.\n  **/\n  shared.SignalWithStartWorkflowExecutionAsyncResponse SignalWithStartWorkflowExecutionAsync(1: shared.SignalWithStartWorkflowExecutionAsyncRequest signalWithStartRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.WorkflowExecutionAlreadyStartedError sessionAlreadyExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.EntityNotExistsError entityNotExistError,\n      8: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n  /**\n    * ResetWorkflowExecution reset an existing workflow execution to DecisionTaskCompleted event(exclusive).\n    * And it will immediately terminating the current execution instance.\n    **/\n  shared.ResetWorkflowExecutionResponse ResetWorkflowExecution(1: shared.ResetWorkflowExecutionRequest resetRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * TerminateWorkflowExecution terminates an existing workflow execution by recording WorkflowExecutionTerminated event\n  * in the history and immediately terminating the execution instance.\n  **/\n  void TerminateWorkflowExecution(1: shared.TerminateWorkflowExecutionRequest terminateRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.DomainNotActiveError domainNotActiveError,\n      6: shared.LimitExceededError limitExceededError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific domain.\n  **/\n  shared.ListOpenWorkflowExecutionsResponse ListOpenWorkflowExecutions(1: shared.ListOpenWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.LimitExceededError limitExceededError,\n      6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific domain.\n  **/\n  shared.ListClosedWorkflowExecutionsResponse ListClosedWorkflowExecutions(1: shared.ListClosedWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * ListWorkflowExecutions is a visibility API to list workflow executions in a specific domain.\n  **/\n  shared.ListWorkflowExecutionsResponse ListWorkflowExecutions(1: shared.ListWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * ListArchivedWorkflowExecutions is a visibility API to list archived workflow executions in a specific domain.\n  **/\n  shared.ListArchivedWorkflowExecutionsResponse ListArchivedWorkflowExecutions(1: shared.ListArchivedWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific domain without order.\n  **/\n  shared.ListWorkflowExecutionsResponse ScanWorkflowExecutions(1: shared.ListWorkflowExecutionsRequest listRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * CountWorkflowExecutions is a visibility API to count of workflow executions in a specific domain.\n  **/\n  shared.CountWorkflowExecutionsResponse CountWorkflowExecutions(1: shared.CountWorkflowExecutionsRequest countRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs\n  **/\n  shared.GetSearchAttributesResponse GetSearchAttributes()\n    throws (\n      2: shared.ServiceBusyError serviceBusyError,\n      3: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * RespondQueryTaskCompleted is called by application worker to complete a QueryTask (which is a DecisionTask for query)\n  * as a result of 'PollForDecisionTask' API call. Completing a QueryTask will unblock the client call to 'QueryWorkflow'\n  * API and return the query result to client as a response to 'QueryWorkflow' API call.\n  **/\n  void RespondQueryTaskCompleted(1: shared.RespondQueryTaskCompletedRequest completeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * Reset the sticky tasklist related information in mutable state of a given workflow.\n  * Things cleared are:\n  * 1. StickyTaskList\n  * 2. StickyScheduleToStartTimeout\n  * 3. ClientLibraryVersion\n  * 4. ClientFeatureVersion\n  * 5. ClientImpl\n  **/\n  shared.ResetStickyTaskListResponse ResetStickyTaskList(1: shared.ResetStickyTaskListRequest resetRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.DomainNotActiveError domainNotActiveError,\n      7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n      8: shared.WorkflowExecutionAlreadyCompletedError workflowExecutionAlreadyCompletedError,\n    )\n\n  /**\n  * QueryWorkflow returns query result for a specified workflow execution\n  **/\n  shared.QueryWorkflowResponse QueryWorkflow(1: shared.QueryWorkflowRequest queryRequest)\n\tthrows (\n\t  1: shared.BadRequestError badRequestError,\n\t  3: shared.EntityNotExistsError entityNotExistError,\n\t  4: shared.QueryFailedError queryFailedError,\n\t  5: shared.LimitExceededError limitExceededError,\n\t  6: shared.ServiceBusyError serviceBusyError,\n\t  7: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n\t)\n\n  /**\n  * DescribeWorkflowExecution returns information about the specified workflow execution.\n  **/\n  shared.DescribeWorkflowExecutionResponse DescribeWorkflowExecution(1: shared.DescribeWorkflowExecutionRequest describeRequest)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * DescribeTaskList returns information about the target tasklist, right now this API returns the\n  * pollers which polled this tasklist in last few minutes.\n  **/\n  shared.DescribeTaskListResponse DescribeTaskList(1: shared.DescribeTaskListRequest request)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n      6: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n  /**\n  * GetClusterInfo returns information about cadence cluster\n  **/\n  shared.ClusterInfo GetClusterInfo()\n    throws (\n      1: shared.InternalServiceError internalServiceError,\n      2: shared.ServiceBusyError serviceBusyError,\n    )\n\n  /**\n  * GetTaskListsByDomain returns the list of all the task lists for a domainName.\n  **/\n  shared.GetTaskListsByDomainResponse GetTaskListsByDomain(1: shared.GetTaskListsByDomainRequest request)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      2: shared.EntityNotExistsError entityNotExistError,\n      3: shared.LimitExceededError limitExceededError,\n      4: shared.ServiceBusyError serviceBusyError,\n      5: shared.ClientVersionNotSupportedError clientVersionNotSupportedError,\n    )\n\n   /**\n   * ReapplyEvents applies stale events to the current workflow and current run\n   **/\n  shared.ListTaskListPartitionsResponse ListTaskListPartitions(1: shared.ListTaskListPartitionsRequest request)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      3: shared.EntityNotExistsError entityNotExistError,\n      4: shared.LimitExceededError limitExceededError,\n      5: shared.ServiceBusyError serviceBusyError,\n    )\n\n  /**\n  * RefreshWorkflowTasks refreshes all tasks of a workflow\n  **/\n  void RefreshWorkflowTasks(1: shared.RefreshWorkflowTasksRequest request)\n    throws (\n      1: shared.BadRequestError badRequestError,\n      2: shared.DomainNotActiveError domainNotActiveError,\n      3: shared.ServiceBusyError serviceBusyError,\n      4: shared.EntityNotExistsError entityNotExistError,\n    )\n}\n"
 
 // WorkflowService_CountWorkflowExecutions_Args represents the arguments for the WorkflowService.CountWorkflowExecutions function.
 //
@@ -62,14 +64,14 @@ type WorkflowService_CountWorkflowExecutions_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_CountWorkflowExecutions_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -103,16 +105,16 @@ func _CountWorkflowExecutionsRequest_Read(w wire.Value) (*shared.CountWorkflowEx
 // An error is returned if we were unable to build a WorkflowService_CountWorkflowExecutions_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_CountWorkflowExecutions_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_CountWorkflowExecutions_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_CountWorkflowExecutions_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -357,14 +359,14 @@ type WorkflowService_CountWorkflowExecutions_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_CountWorkflowExecutions_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -458,16 +460,16 @@ func _ClientVersionNotSupportedError_Read(w wire.Value) (*shared.ClientVersionNo
 // An error is returned if we were unable to build a WorkflowService_CountWorkflowExecutions_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_CountWorkflowExecutions_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_CountWorkflowExecutions_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_CountWorkflowExecutions_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -729,14 +731,14 @@ type WorkflowService_DeprecateDomain_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_DeprecateDomain_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -770,16 +772,16 @@ func _DeprecateDomainRequest_Read(w wire.Value) (*shared.DeprecateDomainRequest,
 // An error is returned if we were unable to build a WorkflowService_DeprecateDomain_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_DeprecateDomain_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_DeprecateDomain_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_DeprecateDomain_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -1026,14 +1028,14 @@ type WorkflowService_DeprecateDomain_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_DeprecateDomain_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -1103,16 +1105,16 @@ func _DomainNotActiveError_Read(w wire.Value) (*shared.DomainNotActiveError, err
 // An error is returned if we were unable to build a WorkflowService_DeprecateDomain_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_DeprecateDomain_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_DeprecateDomain_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_DeprecateDomain_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -1374,14 +1376,14 @@ type WorkflowService_DescribeDomain_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_DescribeDomain_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -1415,16 +1417,16 @@ func _DescribeDomainRequest_Read(w wire.Value) (*shared.DescribeDomainRequest, e
 // An error is returned if we were unable to build a WorkflowService_DescribeDomain_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_DescribeDomain_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_DescribeDomain_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_DescribeDomain_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -1669,14 +1671,14 @@ type WorkflowService_DescribeDomain_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_DescribeDomain_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -1746,16 +1748,16 @@ func _DescribeDomainResponse_Read(w wire.Value) (*shared.DescribeDomainResponse,
 // An error is returned if we were unable to build a WorkflowService_DescribeDomain_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_DescribeDomain_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_DescribeDomain_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_DescribeDomain_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -2017,14 +2019,14 @@ type WorkflowService_DescribeTaskList_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_DescribeTaskList_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -2058,16 +2060,16 @@ func _DescribeTaskListRequest_Read(w wire.Value) (*shared.DescribeTaskListReques
 // An error is returned if we were unable to build a WorkflowService_DescribeTaskList_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_DescribeTaskList_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_DescribeTaskList_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_DescribeTaskList_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -2324,14 +2326,14 @@ type WorkflowService_DescribeTaskList_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_DescribeTaskList_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [6]wire.Field
@@ -2415,16 +2417,16 @@ func _LimitExceededError_Read(w wire.Value) (*shared.LimitExceededError, error) 
 // An error is returned if we were unable to build a WorkflowService_DescribeTaskList_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_DescribeTaskList_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_DescribeTaskList_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_DescribeTaskList_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -2722,14 +2724,14 @@ type WorkflowService_DescribeWorkflowExecution_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_DescribeWorkflowExecution_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -2763,16 +2765,16 @@ func _DescribeWorkflowExecutionRequest_Read(w wire.Value) (*shared.DescribeWorkf
 // An error is returned if we were unable to build a WorkflowService_DescribeWorkflowExecution_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_DescribeWorkflowExecution_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_DescribeWorkflowExecution_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_DescribeWorkflowExecution_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -3029,14 +3031,14 @@ type WorkflowService_DescribeWorkflowExecution_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_DescribeWorkflowExecution_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [6]wire.Field
@@ -3114,16 +3116,16 @@ func _DescribeWorkflowExecutionResponse_Read(w wire.Value) (*shared.DescribeWork
 // An error is returned if we were unable to build a WorkflowService_DescribeWorkflowExecution_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_DescribeWorkflowExecution_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_DescribeWorkflowExecution_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_DescribeWorkflowExecution_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -3420,14 +3422,14 @@ type WorkflowService_GetClusterInfo_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_GetClusterInfo_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [0]wire.Field
@@ -3444,16 +3446,16 @@ func (v *WorkflowService_GetClusterInfo_Args) ToWire() (wire.Value, error) {
 // An error is returned if we were unable to build a WorkflowService_GetClusterInfo_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_GetClusterInfo_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_GetClusterInfo_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_GetClusterInfo_Args) FromWire(w wire.Value) error {
 
 	for _, field := range w.GetStruct().Fields {
@@ -3634,14 +3636,14 @@ type WorkflowService_GetClusterInfo_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_GetClusterInfo_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [3]wire.Field
@@ -3701,16 +3703,16 @@ func _InternalServiceError_Read(w wire.Value) (*shared.InternalServiceError, err
 // An error is returned if we were unable to build a WorkflowService_GetClusterInfo_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_GetClusterInfo_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_GetClusterInfo_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_GetClusterInfo_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -3899,14 +3901,14 @@ type WorkflowService_GetSearchAttributes_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_GetSearchAttributes_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [0]wire.Field
@@ -3923,16 +3925,16 @@ func (v *WorkflowService_GetSearchAttributes_Args) ToWire() (wire.Value, error) 
 // An error is returned if we were unable to build a WorkflowService_GetSearchAttributes_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_GetSearchAttributes_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_GetSearchAttributes_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_GetSearchAttributes_Args) FromWire(w wire.Value) error {
 
 	for _, field := range w.GetStruct().Fields {
@@ -4113,14 +4115,14 @@ type WorkflowService_GetSearchAttributes_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_GetSearchAttributes_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [3]wire.Field
@@ -4174,16 +4176,16 @@ func _GetSearchAttributesResponse_Read(w wire.Value) (*shared.GetSearchAttribute
 // An error is returned if we were unable to build a WorkflowService_GetSearchAttributes_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_GetSearchAttributes_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_GetSearchAttributes_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_GetSearchAttributes_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -4373,14 +4375,14 @@ type WorkflowService_GetTaskListsByDomain_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_GetTaskListsByDomain_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -4414,16 +4416,16 @@ func _GetTaskListsByDomainRequest_Read(w wire.Value) (*shared.GetTaskListsByDoma
 // An error is returned if we were unable to build a WorkflowService_GetTaskListsByDomain_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_GetTaskListsByDomain_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_GetTaskListsByDomain_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_GetTaskListsByDomain_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -4680,14 +4682,14 @@ type WorkflowService_GetTaskListsByDomain_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_GetTaskListsByDomain_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [6]wire.Field
@@ -4765,16 +4767,16 @@ func _GetTaskListsByDomainResponse_Read(w wire.Value) (*shared.GetTaskListsByDom
 // An error is returned if we were unable to build a WorkflowService_GetTaskListsByDomain_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_GetTaskListsByDomain_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_GetTaskListsByDomain_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_GetTaskListsByDomain_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -5072,14 +5074,14 @@ type WorkflowService_GetWorkflowExecutionHistory_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_GetWorkflowExecutionHistory_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -5113,16 +5115,16 @@ func _GetWorkflowExecutionHistoryRequest_Read(w wire.Value) (*shared.GetWorkflow
 // An error is returned if we were unable to build a WorkflowService_GetWorkflowExecutionHistory_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_GetWorkflowExecutionHistory_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_GetWorkflowExecutionHistory_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_GetWorkflowExecutionHistory_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -5367,14 +5369,14 @@ type WorkflowService_GetWorkflowExecutionHistory_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_GetWorkflowExecutionHistory_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -5444,16 +5446,16 @@ func _GetWorkflowExecutionHistoryResponse_Read(w wire.Value) (*shared.GetWorkflo
 // An error is returned if we were unable to build a WorkflowService_GetWorkflowExecutionHistory_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_GetWorkflowExecutionHistory_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_GetWorkflowExecutionHistory_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_GetWorkflowExecutionHistory_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -5715,14 +5717,14 @@ type WorkflowService_ListArchivedWorkflowExecutions_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListArchivedWorkflowExecutions_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -5756,16 +5758,16 @@ func _ListArchivedWorkflowExecutionsRequest_Read(w wire.Value) (*shared.ListArch
 // An error is returned if we were unable to build a WorkflowService_ListArchivedWorkflowExecutions_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListArchivedWorkflowExecutions_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListArchivedWorkflowExecutions_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListArchivedWorkflowExecutions_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -6010,14 +6012,14 @@ type WorkflowService_ListArchivedWorkflowExecutions_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListArchivedWorkflowExecutions_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -6087,16 +6089,16 @@ func _ListArchivedWorkflowExecutionsResponse_Read(w wire.Value) (*shared.ListArc
 // An error is returned if we were unable to build a WorkflowService_ListArchivedWorkflowExecutions_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListArchivedWorkflowExecutions_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListArchivedWorkflowExecutions_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListArchivedWorkflowExecutions_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -6358,14 +6360,14 @@ type WorkflowService_ListClosedWorkflowExecutions_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListClosedWorkflowExecutions_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -6399,16 +6401,16 @@ func _ListClosedWorkflowExecutionsRequest_Read(w wire.Value) (*shared.ListClosed
 // An error is returned if we were unable to build a WorkflowService_ListClosedWorkflowExecutions_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListClosedWorkflowExecutions_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListClosedWorkflowExecutions_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListClosedWorkflowExecutions_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -6653,14 +6655,14 @@ type WorkflowService_ListClosedWorkflowExecutions_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListClosedWorkflowExecutions_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -6730,16 +6732,16 @@ func _ListClosedWorkflowExecutionsResponse_Read(w wire.Value) (*shared.ListClose
 // An error is returned if we were unable to build a WorkflowService_ListClosedWorkflowExecutions_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListClosedWorkflowExecutions_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListClosedWorkflowExecutions_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListClosedWorkflowExecutions_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -7001,14 +7003,14 @@ type WorkflowService_ListDomains_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListDomains_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -7042,16 +7044,16 @@ func _ListDomainsRequest_Read(w wire.Value) (*shared.ListDomainsRequest, error) 
 // An error is returned if we were unable to build a WorkflowService_ListDomains_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListDomains_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListDomains_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListDomains_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -7296,14 +7298,14 @@ type WorkflowService_ListDomains_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListDomains_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -7373,16 +7375,16 @@ func _ListDomainsResponse_Read(w wire.Value) (*shared.ListDomainsResponse, error
 // An error is returned if we were unable to build a WorkflowService_ListDomains_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListDomains_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListDomains_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListDomains_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -7644,14 +7646,14 @@ type WorkflowService_ListOpenWorkflowExecutions_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListOpenWorkflowExecutions_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -7685,16 +7687,16 @@ func _ListOpenWorkflowExecutionsRequest_Read(w wire.Value) (*shared.ListOpenWork
 // An error is returned if we were unable to build a WorkflowService_ListOpenWorkflowExecutions_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListOpenWorkflowExecutions_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListOpenWorkflowExecutions_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListOpenWorkflowExecutions_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -7951,14 +7953,14 @@ type WorkflowService_ListOpenWorkflowExecutions_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListOpenWorkflowExecutions_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [6]wire.Field
@@ -8036,16 +8038,16 @@ func _ListOpenWorkflowExecutionsResponse_Read(w wire.Value) (*shared.ListOpenWor
 // An error is returned if we were unable to build a WorkflowService_ListOpenWorkflowExecutions_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListOpenWorkflowExecutions_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListOpenWorkflowExecutions_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListOpenWorkflowExecutions_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -8343,14 +8345,14 @@ type WorkflowService_ListTaskListPartitions_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListTaskListPartitions_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -8384,16 +8386,16 @@ func _ListTaskListPartitionsRequest_Read(w wire.Value) (*shared.ListTaskListPart
 // An error is returned if we were unable to build a WorkflowService_ListTaskListPartitions_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListTaskListPartitions_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListTaskListPartitions_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListTaskListPartitions_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -8638,14 +8640,14 @@ type WorkflowService_ListTaskListPartitions_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListTaskListPartitions_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -8715,16 +8717,16 @@ func _ListTaskListPartitionsResponse_Read(w wire.Value) (*shared.ListTaskListPar
 // An error is returned if we were unable to build a WorkflowService_ListTaskListPartitions_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListTaskListPartitions_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListTaskListPartitions_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListTaskListPartitions_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -8986,14 +8988,14 @@ type WorkflowService_ListWorkflowExecutions_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListWorkflowExecutions_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -9027,16 +9029,16 @@ func _ListWorkflowExecutionsRequest_Read(w wire.Value) (*shared.ListWorkflowExec
 // An error is returned if we were unable to build a WorkflowService_ListWorkflowExecutions_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListWorkflowExecutions_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListWorkflowExecutions_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListWorkflowExecutions_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -9281,14 +9283,14 @@ type WorkflowService_ListWorkflowExecutions_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ListWorkflowExecutions_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -9358,16 +9360,16 @@ func _ListWorkflowExecutionsResponse_Read(w wire.Value) (*shared.ListWorkflowExe
 // An error is returned if we were unable to build a WorkflowService_ListWorkflowExecutions_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ListWorkflowExecutions_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ListWorkflowExecutions_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ListWorkflowExecutions_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -9629,14 +9631,14 @@ type WorkflowService_PollForActivityTask_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_PollForActivityTask_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -9670,16 +9672,16 @@ func _PollForActivityTaskRequest_Read(w wire.Value) (*shared.PollForActivityTask
 // An error is returned if we were unable to build a WorkflowService_PollForActivityTask_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_PollForActivityTask_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_PollForActivityTask_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_PollForActivityTask_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -9948,14 +9950,14 @@ type WorkflowService_PollForActivityTask_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_PollForActivityTask_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -10041,16 +10043,16 @@ func _PollForActivityTaskResponse_Read(w wire.Value) (*shared.PollForActivityTas
 // An error is returned if we were unable to build a WorkflowService_PollForActivityTask_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_PollForActivityTask_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_PollForActivityTask_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_PollForActivityTask_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -10384,14 +10386,14 @@ type WorkflowService_PollForDecisionTask_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_PollForDecisionTask_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -10425,16 +10427,16 @@ func _PollForDecisionTaskRequest_Read(w wire.Value) (*shared.PollForDecisionTask
 // An error is returned if we were unable to build a WorkflowService_PollForDecisionTask_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_PollForDecisionTask_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_PollForDecisionTask_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_PollForDecisionTask_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -10703,14 +10705,14 @@ type WorkflowService_PollForDecisionTask_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_PollForDecisionTask_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -10796,16 +10798,16 @@ func _PollForDecisionTaskResponse_Read(w wire.Value) (*shared.PollForDecisionTas
 // An error is returned if we were unable to build a WorkflowService_PollForDecisionTask_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_PollForDecisionTask_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_PollForDecisionTask_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_PollForDecisionTask_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -11139,14 +11141,14 @@ type WorkflowService_QueryWorkflow_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_QueryWorkflow_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -11180,16 +11182,16 @@ func _QueryWorkflowRequest_Read(w wire.Value) (*shared.QueryWorkflowRequest, err
 // An error is returned if we were unable to build a WorkflowService_QueryWorkflow_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_QueryWorkflow_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_QueryWorkflow_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_QueryWorkflow_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -11458,14 +11460,14 @@ type WorkflowService_QueryWorkflow_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_QueryWorkflow_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -11557,16 +11559,16 @@ func _QueryFailedError_Read(w wire.Value) (*shared.QueryFailedError, error) {
 // An error is returned if we were unable to build a WorkflowService_QueryWorkflow_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_QueryWorkflow_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_QueryWorkflow_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_QueryWorkflow_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -11900,14 +11902,14 @@ type WorkflowService_RecordActivityTaskHeartbeat_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RecordActivityTaskHeartbeat_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -11941,16 +11943,16 @@ func _RecordActivityTaskHeartbeatRequest_Read(w wire.Value) (*shared.RecordActiv
 // An error is returned if we were unable to build a WorkflowService_RecordActivityTaskHeartbeat_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RecordActivityTaskHeartbeat_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RecordActivityTaskHeartbeat_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RecordActivityTaskHeartbeat_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -12231,14 +12233,14 @@ type WorkflowService_RecordActivityTaskHeartbeat_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [8]wire.Field
@@ -12338,16 +12340,16 @@ func _WorkflowExecutionAlreadyCompletedError_Read(w wire.Value) (*shared.Workflo
 // An error is returned if we were unable to build a WorkflowService_RecordActivityTaskHeartbeat_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RecordActivityTaskHeartbeat_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RecordActivityTaskHeartbeat_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RecordActivityTaskHeartbeat_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -12717,14 +12719,14 @@ type WorkflowService_RecordActivityTaskHeartbeatByID_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RecordActivityTaskHeartbeatByID_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -12758,16 +12760,16 @@ func _RecordActivityTaskHeartbeatByIDRequest_Read(w wire.Value) (*shared.RecordA
 // An error is returned if we were unable to build a WorkflowService_RecordActivityTaskHeartbeatByID_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RecordActivityTaskHeartbeatByID_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RecordActivityTaskHeartbeatByID_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RecordActivityTaskHeartbeatByID_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -13048,14 +13050,14 @@ type WorkflowService_RecordActivityTaskHeartbeatByID_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RecordActivityTaskHeartbeatByID_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [8]wire.Field
@@ -13143,16 +13145,16 @@ func (v *WorkflowService_RecordActivityTaskHeartbeatByID_Result) ToWire() (wire.
 // An error is returned if we were unable to build a WorkflowService_RecordActivityTaskHeartbeatByID_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RecordActivityTaskHeartbeatByID_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RecordActivityTaskHeartbeatByID_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RecordActivityTaskHeartbeatByID_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -13522,14 +13524,14 @@ type WorkflowService_RefreshWorkflowTasks_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RefreshWorkflowTasks_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -13563,16 +13565,16 @@ func _RefreshWorkflowTasksRequest_Read(w wire.Value) (*shared.RefreshWorkflowTas
 // An error is returned if we were unable to build a WorkflowService_RefreshWorkflowTasks_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RefreshWorkflowTasks_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RefreshWorkflowTasks_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RefreshWorkflowTasks_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -13807,14 +13809,14 @@ type WorkflowService_RefreshWorkflowTasks_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RefreshWorkflowTasks_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [4]wire.Field
@@ -13870,16 +13872,16 @@ func (v *WorkflowService_RefreshWorkflowTasks_Result) ToWire() (wire.Value, erro
 // An error is returned if we were unable to build a WorkflowService_RefreshWorkflowTasks_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RefreshWorkflowTasks_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RefreshWorkflowTasks_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RefreshWorkflowTasks_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -14105,14 +14107,14 @@ type WorkflowService_RegisterDomain_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RegisterDomain_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -14146,16 +14148,16 @@ func _RegisterDomainRequest_Read(w wire.Value) (*shared.RegisterDomainRequest, e
 // An error is returned if we were unable to build a WorkflowService_RegisterDomain_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RegisterDomain_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RegisterDomain_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RegisterDomain_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -14390,14 +14392,14 @@ type WorkflowService_RegisterDomain_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RegisterDomain_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [4]wire.Field
@@ -14459,16 +14461,16 @@ func _DomainAlreadyExistsError_Read(w wire.Value) (*shared.DomainAlreadyExistsEr
 // An error is returned if we were unable to build a WorkflowService_RegisterDomain_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RegisterDomain_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RegisterDomain_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RegisterDomain_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -14694,14 +14696,14 @@ type WorkflowService_RequestCancelWorkflowExecution_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RequestCancelWorkflowExecution_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -14735,16 +14737,16 @@ func _RequestCancelWorkflowExecutionRequest_Read(w wire.Value) (*shared.RequestC
 // An error is returned if we were unable to build a WorkflowService_RequestCancelWorkflowExecution_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RequestCancelWorkflowExecution_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RequestCancelWorkflowExecution_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RequestCancelWorkflowExecution_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -15027,14 +15029,14 @@ type WorkflowService_RequestCancelWorkflowExecution_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RequestCancelWorkflowExecution_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [8]wire.Field
@@ -15128,16 +15130,16 @@ func _CancellationAlreadyRequestedError_Read(w wire.Value) (*shared.Cancellation
 // An error is returned if we were unable to build a WorkflowService_RequestCancelWorkflowExecution_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RequestCancelWorkflowExecution_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RequestCancelWorkflowExecution_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RequestCancelWorkflowExecution_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -15507,14 +15509,14 @@ type WorkflowService_ResetStickyTaskList_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ResetStickyTaskList_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -15548,16 +15550,16 @@ func _ResetStickyTaskListRequest_Read(w wire.Value) (*shared.ResetStickyTaskList
 // An error is returned if we were unable to build a WorkflowService_ResetStickyTaskList_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ResetStickyTaskList_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ResetStickyTaskList_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ResetStickyTaskList_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -15838,14 +15840,14 @@ type WorkflowService_ResetStickyTaskList_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ResetStickyTaskList_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [8]wire.Field
@@ -15939,16 +15941,16 @@ func _ResetStickyTaskListResponse_Read(w wire.Value) (*shared.ResetStickyTaskLis
 // An error is returned if we were unable to build a WorkflowService_ResetStickyTaskList_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ResetStickyTaskList_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ResetStickyTaskList_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ResetStickyTaskList_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -16318,14 +16320,14 @@ type WorkflowService_ResetWorkflowExecution_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ResetWorkflowExecution_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -16359,16 +16361,16 @@ func _ResetWorkflowExecutionRequest_Read(w wire.Value) (*shared.ResetWorkflowExe
 // An error is returned if we were unable to build a WorkflowService_ResetWorkflowExecution_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ResetWorkflowExecution_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ResetWorkflowExecution_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ResetWorkflowExecution_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -16637,14 +16639,14 @@ type WorkflowService_ResetWorkflowExecution_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ResetWorkflowExecution_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -16730,16 +16732,16 @@ func _ResetWorkflowExecutionResponse_Read(w wire.Value) (*shared.ResetWorkflowEx
 // An error is returned if we were unable to build a WorkflowService_ResetWorkflowExecution_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ResetWorkflowExecution_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ResetWorkflowExecution_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ResetWorkflowExecution_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -17073,14 +17075,14 @@ type WorkflowService_RespondActivityTaskCanceled_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskCanceled_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -17114,16 +17116,16 @@ func _RespondActivityTaskCanceledRequest_Read(w wire.Value) (*shared.RespondActi
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskCanceled_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskCanceled_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskCanceled_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskCanceled_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -17394,14 +17396,14 @@ type WorkflowService_RespondActivityTaskCanceled_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskCanceled_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -17481,16 +17483,16 @@ func (v *WorkflowService_RespondActivityTaskCanceled_Result) ToWire() (wire.Valu
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskCanceled_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskCanceled_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskCanceled_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskCanceled_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -17824,14 +17826,14 @@ type WorkflowService_RespondActivityTaskCanceledByID_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskCanceledByID_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -17865,16 +17867,16 @@ func _RespondActivityTaskCanceledByIDRequest_Read(w wire.Value) (*shared.Respond
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskCanceledByID_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskCanceledByID_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskCanceledByID_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskCanceledByID_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -18145,14 +18147,14 @@ type WorkflowService_RespondActivityTaskCanceledByID_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskCanceledByID_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -18232,16 +18234,16 @@ func (v *WorkflowService_RespondActivityTaskCanceledByID_Result) ToWire() (wire.
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskCanceledByID_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskCanceledByID_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskCanceledByID_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskCanceledByID_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -18575,14 +18577,14 @@ type WorkflowService_RespondActivityTaskCompleted_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskCompleted_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -18616,16 +18618,16 @@ func _RespondActivityTaskCompletedRequest_Read(w wire.Value) (*shared.RespondAct
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskCompleted_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskCompleted_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskCompleted_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskCompleted_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -18896,14 +18898,14 @@ type WorkflowService_RespondActivityTaskCompleted_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskCompleted_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -18983,16 +18985,16 @@ func (v *WorkflowService_RespondActivityTaskCompleted_Result) ToWire() (wire.Val
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskCompleted_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskCompleted_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskCompleted_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskCompleted_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -19326,14 +19328,14 @@ type WorkflowService_RespondActivityTaskCompletedByID_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskCompletedByID_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -19367,16 +19369,16 @@ func _RespondActivityTaskCompletedByIDRequest_Read(w wire.Value) (*shared.Respon
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskCompletedByID_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskCompletedByID_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskCompletedByID_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskCompletedByID_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -19647,14 +19649,14 @@ type WorkflowService_RespondActivityTaskCompletedByID_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskCompletedByID_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -19734,16 +19736,16 @@ func (v *WorkflowService_RespondActivityTaskCompletedByID_Result) ToWire() (wire
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskCompletedByID_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskCompletedByID_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskCompletedByID_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskCompletedByID_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -20077,14 +20079,14 @@ type WorkflowService_RespondActivityTaskFailed_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskFailed_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -20118,16 +20120,16 @@ func _RespondActivityTaskFailedRequest_Read(w wire.Value) (*shared.RespondActivi
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskFailed_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskFailed_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskFailed_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskFailed_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -20398,14 +20400,14 @@ type WorkflowService_RespondActivityTaskFailed_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskFailed_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -20485,16 +20487,16 @@ func (v *WorkflowService_RespondActivityTaskFailed_Result) ToWire() (wire.Value,
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskFailed_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskFailed_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskFailed_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskFailed_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -20828,14 +20830,14 @@ type WorkflowService_RespondActivityTaskFailedByID_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskFailedByID_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -20869,16 +20871,16 @@ func _RespondActivityTaskFailedByIDRequest_Read(w wire.Value) (*shared.RespondAc
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskFailedByID_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskFailedByID_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskFailedByID_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskFailedByID_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -21149,14 +21151,14 @@ type WorkflowService_RespondActivityTaskFailedByID_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondActivityTaskFailedByID_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -21236,16 +21238,16 @@ func (v *WorkflowService_RespondActivityTaskFailedByID_Result) ToWire() (wire.Va
 // An error is returned if we were unable to build a WorkflowService_RespondActivityTaskFailedByID_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondActivityTaskFailedByID_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondActivityTaskFailedByID_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondActivityTaskFailedByID_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -21579,14 +21581,14 @@ type WorkflowService_RespondDecisionTaskCompleted_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondDecisionTaskCompleted_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -21620,16 +21622,16 @@ func _RespondDecisionTaskCompletedRequest_Read(w wire.Value) (*shared.RespondDec
 // An error is returned if we were unable to build a WorkflowService_RespondDecisionTaskCompleted_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondDecisionTaskCompleted_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondDecisionTaskCompleted_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondDecisionTaskCompleted_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -21910,14 +21912,14 @@ type WorkflowService_RespondDecisionTaskCompleted_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondDecisionTaskCompleted_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [8]wire.Field
@@ -22011,16 +22013,16 @@ func _RespondDecisionTaskCompletedResponse_Read(w wire.Value) (*shared.RespondDe
 // An error is returned if we were unable to build a WorkflowService_RespondDecisionTaskCompleted_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondDecisionTaskCompleted_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondDecisionTaskCompleted_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondDecisionTaskCompleted_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -22390,14 +22392,14 @@ type WorkflowService_RespondDecisionTaskFailed_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondDecisionTaskFailed_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -22431,16 +22433,16 @@ func _RespondDecisionTaskFailedRequest_Read(w wire.Value) (*shared.RespondDecisi
 // An error is returned if we were unable to build a WorkflowService_RespondDecisionTaskFailed_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondDecisionTaskFailed_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondDecisionTaskFailed_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondDecisionTaskFailed_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -22711,14 +22713,14 @@ type WorkflowService_RespondDecisionTaskFailed_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondDecisionTaskFailed_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -22798,16 +22800,16 @@ func (v *WorkflowService_RespondDecisionTaskFailed_Result) ToWire() (wire.Value,
 // An error is returned if we were unable to build a WorkflowService_RespondDecisionTaskFailed_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondDecisionTaskFailed_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondDecisionTaskFailed_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondDecisionTaskFailed_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -23141,14 +23143,14 @@ type WorkflowService_RespondQueryTaskCompleted_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondQueryTaskCompleted_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -23182,16 +23184,16 @@ func _RespondQueryTaskCompletedRequest_Read(w wire.Value) (*shared.RespondQueryT
 // An error is returned if we were unable to build a WorkflowService_RespondQueryTaskCompleted_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondQueryTaskCompleted_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondQueryTaskCompleted_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondQueryTaskCompleted_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -23450,14 +23452,14 @@ type WorkflowService_RespondQueryTaskCompleted_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_RespondQueryTaskCompleted_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [6]wire.Field
@@ -23529,16 +23531,16 @@ func (v *WorkflowService_RespondQueryTaskCompleted_Result) ToWire() (wire.Value,
 // An error is returned if we were unable to build a WorkflowService_RespondQueryTaskCompleted_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_RespondQueryTaskCompleted_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_RespondQueryTaskCompleted_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_RespondQueryTaskCompleted_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -23822,6 +23824,761 @@ func (v *WorkflowService_RespondQueryTaskCompleted_Result) EnvelopeType() wire.E
 	return wire.Reply
 }
 
+// WorkflowService_RestartWorkflowExecution_Args represents the arguments for the WorkflowService.RestartWorkflowExecution function.
+//
+// The arguments for RestartWorkflowExecution are sent and received over the wire as this struct.
+type WorkflowService_RestartWorkflowExecution_Args struct {
+	RestartRequest *shared.RestartWorkflowExecutionRequest `json:"restartRequest,omitempty"`
+}
+
+// ToWire translates a WorkflowService_RestartWorkflowExecution_Args struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
+//
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
+func (v *WorkflowService_RestartWorkflowExecution_Args) ToWire() (wire.Value, error) {
+	var (
+		fields [1]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.RestartRequest != nil {
+		w, err = v.RestartRequest.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 1, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _RestartWorkflowExecutionRequest_Read(w wire.Value) (*shared.RestartWorkflowExecutionRequest, error) {
+	var v shared.RestartWorkflowExecutionRequest
+	err := v.FromWire(w)
+	return &v, err
+}
+
+// FromWire deserializes a WorkflowService_RestartWorkflowExecution_Args struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a WorkflowService_RestartWorkflowExecution_Args struct
+// from the provided intermediate representation.
+//
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
+//
+//	var v WorkflowService_RestartWorkflowExecution_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
+func (v *WorkflowService_RestartWorkflowExecution_Args) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 1:
+			if field.Value.Type() == wire.TStruct {
+				v.RestartRequest, err = _RestartWorkflowExecutionRequest_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a WorkflowService_RestartWorkflowExecution_Args
+// struct.
+func (v *WorkflowService_RestartWorkflowExecution_Args) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [1]string
+	i := 0
+	if v.RestartRequest != nil {
+		fields[i] = fmt.Sprintf("RestartRequest: %v", v.RestartRequest)
+		i++
+	}
+
+	return fmt.Sprintf("WorkflowService_RestartWorkflowExecution_Args{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this WorkflowService_RestartWorkflowExecution_Args match the
+// provided WorkflowService_RestartWorkflowExecution_Args.
+//
+// This function performs a deep comparison.
+func (v *WorkflowService_RestartWorkflowExecution_Args) Equals(rhs *WorkflowService_RestartWorkflowExecution_Args) bool {
+	if v == nil {
+		return rhs == nil
+	} else if rhs == nil {
+		return false
+	}
+	if !((v.RestartRequest == nil && rhs.RestartRequest == nil) || (v.RestartRequest != nil && rhs.RestartRequest != nil && v.RestartRequest.Equals(rhs.RestartRequest))) {
+		return false
+	}
+
+	return true
+}
+
+// MarshalLogObject implements zapcore.ObjectMarshaler, enabling
+// fast logging of WorkflowService_RestartWorkflowExecution_Args.
+func (v *WorkflowService_RestartWorkflowExecution_Args) MarshalLogObject(enc zapcore.ObjectEncoder) (err error) {
+	if v == nil {
+		return nil
+	}
+	if v.RestartRequest != nil {
+		err = multierr.Append(err, enc.AddObject("restartRequest", v.RestartRequest))
+	}
+	return err
+}
+
+// GetRestartRequest returns the value of RestartRequest if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_RestartWorkflowExecution_Args) GetRestartRequest() (o *shared.RestartWorkflowExecutionRequest) {
+	if v != nil && v.RestartRequest != nil {
+		return v.RestartRequest
+	}
+
+	return
+}
+
+// IsSetRestartRequest returns true if RestartRequest is not nil.
+func (v *WorkflowService_RestartWorkflowExecution_Args) IsSetRestartRequest() bool {
+	return v != nil && v.RestartRequest != nil
+}
+
+// MethodName returns the name of the Thrift function as specified in
+// the IDL, for which this struct represent the arguments.
+//
+// This will always be "RestartWorkflowExecution" for this struct.
+func (v *WorkflowService_RestartWorkflowExecution_Args) MethodName() string {
+	return "RestartWorkflowExecution"
+}
+
+// EnvelopeType returns the kind of value inside this struct.
+//
+// This will always be Call for this struct.
+func (v *WorkflowService_RestartWorkflowExecution_Args) EnvelopeType() wire.EnvelopeType {
+	return wire.Call
+}
+
+// WorkflowService_RestartWorkflowExecution_Helper provides functions that aid in handling the
+// parameters and return values of the WorkflowService.RestartWorkflowExecution
+// function.
+var WorkflowService_RestartWorkflowExecution_Helper = struct {
+	// Args accepts the parameters of RestartWorkflowExecution in-order and returns
+	// the arguments struct for the function.
+	Args func(
+		restartRequest *shared.RestartWorkflowExecutionRequest,
+	) *WorkflowService_RestartWorkflowExecution_Args
+
+	// IsException returns true if the given error can be thrown
+	// by RestartWorkflowExecution.
+	//
+	// An error can be thrown by RestartWorkflowExecution only if the
+	// corresponding exception type was mentioned in the 'throws'
+	// section for it in the Thrift file.
+	IsException func(error) bool
+
+	// WrapResponse returns the result struct for RestartWorkflowExecution
+	// given its return value and error.
+	//
+	// This allows mapping values and errors returned by
+	// RestartWorkflowExecution into a serializable result struct.
+	// WrapResponse returns a non-nil error if the provided
+	// error cannot be thrown by RestartWorkflowExecution
+	//
+	//   value, err := RestartWorkflowExecution(args)
+	//   result, err := WorkflowService_RestartWorkflowExecution_Helper.WrapResponse(value, err)
+	//   if err != nil {
+	//     return fmt.Errorf("unexpected error from RestartWorkflowExecution: %v", err)
+	//   }
+	//   serialize(result)
+	WrapResponse func(*shared.RestartWorkflowExecutionResponse, error) (*WorkflowService_RestartWorkflowExecution_Result, error)
+
+	// UnwrapResponse takes the result struct for RestartWorkflowExecution
+	// and returns the value or error returned by it.
+	//
+	// The error is non-nil only if RestartWorkflowExecution threw an
+	// exception.
+	//
+	//   result := deserialize(bytes)
+	//   value, err := WorkflowService_RestartWorkflowExecution_Helper.UnwrapResponse(result)
+	UnwrapResponse func(*WorkflowService_RestartWorkflowExecution_Result) (*shared.RestartWorkflowExecutionResponse, error)
+}{}
+
+func init() {
+	WorkflowService_RestartWorkflowExecution_Helper.Args = func(
+		restartRequest *shared.RestartWorkflowExecutionRequest,
+	) *WorkflowService_RestartWorkflowExecution_Args {
+		return &WorkflowService_RestartWorkflowExecution_Args{
+			RestartRequest: restartRequest,
+		}
+	}
+
+	WorkflowService_RestartWorkflowExecution_Helper.IsException = func(err error) bool {
+		switch err.(type) {
+		case *shared.BadRequestError:
+			return true
+		case *shared.ServiceBusyError:
+			return true
+		case *shared.DomainNotActiveError:
+			return true
+		case *shared.LimitExceededError:
+			return true
+		case *shared.EntityNotExistsError:
+			return true
+		case *shared.ClientVersionNotSupportedError:
+			return true
+		default:
+			return false
+		}
+	}
+
+	WorkflowService_RestartWorkflowExecution_Helper.WrapResponse = func(success *shared.RestartWorkflowExecutionResponse, err error) (*WorkflowService_RestartWorkflowExecution_Result, error) {
+		if err == nil {
+			return &WorkflowService_RestartWorkflowExecution_Result{Success: success}, nil
+		}
+
+		switch e := err.(type) {
+		case *shared.BadRequestError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RestartWorkflowExecution_Result.BadRequestError")
+			}
+			return &WorkflowService_RestartWorkflowExecution_Result{BadRequestError: e}, nil
+		case *shared.ServiceBusyError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RestartWorkflowExecution_Result.ServiceBusyError")
+			}
+			return &WorkflowService_RestartWorkflowExecution_Result{ServiceBusyError: e}, nil
+		case *shared.DomainNotActiveError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RestartWorkflowExecution_Result.DomainNotActiveError")
+			}
+			return &WorkflowService_RestartWorkflowExecution_Result{DomainNotActiveError: e}, nil
+		case *shared.LimitExceededError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RestartWorkflowExecution_Result.LimitExceededError")
+			}
+			return &WorkflowService_RestartWorkflowExecution_Result{LimitExceededError: e}, nil
+		case *shared.EntityNotExistsError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RestartWorkflowExecution_Result.EntityNotExistError")
+			}
+			return &WorkflowService_RestartWorkflowExecution_Result{EntityNotExistError: e}, nil
+		case *shared.ClientVersionNotSupportedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_RestartWorkflowExecution_Result.ClientVersionNotSupportedError")
+			}
+			return &WorkflowService_RestartWorkflowExecution_Result{ClientVersionNotSupportedError: e}, nil
+		}
+
+		return nil, err
+	}
+	WorkflowService_RestartWorkflowExecution_Helper.UnwrapResponse = func(result *WorkflowService_RestartWorkflowExecution_Result) (success *shared.RestartWorkflowExecutionResponse, err error) {
+		if result.BadRequestError != nil {
+			err = result.BadRequestError
+			return
+		}
+		if result.ServiceBusyError != nil {
+			err = result.ServiceBusyError
+			return
+		}
+		if result.DomainNotActiveError != nil {
+			err = result.DomainNotActiveError
+			return
+		}
+		if result.LimitExceededError != nil {
+			err = result.LimitExceededError
+			return
+		}
+		if result.EntityNotExistError != nil {
+			err = result.EntityNotExistError
+			return
+		}
+		if result.ClientVersionNotSupportedError != nil {
+			err = result.ClientVersionNotSupportedError
+			return
+		}
+
+		if result.Success != nil {
+			success = result.Success
+			return
+		}
+
+		err = errors.New("expected a non-void result")
+		return
+	}
+
+}
+
+// WorkflowService_RestartWorkflowExecution_Result represents the result of a WorkflowService.RestartWorkflowExecution function call.
+//
+// The result of a RestartWorkflowExecution execution is sent and received over the wire as this struct.
+//
+// Success is set only if the function did not throw an exception.
+type WorkflowService_RestartWorkflowExecution_Result struct {
+	// Value returned by RestartWorkflowExecution after a successful execution.
+	Success                        *shared.RestartWorkflowExecutionResponse `json:"success,omitempty"`
+	BadRequestError                *shared.BadRequestError                  `json:"badRequestError,omitempty"`
+	ServiceBusyError               *shared.ServiceBusyError                 `json:"serviceBusyError,omitempty"`
+	DomainNotActiveError           *shared.DomainNotActiveError             `json:"domainNotActiveError,omitempty"`
+	LimitExceededError             *shared.LimitExceededError               `json:"limitExceededError,omitempty"`
+	EntityNotExistError            *shared.EntityNotExistsError             `json:"entityNotExistError,omitempty"`
+	ClientVersionNotSupportedError *shared.ClientVersionNotSupportedError   `json:"clientVersionNotSupportedError,omitempty"`
+}
+
+// ToWire translates a WorkflowService_RestartWorkflowExecution_Result struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
+//
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
+func (v *WorkflowService_RestartWorkflowExecution_Result) ToWire() (wire.Value, error) {
+	var (
+		fields [7]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.Success != nil {
+		w, err = v.Success.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 0, Value: w}
+		i++
+	}
+	if v.BadRequestError != nil {
+		w, err = v.BadRequestError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 1, Value: w}
+		i++
+	}
+	if v.ServiceBusyError != nil {
+		w, err = v.ServiceBusyError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 2, Value: w}
+		i++
+	}
+	if v.DomainNotActiveError != nil {
+		w, err = v.DomainNotActiveError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 3, Value: w}
+		i++
+	}
+	if v.LimitExceededError != nil {
+		w, err = v.LimitExceededError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 4, Value: w}
+		i++
+	}
+	if v.EntityNotExistError != nil {
+		w, err = v.EntityNotExistError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 5, Value: w}
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		w, err = v.ClientVersionNotSupportedError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 6, Value: w}
+		i++
+	}
+
+	if i != 1 {
+		return wire.Value{}, fmt.Errorf("WorkflowService_RestartWorkflowExecution_Result should have exactly one field: got %v fields", i)
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _RestartWorkflowExecutionResponse_Read(w wire.Value) (*shared.RestartWorkflowExecutionResponse, error) {
+	var v shared.RestartWorkflowExecutionResponse
+	err := v.FromWire(w)
+	return &v, err
+}
+
+// FromWire deserializes a WorkflowService_RestartWorkflowExecution_Result struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a WorkflowService_RestartWorkflowExecution_Result struct
+// from the provided intermediate representation.
+//
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
+//
+//	var v WorkflowService_RestartWorkflowExecution_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
+func (v *WorkflowService_RestartWorkflowExecution_Result) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 0:
+			if field.Value.Type() == wire.TStruct {
+				v.Success, err = _RestartWorkflowExecutionResponse_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 1:
+			if field.Value.Type() == wire.TStruct {
+				v.BadRequestError, err = _BadRequestError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 2:
+			if field.Value.Type() == wire.TStruct {
+				v.ServiceBusyError, err = _ServiceBusyError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 3:
+			if field.Value.Type() == wire.TStruct {
+				v.DomainNotActiveError, err = _DomainNotActiveError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 4:
+			if field.Value.Type() == wire.TStruct {
+				v.LimitExceededError, err = _LimitExceededError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 5:
+			if field.Value.Type() == wire.TStruct {
+				v.EntityNotExistError, err = _EntityNotExistsError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 6:
+			if field.Value.Type() == wire.TStruct {
+				v.ClientVersionNotSupportedError, err = _ClientVersionNotSupportedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	count := 0
+	if v.Success != nil {
+		count++
+	}
+	if v.BadRequestError != nil {
+		count++
+	}
+	if v.ServiceBusyError != nil {
+		count++
+	}
+	if v.DomainNotActiveError != nil {
+		count++
+	}
+	if v.LimitExceededError != nil {
+		count++
+	}
+	if v.EntityNotExistError != nil {
+		count++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		count++
+	}
+	if count != 1 {
+		return fmt.Errorf("WorkflowService_RestartWorkflowExecution_Result should have exactly one field: got %v fields", count)
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a WorkflowService_RestartWorkflowExecution_Result
+// struct.
+func (v *WorkflowService_RestartWorkflowExecution_Result) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [7]string
+	i := 0
+	if v.Success != nil {
+		fields[i] = fmt.Sprintf("Success: %v", v.Success)
+		i++
+	}
+	if v.BadRequestError != nil {
+		fields[i] = fmt.Sprintf("BadRequestError: %v", v.BadRequestError)
+		i++
+	}
+	if v.ServiceBusyError != nil {
+		fields[i] = fmt.Sprintf("ServiceBusyError: %v", v.ServiceBusyError)
+		i++
+	}
+	if v.DomainNotActiveError != nil {
+		fields[i] = fmt.Sprintf("DomainNotActiveError: %v", v.DomainNotActiveError)
+		i++
+	}
+	if v.LimitExceededError != nil {
+		fields[i] = fmt.Sprintf("LimitExceededError: %v", v.LimitExceededError)
+		i++
+	}
+	if v.EntityNotExistError != nil {
+		fields[i] = fmt.Sprintf("EntityNotExistError: %v", v.EntityNotExistError)
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		fields[i] = fmt.Sprintf("ClientVersionNotSupportedError: %v", v.ClientVersionNotSupportedError)
+		i++
+	}
+
+	return fmt.Sprintf("WorkflowService_RestartWorkflowExecution_Result{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this WorkflowService_RestartWorkflowExecution_Result match the
+// provided WorkflowService_RestartWorkflowExecution_Result.
+//
+// This function performs a deep comparison.
+func (v *WorkflowService_RestartWorkflowExecution_Result) Equals(rhs *WorkflowService_RestartWorkflowExecution_Result) bool {
+	if v == nil {
+		return rhs == nil
+	} else if rhs == nil {
+		return false
+	}
+	if !((v.Success == nil && rhs.Success == nil) || (v.Success != nil && rhs.Success != nil && v.Success.Equals(rhs.Success))) {
+		return false
+	}
+	if !((v.BadRequestError == nil && rhs.BadRequestError == nil) || (v.BadRequestError != nil && rhs.BadRequestError != nil && v.BadRequestError.Equals(rhs.BadRequestError))) {
+		return false
+	}
+	if !((v.ServiceBusyError == nil && rhs.ServiceBusyError == nil) || (v.ServiceBusyError != nil && rhs.ServiceBusyError != nil && v.ServiceBusyError.Equals(rhs.ServiceBusyError))) {
+		return false
+	}
+	if !((v.DomainNotActiveError == nil && rhs.DomainNotActiveError == nil) || (v.DomainNotActiveError != nil && rhs.DomainNotActiveError != nil && v.DomainNotActiveError.Equals(rhs.DomainNotActiveError))) {
+		return false
+	}
+	if !((v.LimitExceededError == nil && rhs.LimitExceededError == nil) || (v.LimitExceededError != nil && rhs.LimitExceededError != nil && v.LimitExceededError.Equals(rhs.LimitExceededError))) {
+		return false
+	}
+	if !((v.EntityNotExistError == nil && rhs.EntityNotExistError == nil) || (v.EntityNotExistError != nil && rhs.EntityNotExistError != nil && v.EntityNotExistError.Equals(rhs.EntityNotExistError))) {
+		return false
+	}
+	if !((v.ClientVersionNotSupportedError == nil && rhs.ClientVersionNotSupportedError == nil) || (v.ClientVersionNotSupportedError != nil && rhs.ClientVersionNotSupportedError != nil && v.ClientVersionNotSupportedError.Equals(rhs.ClientVersionNotSupportedError))) {
+		return false
+	}
+
+	return true
+}
+
+// MarshalLogObject implements zapcore.ObjectMarshaler, enabling
+// fast logging of WorkflowService_RestartWorkflowExecution_Result.
+func (v *WorkflowService_RestartWorkflowExecution_Result) MarshalLogObject(enc zapcore.ObjectEncoder) (err error) {
+	if v == nil {
+		return nil
+	}
+	if v.Success != nil {
+		err = multierr.Append(err, enc.AddObject("success", v.Success))
+	}
+	if v.BadRequestError != nil {
+		err = multierr.Append(err, enc.AddObject("badRequestError", v.BadRequestError))
+	}
+	if v.ServiceBusyError != nil {
+		err = multierr.Append(err, enc.AddObject("serviceBusyError", v.ServiceBusyError))
+	}
+	if v.DomainNotActiveError != nil {
+		err = multierr.Append(err, enc.AddObject("domainNotActiveError", v.DomainNotActiveError))
+	}
+	if v.LimitExceededError != nil {
+		err = multierr.Append(err, enc.AddObject("limitExceededError", v.LimitExceededError))
+	}
+	if v.EntityNotExistError != nil {
+		err = multierr.Append(err, enc.AddObject("entityNotExistError", v.EntityNotExistError))
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		err = multierr.Append(err, enc.AddObject("clientVersionNotSupportedError", v.ClientVersionNotSupportedError))
+	}
+	return err
+}
+
+// GetSuccess returns the value of Success if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_RestartWorkflowExecution_Result) GetSuccess() (o *shared.RestartWorkflowExecutionResponse) {
+	if v != nil && v.Success != nil {
+		return v.Success
+	}
+
+	return
+}
+
+// IsSetSuccess returns true if Success is not nil.
+func (v *WorkflowService_RestartWorkflowExecution_Result) IsSetSuccess() bool {
+	return v != nil && v.Success != nil
+}
+
+// GetBadRequestError returns the value of BadRequestError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_RestartWorkflowExecution_Result) GetBadRequestError() (o *shared.BadRequestError) {
+	if v != nil && v.BadRequestError != nil {
+		return v.BadRequestError
+	}
+
+	return
+}
+
+// IsSetBadRequestError returns true if BadRequestError is not nil.
+func (v *WorkflowService_RestartWorkflowExecution_Result) IsSetBadRequestError() bool {
+	return v != nil && v.BadRequestError != nil
+}
+
+// GetServiceBusyError returns the value of ServiceBusyError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_RestartWorkflowExecution_Result) GetServiceBusyError() (o *shared.ServiceBusyError) {
+	if v != nil && v.ServiceBusyError != nil {
+		return v.ServiceBusyError
+	}
+
+	return
+}
+
+// IsSetServiceBusyError returns true if ServiceBusyError is not nil.
+func (v *WorkflowService_RestartWorkflowExecution_Result) IsSetServiceBusyError() bool {
+	return v != nil && v.ServiceBusyError != nil
+}
+
+// GetDomainNotActiveError returns the value of DomainNotActiveError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_RestartWorkflowExecution_Result) GetDomainNotActiveError() (o *shared.DomainNotActiveError) {
+	if v != nil && v.DomainNotActiveError != nil {
+		return v.DomainNotActiveError
+	}
+
+	return
+}
+
+// IsSetDomainNotActiveError returns true if DomainNotActiveError is not nil.
+func (v *WorkflowService_RestartWorkflowExecution_Result) IsSetDomainNotActiveError() bool {
+	return v != nil && v.DomainNotActiveError != nil
+}
+
+// GetLimitExceededError returns the value of LimitExceededError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_RestartWorkflowExecution_Result) GetLimitExceededError() (o *shared.LimitExceededError) {
+	if v != nil && v.LimitExceededError != nil {
+		return v.LimitExceededError
+	}
+
+	return
+}
+
+// IsSetLimitExceededError returns true if LimitExceededError is not nil.
+func (v *WorkflowService_RestartWorkflowExecution_Result) IsSetLimitExceededError() bool {
+	return v != nil && v.LimitExceededError != nil
+}
+
+// GetEntityNotExistError returns the value of EntityNotExistError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_RestartWorkflowExecution_Result) GetEntityNotExistError() (o *shared.EntityNotExistsError) {
+	if v != nil && v.EntityNotExistError != nil {
+		return v.EntityNotExistError
+	}
+
+	return
+}
+
+// IsSetEntityNotExistError returns true if EntityNotExistError is not nil.
+func (v *WorkflowService_RestartWorkflowExecution_Result) IsSetEntityNotExistError() bool {
+	return v != nil && v.EntityNotExistError != nil
+}
+
+// GetClientVersionNotSupportedError returns the value of ClientVersionNotSupportedError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_RestartWorkflowExecution_Result) GetClientVersionNotSupportedError() (o *shared.ClientVersionNotSupportedError) {
+	if v != nil && v.ClientVersionNotSupportedError != nil {
+		return v.ClientVersionNotSupportedError
+	}
+
+	return
+}
+
+// IsSetClientVersionNotSupportedError returns true if ClientVersionNotSupportedError is not nil.
+func (v *WorkflowService_RestartWorkflowExecution_Result) IsSetClientVersionNotSupportedError() bool {
+	return v != nil && v.ClientVersionNotSupportedError != nil
+}
+
+// MethodName returns the name of the Thrift function as specified in
+// the IDL, for which this struct represent the result.
+//
+// This will always be "RestartWorkflowExecution" for this struct.
+func (v *WorkflowService_RestartWorkflowExecution_Result) MethodName() string {
+	return "RestartWorkflowExecution"
+}
+
+// EnvelopeType returns the kind of value inside this struct.
+//
+// This will always be Reply for this struct.
+func (v *WorkflowService_RestartWorkflowExecution_Result) EnvelopeType() wire.EnvelopeType {
+	return wire.Reply
+}
+
 // WorkflowService_ScanWorkflowExecutions_Args represents the arguments for the WorkflowService.ScanWorkflowExecutions function.
 //
 // The arguments for ScanWorkflowExecutions are sent and received over the wire as this struct.
@@ -23836,14 +24593,14 @@ type WorkflowService_ScanWorkflowExecutions_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ScanWorkflowExecutions_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -23871,16 +24628,16 @@ func (v *WorkflowService_ScanWorkflowExecutions_Args) ToWire() (wire.Value, erro
 // An error is returned if we were unable to build a WorkflowService_ScanWorkflowExecutions_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ScanWorkflowExecutions_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ScanWorkflowExecutions_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ScanWorkflowExecutions_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -24125,14 +24882,14 @@ type WorkflowService_ScanWorkflowExecutions_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_ScanWorkflowExecutions_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [5]wire.Field
@@ -24196,16 +24953,16 @@ func (v *WorkflowService_ScanWorkflowExecutions_Result) ToWire() (wire.Value, er
 // An error is returned if we were unable to build a WorkflowService_ScanWorkflowExecutions_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_ScanWorkflowExecutions_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_ScanWorkflowExecutions_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_ScanWorkflowExecutions_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -24467,14 +25224,14 @@ type WorkflowService_SignalWithStartWorkflowExecution_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_SignalWithStartWorkflowExecution_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -24508,16 +25265,16 @@ func _SignalWithStartWorkflowExecutionRequest_Read(w wire.Value) (*shared.Signal
 // An error is returned if we were unable to build a WorkflowService_SignalWithStartWorkflowExecution_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_SignalWithStartWorkflowExecution_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_SignalWithStartWorkflowExecution_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_SignalWithStartWorkflowExecution_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -24798,14 +25555,14 @@ type WorkflowService_SignalWithStartWorkflowExecution_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_SignalWithStartWorkflowExecution_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [8]wire.Field
@@ -24905,16 +25662,16 @@ func _WorkflowExecutionAlreadyStartedError_Read(w wire.Value) (*shared.WorkflowE
 // An error is returned if we were unable to build a WorkflowService_SignalWithStartWorkflowExecution_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_SignalWithStartWorkflowExecution_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_SignalWithStartWorkflowExecution_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_SignalWithStartWorkflowExecution_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -25270,6 +26027,817 @@ func (v *WorkflowService_SignalWithStartWorkflowExecution_Result) EnvelopeType()
 	return wire.Reply
 }
 
+// WorkflowService_SignalWithStartWorkflowExecutionAsync_Args represents the arguments for the WorkflowService.SignalWithStartWorkflowExecutionAsync function.
+//
+// The arguments for SignalWithStartWorkflowExecutionAsync are sent and received over the wire as this struct.
+type WorkflowService_SignalWithStartWorkflowExecutionAsync_Args struct {
+	SignalWithStartRequest *shared.SignalWithStartWorkflowExecutionAsyncRequest `json:"signalWithStartRequest,omitempty"`
+}
+
+// ToWire translates a WorkflowService_SignalWithStartWorkflowExecutionAsync_Args struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
+//
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) ToWire() (wire.Value, error) {
+	var (
+		fields [1]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.SignalWithStartRequest != nil {
+		w, err = v.SignalWithStartRequest.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 1, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _SignalWithStartWorkflowExecutionAsyncRequest_Read(w wire.Value) (*shared.SignalWithStartWorkflowExecutionAsyncRequest, error) {
+	var v shared.SignalWithStartWorkflowExecutionAsyncRequest
+	err := v.FromWire(w)
+	return &v, err
+}
+
+// FromWire deserializes a WorkflowService_SignalWithStartWorkflowExecutionAsync_Args struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a WorkflowService_SignalWithStartWorkflowExecutionAsync_Args struct
+// from the provided intermediate representation.
+//
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
+//
+//	var v WorkflowService_SignalWithStartWorkflowExecutionAsync_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 1:
+			if field.Value.Type() == wire.TStruct {
+				v.SignalWithStartRequest, err = _SignalWithStartWorkflowExecutionAsyncRequest_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a WorkflowService_SignalWithStartWorkflowExecutionAsync_Args
+// struct.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [1]string
+	i := 0
+	if v.SignalWithStartRequest != nil {
+		fields[i] = fmt.Sprintf("SignalWithStartRequest: %v", v.SignalWithStartRequest)
+		i++
+	}
+
+	return fmt.Sprintf("WorkflowService_SignalWithStartWorkflowExecutionAsync_Args{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this WorkflowService_SignalWithStartWorkflowExecutionAsync_Args match the
+// provided WorkflowService_SignalWithStartWorkflowExecutionAsync_Args.
+//
+// This function performs a deep comparison.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) Equals(rhs *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) bool {
+	if v == nil {
+		return rhs == nil
+	} else if rhs == nil {
+		return false
+	}
+	if !((v.SignalWithStartRequest == nil && rhs.SignalWithStartRequest == nil) || (v.SignalWithStartRequest != nil && rhs.SignalWithStartRequest != nil && v.SignalWithStartRequest.Equals(rhs.SignalWithStartRequest))) {
+		return false
+	}
+
+	return true
+}
+
+// MarshalLogObject implements zapcore.ObjectMarshaler, enabling
+// fast logging of WorkflowService_SignalWithStartWorkflowExecutionAsync_Args.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) MarshalLogObject(enc zapcore.ObjectEncoder) (err error) {
+	if v == nil {
+		return nil
+	}
+	if v.SignalWithStartRequest != nil {
+		err = multierr.Append(err, enc.AddObject("signalWithStartRequest", v.SignalWithStartRequest))
+	}
+	return err
+}
+
+// GetSignalWithStartRequest returns the value of SignalWithStartRequest if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) GetSignalWithStartRequest() (o *shared.SignalWithStartWorkflowExecutionAsyncRequest) {
+	if v != nil && v.SignalWithStartRequest != nil {
+		return v.SignalWithStartRequest
+	}
+
+	return
+}
+
+// IsSetSignalWithStartRequest returns true if SignalWithStartRequest is not nil.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) IsSetSignalWithStartRequest() bool {
+	return v != nil && v.SignalWithStartRequest != nil
+}
+
+// MethodName returns the name of the Thrift function as specified in
+// the IDL, for which this struct represent the arguments.
+//
+// This will always be "SignalWithStartWorkflowExecutionAsync" for this struct.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) MethodName() string {
+	return "SignalWithStartWorkflowExecutionAsync"
+}
+
+// EnvelopeType returns the kind of value inside this struct.
+//
+// This will always be Call for this struct.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args) EnvelopeType() wire.EnvelopeType {
+	return wire.Call
+}
+
+// WorkflowService_SignalWithStartWorkflowExecutionAsync_Helper provides functions that aid in handling the
+// parameters and return values of the WorkflowService.SignalWithStartWorkflowExecutionAsync
+// function.
+var WorkflowService_SignalWithStartWorkflowExecutionAsync_Helper = struct {
+	// Args accepts the parameters of SignalWithStartWorkflowExecutionAsync in-order and returns
+	// the arguments struct for the function.
+	Args func(
+		signalWithStartRequest *shared.SignalWithStartWorkflowExecutionAsyncRequest,
+	) *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args
+
+	// IsException returns true if the given error can be thrown
+	// by SignalWithStartWorkflowExecutionAsync.
+	//
+	// An error can be thrown by SignalWithStartWorkflowExecutionAsync only if the
+	// corresponding exception type was mentioned in the 'throws'
+	// section for it in the Thrift file.
+	IsException func(error) bool
+
+	// WrapResponse returns the result struct for SignalWithStartWorkflowExecutionAsync
+	// given its return value and error.
+	//
+	// This allows mapping values and errors returned by
+	// SignalWithStartWorkflowExecutionAsync into a serializable result struct.
+	// WrapResponse returns a non-nil error if the provided
+	// error cannot be thrown by SignalWithStartWorkflowExecutionAsync
+	//
+	//   value, err := SignalWithStartWorkflowExecutionAsync(args)
+	//   result, err := WorkflowService_SignalWithStartWorkflowExecutionAsync_Helper.WrapResponse(value, err)
+	//   if err != nil {
+	//     return fmt.Errorf("unexpected error from SignalWithStartWorkflowExecutionAsync: %v", err)
+	//   }
+	//   serialize(result)
+	WrapResponse func(*shared.SignalWithStartWorkflowExecutionAsyncResponse, error) (*WorkflowService_SignalWithStartWorkflowExecutionAsync_Result, error)
+
+	// UnwrapResponse takes the result struct for SignalWithStartWorkflowExecutionAsync
+	// and returns the value or error returned by it.
+	//
+	// The error is non-nil only if SignalWithStartWorkflowExecutionAsync threw an
+	// exception.
+	//
+	//   result := deserialize(bytes)
+	//   value, err := WorkflowService_SignalWithStartWorkflowExecutionAsync_Helper.UnwrapResponse(result)
+	UnwrapResponse func(*WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) (*shared.SignalWithStartWorkflowExecutionAsyncResponse, error)
+}{}
+
+func init() {
+	WorkflowService_SignalWithStartWorkflowExecutionAsync_Helper.Args = func(
+		signalWithStartRequest *shared.SignalWithStartWorkflowExecutionAsyncRequest,
+	) *WorkflowService_SignalWithStartWorkflowExecutionAsync_Args {
+		return &WorkflowService_SignalWithStartWorkflowExecutionAsync_Args{
+			SignalWithStartRequest: signalWithStartRequest,
+		}
+	}
+
+	WorkflowService_SignalWithStartWorkflowExecutionAsync_Helper.IsException = func(err error) bool {
+		switch err.(type) {
+		case *shared.BadRequestError:
+			return true
+		case *shared.WorkflowExecutionAlreadyStartedError:
+			return true
+		case *shared.ServiceBusyError:
+			return true
+		case *shared.DomainNotActiveError:
+			return true
+		case *shared.LimitExceededError:
+			return true
+		case *shared.EntityNotExistsError:
+			return true
+		case *shared.ClientVersionNotSupportedError:
+			return true
+		default:
+			return false
+		}
+	}
+
+	WorkflowService_SignalWithStartWorkflowExecutionAsync_Helper.WrapResponse = func(success *shared.SignalWithStartWorkflowExecutionAsyncResponse, err error) (*WorkflowService_SignalWithStartWorkflowExecutionAsync_Result, error) {
+		if err == nil {
+			return &WorkflowService_SignalWithStartWorkflowExecutionAsync_Result{Success: success}, nil
+		}
+
+		switch e := err.(type) {
+		case *shared.BadRequestError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_SignalWithStartWorkflowExecutionAsync_Result.BadRequestError")
+			}
+			return &WorkflowService_SignalWithStartWorkflowExecutionAsync_Result{BadRequestError: e}, nil
+		case *shared.WorkflowExecutionAlreadyStartedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_SignalWithStartWorkflowExecutionAsync_Result.SessionAlreadyExistError")
+			}
+			return &WorkflowService_SignalWithStartWorkflowExecutionAsync_Result{SessionAlreadyExistError: e}, nil
+		case *shared.ServiceBusyError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_SignalWithStartWorkflowExecutionAsync_Result.ServiceBusyError")
+			}
+			return &WorkflowService_SignalWithStartWorkflowExecutionAsync_Result{ServiceBusyError: e}, nil
+		case *shared.DomainNotActiveError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_SignalWithStartWorkflowExecutionAsync_Result.DomainNotActiveError")
+			}
+			return &WorkflowService_SignalWithStartWorkflowExecutionAsync_Result{DomainNotActiveError: e}, nil
+		case *shared.LimitExceededError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_SignalWithStartWorkflowExecutionAsync_Result.LimitExceededError")
+			}
+			return &WorkflowService_SignalWithStartWorkflowExecutionAsync_Result{LimitExceededError: e}, nil
+		case *shared.EntityNotExistsError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_SignalWithStartWorkflowExecutionAsync_Result.EntityNotExistError")
+			}
+			return &WorkflowService_SignalWithStartWorkflowExecutionAsync_Result{EntityNotExistError: e}, nil
+		case *shared.ClientVersionNotSupportedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_SignalWithStartWorkflowExecutionAsync_Result.ClientVersionNotSupportedError")
+			}
+			return &WorkflowService_SignalWithStartWorkflowExecutionAsync_Result{ClientVersionNotSupportedError: e}, nil
+		}
+
+		return nil, err
+	}
+	WorkflowService_SignalWithStartWorkflowExecutionAsync_Helper.UnwrapResponse = func(result *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) (success *shared.SignalWithStartWorkflowExecutionAsyncResponse, err error) {
+		if result.BadRequestError != nil {
+			err = result.BadRequestError
+			return
+		}
+		if result.SessionAlreadyExistError != nil {
+			err = result.SessionAlreadyExistError
+			return
+		}
+		if result.ServiceBusyError != nil {
+			err = result.ServiceBusyError
+			return
+		}
+		if result.DomainNotActiveError != nil {
+			err = result.DomainNotActiveError
+			return
+		}
+		if result.LimitExceededError != nil {
+			err = result.LimitExceededError
+			return
+		}
+		if result.EntityNotExistError != nil {
+			err = result.EntityNotExistError
+			return
+		}
+		if result.ClientVersionNotSupportedError != nil {
+			err = result.ClientVersionNotSupportedError
+			return
+		}
+
+		if result.Success != nil {
+			success = result.Success
+			return
+		}
+
+		err = errors.New("expected a non-void result")
+		return
+	}
+
+}
+
+// WorkflowService_SignalWithStartWorkflowExecutionAsync_Result represents the result of a WorkflowService.SignalWithStartWorkflowExecutionAsync function call.
+//
+// The result of a SignalWithStartWorkflowExecutionAsync execution is sent and received over the wire as this struct.
+//
+// Success is set only if the function did not throw an exception.
+type WorkflowService_SignalWithStartWorkflowExecutionAsync_Result struct {
+	// Value returned by SignalWithStartWorkflowExecutionAsync after a successful execution.
+	Success                        *shared.SignalWithStartWorkflowExecutionAsyncResponse `json:"success,omitempty"`
+	BadRequestError                *shared.BadRequestError                               `json:"badRequestError,omitempty"`
+	SessionAlreadyExistError       *shared.WorkflowExecutionAlreadyStartedError          `json:"sessionAlreadyExistError,omitempty"`
+	ServiceBusyError               *shared.ServiceBusyError                              `json:"serviceBusyError,omitempty"`
+	DomainNotActiveError           *shared.DomainNotActiveError                          `json:"domainNotActiveError,omitempty"`
+	LimitExceededError             *shared.LimitExceededError                            `json:"limitExceededError,omitempty"`
+	EntityNotExistError            *shared.EntityNotExistsError                          `json:"entityNotExistError,omitempty"`
+	ClientVersionNotSupportedError *shared.ClientVersionNotSupportedError                `json:"clientVersionNotSupportedError,omitempty"`
+}
+
+// ToWire translates a WorkflowService_SignalWithStartWorkflowExecutionAsync_Result struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
+//
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) ToWire() (wire.Value, error) {
+	var (
+		fields [8]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.Success != nil {
+		w, err = v.Success.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 0, Value: w}
+		i++
+	}
+	if v.BadRequestError != nil {
+		w, err = v.BadRequestError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 1, Value: w}
+		i++
+	}
+	if v.SessionAlreadyExistError != nil {
+		w, err = v.SessionAlreadyExistError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 3, Value: w}
+		i++
+	}
+	if v.ServiceBusyError != nil {
+		w, err = v.ServiceBusyError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 4, Value: w}
+		i++
+	}
+	if v.DomainNotActiveError != nil {
+		w, err = v.DomainNotActiveError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 5, Value: w}
+		i++
+	}
+	if v.LimitExceededError != nil {
+		w, err = v.LimitExceededError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 6, Value: w}
+		i++
+	}
+	if v.EntityNotExistError != nil {
+		w, err = v.EntityNotExistError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 7, Value: w}
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		w, err = v.ClientVersionNotSupportedError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 8, Value: w}
+		i++
+	}
+
+	if i != 1 {
+		return wire.Value{}, fmt.Errorf("WorkflowService_SignalWithStartWorkflowExecutionAsync_Result should have exactly one field: got %v fields", i)
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _SignalWithStartWorkflowExecutionAsyncResponse_Read(w wire.Value) (*shared.SignalWithStartWorkflowExecutionAsyncResponse, error) {
+	var v shared.SignalWithStartWorkflowExecutionAsyncResponse
+	err := v.FromWire(w)
+	return &v, err
+}
+
+// FromWire deserializes a WorkflowService_SignalWithStartWorkflowExecutionAsync_Result struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a WorkflowService_SignalWithStartWorkflowExecutionAsync_Result struct
+// from the provided intermediate representation.
+//
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
+//
+//	var v WorkflowService_SignalWithStartWorkflowExecutionAsync_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 0:
+			if field.Value.Type() == wire.TStruct {
+				v.Success, err = _SignalWithStartWorkflowExecutionAsyncResponse_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 1:
+			if field.Value.Type() == wire.TStruct {
+				v.BadRequestError, err = _BadRequestError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 3:
+			if field.Value.Type() == wire.TStruct {
+				v.SessionAlreadyExistError, err = _WorkflowExecutionAlreadyStartedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 4:
+			if field.Value.Type() == wire.TStruct {
+				v.ServiceBusyError, err = _ServiceBusyError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 5:
+			if field.Value.Type() == wire.TStruct {
+				v.DomainNotActiveError, err = _DomainNotActiveError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 6:
+			if field.Value.Type() == wire.TStruct {
+				v.LimitExceededError, err = _LimitExceededError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 7:
+			if field.Value.Type() == wire.TStruct {
+				v.EntityNotExistError, err = _EntityNotExistsError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 8:
+			if field.Value.Type() == wire.TStruct {
+				v.ClientVersionNotSupportedError, err = _ClientVersionNotSupportedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	count := 0
+	if v.Success != nil {
+		count++
+	}
+	if v.BadRequestError != nil {
+		count++
+	}
+	if v.SessionAlreadyExistError != nil {
+		count++
+	}
+	if v.ServiceBusyError != nil {
+		count++
+	}
+	if v.DomainNotActiveError != nil {
+		count++
+	}
+	if v.LimitExceededError != nil {
+		count++
+	}
+	if v.EntityNotExistError != nil {
+		count++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		count++
+	}
+	if count != 1 {
+		return fmt.Errorf("WorkflowService_SignalWithStartWorkflowExecutionAsync_Result should have exactly one field: got %v fields", count)
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a WorkflowService_SignalWithStartWorkflowExecutionAsync_Result
+// struct.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [8]string
+	i := 0
+	if v.Success != nil {
+		fields[i] = fmt.Sprintf("Success: %v", v.Success)
+		i++
+	}
+	if v.BadRequestError != nil {
+		fields[i] = fmt.Sprintf("BadRequestError: %v", v.BadRequestError)
+		i++
+	}
+	if v.SessionAlreadyExistError != nil {
+		fields[i] = fmt.Sprintf("SessionAlreadyExistError: %v", v.SessionAlreadyExistError)
+		i++
+	}
+	if v.ServiceBusyError != nil {
+		fields[i] = fmt.Sprintf("ServiceBusyError: %v", v.ServiceBusyError)
+		i++
+	}
+	if v.DomainNotActiveError != nil {
+		fields[i] = fmt.Sprintf("DomainNotActiveError: %v", v.DomainNotActiveError)
+		i++
+	}
+	if v.LimitExceededError != nil {
+		fields[i] = fmt.Sprintf("LimitExceededError: %v", v.LimitExceededError)
+		i++
+	}
+	if v.EntityNotExistError != nil {
+		fields[i] = fmt.Sprintf("EntityNotExistError: %v", v.EntityNotExistError)
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		fields[i] = fmt.Sprintf("ClientVersionNotSupportedError: %v", v.ClientVersionNotSupportedError)
+		i++
+	}
+
+	return fmt.Sprintf("WorkflowService_SignalWithStartWorkflowExecutionAsync_Result{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this WorkflowService_SignalWithStartWorkflowExecutionAsync_Result match the
+// provided WorkflowService_SignalWithStartWorkflowExecutionAsync_Result.
+//
+// This function performs a deep comparison.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) Equals(rhs *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) bool {
+	if v == nil {
+		return rhs == nil
+	} else if rhs == nil {
+		return false
+	}
+	if !((v.Success == nil && rhs.Success == nil) || (v.Success != nil && rhs.Success != nil && v.Success.Equals(rhs.Success))) {
+		return false
+	}
+	if !((v.BadRequestError == nil && rhs.BadRequestError == nil) || (v.BadRequestError != nil && rhs.BadRequestError != nil && v.BadRequestError.Equals(rhs.BadRequestError))) {
+		return false
+	}
+	if !((v.SessionAlreadyExistError == nil && rhs.SessionAlreadyExistError == nil) || (v.SessionAlreadyExistError != nil && rhs.SessionAlreadyExistError != nil && v.SessionAlreadyExistError.Equals(rhs.SessionAlreadyExistError))) {
+		return false
+	}
+	if !((v.ServiceBusyError == nil && rhs.ServiceBusyError == nil) || (v.ServiceBusyError != nil && rhs.ServiceBusyError != nil && v.ServiceBusyError.Equals(rhs.ServiceBusyError))) {
+		return false
+	}
+	if !((v.DomainNotActiveError == nil && rhs.DomainNotActiveError == nil) || (v.DomainNotActiveError != nil && rhs.DomainNotActiveError != nil && v.DomainNotActiveError.Equals(rhs.DomainNotActiveError))) {
+		return false
+	}
+	if !((v.LimitExceededError == nil && rhs.LimitExceededError == nil) || (v.LimitExceededError != nil && rhs.LimitExceededError != nil && v.LimitExceededError.Equals(rhs.LimitExceededError))) {
+		return false
+	}
+	if !((v.EntityNotExistError == nil && rhs.EntityNotExistError == nil) || (v.EntityNotExistError != nil && rhs.EntityNotExistError != nil && v.EntityNotExistError.Equals(rhs.EntityNotExistError))) {
+		return false
+	}
+	if !((v.ClientVersionNotSupportedError == nil && rhs.ClientVersionNotSupportedError == nil) || (v.ClientVersionNotSupportedError != nil && rhs.ClientVersionNotSupportedError != nil && v.ClientVersionNotSupportedError.Equals(rhs.ClientVersionNotSupportedError))) {
+		return false
+	}
+
+	return true
+}
+
+// MarshalLogObject implements zapcore.ObjectMarshaler, enabling
+// fast logging of WorkflowService_SignalWithStartWorkflowExecutionAsync_Result.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) MarshalLogObject(enc zapcore.ObjectEncoder) (err error) {
+	if v == nil {
+		return nil
+	}
+	if v.Success != nil {
+		err = multierr.Append(err, enc.AddObject("success", v.Success))
+	}
+	if v.BadRequestError != nil {
+		err = multierr.Append(err, enc.AddObject("badRequestError", v.BadRequestError))
+	}
+	if v.SessionAlreadyExistError != nil {
+		err = multierr.Append(err, enc.AddObject("sessionAlreadyExistError", v.SessionAlreadyExistError))
+	}
+	if v.ServiceBusyError != nil {
+		err = multierr.Append(err, enc.AddObject("serviceBusyError", v.ServiceBusyError))
+	}
+	if v.DomainNotActiveError != nil {
+		err = multierr.Append(err, enc.AddObject("domainNotActiveError", v.DomainNotActiveError))
+	}
+	if v.LimitExceededError != nil {
+		err = multierr.Append(err, enc.AddObject("limitExceededError", v.LimitExceededError))
+	}
+	if v.EntityNotExistError != nil {
+		err = multierr.Append(err, enc.AddObject("entityNotExistError", v.EntityNotExistError))
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		err = multierr.Append(err, enc.AddObject("clientVersionNotSupportedError", v.ClientVersionNotSupportedError))
+	}
+	return err
+}
+
+// GetSuccess returns the value of Success if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) GetSuccess() (o *shared.SignalWithStartWorkflowExecutionAsyncResponse) {
+	if v != nil && v.Success != nil {
+		return v.Success
+	}
+
+	return
+}
+
+// IsSetSuccess returns true if Success is not nil.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) IsSetSuccess() bool {
+	return v != nil && v.Success != nil
+}
+
+// GetBadRequestError returns the value of BadRequestError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) GetBadRequestError() (o *shared.BadRequestError) {
+	if v != nil && v.BadRequestError != nil {
+		return v.BadRequestError
+	}
+
+	return
+}
+
+// IsSetBadRequestError returns true if BadRequestError is not nil.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) IsSetBadRequestError() bool {
+	return v != nil && v.BadRequestError != nil
+}
+
+// GetSessionAlreadyExistError returns the value of SessionAlreadyExistError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) GetSessionAlreadyExistError() (o *shared.WorkflowExecutionAlreadyStartedError) {
+	if v != nil && v.SessionAlreadyExistError != nil {
+		return v.SessionAlreadyExistError
+	}
+
+	return
+}
+
+// IsSetSessionAlreadyExistError returns true if SessionAlreadyExistError is not nil.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) IsSetSessionAlreadyExistError() bool {
+	return v != nil && v.SessionAlreadyExistError != nil
+}
+
+// GetServiceBusyError returns the value of ServiceBusyError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) GetServiceBusyError() (o *shared.ServiceBusyError) {
+	if v != nil && v.ServiceBusyError != nil {
+		return v.ServiceBusyError
+	}
+
+	return
+}
+
+// IsSetServiceBusyError returns true if ServiceBusyError is not nil.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) IsSetServiceBusyError() bool {
+	return v != nil && v.ServiceBusyError != nil
+}
+
+// GetDomainNotActiveError returns the value of DomainNotActiveError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) GetDomainNotActiveError() (o *shared.DomainNotActiveError) {
+	if v != nil && v.DomainNotActiveError != nil {
+		return v.DomainNotActiveError
+	}
+
+	return
+}
+
+// IsSetDomainNotActiveError returns true if DomainNotActiveError is not nil.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) IsSetDomainNotActiveError() bool {
+	return v != nil && v.DomainNotActiveError != nil
+}
+
+// GetLimitExceededError returns the value of LimitExceededError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) GetLimitExceededError() (o *shared.LimitExceededError) {
+	if v != nil && v.LimitExceededError != nil {
+		return v.LimitExceededError
+	}
+
+	return
+}
+
+// IsSetLimitExceededError returns true if LimitExceededError is not nil.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) IsSetLimitExceededError() bool {
+	return v != nil && v.LimitExceededError != nil
+}
+
+// GetEntityNotExistError returns the value of EntityNotExistError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) GetEntityNotExistError() (o *shared.EntityNotExistsError) {
+	if v != nil && v.EntityNotExistError != nil {
+		return v.EntityNotExistError
+	}
+
+	return
+}
+
+// IsSetEntityNotExistError returns true if EntityNotExistError is not nil.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) IsSetEntityNotExistError() bool {
+	return v != nil && v.EntityNotExistError != nil
+}
+
+// GetClientVersionNotSupportedError returns the value of ClientVersionNotSupportedError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) GetClientVersionNotSupportedError() (o *shared.ClientVersionNotSupportedError) {
+	if v != nil && v.ClientVersionNotSupportedError != nil {
+		return v.ClientVersionNotSupportedError
+	}
+
+	return
+}
+
+// IsSetClientVersionNotSupportedError returns true if ClientVersionNotSupportedError is not nil.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) IsSetClientVersionNotSupportedError() bool {
+	return v != nil && v.ClientVersionNotSupportedError != nil
+}
+
+// MethodName returns the name of the Thrift function as specified in
+// the IDL, for which this struct represent the result.
+//
+// This will always be "SignalWithStartWorkflowExecutionAsync" for this struct.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) MethodName() string {
+	return "SignalWithStartWorkflowExecutionAsync"
+}
+
+// EnvelopeType returns the kind of value inside this struct.
+//
+// This will always be Reply for this struct.
+func (v *WorkflowService_SignalWithStartWorkflowExecutionAsync_Result) EnvelopeType() wire.EnvelopeType {
+	return wire.Reply
+}
+
 // WorkflowService_SignalWorkflowExecution_Args represents the arguments for the WorkflowService.SignalWorkflowExecution function.
 //
 // The arguments for SignalWorkflowExecution are sent and received over the wire as this struct.
@@ -25284,14 +26852,14 @@ type WorkflowService_SignalWorkflowExecution_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_SignalWorkflowExecution_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -25325,16 +26893,16 @@ func _SignalWorkflowExecutionRequest_Read(w wire.Value) (*shared.SignalWorkflowE
 // An error is returned if we were unable to build a WorkflowService_SignalWorkflowExecution_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_SignalWorkflowExecution_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_SignalWorkflowExecution_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_SignalWorkflowExecution_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -25605,14 +27173,14 @@ type WorkflowService_SignalWorkflowExecution_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_SignalWorkflowExecution_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -25692,16 +27260,16 @@ func (v *WorkflowService_SignalWorkflowExecution_Result) ToWire() (wire.Value, e
 // An error is returned if we were unable to build a WorkflowService_SignalWorkflowExecution_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_SignalWorkflowExecution_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_SignalWorkflowExecution_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_SignalWorkflowExecution_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -26035,14 +27603,14 @@ type WorkflowService_StartWorkflowExecution_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_StartWorkflowExecution_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -26076,16 +27644,16 @@ func _StartWorkflowExecutionRequest_Read(w wire.Value) (*shared.StartWorkflowExe
 // An error is returned if we were unable to build a WorkflowService_StartWorkflowExecution_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_StartWorkflowExecution_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_StartWorkflowExecution_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_StartWorkflowExecution_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -26366,14 +27934,14 @@ type WorkflowService_StartWorkflowExecution_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_StartWorkflowExecution_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [8]wire.Field
@@ -26461,16 +28029,16 @@ func (v *WorkflowService_StartWorkflowExecution_Result) ToWire() (wire.Value, er
 // An error is returned if we were unable to build a WorkflowService_StartWorkflowExecution_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_StartWorkflowExecution_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_StartWorkflowExecution_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_StartWorkflowExecution_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -26826,6 +28394,817 @@ func (v *WorkflowService_StartWorkflowExecution_Result) EnvelopeType() wire.Enve
 	return wire.Reply
 }
 
+// WorkflowService_StartWorkflowExecutionAsync_Args represents the arguments for the WorkflowService.StartWorkflowExecutionAsync function.
+//
+// The arguments for StartWorkflowExecutionAsync are sent and received over the wire as this struct.
+type WorkflowService_StartWorkflowExecutionAsync_Args struct {
+	StartRequest *shared.StartWorkflowExecutionAsyncRequest `json:"startRequest,omitempty"`
+}
+
+// ToWire translates a WorkflowService_StartWorkflowExecutionAsync_Args struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
+//
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
+func (v *WorkflowService_StartWorkflowExecutionAsync_Args) ToWire() (wire.Value, error) {
+	var (
+		fields [1]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.StartRequest != nil {
+		w, err = v.StartRequest.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 1, Value: w}
+		i++
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _StartWorkflowExecutionAsyncRequest_Read(w wire.Value) (*shared.StartWorkflowExecutionAsyncRequest, error) {
+	var v shared.StartWorkflowExecutionAsyncRequest
+	err := v.FromWire(w)
+	return &v, err
+}
+
+// FromWire deserializes a WorkflowService_StartWorkflowExecutionAsync_Args struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a WorkflowService_StartWorkflowExecutionAsync_Args struct
+// from the provided intermediate representation.
+//
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
+//
+//	var v WorkflowService_StartWorkflowExecutionAsync_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
+func (v *WorkflowService_StartWorkflowExecutionAsync_Args) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 1:
+			if field.Value.Type() == wire.TStruct {
+				v.StartRequest, err = _StartWorkflowExecutionAsyncRequest_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a WorkflowService_StartWorkflowExecutionAsync_Args
+// struct.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Args) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [1]string
+	i := 0
+	if v.StartRequest != nil {
+		fields[i] = fmt.Sprintf("StartRequest: %v", v.StartRequest)
+		i++
+	}
+
+	return fmt.Sprintf("WorkflowService_StartWorkflowExecutionAsync_Args{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this WorkflowService_StartWorkflowExecutionAsync_Args match the
+// provided WorkflowService_StartWorkflowExecutionAsync_Args.
+//
+// This function performs a deep comparison.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Args) Equals(rhs *WorkflowService_StartWorkflowExecutionAsync_Args) bool {
+	if v == nil {
+		return rhs == nil
+	} else if rhs == nil {
+		return false
+	}
+	if !((v.StartRequest == nil && rhs.StartRequest == nil) || (v.StartRequest != nil && rhs.StartRequest != nil && v.StartRequest.Equals(rhs.StartRequest))) {
+		return false
+	}
+
+	return true
+}
+
+// MarshalLogObject implements zapcore.ObjectMarshaler, enabling
+// fast logging of WorkflowService_StartWorkflowExecutionAsync_Args.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Args) MarshalLogObject(enc zapcore.ObjectEncoder) (err error) {
+	if v == nil {
+		return nil
+	}
+	if v.StartRequest != nil {
+		err = multierr.Append(err, enc.AddObject("startRequest", v.StartRequest))
+	}
+	return err
+}
+
+// GetStartRequest returns the value of StartRequest if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Args) GetStartRequest() (o *shared.StartWorkflowExecutionAsyncRequest) {
+	if v != nil && v.StartRequest != nil {
+		return v.StartRequest
+	}
+
+	return
+}
+
+// IsSetStartRequest returns true if StartRequest is not nil.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Args) IsSetStartRequest() bool {
+	return v != nil && v.StartRequest != nil
+}
+
+// MethodName returns the name of the Thrift function as specified in
+// the IDL, for which this struct represent the arguments.
+//
+// This will always be "StartWorkflowExecutionAsync" for this struct.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Args) MethodName() string {
+	return "StartWorkflowExecutionAsync"
+}
+
+// EnvelopeType returns the kind of value inside this struct.
+//
+// This will always be Call for this struct.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Args) EnvelopeType() wire.EnvelopeType {
+	return wire.Call
+}
+
+// WorkflowService_StartWorkflowExecutionAsync_Helper provides functions that aid in handling the
+// parameters and return values of the WorkflowService.StartWorkflowExecutionAsync
+// function.
+var WorkflowService_StartWorkflowExecutionAsync_Helper = struct {
+	// Args accepts the parameters of StartWorkflowExecutionAsync in-order and returns
+	// the arguments struct for the function.
+	Args func(
+		startRequest *shared.StartWorkflowExecutionAsyncRequest,
+	) *WorkflowService_StartWorkflowExecutionAsync_Args
+
+	// IsException returns true if the given error can be thrown
+	// by StartWorkflowExecutionAsync.
+	//
+	// An error can be thrown by StartWorkflowExecutionAsync only if the
+	// corresponding exception type was mentioned in the 'throws'
+	// section for it in the Thrift file.
+	IsException func(error) bool
+
+	// WrapResponse returns the result struct for StartWorkflowExecutionAsync
+	// given its return value and error.
+	//
+	// This allows mapping values and errors returned by
+	// StartWorkflowExecutionAsync into a serializable result struct.
+	// WrapResponse returns a non-nil error if the provided
+	// error cannot be thrown by StartWorkflowExecutionAsync
+	//
+	//   value, err := StartWorkflowExecutionAsync(args)
+	//   result, err := WorkflowService_StartWorkflowExecutionAsync_Helper.WrapResponse(value, err)
+	//   if err != nil {
+	//     return fmt.Errorf("unexpected error from StartWorkflowExecutionAsync: %v", err)
+	//   }
+	//   serialize(result)
+	WrapResponse func(*shared.StartWorkflowExecutionAsyncResponse, error) (*WorkflowService_StartWorkflowExecutionAsync_Result, error)
+
+	// UnwrapResponse takes the result struct for StartWorkflowExecutionAsync
+	// and returns the value or error returned by it.
+	//
+	// The error is non-nil only if StartWorkflowExecutionAsync threw an
+	// exception.
+	//
+	//   result := deserialize(bytes)
+	//   value, err := WorkflowService_StartWorkflowExecutionAsync_Helper.UnwrapResponse(result)
+	UnwrapResponse func(*WorkflowService_StartWorkflowExecutionAsync_Result) (*shared.StartWorkflowExecutionAsyncResponse, error)
+}{}
+
+func init() {
+	WorkflowService_StartWorkflowExecutionAsync_Helper.Args = func(
+		startRequest *shared.StartWorkflowExecutionAsyncRequest,
+	) *WorkflowService_StartWorkflowExecutionAsync_Args {
+		return &WorkflowService_StartWorkflowExecutionAsync_Args{
+			StartRequest: startRequest,
+		}
+	}
+
+	WorkflowService_StartWorkflowExecutionAsync_Helper.IsException = func(err error) bool {
+		switch err.(type) {
+		case *shared.BadRequestError:
+			return true
+		case *shared.WorkflowExecutionAlreadyStartedError:
+			return true
+		case *shared.ServiceBusyError:
+			return true
+		case *shared.DomainNotActiveError:
+			return true
+		case *shared.LimitExceededError:
+			return true
+		case *shared.EntityNotExistsError:
+			return true
+		case *shared.ClientVersionNotSupportedError:
+			return true
+		default:
+			return false
+		}
+	}
+
+	WorkflowService_StartWorkflowExecutionAsync_Helper.WrapResponse = func(success *shared.StartWorkflowExecutionAsyncResponse, err error) (*WorkflowService_StartWorkflowExecutionAsync_Result, error) {
+		if err == nil {
+			return &WorkflowService_StartWorkflowExecutionAsync_Result{Success: success}, nil
+		}
+
+		switch e := err.(type) {
+		case *shared.BadRequestError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecutionAsync_Result.BadRequestError")
+			}
+			return &WorkflowService_StartWorkflowExecutionAsync_Result{BadRequestError: e}, nil
+		case *shared.WorkflowExecutionAlreadyStartedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecutionAsync_Result.SessionAlreadyExistError")
+			}
+			return &WorkflowService_StartWorkflowExecutionAsync_Result{SessionAlreadyExistError: e}, nil
+		case *shared.ServiceBusyError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecutionAsync_Result.ServiceBusyError")
+			}
+			return &WorkflowService_StartWorkflowExecutionAsync_Result{ServiceBusyError: e}, nil
+		case *shared.DomainNotActiveError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecutionAsync_Result.DomainNotActiveError")
+			}
+			return &WorkflowService_StartWorkflowExecutionAsync_Result{DomainNotActiveError: e}, nil
+		case *shared.LimitExceededError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecutionAsync_Result.LimitExceededError")
+			}
+			return &WorkflowService_StartWorkflowExecutionAsync_Result{LimitExceededError: e}, nil
+		case *shared.EntityNotExistsError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecutionAsync_Result.EntityNotExistError")
+			}
+			return &WorkflowService_StartWorkflowExecutionAsync_Result{EntityNotExistError: e}, nil
+		case *shared.ClientVersionNotSupportedError:
+			if e == nil {
+				return nil, errors.New("WrapResponse received non-nil error type with nil value for WorkflowService_StartWorkflowExecutionAsync_Result.ClientVersionNotSupportedError")
+			}
+			return &WorkflowService_StartWorkflowExecutionAsync_Result{ClientVersionNotSupportedError: e}, nil
+		}
+
+		return nil, err
+	}
+	WorkflowService_StartWorkflowExecutionAsync_Helper.UnwrapResponse = func(result *WorkflowService_StartWorkflowExecutionAsync_Result) (success *shared.StartWorkflowExecutionAsyncResponse, err error) {
+		if result.BadRequestError != nil {
+			err = result.BadRequestError
+			return
+		}
+		if result.SessionAlreadyExistError != nil {
+			err = result.SessionAlreadyExistError
+			return
+		}
+		if result.ServiceBusyError != nil {
+			err = result.ServiceBusyError
+			return
+		}
+		if result.DomainNotActiveError != nil {
+			err = result.DomainNotActiveError
+			return
+		}
+		if result.LimitExceededError != nil {
+			err = result.LimitExceededError
+			return
+		}
+		if result.EntityNotExistError != nil {
+			err = result.EntityNotExistError
+			return
+		}
+		if result.ClientVersionNotSupportedError != nil {
+			err = result.ClientVersionNotSupportedError
+			return
+		}
+
+		if result.Success != nil {
+			success = result.Success
+			return
+		}
+
+		err = errors.New("expected a non-void result")
+		return
+	}
+
+}
+
+// WorkflowService_StartWorkflowExecutionAsync_Result represents the result of a WorkflowService.StartWorkflowExecutionAsync function call.
+//
+// The result of a StartWorkflowExecutionAsync execution is sent and received over the wire as this struct.
+//
+// Success is set only if the function did not throw an exception.
+type WorkflowService_StartWorkflowExecutionAsync_Result struct {
+	// Value returned by StartWorkflowExecutionAsync after a successful execution.
+	Success                        *shared.StartWorkflowExecutionAsyncResponse  `json:"success,omitempty"`
+	BadRequestError                *shared.BadRequestError                      `json:"badRequestError,omitempty"`
+	SessionAlreadyExistError       *shared.WorkflowExecutionAlreadyStartedError `json:"sessionAlreadyExistError,omitempty"`
+	ServiceBusyError               *shared.ServiceBusyError                     `json:"serviceBusyError,omitempty"`
+	DomainNotActiveError           *shared.DomainNotActiveError                 `json:"domainNotActiveError,omitempty"`
+	LimitExceededError             *shared.LimitExceededError                   `json:"limitExceededError,omitempty"`
+	EntityNotExistError            *shared.EntityNotExistsError                 `json:"entityNotExistError,omitempty"`
+	ClientVersionNotSupportedError *shared.ClientVersionNotSupportedError       `json:"clientVersionNotSupportedError,omitempty"`
+}
+
+// ToWire translates a WorkflowService_StartWorkflowExecutionAsync_Result struct into a Thrift-level intermediate
+// representation. This intermediate representation may be serialized
+// into bytes using a ThriftRW protocol implementation.
+//
+// An error is returned if the struct or any of its fields failed to
+// validate.
+//
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
+//
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) ToWire() (wire.Value, error) {
+	var (
+		fields [8]wire.Field
+		i      int = 0
+		w      wire.Value
+		err    error
+	)
+
+	if v.Success != nil {
+		w, err = v.Success.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 0, Value: w}
+		i++
+	}
+	if v.BadRequestError != nil {
+		w, err = v.BadRequestError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 1, Value: w}
+		i++
+	}
+	if v.SessionAlreadyExistError != nil {
+		w, err = v.SessionAlreadyExistError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 3, Value: w}
+		i++
+	}
+	if v.ServiceBusyError != nil {
+		w, err = v.ServiceBusyError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 4, Value: w}
+		i++
+	}
+	if v.DomainNotActiveError != nil {
+		w, err = v.DomainNotActiveError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 5, Value: w}
+		i++
+	}
+	if v.LimitExceededError != nil {
+		w, err = v.LimitExceededError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 6, Value: w}
+		i++
+	}
+	if v.EntityNotExistError != nil {
+		w, err = v.EntityNotExistError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 7, Value: w}
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		w, err = v.ClientVersionNotSupportedError.ToWire()
+		if err != nil {
+			return w, err
+		}
+		fields[i] = wire.Field{ID: 8, Value: w}
+		i++
+	}
+
+	if i != 1 {
+		return wire.Value{}, fmt.Errorf("WorkflowService_StartWorkflowExecutionAsync_Result should have exactly one field: got %v fields", i)
+	}
+
+	return wire.NewValueStruct(wire.Struct{Fields: fields[:i]}), nil
+}
+
+func _StartWorkflowExecutionAsyncResponse_Read(w wire.Value) (*shared.StartWorkflowExecutionAsyncResponse, error) {
+	var v shared.StartWorkflowExecutionAsyncResponse
+	err := v.FromWire(w)
+	return &v, err
+}
+
+// FromWire deserializes a WorkflowService_StartWorkflowExecutionAsync_Result struct from its Thrift-level
+// representation. The Thrift-level representation may be obtained
+// from a ThriftRW protocol implementation.
+//
+// An error is returned if we were unable to build a WorkflowService_StartWorkflowExecutionAsync_Result struct
+// from the provided intermediate representation.
+//
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
+//
+//	var v WorkflowService_StartWorkflowExecutionAsync_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) FromWire(w wire.Value) error {
+	var err error
+
+	for _, field := range w.GetStruct().Fields {
+		switch field.ID {
+		case 0:
+			if field.Value.Type() == wire.TStruct {
+				v.Success, err = _StartWorkflowExecutionAsyncResponse_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 1:
+			if field.Value.Type() == wire.TStruct {
+				v.BadRequestError, err = _BadRequestError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 3:
+			if field.Value.Type() == wire.TStruct {
+				v.SessionAlreadyExistError, err = _WorkflowExecutionAlreadyStartedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 4:
+			if field.Value.Type() == wire.TStruct {
+				v.ServiceBusyError, err = _ServiceBusyError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 5:
+			if field.Value.Type() == wire.TStruct {
+				v.DomainNotActiveError, err = _DomainNotActiveError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 6:
+			if field.Value.Type() == wire.TStruct {
+				v.LimitExceededError, err = _LimitExceededError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 7:
+			if field.Value.Type() == wire.TStruct {
+				v.EntityNotExistError, err = _EntityNotExistsError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		case 8:
+			if field.Value.Type() == wire.TStruct {
+				v.ClientVersionNotSupportedError, err = _ClientVersionNotSupportedError_Read(field.Value)
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+	}
+
+	count := 0
+	if v.Success != nil {
+		count++
+	}
+	if v.BadRequestError != nil {
+		count++
+	}
+	if v.SessionAlreadyExistError != nil {
+		count++
+	}
+	if v.ServiceBusyError != nil {
+		count++
+	}
+	if v.DomainNotActiveError != nil {
+		count++
+	}
+	if v.LimitExceededError != nil {
+		count++
+	}
+	if v.EntityNotExistError != nil {
+		count++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		count++
+	}
+	if count != 1 {
+		return fmt.Errorf("WorkflowService_StartWorkflowExecutionAsync_Result should have exactly one field: got %v fields", count)
+	}
+
+	return nil
+}
+
+// String returns a readable string representation of a WorkflowService_StartWorkflowExecutionAsync_Result
+// struct.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) String() string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	var fields [8]string
+	i := 0
+	if v.Success != nil {
+		fields[i] = fmt.Sprintf("Success: %v", v.Success)
+		i++
+	}
+	if v.BadRequestError != nil {
+		fields[i] = fmt.Sprintf("BadRequestError: %v", v.BadRequestError)
+		i++
+	}
+	if v.SessionAlreadyExistError != nil {
+		fields[i] = fmt.Sprintf("SessionAlreadyExistError: %v", v.SessionAlreadyExistError)
+		i++
+	}
+	if v.ServiceBusyError != nil {
+		fields[i] = fmt.Sprintf("ServiceBusyError: %v", v.ServiceBusyError)
+		i++
+	}
+	if v.DomainNotActiveError != nil {
+		fields[i] = fmt.Sprintf("DomainNotActiveError: %v", v.DomainNotActiveError)
+		i++
+	}
+	if v.LimitExceededError != nil {
+		fields[i] = fmt.Sprintf("LimitExceededError: %v", v.LimitExceededError)
+		i++
+	}
+	if v.EntityNotExistError != nil {
+		fields[i] = fmt.Sprintf("EntityNotExistError: %v", v.EntityNotExistError)
+		i++
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		fields[i] = fmt.Sprintf("ClientVersionNotSupportedError: %v", v.ClientVersionNotSupportedError)
+		i++
+	}
+
+	return fmt.Sprintf("WorkflowService_StartWorkflowExecutionAsync_Result{%v}", strings.Join(fields[:i], ", "))
+}
+
+// Equals returns true if all the fields of this WorkflowService_StartWorkflowExecutionAsync_Result match the
+// provided WorkflowService_StartWorkflowExecutionAsync_Result.
+//
+// This function performs a deep comparison.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) Equals(rhs *WorkflowService_StartWorkflowExecutionAsync_Result) bool {
+	if v == nil {
+		return rhs == nil
+	} else if rhs == nil {
+		return false
+	}
+	if !((v.Success == nil && rhs.Success == nil) || (v.Success != nil && rhs.Success != nil && v.Success.Equals(rhs.Success))) {
+		return false
+	}
+	if !((v.BadRequestError == nil && rhs.BadRequestError == nil) || (v.BadRequestError != nil && rhs.BadRequestError != nil && v.BadRequestError.Equals(rhs.BadRequestError))) {
+		return false
+	}
+	if !((v.SessionAlreadyExistError == nil && rhs.SessionAlreadyExistError == nil) || (v.SessionAlreadyExistError != nil && rhs.SessionAlreadyExistError != nil && v.SessionAlreadyExistError.Equals(rhs.SessionAlreadyExistError))) {
+		return false
+	}
+	if !((v.ServiceBusyError == nil && rhs.ServiceBusyError == nil) || (v.ServiceBusyError != nil && rhs.ServiceBusyError != nil && v.ServiceBusyError.Equals(rhs.ServiceBusyError))) {
+		return false
+	}
+	if !((v.DomainNotActiveError == nil && rhs.DomainNotActiveError == nil) || (v.DomainNotActiveError != nil && rhs.DomainNotActiveError != nil && v.DomainNotActiveError.Equals(rhs.DomainNotActiveError))) {
+		return false
+	}
+	if !((v.LimitExceededError == nil && rhs.LimitExceededError == nil) || (v.LimitExceededError != nil && rhs.LimitExceededError != nil && v.LimitExceededError.Equals(rhs.LimitExceededError))) {
+		return false
+	}
+	if !((v.EntityNotExistError == nil && rhs.EntityNotExistError == nil) || (v.EntityNotExistError != nil && rhs.EntityNotExistError != nil && v.EntityNotExistError.Equals(rhs.EntityNotExistError))) {
+		return false
+	}
+	if !((v.ClientVersionNotSupportedError == nil && rhs.ClientVersionNotSupportedError == nil) || (v.ClientVersionNotSupportedError != nil && rhs.ClientVersionNotSupportedError != nil && v.ClientVersionNotSupportedError.Equals(rhs.ClientVersionNotSupportedError))) {
+		return false
+	}
+
+	return true
+}
+
+// MarshalLogObject implements zapcore.ObjectMarshaler, enabling
+// fast logging of WorkflowService_StartWorkflowExecutionAsync_Result.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) MarshalLogObject(enc zapcore.ObjectEncoder) (err error) {
+	if v == nil {
+		return nil
+	}
+	if v.Success != nil {
+		err = multierr.Append(err, enc.AddObject("success", v.Success))
+	}
+	if v.BadRequestError != nil {
+		err = multierr.Append(err, enc.AddObject("badRequestError", v.BadRequestError))
+	}
+	if v.SessionAlreadyExistError != nil {
+		err = multierr.Append(err, enc.AddObject("sessionAlreadyExistError", v.SessionAlreadyExistError))
+	}
+	if v.ServiceBusyError != nil {
+		err = multierr.Append(err, enc.AddObject("serviceBusyError", v.ServiceBusyError))
+	}
+	if v.DomainNotActiveError != nil {
+		err = multierr.Append(err, enc.AddObject("domainNotActiveError", v.DomainNotActiveError))
+	}
+	if v.LimitExceededError != nil {
+		err = multierr.Append(err, enc.AddObject("limitExceededError", v.LimitExceededError))
+	}
+	if v.EntityNotExistError != nil {
+		err = multierr.Append(err, enc.AddObject("entityNotExistError", v.EntityNotExistError))
+	}
+	if v.ClientVersionNotSupportedError != nil {
+		err = multierr.Append(err, enc.AddObject("clientVersionNotSupportedError", v.ClientVersionNotSupportedError))
+	}
+	return err
+}
+
+// GetSuccess returns the value of Success if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) GetSuccess() (o *shared.StartWorkflowExecutionAsyncResponse) {
+	if v != nil && v.Success != nil {
+		return v.Success
+	}
+
+	return
+}
+
+// IsSetSuccess returns true if Success is not nil.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) IsSetSuccess() bool {
+	return v != nil && v.Success != nil
+}
+
+// GetBadRequestError returns the value of BadRequestError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) GetBadRequestError() (o *shared.BadRequestError) {
+	if v != nil && v.BadRequestError != nil {
+		return v.BadRequestError
+	}
+
+	return
+}
+
+// IsSetBadRequestError returns true if BadRequestError is not nil.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) IsSetBadRequestError() bool {
+	return v != nil && v.BadRequestError != nil
+}
+
+// GetSessionAlreadyExistError returns the value of SessionAlreadyExistError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) GetSessionAlreadyExistError() (o *shared.WorkflowExecutionAlreadyStartedError) {
+	if v != nil && v.SessionAlreadyExistError != nil {
+		return v.SessionAlreadyExistError
+	}
+
+	return
+}
+
+// IsSetSessionAlreadyExistError returns true if SessionAlreadyExistError is not nil.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) IsSetSessionAlreadyExistError() bool {
+	return v != nil && v.SessionAlreadyExistError != nil
+}
+
+// GetServiceBusyError returns the value of ServiceBusyError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) GetServiceBusyError() (o *shared.ServiceBusyError) {
+	if v != nil && v.ServiceBusyError != nil {
+		return v.ServiceBusyError
+	}
+
+	return
+}
+
+// IsSetServiceBusyError returns true if ServiceBusyError is not nil.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) IsSetServiceBusyError() bool {
+	return v != nil && v.ServiceBusyError != nil
+}
+
+// GetDomainNotActiveError returns the value of DomainNotActiveError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) GetDomainNotActiveError() (o *shared.DomainNotActiveError) {
+	if v != nil && v.DomainNotActiveError != nil {
+		return v.DomainNotActiveError
+	}
+
+	return
+}
+
+// IsSetDomainNotActiveError returns true if DomainNotActiveError is not nil.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) IsSetDomainNotActiveError() bool {
+	return v != nil && v.DomainNotActiveError != nil
+}
+
+// GetLimitExceededError returns the value of LimitExceededError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) GetLimitExceededError() (o *shared.LimitExceededError) {
+	if v != nil && v.LimitExceededError != nil {
+		return v.LimitExceededError
+	}
+
+	return
+}
+
+// IsSetLimitExceededError returns true if LimitExceededError is not nil.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) IsSetLimitExceededError() bool {
+	return v != nil && v.LimitExceededError != nil
+}
+
+// GetEntityNotExistError returns the value of EntityNotExistError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) GetEntityNotExistError() (o *shared.EntityNotExistsError) {
+	if v != nil && v.EntityNotExistError != nil {
+		return v.EntityNotExistError
+	}
+
+	return
+}
+
+// IsSetEntityNotExistError returns true if EntityNotExistError is not nil.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) IsSetEntityNotExistError() bool {
+	return v != nil && v.EntityNotExistError != nil
+}
+
+// GetClientVersionNotSupportedError returns the value of ClientVersionNotSupportedError if it is set or its
+// zero value if it is unset.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) GetClientVersionNotSupportedError() (o *shared.ClientVersionNotSupportedError) {
+	if v != nil && v.ClientVersionNotSupportedError != nil {
+		return v.ClientVersionNotSupportedError
+	}
+
+	return
+}
+
+// IsSetClientVersionNotSupportedError returns true if ClientVersionNotSupportedError is not nil.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) IsSetClientVersionNotSupportedError() bool {
+	return v != nil && v.ClientVersionNotSupportedError != nil
+}
+
+// MethodName returns the name of the Thrift function as specified in
+// the IDL, for which this struct represent the result.
+//
+// This will always be "StartWorkflowExecutionAsync" for this struct.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) MethodName() string {
+	return "StartWorkflowExecutionAsync"
+}
+
+// EnvelopeType returns the kind of value inside this struct.
+//
+// This will always be Reply for this struct.
+func (v *WorkflowService_StartWorkflowExecutionAsync_Result) EnvelopeType() wire.EnvelopeType {
+	return wire.Reply
+}
+
 // WorkflowService_TerminateWorkflowExecution_Args represents the arguments for the WorkflowService.TerminateWorkflowExecution function.
 //
 // The arguments for TerminateWorkflowExecution are sent and received over the wire as this struct.
@@ -26840,14 +29219,14 @@ type WorkflowService_TerminateWorkflowExecution_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_TerminateWorkflowExecution_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -26881,16 +29260,16 @@ func _TerminateWorkflowExecutionRequest_Read(w wire.Value) (*shared.TerminateWor
 // An error is returned if we were unable to build a WorkflowService_TerminateWorkflowExecution_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_TerminateWorkflowExecution_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_TerminateWorkflowExecution_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_TerminateWorkflowExecution_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -27161,14 +29540,14 @@ type WorkflowService_TerminateWorkflowExecution_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_TerminateWorkflowExecution_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [7]wire.Field
@@ -27248,16 +29627,16 @@ func (v *WorkflowService_TerminateWorkflowExecution_Result) ToWire() (wire.Value
 // An error is returned if we were unable to build a WorkflowService_TerminateWorkflowExecution_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_TerminateWorkflowExecution_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_TerminateWorkflowExecution_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_TerminateWorkflowExecution_Result) FromWire(w wire.Value) error {
 	var err error
 
@@ -27591,14 +29970,14 @@ type WorkflowService_UpdateDomain_Args struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_UpdateDomain_Args) ToWire() (wire.Value, error) {
 	var (
 		fields [1]wire.Field
@@ -27632,16 +30011,16 @@ func _UpdateDomainRequest_Read(w wire.Value) (*shared.UpdateDomainRequest, error
 // An error is returned if we were unable to build a WorkflowService_UpdateDomain_Args struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_UpdateDomain_Args
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_UpdateDomain_Args
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_UpdateDomain_Args) FromWire(w wire.Value) error {
 	var err error
 
@@ -27898,14 +30277,14 @@ type WorkflowService_UpdateDomain_Result struct {
 // An error is returned if the struct or any of its fields failed to
 // validate.
 //
-//   x, err := v.ToWire()
-//   if err != nil {
-//     return err
-//   }
+//	x, err := v.ToWire()
+//	if err != nil {
+//	  return err
+//	}
 //
-//   if err := binaryProtocol.Encode(x, writer); err != nil {
-//     return err
-//   }
+//	if err := binaryProtocol.Encode(x, writer); err != nil {
+//	  return err
+//	}
 func (v *WorkflowService_UpdateDomain_Result) ToWire() (wire.Value, error) {
 	var (
 		fields [6]wire.Field
@@ -27983,16 +30362,16 @@ func _UpdateDomainResponse_Read(w wire.Value) (*shared.UpdateDomainResponse, err
 // An error is returned if we were unable to build a WorkflowService_UpdateDomain_Result struct
 // from the provided intermediate representation.
 //
-//   x, err := binaryProtocol.Decode(reader, wire.TStruct)
-//   if err != nil {
-//     return nil, err
-//   }
+//	x, err := binaryProtocol.Decode(reader, wire.TStruct)
+//	if err != nil {
+//	  return nil, err
+//	}
 //
-//   var v WorkflowService_UpdateDomain_Result
-//   if err := v.FromWire(x); err != nil {
-//     return nil, err
-//   }
-//   return &v, nil
+//	var v WorkflowService_UpdateDomain_Result
+//	if err := v.FromWire(x); err != nil {
+//	  return nil, err
+//	}
+//	return &v, nil
 func (v *WorkflowService_UpdateDomain_Result) FromWire(w wire.Value) error {
 	var err error
 

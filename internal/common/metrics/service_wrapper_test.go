@@ -22,13 +22,15 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"io"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"

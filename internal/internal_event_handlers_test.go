@@ -490,7 +490,6 @@ func TestWorkflowExecutionEventHandler_ProcessEvent_no_error_events(t *testing.T
 	for _, tc := range []struct {
 		event          *s.HistoryEvent
 		prepareHandler func(*testing.T, *workflowExecutionEventHandlerImpl)
-		assertHandler  func(*testing.T, *workflowExecutionEventHandlerImpl)
 	}{
 		{
 			event: &s.HistoryEvent{
@@ -515,9 +514,6 @@ func TestWorkflowExecutionEventHandler_ProcessEvent_no_error_events(t *testing.T
 				})
 				impl.decisionsHelper.getDecisions(true)
 				impl.decisionsHelper.handleActivityTaskScheduled(1, "test-activity")
-				impl.completeHandler = func(result []byte, err error) {
-					assert.NoError(t, err)
-				}
 			},
 		},
 		{
@@ -543,9 +539,6 @@ func TestWorkflowExecutionEventHandler_ProcessEvent_no_error_events(t *testing.T
 				})
 				impl.decisionsHelper.getDecisions(true)
 				impl.decisionsHelper.handleActivityTaskScheduled(2, "test-activity")
-				impl.completeHandler = func(result []byte, err error) {
-					assert.NoError(t, err)
-				}
 			},
 		},
 		{
@@ -572,9 +565,6 @@ func TestWorkflowExecutionEventHandler_ProcessEvent_no_error_events(t *testing.T
 				impl.decisionsHelper.handleActivityTaskScheduled(3, "test-activity")
 				decision.cancel()
 				decision.handleDecisionSent()
-				impl.completeHandler = func(result []byte, err error) {
-					assert.NoError(t, err)
-				}
 			},
 		},
 		{
@@ -600,9 +590,6 @@ func TestWorkflowExecutionEventHandler_ProcessEvent_no_error_events(t *testing.T
 				impl.decisionsHelper.handleTimerStarted("test-timer")
 				decision.cancel()
 				decision.handleDecisionSent()
-				impl.completeHandler = func(result []byte, err error) {
-					assert.NoError(t, err)
-				}
 			},
 		},
 		{
@@ -629,9 +616,6 @@ func TestWorkflowExecutionEventHandler_ProcessEvent_no_error_events(t *testing.T
 				impl.decisionsHelper.handleTimerStarted("test-timer")
 				decision.cancel()
 				decision.handleDecisionSent()
-				impl.completeHandler = func(result []byte, err error) {
-					assert.NoError(t, err)
-				}
 			},
 		},
 		{
@@ -696,6 +680,13 @@ func TestWorkflowExecutionEventHandler_ProcessEvent_no_error_events(t *testing.T
 			weh := testWorkflowExecutionEventHandler(t, newRegistry())
 			if tc.prepareHandler != nil {
 				tc.prepareHandler(t, weh)
+			}
+
+			// EventHandle handles all internal failures as panics.
+			// make sure we don't fail event processing.
+			// This can happen if there is a panic inside the handler.
+			weh.completeHandler = func(result []byte, err error) {
+				assert.NoError(t, err)
 			}
 
 			err := weh.ProcessEvent(tc.event, false, false)

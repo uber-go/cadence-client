@@ -623,10 +623,7 @@ func (wc *workflowEnvironmentImpl) GetVersion(changeID string, minSupported, max
 		// Also upsert search attributes to enable ability to search by changeVersion.
 		version = maxSupported
 		wc.decisionsHelper.recordVersionMarker(changeID, version, wc.GetDataConverter())
-		err := wc.UpsertSearchAttributes(createSearchAttributesForChangeVersion(changeID, version, wc.changeVersions))
-		if err != nil {
-			wc.logger.Warn("Failed to upsert search attributes for change version", zap.Error(err))
-		}
+		wc.UpsertSearchAttributes(createSearchAttributesForChangeVersion(changeID, version, wc.changeVersions))
 	}
 
 	validateVersion(changeID, version, minSupported, maxSupported)

@@ -30,12 +30,22 @@ import (
 )
 
 func Test_MergeDicts(t *testing.T) {
-	dic1 := map[string]string{"a": "1", "b": "2"}
-	dic2 := map[string]string{"b": "3", "c": "4"}
-	expected := map[string]string{"a": "1", "b": "3", "c": "4"}
+	cases := []struct {
+		dic1     map[string]string
+		dic2     map[string]string
+		expected map[string]string
+	}{
+		{map[string]string{"a": "1", "b": "2"}, map[string]string{"b": "3", "c": "4"}, map[string]string{"a": "1", "b": "3", "c": "4"}},
+		{map[string]string{"a": "1"}, map[string]string{"a": "2"}, map[string]string{"a": "2"}},
+		{map[string]string{}, map[string]string{"a": "1"}, map[string]string{"a": "1"}},
+		{map[string]string{"a": "1"}, map[string]string{}, map[string]string{"a": "1"}},
+		{map[string]string{}, map[string]string{}, map[string]string{}},
+	}
 
-	result := MergeDicts(dic1, dic2)
-	assert.Equal(t, expected, result)
+	for _, c := range cases {
+		result := MergeDicts(c.dic1, c.dic2)
+		assert.Equal(t, c.expected, result)
+	}
 }
 
 func Test_AwaitWaitGroup(t *testing.T) {

@@ -722,12 +722,12 @@ func TestSideEffect(t *testing.T) {
 
 func TestGetVersion_validation(t *testing.T) {
 	t.Run("version < minSupported", func(t *testing.T) {
-		assert.PanicsWithValue(t, `Workflow code removed support of version 1. for \"test\" changeID. The oldest supported version is 2`, func() {
+		assert.PanicsWithValue(t, `Workflow code removed support of version 1. for "test" changeID. The oldest supported version is 2`, func() {
 			validateVersion("test", 1, 2, 3)
 		})
 	})
 	t.Run("version > maxSupported", func(t *testing.T) {
-		assert.PanicsWithValue(t, `Workflow code is too old to support version 3 for \"test\" changeID. The maximum supported version is 2`, func() {
+		assert.PanicsWithValue(t, `Workflow code is too old to support version 3 for "test" changeID. The maximum supported version is 2`, func() {
 			validateVersion("test", 3, 1, 2)
 		})
 	})

@@ -840,6 +840,94 @@ func TestMutableSideEffect(t *testing.T) {
 	})
 }
 
+func TestEventHandler_handleMarkerRecorded(t *testing.T) {
+	for _, tc := range []struct {
+		marker       *s.MarkerRecordedEventAttributes
+		assertResult func(t *testing.T, result *workflowExecutionEventHandlerImpl)
+	}{
+		{
+			marker: &s.MarkerRecordedEventAttributes{
+				MarkerName: common.StringPtr(sideEffectMarkerName),
+				Details:    getSerializedDetails(t, 1, []byte("test")),
+			},
+			assertResult: func(t *testing.T, result *workflowExecutionEventHandlerImpl) {
+				require.Contains(t, result.sideEffectResult, int32(1))
+				assert.Equal(t, []byte("test"), result.sideEffectResult[1])
+			},
+		},
+		{
+			marker: &s.MarkerRecordedEventAttributes{
+				MarkerName: common.StringPtr(versionMarkerName),
+				Details:    getSerializedDetails(t, "test-version", Version(1)),
+			},
+			assertResult: func(t *testing.T, result *workflowExecutionEventHandlerImpl) {
+				require.Contains(t, result.changeVersions, "test-version")
+				assert.Equal(t, Version(1), result.changeVersions["test-version"])
+			},
+		},
+		{
+			marker: &s.MarkerRecordedEventAttributes{
+				MarkerName: common.StringPtr(mutableSideEffectMarkerName),
+				Details:    getSerializedDetails(t, "test-marker", "test"),
+			},
+			assertResult: func(t *testing.T, result *workflowExecutionEventHandlerImpl) {
+				require.Contains(t, result.mutableSideEffect, "test-marker")
+				assert.Equal(t, []byte("test"), result.mutableSideEffect["test-marker"])
+			},
+		},
+	} {
+		weh := testWorkflowExecutionEventHandler(t, newRegistry())
+		err := weh.handleMarkerRecorded(1, tc.marker)
+		assert.NoError(t, err)
+	}
+}
+
+func TestEventHandler_handleMarkerRecorded_failures(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		marker         *s.MarkerRecordedEventAttributes
+		assertErrorStr string
+	}{
+		{
+			name: "unknown marker",
+			marker: &s.MarkerRecordedEventAttributes{
+				MarkerName: common.StringPtr("unknown"),
+			},
+			assertErrorStr: "unknown marker name \"unknown\" for eventID \"1\"",
+		},
+		{
+			name: "side effect with invalid details",
+			marker: &s.MarkerRecordedEventAttributes{
+				MarkerName: common.StringPtr(sideEffectMarkerName),
+				Details:    []byte("invalid"),
+			},
+			assertErrorStr: "extract side effect: unable to decode argument:",
+		},
+		{
+			name: "version with invalid details",
+			marker: &s.MarkerRecordedEventAttributes{
+				MarkerName: common.StringPtr(versionMarkerName),
+				Details:    []byte("invalid"),
+			},
+			assertErrorStr: "extract change id: unable to decode argument:",
+		},
+		{
+			name: "mutable side effect with invalid details",
+			marker: &s.MarkerRecordedEventAttributes{
+				MarkerName: common.StringPtr(mutableSideEffectMarkerName),
+				Details:    []byte("invalid"),
+			},
+			assertErrorStr: "extract fixed id: unable to decode argument:",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			weh := testWorkflowExecutionEventHandler(t, newRegistry())
+			err := weh.handleMarkerRecorded(1, tc.marker)
+			assert.ErrorContains(t, err, tc.assertErrorStr)
+		})
+	}
+}
+
 func testWorkflowExecutionEventHandler(t *testing.T, registry *registry) *workflowExecutionEventHandlerImpl {
 	return newWorkflowExecutionEventHandler(
 		testWorkflowInfo,
@@ -860,4 +948,11 @@ var testWorkflowInfo = &WorkflowInfo{
 		Name: "test",
 		Path: "",
 	},
+}
+
+func getSerializedDetails[T, V any](t *testing.T, id T, data V) []byte {
+	converter := defaultDataConverter{}
+	res, err := converter.ToData(id, data)
+	require.NoError(t, err)
+	return res
 }

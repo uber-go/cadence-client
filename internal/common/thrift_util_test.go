@@ -78,9 +78,11 @@ func TestIsUseThriftEncoding(t *testing.T) {
 
 func TestIsUseThriftDecoding(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		str1 := &mockThriftStruct{}
+		str2 := &mockThriftStruct{}
 		ts := []interface{}{
-			&mockThriftStruct{},
-			&mockThriftStruct{},
+			&str1,
+			&str2,
 		}
 
 		assert.True(t, IsUseThriftDecoding(ts))

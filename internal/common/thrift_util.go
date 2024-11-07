@@ -86,7 +86,8 @@ func IsUseThriftDecoding(objs []interface{}) bool {
 	// NOTE: our criteria to use which encoder is simple if all the types are de-serializable using thrift then we use
 	// thrift decoder. For everything else we default to gob.
 	for _, obj := range objs {
-		if !IsThriftType(obj) {
+		rVal := reflect.ValueOf(obj)
+		if rVal.Kind() != reflect.Ptr || !IsThriftType(reflect.Indirect(rVal).Interface()) {
 			return false
 		}
 	}

@@ -77,19 +77,23 @@ func TestIsUseThriftEncoding(t *testing.T) {
 }
 
 func TestIsUseThriftDecoding(t *testing.T) {
-	ts := []interface{}{
-		&mockThriftStruct{},
-		&mockThriftStruct{},
-	}
+	t.Run("success", func(t *testing.T) {
+		ts := []interface{}{
+			&mockThriftStruct{},
+			&mockThriftStruct{},
+		}
 
-	assert.True(t, IsUseThriftDecoding(ts))
+		assert.True(t, IsUseThriftDecoding(ts))
+	})
 
-	ts = []interface{}{
-		&mockThriftStruct{},
-		"string",
-	}
+	t.Run("fail", func(t *testing.T) {
+		ts := []interface{}{
+			&mockThriftStruct{},
+			"string",
+		}
 
-	assert.False(t, IsUseThriftDecoding(ts))
+		assert.False(t, IsUseThriftDecoding(ts))
+	})
 }
 
 func TestIsThriftType(t *testing.T) {

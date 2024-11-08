@@ -22,10 +22,11 @@ package testlogger
 
 import (
 	"fmt"
-	"go.uber.org/zap/zaptest"
 	"os"
 	"testing"
 	"time"
+
+	"go.uber.org/zap/zaptest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

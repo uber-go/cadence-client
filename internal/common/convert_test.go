@@ -40,7 +40,7 @@ func TestPtrOf(t *testing.T) {
 func TestPtrHelpers(t *testing.T) {
 	assert.Equal(t, int32(1), *Int32Ptr(1))
 	assert.Equal(t, int64(1), *Int64Ptr(1))
-	assert.Equal(t, float64(1.1), *Float64Ptr(1.1))
+	assert.Equal(t, 1.1, *Float64Ptr(1.1))
 	assert.Equal(t, true, *BoolPtr(true))
 	assert.Equal(t, "a", *StringPtr("a"))
 	assert.Equal(t, s.TaskList{Name: PtrOf("a")}, *TaskListPtr(s.TaskList{Name: PtrOf("a")}))

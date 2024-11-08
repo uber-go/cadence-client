@@ -59,43 +59,71 @@ func TestTListDeserialize(t *testing.T) {
 }
 
 func TestIsUseThriftEncoding(t *testing.T) {
-	ts := []interface{}{
-		&mockThriftStruct{},
-		&mockThriftStruct{},
+	for _, tc := range []struct {
+		name     string
+		input    []interface{}
+		expected bool
+	}{
+		{
+			name:     "nil",
+			input:    nil,
+			expected: false,
+		},
+		{
+			name: "success",
+			input: []interface{}{
+				&mockThriftStruct{},
+				&mockThriftStruct{},
+			},
+			expected: true,
+		},
+		{
+			name: "fail",
+			input: []interface{}{
+				&mockThriftStruct{},
+				PtrOf("string"),
+			},
+			expected: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, IsUseThriftEncoding(tc.input))
+		})
 	}
-
-	result := IsUseThriftEncoding(ts)
-	assert.True(t, result)
-
-	ts = []interface{}{
-		&mockThriftStruct{},
-		"string",
-	}
-
-	result = IsUseThriftEncoding(ts)
-	assert.False(t, result)
 }
 
 func TestIsUseThriftDecoding(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		str1 := &mockThriftStruct{}
-		str2 := &mockThriftStruct{}
-		ts := []interface{}{
-			&str1,
-			&str2,
-		}
-
-		assert.True(t, IsUseThriftDecoding(ts))
-	})
-
-	t.Run("fail", func(t *testing.T) {
-		ts := []interface{}{
-			&mockThriftStruct{},
-			"string",
-		}
-
-		assert.False(t, IsUseThriftDecoding(ts))
-	})
+	for _, tc := range []struct {
+		name     string
+		input    []interface{}
+		expected bool
+	}{
+		{
+			name:     "nil",
+			input:    nil,
+			expected: false,
+		},
+		{
+			name: "success",
+			input: []interface{}{
+				PtrOf(&mockThriftStruct{}),
+				PtrOf(&mockThriftStruct{}),
+			},
+			expected: true,
+		},
+		{
+			name: "fail",
+			input: []interface{}{
+				PtrOf(&mockThriftStruct{}),
+				PtrOf("string"),
+			},
+			expected: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, IsUseThriftDecoding(tc.input))
+		})
+	}
 }
 
 func TestIsThriftType(t *testing.T) {

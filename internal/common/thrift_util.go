@@ -71,6 +71,9 @@ func TListDeserialize(ts []thrift.TStruct, b []byte) (err error) {
 
 // IsUseThriftEncoding checks if the objects passed in are all encoded using thrift.
 func IsUseThriftEncoding(objs []interface{}) bool {
+	if len(objs) == 0 {
+		return false
+	}
 	// NOTE: our criteria to use which encoder is simple if all the types are serializable using thrift then we use
 	// thrift encoder. For everything else we default to gob.
 	for _, obj := range objs {
@@ -83,6 +86,9 @@ func IsUseThriftEncoding(objs []interface{}) bool {
 
 // IsUseThriftDecoding checks if the objects passed in are all de-serializable using thrift.
 func IsUseThriftDecoding(objs []interface{}) bool {
+	if len(objs) == 0 {
+		return false
+	}
 	// NOTE: our criteria to use which encoder is simple if all the types are de-serializable using thrift then we use
 	// thrift decoder. For everything else we default to gob.
 	for _, obj := range objs {

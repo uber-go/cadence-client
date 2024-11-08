@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"go.uber.org/cadence/internal/common/debug"
 
 	"github.com/golang/mock/gomock"
@@ -41,7 +43,6 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -123,7 +124,7 @@ func (s *internalWorkerTestSuite) TearDownTest() {
 }
 
 func getTestLogger(t *testing.T) *zap.Logger {
-	return zaptest.NewLogger(t)
+	return testlogger.NewZap(t)
 }
 
 func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExecutionParameters) {
@@ -411,7 +412,7 @@ func createWorkerWithThrottle(
 	// Configure worker options.
 	workerOptions.WorkerActivitiesPerSecond = 20
 	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
-	workerOptions.Logger = zaptest.NewLogger(t)
+	workerOptions.Logger = testlogger.NewZap(t)
 	workerOptions.EnableSessionWorker = true
 
 	// Start Worker.

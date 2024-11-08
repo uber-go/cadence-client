@@ -27,9 +27,10 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	m "go.uber.org/cadence/.gen/go/shared"
@@ -182,7 +183,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 		WorkerOptions: WorkerOptions{
 			MaxConcurrentActivityTaskPollers: 4,
 			MaxConcurrentDecisionTaskPollers: 4,
-			Logger:                           zaptest.NewLogger(s.T()),
+			Logger:                           testlogger.NewZap(s.T()),
 		},
 	}
 
@@ -214,7 +215,7 @@ func (s *InterfacesTestSuite) TestInterface() {
 		WorkerOptions: WorkerOptions{
 			MaxConcurrentActivityTaskPollers: 10,
 			MaxConcurrentDecisionTaskPollers: 10,
-			Logger:                           zaptest.NewLogger(s.T()),
+			Logger:                           testlogger.NewZap(s.T()),
 		},
 	}
 

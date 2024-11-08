@@ -26,13 +26,14 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	m "go.uber.org/cadence/.gen/go/shared"
@@ -127,7 +128,7 @@ func (s *WorkersTestSuite) testActivityWorker(useLocallyDispatched bool) {
 		TaskList: "testTaskList",
 		WorkerOptions: WorkerOptions{
 			MaxConcurrentActivityTaskPollers: 5,
-			Logger:                           zaptest.NewLogger(s.T())},
+			Logger:                           testlogger.NewZap(s.T())},
 	}
 	overrides := &workerOverrides{activityTaskHandler: newSampleActivityTaskHandler(), useLocallyDispatchedActivityPoller: useLocallyDispatched}
 	a := &greeterActivity{}
@@ -173,7 +174,7 @@ func (s *WorkersTestSuite) TestActivityWorkerStop() {
 			WorkerOptions{
 				MaxConcurrentActivityTaskPollers:   5,
 				MaxConcurrentActivityExecutionSize: 2,
-				Logger:                             zaptest.NewLogger(s.T()),
+				Logger:                             testlogger.NewZap(s.T()),
 			},
 		),
 		UserContext:       ctx,
@@ -212,7 +213,7 @@ func (s *WorkersTestSuite) TestPollForDecisionTask_InternalServiceError() {
 		TaskList: "testDecisionTaskList",
 		WorkerOptions: WorkerOptions{
 			MaxConcurrentDecisionTaskPollers: 5,
-			Logger:                           zaptest.NewLogger(s.T())},
+			Logger:                           testlogger.NewZap(s.T())},
 	}
 	overrides := &workerOverrides{workflowTaskHandler: newSampleWorkflowTaskHandler()}
 	workflowWorker := newWorkflowWorkerInternal(
@@ -336,7 +337,7 @@ func (s *WorkersTestSuite) TestLongRunningDecisionTask() {
 	}).Times(2)
 
 	options := WorkerOptions{
-		Logger:                zaptest.NewLogger(s.T()),
+		Logger:                testlogger.NewZap(s.T()),
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
 	}
@@ -502,7 +503,7 @@ func (s *WorkersTestSuite) TestQueryTask_WorkflowCacheEvicted() {
 	s.service.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), callOptions()...).Return(&m.PollForDecisionTaskResponse{}, &m.InternalServiceError{}).AnyTimes()
 
 	options := WorkerOptions{
-		Logger:                zaptest.NewLogger(s.T()),
+		Logger:                testlogger.NewZap(s.T()),
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
 		DataConverter:         dc,
@@ -636,7 +637,7 @@ func (s *WorkersTestSuite) TestMultipleLocalActivities() {
 	}).Times(1)
 
 	options := WorkerOptions{
-		Logger:                zaptest.NewLogger(s.T()),
+		Logger:                testlogger.NewZap(s.T()),
 		DisableActivityWorker: true,
 		Identity:              "test-worker-identity",
 	}
@@ -748,7 +749,7 @@ func (s *WorkersTestSuite) TestLocallyDispatchedActivity() {
 	}).Times(1)
 
 	options := WorkerOptions{
-		Logger:   zaptest.NewLogger(s.T()),
+		Logger:   testlogger.NewZap(s.T()),
 		Identity: "test-worker-identity",
 	}
 	worker, err := newAggregatedWorker(s.service, domain, taskList, options)
@@ -814,7 +815,7 @@ func (s *WorkersTestSuite) TestMultipleLocallyDispatchedActivity() {
 	}
 
 	options := WorkerOptions{
-		Logger:   zaptest.NewLogger(s.T()),
+		Logger:   testlogger.NewZap(s.T()),
 		Identity: "test-worker-identity",
 	}
 

@@ -22,6 +22,7 @@ package testlogger
 
 import (
 	"fmt"
+	"go.uber.org/zap/zaptest"
 	"os"
 	"testing"
 	"time"
@@ -131,7 +132,7 @@ func TestFallbackTestCore_Enabled(t *testing.T) {
 	core := &fallbackTestCore{
 		t:         t,
 		fallback:  fallbackLogger.Core(),
-		testing:   testlogger.NewZap(t).Core(),
+		testing:   zaptest.NewLogger(t).Core(),
 		completed: &atomic.Bool{},
 	}
 	// Debug is enabled in zaptest.Logger
@@ -145,8 +146,8 @@ func TestFallbackTestCore_Sync(t *testing.T) {
 
 	core := &fallbackTestCore{
 		t:         t,
-		fallback:  testlogger.NewZap(t).Core(),
-		testing:   testlogger.NewZap(t).Core(),
+		fallback:  zaptest.NewLogger(t).Core(),
+		testing:   zaptest.NewLogger(t).Core(),
 		completed: &atomic.Bool{},
 	}
 	// Sync for testing logger must not fail.

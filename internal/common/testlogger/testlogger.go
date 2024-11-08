@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -80,6 +81,7 @@ func NewObserved(t TestingT) (*zap.Logger, *observer.ObservedLogs) {
 }
 
 type fallbackTestCore struct {
+	sync.Mutex
 	t         TestingT
 	fallback  zapcore.Core
 	testing   zapcore.Core
@@ -132,6 +134,9 @@ func (f *fallbackTestCore) Write(entry zapcore.Entry, fields []zapcore.Field) er
 		}
 		return f.fallback.Write(entry, fields)
 	}
+	// Ensure no concurrent writes to the test logger.
+	f.Lock()
+	defer f.Unlock()
 	return f.testing.Write(entry, fields)
 }
 

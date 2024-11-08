@@ -413,10 +413,6 @@ func createWorkerWithThrottle(
 	workerOptions.WorkerActivitiesPerSecond = 20
 	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
 	workerOptions.Logger = testlogger.NewZap(t)
-	if workerOptions.FeatureFlags.PollerAutoScalerEnabled {
-		// Autoscaller can cause concurrent writes in the test logger, so it is unsafe to use.
-		workerOptions.Logger = zap.NewNop()
-	}
 	workerOptions.EnableSessionWorker = true
 
 	// Start Worker.

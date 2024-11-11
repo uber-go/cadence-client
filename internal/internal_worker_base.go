@@ -214,11 +214,7 @@ func (bw *baseWorker) Start() {
 
 	bw.shutdownWG.Add(1)
 	go bw.runTaskDispatcher()
-
-	// We want the emit function run once per host instead of run once per worker
-	// since the emit function is host level metric.
-	bw.shutdownWG.Add(1)
-
+	
 	bw.isWorkerStarted = true
 	traceLog(func() {
 		bw.logger.Info("Started Worker",

@@ -22,11 +22,12 @@ package testlogger
 
 import (
 	"fmt"
-	"go.uber.org/cadence/internal/common"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/cadence/internal/common"
 
 	"go.uber.org/zap/zaptest"
 

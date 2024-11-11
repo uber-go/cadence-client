@@ -22,10 +22,11 @@ package testlogger
 
 import (
 	"fmt"
-	"go.uber.org/cadence/internal/common"
 	"slices"
 	"strings"
 	"sync"
+
+	"go.uber.org/cadence/internal/common"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"

@@ -26,9 +26,10 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/atomic"
-	"go.uber.org/zap/zaptest"
 
 	s "go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common/autoscaler"
@@ -169,7 +170,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 					DryRun:            tt.args.isDryRun,
 					TargetUtilization: float64(tt.args.targetMilliUsage) / 1000,
 				},
-				zaptest.NewLogger(t),
+				testlogger.NewZap(t),
 				// hook function that collects number of iterations
 				func() {
 					autoscalerEpoch.Add(1)

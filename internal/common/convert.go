@@ -95,3 +95,17 @@ func QueryResultTypePtr(t s.QueryResultType) *s.QueryResultType {
 func PtrOf[T any](v T) *T {
 	return &v
 }
+
+// ValueFromPtr returns the value from a pointer.
+func ValueFromPtr[T any](v *T) T {
+	if v == nil {
+		return Zero[T]()
+	}
+	return *v
+}
+
+// Zero returns the zero value of a type by return type.
+func Zero[T any]() T {
+	var zero T
+	return zero
+}

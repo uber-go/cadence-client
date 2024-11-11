@@ -28,10 +28,11 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/internal/common/metrics"
 )
@@ -50,7 +51,7 @@ func (s *WorkflowUnitTest) SetupSuite() {
 	}
 }
 func (s *WorkflowUnitTest) SetupTest() {
-	s.SetLogger(zaptest.NewLogger(s.T()))
+	s.SetLogger(testlogger.NewZap(s.T()))
 }
 
 func TestWorkflowUnitTest(t *testing.T) {

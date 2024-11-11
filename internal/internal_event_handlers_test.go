@@ -24,9 +24,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/internal/common"
 
@@ -932,7 +933,7 @@ func testWorkflowExecutionEventHandler(t *testing.T, registry *registry) *workfl
 	return newWorkflowExecutionEventHandler(
 		testWorkflowInfo,
 		func(result []byte, err error) {},
-		zaptest.NewLogger(t),
+		testlogger.NewZap(t),
 		true,
 		tally.NewTestScope("test", nil),
 		registry,

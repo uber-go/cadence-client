@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/jonboulle/clockwork"
 
 	"github.com/golang/mock/gomock"
@@ -34,7 +36,6 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	s "go.uber.org/cadence/.gen/go/shared"
@@ -57,7 +58,7 @@ func TestActivityTaskHandler_Execute_deadline(t *testing.T) {
 
 	for i, d := range deadlineTests {
 		t.Run(fmt.Sprintf("testIndex: %v, testDetails: %v", i, d), func(t *testing.T) {
-			logger := zaptest.NewLogger(t)
+			logger := testlogger.NewZap(t)
 			a := &testActivityDeadline{logger: logger}
 			registry := newRegistry()
 			registry.addActivityWithLock(a.ActivityType().Name, a)
@@ -101,7 +102,7 @@ func TestActivityTaskHandler_Execute_deadline(t *testing.T) {
 }
 
 func TestActivityTaskHandler_Execute_worker_stop(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	logger := testlogger.NewZap(t)
 
 	a := &testActivityDeadline{logger: logger}
 	registry := newRegistry()
@@ -150,7 +151,7 @@ func TestActivityTaskHandler_Execute_worker_stop(t *testing.T) {
 }
 
 func TestActivityTaskHandler_Execute_with_propagators(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	logger := testlogger.NewZap(t)
 
 	now := time.Now()
 
@@ -208,7 +209,7 @@ func TestActivityTaskHandler_Execute_with_propagators(t *testing.T) {
 }
 
 func TestActivityTaskHandler_Execute_with_propagator_failure(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	logger := testlogger.NewZap(t)
 
 	now := time.Now()
 
@@ -254,7 +255,7 @@ func TestActivityTaskHandler_Execute_with_propagator_failure(t *testing.T) {
 }
 
 func TestActivityTaskHandler_Execute_with_auto_heartbeat(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	logger := testlogger.NewZap(t)
 
 	now := time.Now()
 

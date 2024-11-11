@@ -214,7 +214,7 @@ func (bw *baseWorker) Start() {
 
 	bw.shutdownWG.Add(1)
 	go bw.runTaskDispatcher()
-	
+
 	bw.isWorkerStarted = true
 	traceLog(func() {
 		bw.logger.Info("Started Worker",

@@ -22,12 +22,12 @@ package testlogger
 
 import (
 	"fmt"
+	"go.uber.org/cadence/internal/common"
 	"slices"
 	"strings"
 	"sync"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
@@ -58,10 +58,11 @@ func NewZap(t TestingT) *zap.Logger {
 	logAfterComplete, err := zap.NewDevelopment()
 	require.NoError(t, err, "could not build a fallback zap logger")
 	replaced := &fallbackTestCore{
+		mu:        &sync.RWMutex{},
 		t:         t,
 		fallback:  logAfterComplete.Core(),
 		testing:   zaptest.NewLogger(t).Core(),
-		completed: &atomic.Bool{},
+		completed: common.PtrOf(false),
 	}
 
 	t.Cleanup(replaced.UseFallback) // switch to fallback before ending the test
@@ -81,30 +82,38 @@ func NewObserved(t TestingT) (*zap.Logger, *observer.ObservedLogs) {
 }
 
 type fallbackTestCore struct {
-	sync.Mutex
+	mu        *sync.RWMutex
 	t         TestingT
 	fallback  zapcore.Core
 	testing   zapcore.Core
-	completed *atomic.Bool
+	completed *bool
 }
 
 var _ zapcore.Core = (*fallbackTestCore)(nil)
 
 func (f *fallbackTestCore) UseFallback() {
-	f.completed.Store(true)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	*f.completed = true
 }
 
 func (f *fallbackTestCore) Enabled(level zapcore.Level) bool {
-	if f.completed.Load() {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	if f.completed != nil && *f.completed {
 		return f.fallback.Enabled(level)
 	}
 	return f.testing.Enabled(level)
 }
 
 func (f *fallbackTestCore) With(fields []zapcore.Field) zapcore.Core {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	// need to copy and defer, else the returned core will be used at an
 	// arbitrarily later point in time, possibly after the test has completed.
 	return &fallbackTestCore{
+		mu:        f.mu,
 		t:         f.t,
 		fallback:  f.fallback.With(fields),
 		testing:   f.testing.With(fields),
@@ -113,6 +122,8 @@ func (f *fallbackTestCore) With(fields []zapcore.Field) zapcore.Core {
 }
 
 func (f *fallbackTestCore) Check(entry zapcore.Entry, checked *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	// see other Check impls, all look similar.
 	// this defers the "where to log" decision to Write, as `f` is the core that will write.
 	if f.fallback.Enabled(entry.Level) {
@@ -122,7 +133,10 @@ func (f *fallbackTestCore) Check(entry zapcore.Entry, checked *zapcore.CheckedEn
 }
 
 func (f *fallbackTestCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
-	if f.completed.Load() {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	if common.ValueFromPtr(f.completed) {
 		entry.Message = fmt.Sprintf("COULD FAIL TEST %q, logged too late: %v", f.t.Name(), entry.Message)
 
 		hasStack := slices.ContainsFunc(fields, func(field zapcore.Field) bool {
@@ -134,14 +148,14 @@ func (f *fallbackTestCore) Write(entry zapcore.Entry, fields []zapcore.Field) er
 		}
 		return f.fallback.Write(entry, fields)
 	}
-	// Ensure no concurrent writes to the test logger.
-	f.Lock()
-	defer f.Unlock()
 	return f.testing.Write(entry, fields)
 }
 
 func (f *fallbackTestCore) Sync() error {
-	if f.completed.Load() {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	if common.ValueFromPtr(f.completed) {
 		return f.fallback.Sync()
 	}
 	return f.testing.Sync()

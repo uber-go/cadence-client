@@ -22,7 +22,9 @@ package testlogger
 
 import (
 	"fmt"
+	"go.uber.org/cadence/internal/common"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,7 +32,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
 
@@ -47,7 +48,7 @@ func TestMain(m *testing.M) {
 	select {
 	case <-logged:
 		os.Exit(code)
-	case <-time.After(time.Second): // should be MUCH faster
+	case <-time.After(time.Millisecond): // should be MUCH faster
 		_, _ = fmt.Fprintln(os.Stderr, "timed out waiting for test to log")
 		os.Exit(1)
 	}
@@ -131,10 +132,11 @@ func TestFallbackTestCore_Enabled(t *testing.T) {
 	require.NoError(t, err)
 
 	core := &fallbackTestCore{
+		mu:        &sync.RWMutex{},
 		t:         t,
 		fallback:  fallbackLogger.Core(),
 		testing:   zaptest.NewLogger(t).Core(),
-		completed: &atomic.Bool{},
+		completed: common.PtrOf(false),
 	}
 	// Debug is enabled in zaptest.Logger
 	assert.True(t, core.Enabled(zap.DebugLevel))
@@ -144,16 +146,11 @@ func TestFallbackTestCore_Enabled(t *testing.T) {
 }
 
 func TestFallbackTestCore_Sync(t *testing.T) {
-
-	core := &fallbackTestCore{
-		t:         t,
-		fallback:  zaptest.NewLogger(t).Core(),
-		testing:   zaptest.NewLogger(t).Core(),
-		completed: &atomic.Bool{},
-	}
+	core := NewZap(t).Core().(*fallbackTestCore)
+	core.fallback = zap.NewNop().Core()
 	// Sync for testing logger must not fail.
 	assert.NoError(t, core.Sync(), "normal sync must not fail")
 	core.UseFallback()
 	// Sync for fallback logger must not fail.
-	assert.NoError(t, core.Sync(), "fallback sync must not  fail")
+	assert.NoError(t, core.Sync(), "fallback sync must not fail")
 }

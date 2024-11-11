@@ -64,6 +64,7 @@ func TestValueFromPtr(t *testing.T) {
 	assert.Equal(t, 1.1, ValueFromPtr(PtrOf(1.1)))
 	assert.Equal(t, true, ValueFromPtr(PtrOf(true)))
 	assert.Equal(t, []string{"a"}, ValueFromPtr(PtrOf([]string{"a"})))
+	assert.Equal(t, "" /* default value */, ValueFromPtr((*string)(nil)))
 }
 
 func TestZero(t *testing.T) {

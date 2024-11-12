@@ -24,11 +24,12 @@ import (
 	"context"
 	"testing"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/yarpc"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
@@ -70,7 +71,7 @@ func (s *shadowWorkerSuite) TestNewShadowWorker() {
 		workerExecutionParameters{
 			TaskList: testTaskList,
 			WorkerOptions: WorkerOptions{
-				Logger: zaptest.NewLogger(s.T())},
+				Logger: testlogger.NewZap(s.T())},
 		},
 		registry,
 	)
@@ -102,7 +103,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_InvalidShadowOption() {
 		workerExecutionParameters{
 			TaskList: testTaskList,
 			WorkerOptions: WorkerOptions{
-				Logger: zaptest.NewLogger(s.T())},
+				Logger: testlogger.NewZap(s.T())},
 		},
 		newRegistry(),
 	)
@@ -122,7 +123,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_DomainNotExist() {
 		workerExecutionParameters{
 			TaskList: testTaskList,
 			WorkerOptions: WorkerOptions{
-				Logger: zaptest.NewLogger(s.T())},
+				Logger: testlogger.NewZap(s.T())},
 		},
 		newRegistry(),
 	)
@@ -141,7 +142,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_TaskListNotSpecified() 
 		ShadowOptions{},
 		workerExecutionParameters{
 			WorkerOptions: WorkerOptions{
-				Logger: zaptest.NewLogger(s.T())},
+				Logger: testlogger.NewZap(s.T())},
 		},
 		newRegistry(),
 	)
@@ -165,7 +166,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Failed_StartWorkflowError() {
 		workerExecutionParameters{
 			TaskList: testTaskList,
 			WorkerOptions: WorkerOptions{
-				Logger: zaptest.NewLogger(s.T())},
+				Logger: testlogger.NewZap(s.T())},
 		},
 		newRegistry(),
 	)
@@ -209,7 +210,7 @@ func (s *shadowWorkerSuite) TestStartShadowWorker_Succeed() {
 		workerExecutionParameters{
 			TaskList: testTaskList,
 			WorkerOptions: WorkerOptions{
-				Logger: zaptest.NewLogger(s.T())},
+				Logger: testlogger.NewZap(s.T())},
 		},
 		newRegistry(),
 	)

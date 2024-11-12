@@ -24,12 +24,13 @@ import (
 	"context"
 	"testing"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -56,7 +57,7 @@ func TestActivityTestSuite(t *testing.T) {
 func (s *activityTestSuite) SetupTest() {
 	s.mockCtrl = gomock.NewController(s.T())
 	s.service = workflowservicetest.NewMockClient(s.mockCtrl)
-	s.logger = zaptest.NewLogger(s.T())
+	s.logger = testlogger.NewZap(s.T())
 }
 
 func (s *activityTestSuite) TearDownTest() {

@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"go.uber.org/cadence/internal/common/debug"
 
 	"github.com/golang/mock/gomock"
@@ -41,7 +43,6 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	"go.uber.org/cadence/.gen/go/shared"
@@ -123,7 +124,7 @@ func (s *internalWorkerTestSuite) TearDownTest() {
 }
 
 func getTestLogger(t *testing.T) *zap.Logger {
-	return zaptest.NewLogger(t)
+	return testlogger.NewZap(t)
 }
 
 func (s *internalWorkerTestSuite) testDecisionTaskHandlerHelper(params workerExecutionParameters) {
@@ -411,7 +412,7 @@ func createWorkerWithThrottle(
 	// Configure worker options.
 	workerOptions.WorkerActivitiesPerSecond = 20
 	workerOptions.TaskListActivitiesPerSecond = activitiesPerSecond
-	workerOptions.Logger = zaptest.NewLogger(t)
+	workerOptions.Logger = testlogger.NewZap(t)
 	workerOptions.EnableSessionWorker = true
 
 	// Start Worker.
@@ -1423,6 +1424,94 @@ func Test_augmentWorkerOptions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t, tt.want, AugmentWorkerOptions(tt.args.options), "AugmentWorkerOptions(%v)", tt.args.options)
+		})
+	}
+}
+
+func TestValidateFnFormat_Activity(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		fn      any
+		wantErr string
+	}{
+		{
+			name:    "not a function",
+			fn:      1,
+			wantErr: "expected a func as input",
+		},
+		{
+			name:    "function without return",
+			fn:      func() {},
+			wantErr: "expected function to return result",
+		},
+		{
+			name:    "function with too many return values",
+			fn:      func() (int, int, error) { return 0, 0, nil },
+			wantErr: "expected function to return result",
+		},
+		{
+			name:    "function without error",
+			fn:      func() int { return 0 },
+			wantErr: "expected function second return value",
+		},
+		{
+			name:    "function with error but in the wrong place",
+			fn:      func() (error, int) { return nil, 0 },
+			wantErr: "expected function second return value",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateFnFormat(reflect.TypeOf(tc.fn), false)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
+func TestTestValidateFnFormat_Workflow(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		fn      any
+		wantErr string
+	}{
+		{
+			name:    "not a function",
+			fn:      1,
+			wantErr: "expected a func as input",
+		},
+		{
+			name:    "function without return",
+			fn:      func(_ Context) {},
+			wantErr: "expected function to return result",
+		},
+		{
+			name:    "function with too many return values",
+			fn:      func(_ Context) (int, int, error) { return 0, 0, nil },
+			wantErr: "expected function to return result",
+		},
+		{
+			name:    "function without error",
+			fn:      func(_ Context) int { return 0 },
+			wantErr: "expected function second return value",
+		},
+		{
+			name:    "function with error but in the wrong place",
+			fn:      func(_ Context) (error, int) { return nil, 0 },
+			wantErr: "expected function second return value",
+		},
+		{
+			name:    "workflow without args",
+			fn:      func() error { return nil },
+			wantErr: "expected at least one argument of type workflow.Context",
+		},
+		{
+			name:    "workflow with wrong args",
+			fn:      func(int) error { return nil },
+			wantErr: "expected first argument to be workflow.Context",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateFnFormat(reflect.TypeOf(tc.fn), true)
+			assert.ErrorContains(t, err, tc.wantErr)
 		})
 	}
 }

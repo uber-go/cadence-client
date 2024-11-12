@@ -1427,3 +1427,91 @@ func Test_augmentWorkerOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateFnFormat_Activity(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		fn      any
+		wantErr string
+	}{
+		{
+			name:    "not a function",
+			fn:      1,
+			wantErr: "expected a func as input",
+		},
+		{
+			name:    "function without return",
+			fn:      func() {},
+			wantErr: "expected function to return result",
+		},
+		{
+			name:    "function with too many return values",
+			fn:      func() (int, int, error) { return 0, 0, nil },
+			wantErr: "expected function to return result",
+		},
+		{
+			name:    "function without error",
+			fn:      func() int { return 0 },
+			wantErr: "expected function second return value",
+		},
+		{
+			name:    "function with error but in the wrong place",
+			fn:      func() (error, int) { return nil, 0 },
+			wantErr: "expected function second return value",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateFnFormat(reflect.TypeOf(tc.fn), false)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
+func TestTestValidateFnFormat_Workflow(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		fn      any
+		wantErr string
+	}{
+		{
+			name:    "not a function",
+			fn:      1,
+			wantErr: "expected a func as input",
+		},
+		{
+			name:    "function without return",
+			fn:      func(_ Context) {},
+			wantErr: "expected function to return result",
+		},
+		{
+			name:    "function with too many return values",
+			fn:      func(_ Context) (int, int, error) { return 0, 0, nil },
+			wantErr: "expected function to return result",
+		},
+		{
+			name:    "function without error",
+			fn:      func(_ Context) int { return 0 },
+			wantErr: "expected function second return value",
+		},
+		{
+			name:    "function with error but in the wrong place",
+			fn:      func(_ Context) (error, int) { return nil, 0 },
+			wantErr: "expected function second return value",
+		},
+		{
+			name:    "workflow without args",
+			fn:      func() error { return nil },
+			wantErr: "expected at least one argument of type workflow.Context",
+		},
+		{
+			name:    "workflow with wrong args",
+			fn:      func(int) error { return nil },
+			wantErr: "expected first argument to be workflow.Context",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateFnFormat(reflect.TypeOf(tc.fn), true)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}

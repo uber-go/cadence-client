@@ -32,6 +32,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
@@ -39,7 +41,6 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest"
 	"go.uber.org/zap/zaptest/observer"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
@@ -118,11 +119,11 @@ func getWorkflowInfoWorkflowFunc(ctx Context, expectedLastCompletionResult strin
 
 // Test suite.
 func (t *TaskHandlersTestSuite) SetupTest() {
-	t.logger = zaptest.NewLogger(t.T())
+	t.logger = testlogger.NewZap(t.T())
 }
 
 func (t *TaskHandlersTestSuite) SetupSuite() {
-	t.logger = zaptest.NewLogger(t.T())
+	t.logger = testlogger.NewZap(t.T())
 	registerWorkflows(t.registry)
 }
 
@@ -1419,7 +1420,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeatLogNotCanceled() {
 func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 	mockCtrl := gomock.NewController(t.T())
 	mockService := workflowservicetest.NewMockClient(mockCtrl)
-	logger := zaptest.NewLogger(t.T())
+	logger := testlogger.NewZap(t.T())
 
 	entityNotExistsError := &s.EntityNotExistsError{}
 	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, entityNotExistsError)
@@ -1446,7 +1447,7 @@ func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithError() {
 func (t *TaskHandlersTestSuite) TestHeartBeat_NilResponseWithDomainNotActiveError() {
 	mockCtrl := gomock.NewController(t.T())
 	mockService := workflowservicetest.NewMockClient(mockCtrl)
-	logger := zaptest.NewLogger(t.T())
+	logger := testlogger.NewZap(t.T())
 
 	domainNotActiveError := &s.DomainNotActiveError{}
 	mockService.EXPECT().RecordActivityTaskHeartbeat(gomock.Any(), gomock.Any(), callOptions()...).Return(nil, domainNotActiveError)

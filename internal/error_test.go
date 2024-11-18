@@ -25,8 +25,9 @@ import (
 	"fmt"
 	"testing"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
@@ -62,7 +63,7 @@ var (
 // Creates a new workflow environment with the correct logger configured.
 func newTestActivityEnv(t *testing.T) *TestActivityEnvironment {
 	s := &WorkflowTestSuite{}
-	s.SetLogger(zaptest.NewLogger(t))
+	s.SetLogger(testlogger.NewZap(t))
 	// same tally note
 	env := s.NewTestActivityEnvironment()
 	return env
@@ -482,7 +483,7 @@ func Test_ContinueAsNewError(t *testing.T) {
 		header:   header,
 		ctxProps: []ContextPropagator{NewStringMapPropagator([]string{"test"})},
 	}
-	s.SetLogger(zaptest.NewLogger(t))
+	s.SetLogger(testlogger.NewZap(t))
 	wfEnv := s.NewTestWorkflowEnvironment()
 	wfEnv.Test(t)
 	wfEnv.RegisterWorkflowWithOptions(continueAsNewWorkflowFn, RegisterWorkflowOptions{

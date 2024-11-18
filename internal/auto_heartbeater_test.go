@@ -26,10 +26,11 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
@@ -51,7 +52,7 @@ func TestAutoHearbeater_Run(t *testing.T) {
 	t.Run("worker stop channel", func(t *testing.T) {
 		stopCh := make(chan struct{})
 		invoker := &MockServiceInvoker{}
-		logger := zaptest.NewLogger(t)
+		logger := testlogger.NewZap(t)
 		clock := clockwork.NewFakeClock()
 		hearbeater := newHeartbeater(stopCh, invoker, logger, clock, activityType, workflowExecution)
 
@@ -62,7 +63,7 @@ func TestAutoHearbeater_Run(t *testing.T) {
 	t.Run("context done", func(t *testing.T) {
 		stopCh := make(chan struct{})
 		invoker := &MockServiceInvoker{}
-		logger := zaptest.NewLogger(t)
+		logger := testlogger.NewZap(t)
 		clock := clockwork.NewFakeClock()
 		hearbeater := newHeartbeater(stopCh, invoker, logger, clock, activityType, workflowExecution)
 
@@ -75,7 +76,7 @@ func TestAutoHearbeater_Run(t *testing.T) {
 		stopCh := make(chan struct{})
 		invoker := &MockServiceInvoker{}
 		invoker.EXPECT().BackgroundHeartbeat().Return(nil).Once()
-		logger := zaptest.NewLogger(t)
+		logger := testlogger.NewZap(t)
 		clock := clockwork.NewFakeClock()
 		hearbeater := newHeartbeater(stopCh, invoker, logger, clock, activityType, workflowExecution)
 
@@ -98,7 +99,7 @@ func TestAutoHearbeater_Run(t *testing.T) {
 		stopCh := make(chan struct{})
 		invoker := &MockServiceInvoker{}
 		invoker.EXPECT().BackgroundHeartbeat().Return(assert.AnError).Once()
-		logger := zaptest.NewLogger(t)
+		logger := testlogger.NewZap(t)
 		clock := clockwork.NewFakeClock()
 		hearbeater := newHeartbeater(stopCh, invoker, logger, clock, activityType, workflowExecution)
 

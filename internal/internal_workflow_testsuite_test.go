@@ -31,12 +31,13 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/cadence/internal/common"
@@ -67,7 +68,7 @@ func (s *WorkflowTestSuiteUnitTest) SetupSuite() {
 }
 
 func (s *WorkflowTestSuiteUnitTest) SetupTest() {
-	s.SetLogger(zaptest.NewLogger(s.T()))
+	s.SetLogger(testlogger.NewZap(s.T()))
 }
 
 func TestUnitTestSuite(t *testing.T) {
@@ -3177,7 +3178,7 @@ func (s *WorkflowTestSuiteUnitTest) Test_Regression_ExecuteChildWorkflowWithCanc
 func TestRegression_LocalActivityErrorEncoding(t *testing.T) {
 	// previously not encoded correctly
 	s := WorkflowTestSuite{}
-	s.SetLogger(zaptest.NewLogger(t))
+	s.SetLogger(testlogger.NewZap(t))
 	env := s.NewTestWorkflowEnvironment()
 	sentinel := errors.New("sentinel error value")
 	env.RegisterWorkflowWithOptions(func(ctx Context) error {

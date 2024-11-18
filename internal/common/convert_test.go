@@ -55,3 +55,20 @@ func TestCeilHelpers(t *testing.T) {
 	assert.Equal(t, int32(2), Int32Ceil(1.1))
 	assert.Equal(t, int64(2), Int64Ceil(1.1))
 }
+
+func TestValueFromPtr(t *testing.T) {
+	assert.Equal(t, "a", ValueFromPtr(PtrOf("a")))
+	assert.Equal(t, 1, ValueFromPtr(PtrOf(1)))
+	assert.Equal(t, int32(1), ValueFromPtr(PtrOf(int32(1))))
+	assert.Equal(t, int64(1), ValueFromPtr(PtrOf(int64(1))))
+	assert.Equal(t, 1.1, ValueFromPtr(PtrOf(1.1)))
+	assert.Equal(t, true, ValueFromPtr(PtrOf(true)))
+	assert.Equal(t, []string{"a"}, ValueFromPtr(PtrOf([]string{"a"})))
+	assert.Equal(t, "" /* default value */, ValueFromPtr((*string)(nil)))
+}
+
+func TestZero(t *testing.T) {
+	assert.Equal(t, "", Zero[string]())
+	assert.Equal(t, 0, Zero[int]())
+	assert.Equal(t, (*int)(nil), Zero[*int]())
+}

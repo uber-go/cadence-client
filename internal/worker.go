@@ -266,10 +266,6 @@ type (
 		// default: No provider
 		Authorization auth.AuthorizationProvider
 
-		// Optional: Host is just string on the machine running the client
-		// default: empty string
-		Host string
-
 		// Optional: See WorkerBugPorts for more details
 		//
 		// Deprecated: All bugports are always deprecated and may be removed at any time.

@@ -26,12 +26,13 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/cadence/internal/common/testlogger"
+
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
-	"go.uber.org/zap/zaptest"
 
 	"go.uber.org/cadence/.gen/go/cadence/workflowservicetest"
 	s "go.uber.org/cadence/.gen/go/shared"
@@ -47,7 +48,7 @@ const (
 
 func TestLocalActivityPanic(t *testing.T) {
 	// regression: panics in local activities should not terminate the process
-	s := WorkflowTestSuite{logger: zaptest.NewLogger(t)}
+	s := WorkflowTestSuite{logger: testlogger.NewZap(t)}
 	env := s.NewTestWorkflowEnvironment()
 
 	wf := "panicky_local_activity"
@@ -190,7 +191,7 @@ func buildWorkflowTaskPoller(t *testing.T) (*workflowTaskPoller, *workflowservic
 		taskHandler:                  taskHandler,
 		ldaTunnel:                    lda,
 		metricsScope:                 &metrics.TaggedScope{Scope: tally.NewTestScope("test", nil)},
-		logger:                       zaptest.NewLogger(t),
+		logger:                       testlogger.NewZap(t),
 		stickyUUID:                   "",
 		disableStickyExecution:       false,
 		StickyScheduleToStartTimeout: time.Millisecond,

@@ -22,9 +22,10 @@ package internal
 
 import (
 	"encoding/json"
-	"go.uber.org/cadence/internal/common/testlogger"
 	"testing"
 	"time"
+
+	"go.uber.org/cadence/internal/common/testlogger"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber-go/tally"

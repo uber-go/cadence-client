@@ -69,7 +69,6 @@ func (p *permit) AcquireChan(ctx context.Context, wg *sync.WaitGroup) <-chan str
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer close(ch) // close channel when permit is acquired or expired
 		if err := p.sem.Acquire(ctx, 1); err != nil {
 			return
 		}

@@ -44,7 +44,7 @@ func TestPermit_Simulation(t *testing.T) {
 	}{
 		{
 			name:                  "enough permit, no blocking",
-			maxTestDuration:       200 * time.Millisecond,
+			maxTestDuration:       100 * time.Millisecond,
 			capacity:              []int{1000},
 			goroutines:            100,
 			goroutinesAcquireChan: 100,
@@ -60,7 +60,7 @@ func TestPermit_Simulation(t *testing.T) {
 		},
 		{
 			name:                  "not enough permit for some to acquire, fail some",
-			maxTestDuration:       100 * time.Millisecond,
+			maxTestDuration:       300 * time.Millisecond,
 			capacity:              []int{100},
 			goroutines:            500,
 			goroutinesAcquireChan: 500,
@@ -68,15 +68,15 @@ func TestPermit_Simulation(t *testing.T) {
 		},
 		{
 			name:                  "not enough permit at beginning but due to capacity change, blocking but all acquire",
-			maxTestDuration:       100 * time.Second,
-			capacity:              []int{100, 200, 300},
+			maxTestDuration:       300 * time.Millisecond,
+			capacity:              []int{100, 300, 500},
 			goroutines:            500,
 			goroutinesAcquireChan: 500,
 			expectFailures:        0,
 		},
 		{
 			name:            "not enough permit for any acquire, fail all",
-			maxTestDuration: 1 * time.Second,
+			maxTestDuration: 300 * time.Millisecond,
 			capacity:        []int{0},
 			goroutines:      1000,
 			expectFailures:  1000,

@@ -142,7 +142,7 @@ type (
 		logger               *zap.Logger
 		metricsScope         tally.Scope
 
-		dynamic            *worker.DynamicParams
+		concurrency            *worker.Concurrency
 		pollerAutoScaler   *pollerAutoScaler
 		taskQueueCh        chan interface{}
 		sessionTokenBucket *sessionTokenBucket
@@ -168,18 +168,18 @@ func createPollRetryPolicy() backoff.RetryPolicy {
 func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope tally.Scope, sessionTokenBucket *sessionTokenBucket) *baseWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	dynamic := &worker.DynamicParams{
+	concurrency := &worker.Concurrency{
 		PollerPermit: worker.NewPermit(options.pollerCount),
 		TaskPermit:   worker.NewPermit(options.maxConcurrentTask),
 	}
 
 	var pollerAS *pollerAutoScaler
 	if pollerOptions := options.pollerAutoScaler; pollerOptions.Enabled {
-		dynamic.PollerPermit = worker.NewPermit(pollerOptions.InitCount)
+		concurrency.PollerPermit = worker.NewPermit(pollerOptions.InitCount)
 		pollerAS = newPollerScaler(
 			pollerOptions,
 			logger,
-			dynamic.PollerPermit,
+			concurrency.PollerPermit,
 		)
 	}
 
@@ -190,7 +190,7 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 		retrier:              backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
 		logger:               logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
 		metricsScope:         tagScope(metricsScope, tagWorkerType, options.workerType),
-		dynamic:              dynamic,
+		concurrency:              concurrency,
 		pollerAutoScaler:     pollerAS,
 		taskQueueCh:          make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
 		limiterContext:       ctx,
@@ -252,13 +252,13 @@ func (bw *baseWorker) runPoller() {
 		select {
 		case <-bw.shutdownCh:
 			return
-		case <-bw.dynamic.TaskPermit.AcquireChan(bw.limiterContext, &bw.shutdownWG): // don't poll unless there is a task permit
+		case <-bw.concurrency.TaskPermit.AcquireChan(bw.limiterContext, &bw.shutdownWG): // don't poll unless there is a task permit
 			// TODO move to a centralized place inside the worker
 			// emit metrics on concurrent task permit quota and current task permit count
 			// NOTE task permit doesn't mean there is a task running, it still needs to poll until it gets a task to process
 			// thus the metrics is only an estimated value of how many tasks are running concurrently
-			bw.metricsScope.Gauge(metrics.ConcurrentTaskQuota).Update(float64(bw.dynamic.TaskPermit.Quota()))
-			bw.metricsScope.Gauge(metrics.PollerRequestBufferUsage).Update(float64(bw.dynamic.TaskPermit.Count()))
+			bw.metricsScope.Gauge(metrics.ConcurrentTaskQuota).Update(float64(bw.concurrency.TaskPermit.Quota()))
+			bw.metricsScope.Gauge(metrics.PollerRequestBufferUsage).Update(float64(bw.concurrency.TaskPermit.Count()))
 			if bw.sessionTokenBucket != nil {
 				bw.sessionTokenBucket.waitForAvailableToken()
 			}
@@ -339,7 +339,7 @@ func (bw *baseWorker) pollTask() {
 		case <-bw.shutdownCh:
 		}
 	} else {
-		bw.dynamic.TaskPermit.Release(1) // poll failed, trigger a new poll by returning a task permit
+		bw.concurrency.TaskPermit.Release(1) // poll failed, trigger a new poll by returning a task permit
 	}
 }
 
@@ -374,7 +374,7 @@ func (bw *baseWorker) processTask(task interface{}) {
 		}
 
 		if isPolledTask {
-			bw.dynamic.TaskPermit.Release(1) // task processed, trigger a new poll by returning a task permit
+			bw.concurrency.TaskPermit.Release(1) // task processed, trigger a new poll by returning a task permit
 		}
 	}()
 	err := bw.options.taskWorker.ProcessTask(task)

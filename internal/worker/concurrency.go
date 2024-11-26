@@ -30,8 +30,8 @@ import (
 
 var _ Permit = (*permit)(nil)
 
-// Synchronization contains synchronization primitives for dynamic configuration.
-type DynamicParams struct {
+// Concurrency contains synchronization primitives for dynamically controlling the concurrencies in workers
+type Concurrency struct {
 	PollerPermit Permit // controls concurrency of pollers
 	TaskPermit   Permit // controlls concurrency of task processings
 }
@@ -69,13 +69,14 @@ func (p *permit) AcquireChan(ctx context.Context, wg *sync.WaitGroup) <-chan str
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer close(ch) // close channel when permit is acquired or expired
 		if err := p.sem.Acquire(ctx, 1); err != nil {
-			close(ch)
 			return
 		}
 		select { // try to send to channel, but don't block if listener is gone
 		case ch <- struct{}{}:
 		default:
+			p.sem.Release(1)
 		}
 	}()
 	return ch

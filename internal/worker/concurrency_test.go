@@ -33,53 +33,53 @@ import (
 )
 
 func TestPermit_Simulation(t *testing.T) {
-	tests := []struct{
-		name string
-		capacity []int // update every 50ms
-		goroutines int // each would block on acquiring 2-6 tokens for 100ms
-		goroutinesAcquireChan int // each would block using AcquireChan for 100ms
-		maxTestDuration time.Duration
-		expectFailures int
+	tests := []struct {
+		name                  string
+		capacity              []int // update every 50ms
+		goroutines            int   // each would block on acquiring 2-6 tokens for 100ms
+		goroutinesAcquireChan int   // each would block using AcquireChan for 100ms
+		maxTestDuration       time.Duration
+		expectFailures        int
 		expectFailuresAtLeast int
-	} {
+	}{
 		{
-			name: "enough permit, no blocking",
-			maxTestDuration: 200*time.Millisecond,
-			capacity: []int{1000},
-			goroutines: 100,
+			name:                  "enough permit, no blocking",
+			maxTestDuration:       200 * time.Millisecond,
+			capacity:              []int{1000},
+			goroutines:            100,
 			goroutinesAcquireChan: 100,
-			expectFailures: 0,
+			expectFailures:        0,
 		},
 		{
-			name: "not enough permit, blocking but all acquire",
-			maxTestDuration: 1*time.Second,
-			capacity: []int{200},
-			goroutines: 500,
+			name:                  "not enough permit, blocking but all acquire",
+			maxTestDuration:       1 * time.Second,
+			capacity:              []int{200},
+			goroutines:            500,
 			goroutinesAcquireChan: 500,
-			expectFailures: 0,
+			expectFailures:        0,
 		},
 		{
-			name: "not enough permit for some to acquire, fail some",
-			maxTestDuration: 100*time.Millisecond,
-			capacity: []int{100},
-			goroutines: 500,
+			name:                  "not enough permit for some to acquire, fail some",
+			maxTestDuration:       100 * time.Millisecond,
+			capacity:              []int{100},
+			goroutines:            500,
 			goroutinesAcquireChan: 500,
 			expectFailuresAtLeast: 1,
 		},
 		{
-			name: "not enough permit at beginning but due to capacity change, blocking but all acquire",
-			maxTestDuration: 100*time.Second,
-			capacity: []int{100, 200, 300},
-			goroutines: 500,
+			name:                  "not enough permit at beginning but due to capacity change, blocking but all acquire",
+			maxTestDuration:       100 * time.Second,
+			capacity:              []int{100, 200, 300},
+			goroutines:            500,
 			goroutinesAcquireChan: 500,
-			expectFailures: 0,
+			expectFailures:        0,
 		},
 		{
-			name: "not enough permit for any acquire, fail all",
-			maxTestDuration: 1*time.Second,
-			capacity: []int{0},
-			goroutines: 1000,
-			expectFailures: 1000,
+			name:            "not enough permit for any acquire, fail all",
+			maxTestDuration: 1 * time.Second,
+			capacity:        []int{0},
+			goroutines:      1000,
+			expectFailures:  1000,
 		},
 	}
 
@@ -91,7 +91,7 @@ func TestPermit_Simulation(t *testing.T) {
 			go func() { // update quota every 50ms
 				defer wg.Done()
 				for i := 1; i < len(tt.capacity); i++ {
-					time.Sleep(50*time.Millisecond)
+					time.Sleep(50 * time.Millisecond)
 					permit.SetQuota(tt.capacity[i])
 				}
 			}()
@@ -102,7 +102,7 @@ func TestPermit_Simulation(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					num := rand.Intn(2)+2
+					num := rand.Intn(2) + 2
 					// num := 1
 					if err := permit.Acquire(ctx, num); err != nil {
 						failures.Add(1)
@@ -128,7 +128,7 @@ func TestPermit_Simulation(t *testing.T) {
 
 			wg.Wait()
 			assert.Equal(t, 0, permit.Count())
-			if tt.expectFailuresAtLeast >0 {
+			if tt.expectFailuresAtLeast > 0 {
 				assert.LessOrEqual(t, tt.expectFailuresAtLeast, int(failures.Load()))
 			} else {
 				assert.Equal(t, tt.expectFailures, int(failures.Load()))

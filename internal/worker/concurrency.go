@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/marusama/semaphore/v2"
 )
@@ -56,6 +57,7 @@ func NewPermit(initCount int) Permit {
 }
 
 // Acquire is blocking until a permit is acquired or returns error after context is done
+// Remember to call Release(count) to release the permit after usage
 func (p *permit) Acquire(ctx context.Context, count int) error {
 	if err := p.sem.Acquire(ctx, count); err != nil {
 		return fmt.Errorf("failed to acquire permit before context is done: %w", err)
@@ -63,7 +65,8 @@ func (p *permit) Acquire(ctx context.Context, count int) error {
 	return nil
 }
 
-// AcquireChan returns a permit ready channel. It's closed then permit is acquired
+// AcquireChan returns a permit ready channel. Similar to Acquire, but non-blocking.
+// Remember to call Release(1) to release the permit after usage
 func (p *permit) AcquireChan(ctx context.Context, wg *sync.WaitGroup) <-chan struct{} {
 	ch := make(chan struct{})
 	wg.Add(1)
@@ -74,7 +77,7 @@ func (p *permit) AcquireChan(ctx context.Context, wg *sync.WaitGroup) <-chan str
 		}
 		select { // try to send to channel, but don't block if listener is gone
 		case ch <- struct{}{}:
-		default:
+		case <-time.After(10 * time.Millisecond): // wait time is needed to avoid race condition of channel sending
 			p.sem.Release(1)
 		}
 	}()

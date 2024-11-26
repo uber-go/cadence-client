@@ -463,12 +463,6 @@ func (wc *workflowEnvironmentImpl) GenerateSequence() int32 {
 	return result
 }
 
-func (wc *workflowEnvironmentImpl) CreateNewDecision(decisionType m.DecisionType) *m.Decision {
-	return &m.Decision{
-		DecisionType: common.DecisionTypePtr(decisionType),
-	}
-}
-
 func (wc *workflowEnvironmentImpl) ExecuteActivity(parameters executeActivityParams, callback resultHandler) *activityInfo {
 	scheduleTaskAttr := &m.ScheduleActivityTaskDecisionAttributes{}
 	if parameters.ActivityID == nil || *parameters.ActivityID == "" {

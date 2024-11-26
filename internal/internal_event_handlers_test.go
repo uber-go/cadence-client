@@ -23,6 +23,7 @@ package internal
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"go.uber.org/cadence/internal/common/testlogger"
 
@@ -68,6 +69,13 @@ func TestReplayAwareLogger(t *testing.T) {
 	assert.NotContains(t, messages, "replay info")
 	assert.Contains(t, messages, "normal2 info")
 	assert.Contains(t, messages, "replay2 info")
+
+	isReplay = true
+	enableLoggingInReplay = true
+	parentCore := wrapLogger(&isReplay, &enableLoggingInReplay)
+	wrappedCore := parentCore(core).With([]zapcore.Field{zap.String("key", "value")}).(*replayAwareZapCore)
+	assert.Equal(t, wrappedCore.isReplay, &isReplay)
+	assert.Equal(t, wrappedCore.enableLoggingInReplay, &enableLoggingInReplay)
 }
 
 func testDecodeValueHelper(t *testing.T, env *workflowEnvironmentImpl) {
@@ -927,6 +935,50 @@ func TestEventHandler_handleMarkerRecorded_failures(t *testing.T) {
 			assert.ErrorContains(t, err, tc.assertErrorStr)
 		})
 	}
+}
+
+func TestWorkflowEnvironment_sessions(t *testing.T) {
+	handler := testWorkflowExecutionEventHandler(t, newRegistry())
+	testSession := &SessionInfo{
+		SessionID: "test-session",
+		HostName:  "test-host",
+	}
+	handler.AddSession(testSession)
+	list := handler.getOpenSessions()
+	assert.Contains(t, list, testSession)
+	handler.RemoveSession(testSession.SessionID)
+	list = handler.getOpenSessions()
+	assert.Empty(t, list)
+}
+
+func TestWorkflowExecutionEnvironment_NewTimer_immediate_calls(t *testing.T) {
+	t.Run("immediate call", func(t *testing.T) {
+		handler := testWorkflowExecutionEventHandler(t, newRegistry())
+		handlerCalled := false
+		res := handler.NewTimer(0, func(result []byte, err error) {
+			assert.NoError(t, err)
+			handlerCalled = true
+		})
+		assert.True(t, handlerCalled, "handler must be called immediately")
+		assert.Nil(t, res)
+	})
+	t.Run("negative duration", func(t *testing.T) {
+		handler := testWorkflowExecutionEventHandler(t, newRegistry())
+		handlerCalled := false
+		res := handler.NewTimer(-2*time.Second, func(result []byte, err error) {
+			handlerCalled = true
+			assert.ErrorContains(t, err, "negative duration provided")
+		})
+		assert.Nil(t, res)
+		assert.True(t, handlerCalled, "handler must be called immediately")
+	})
+	t.Run("timer cancellation", func(t *testing.T) {
+		handler := testWorkflowExecutionEventHandler(t, newRegistry())
+		timer := handler.NewTimer(time.Second, func(result []byte, err error) {
+			assert.ErrorIs(t, err, ErrCanceled)
+		})
+		handler.RequestCancelTimer(timer.timerID)
+	})
 }
 
 func testWorkflowExecutionEventHandler(t *testing.T, registry *registry) *workflowExecutionEventHandlerImpl {

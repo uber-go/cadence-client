@@ -30,13 +30,13 @@ import (
 
 var _ Permit = (*permit)(nil)
 
-// Concurrency contains synchronization primitives for dynamically controlling the concurrencies in workers
-type Concurrency struct {
+// ConcurrencyLimit contains synchronization primitives for dynamically controlling the concurrencies in workers
+type ConcurrencyLimit struct {
 	PollerPermit Permit // controls concurrency of pollers
 	TaskPermit   Permit // controlls concurrency of task processings
 }
 
-// Permit is an adaptive
+// Permit is an adaptive permit issuer to control concurrency
 type Permit interface {
 	Acquire(context.Context, int) error
 	AcquireChan(context.Context, *sync.WaitGroup) <-chan struct{}

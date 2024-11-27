@@ -33,7 +33,7 @@ var _ Permit = (*permit)(nil)
 // ConcurrencyLimit contains synchronization primitives for dynamically controlling the concurrencies in workers
 type ConcurrencyLimit struct {
 	PollerPermit Permit // controls concurrency of pollers
-	TaskPermit   Permit // controlls concurrency of task processings
+	TaskPermit   Permit // controls concurrency of task processing
 }
 
 // Permit is an adaptive permit issuer to control concurrency

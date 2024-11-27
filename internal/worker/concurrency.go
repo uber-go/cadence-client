@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/marusama/semaphore/v2"
 )
@@ -77,7 +76,7 @@ func (p *permit) AcquireChan(ctx context.Context, wg *sync.WaitGroup) <-chan str
 		}
 		select { // try to send to channel, but don't block if listener is gone
 		case ch <- struct{}{}:
-		case <-time.After(10 * time.Millisecond): // wait time is needed to avoid race condition of channel sending
+		case <-ctx.Done():
 			p.sem.Release(1)
 		}
 	}()

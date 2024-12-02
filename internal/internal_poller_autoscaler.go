@@ -108,16 +108,6 @@ func newPollerScaler(
 	}
 }
 
-// Acquire concurrent poll quota
-func (p *pollerAutoScaler) Acquire(resource autoscaler.ResourceUnit) error {
-	return p.permit.Acquire(p.ctx, int(resource))
-}
-
-// Release concurrent poll quota
-func (p *pollerAutoScaler) Release(resource autoscaler.ResourceUnit) {
-	p.permit.Release(int(resource))
-}
-
 // GetCurrent poll quota
 func (p *pollerAutoScaler) GetCurrent() autoscaler.ResourceUnit {
 	return autoscaler.ResourceUnit(p.permit.Quota())

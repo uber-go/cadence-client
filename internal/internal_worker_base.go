@@ -169,13 +169,13 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 	ctx, cancel := context.WithCancel(context.Background())
 
 	concurrency := &worker.ConcurrencyLimit{
-		PollerPermit: worker.NewPermit(options.pollerCount),
-		TaskPermit:   worker.NewPermit(options.maxConcurrentTask),
+		PollerPermit: worker.NewResizablePermit(options.pollerCount),
+		TaskPermit:   worker.NewChannelPermit(options.maxConcurrentTask),
 	}
 
 	var pollerAS *pollerAutoScaler
 	if pollerOptions := options.pollerAutoScaler; pollerOptions.Enabled {
-		concurrency.PollerPermit = worker.NewPermit(pollerOptions.InitCount)
+		concurrency.PollerPermit = worker.NewResizablePermit(pollerOptions.InitCount)
 		pollerAS = newPollerScaler(
 			pollerOptions,
 			logger,
@@ -252,7 +252,7 @@ func (bw *baseWorker) runPoller() {
 		select {
 		case <-bw.shutdownCh:
 			return
-		case <-bw.concurrency.TaskPermit.AcquireChan(bw.limiterContext, &bw.shutdownWG): // don't poll unless there is a task permit
+		case <-bw.concurrency.TaskPermit.GetChan(): // don't poll unless there is a task permit
 			// TODO move to a centralized place inside the worker
 			// emit metrics on concurrent task permit quota and current task permit count
 			// NOTE task permit doesn't mean there is a task running, it still needs to poll until it gets a task to process
@@ -300,10 +300,10 @@ func (bw *baseWorker) pollTask() {
 	var task interface{}
 
 	if bw.pollerAutoScaler != nil {
-		if pErr := bw.pollerAutoScaler.Acquire(1); pErr == nil {
-			defer bw.pollerAutoScaler.Release(1)
+		if pErr := bw.concurrency.PollerPermit.Acquire(bw.limiterContext); pErr == nil {
+			defer bw.concurrency.PollerPermit.Release()
 		} else {
-			bw.logger.Warn("poller auto scaler acquire error", zap.Error(pErr))
+			bw.logger.Warn("poller permit acquire error", zap.Error(pErr))
 		}
 	}
 
@@ -339,7 +339,7 @@ func (bw *baseWorker) pollTask() {
 		case <-bw.shutdownCh:
 		}
 	} else {
-		bw.concurrency.TaskPermit.Release(1) // poll failed, trigger a new poll by returning a task permit
+		bw.concurrency.TaskPermit.Release() // poll failed, trigger a new poll by returning a task permit
 	}
 }
 
@@ -374,7 +374,7 @@ func (bw *baseWorker) processTask(task interface{}) {
 		}
 
 		if isPolledTask {
-			bw.concurrency.TaskPermit.Release(1) // task processed, trigger a new poll by returning a task permit
+			bw.concurrency.TaskPermit.Release() // task processed, trigger a new poll by returning a task permit
 		}
 	}()
 	err := bw.options.taskWorker.ProcessTask(task)

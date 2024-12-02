@@ -21,6 +21,7 @@
 package internal
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"testing"
@@ -172,7 +173,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 					TargetUtilization: float64(tt.args.targetMilliUsage) / 1000,
 				},
 				testlogger.NewZap(t),
-				worker.NewPermit(tt.args.initialPollerCount),
+				worker.NewResizablePermit(tt.args.initialPollerCount),
 				// hook function that collects number of iterations
 				func() {
 					autoscalerEpoch.Add(1)
@@ -192,9 +193,9 @@ func Test_pollerAutoscaler(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					for pollResult := range pollChan {
-						pollerScaler.Acquire(1)
+						pollerScaler.permit.Acquire(context.Background())
 						pollerScaler.CollectUsage(pollResult)
-						pollerScaler.Release(1)
+						pollerScaler.permit.Release()
 					}
 				}()
 			}

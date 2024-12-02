@@ -22,79 +22,27 @@ package worker
 
 import (
 	"context"
-	"fmt"
-	"sync"
-
-	"github.com/marusama/semaphore/v2"
 )
 
-var _ Permit = (*permit)(nil)
+var _ Permit = (*resizablePermit)(nil)
+var _ ChannelPermit = (*channelPermit)(nil)
 
 // ConcurrencyLimit contains synchronization primitives for dynamically controlling the concurrencies in workers
 type ConcurrencyLimit struct {
-	PollerPermit Permit // controls concurrency of pollers
-	TaskPermit   Permit // controls concurrency of task processing
+	PollerPermit Permit        // controls concurrency of pollers
+	TaskPermit   ChannelPermit // controls concurrency of task processing
 }
 
 // Permit is an adaptive permit issuer to control concurrency
 type Permit interface {
-	Acquire(context.Context, int) error
-	AcquireChan(context.Context, *sync.WaitGroup) <-chan struct{}
-	Quota() int
-	SetQuota(int)
+	Acquire(context.Context) error
 	Count() int
-	Release(count int)
+	Quota() int
+	Release()
+	SetQuota(int)
 }
 
-type permit struct {
-	sem semaphore.Semaphore
-}
-
-// NewPermit creates a dynamic permit that's resizable
-func NewPermit(initCount int) Permit {
-	return &permit{sem: semaphore.New(initCount)}
-}
-
-// Acquire is blocking until a permit is acquired or returns error after context is done
-// Remember to call Release(count) to release the permit after usage
-func (p *permit) Acquire(ctx context.Context, count int) error {
-	if err := p.sem.Acquire(ctx, count); err != nil {
-		return fmt.Errorf("failed to acquire permit before context is done: %w", err)
-	}
-	return nil
-}
-
-// AcquireChan returns a permit ready channel. Similar to Acquire, but non-blocking.
-// Remember to call Release(1) to release the permit after usage
-func (p *permit) AcquireChan(ctx context.Context, wg *sync.WaitGroup) <-chan struct{} {
-	ch := make(chan struct{})
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := p.sem.Acquire(ctx, 1); err != nil {
-			return
-		}
-		select { // try to send to channel, but don't block if listener is gone
-		case ch <- struct{}{}:
-		case <-ctx.Done():
-			p.sem.Release(1)
-		}
-	}()
-	return ch
-}
-
-func (p *permit) Release(count int) {
-	p.sem.Release(count)
-}
-
-func (p *permit) Quota() int {
-	return p.sem.GetLimit()
-}
-
-func (p *permit) SetQuota(c int) {
-	p.sem.SetLimit(c)
-}
-
-func (p *permit) Count() int {
-	return p.sem.GetCount()
+type ChannelPermit interface {
+	Permit
+	GetChan() <-chan struct{} // fetch the underlying channel
 }

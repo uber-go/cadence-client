@@ -143,7 +143,7 @@ type (
 		metricsScope         tally.Scope
 
 		concurrency        *worker.ConcurrencyLimit
-		pollerAutoScaler   *pollerAutoScaler
+		concurrencyAutoScaler   *worker.ConcurrencyAutoScaler
 		taskQueueCh        chan interface{}
 		sessionTokenBucket *sessionTokenBucket
 	}
@@ -173,14 +173,11 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 		TaskPermit:   worker.NewChannelPermit(options.maxConcurrentTask),
 	}
 
-	var pollerAS *pollerAutoScaler
+	var concurrencyAS *worker.ConcurrencyAutoScaler
 	if pollerOptions := options.pollerAutoScaler; pollerOptions.Enabled {
 		concurrency.PollerPermit = worker.NewResizablePermit(pollerOptions.InitCount)
-		pollerAS = newPollerScaler(
-			pollerOptions,
-			logger,
-			concurrency.PollerPermit,
-		)
+		concurrencyAS = worker.NewConcurrencyAutoScaler(worker.ConcurrencyAutoScalerOptions{
+		})
 	}
 
 	bw := &baseWorker{
@@ -191,7 +188,7 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 		logger:               logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
 		metricsScope:         tagScope(metricsScope, tagWorkerType, options.workerType),
 		concurrency:          concurrency,
-		pollerAutoScaler:     pollerAS,
+		concurrencyAutoScaler: concurrencyAS,
 		taskQueueCh:          make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
 		limiterContext:       ctx,
 		limiterContextCancel: cancel,
@@ -211,8 +208,8 @@ func (bw *baseWorker) Start() {
 
 	bw.metricsScope.Counter(metrics.WorkerStartCounter).Inc(1)
 
-	if bw.pollerAutoScaler != nil {
-		bw.pollerAutoScaler.Start()
+	if bw.concurrencyAutoScaler != nil {
+		bw.concurrencyAutoScaler.Start()
 	}
 
 	for i := 0; i < bw.options.pollerCount; i++ {
@@ -299,7 +296,7 @@ func (bw *baseWorker) pollTask() {
 	var err error
 	var task interface{}
 
-	if bw.pollerAutoScaler != nil {
+	if bw.concurrencyAutoScaler != nil {
 		if pErr := bw.concurrency.PollerPermit.Acquire(bw.limiterContext); pErr == nil {
 			defer bw.concurrency.PollerPermit.Release()
 		} else {
@@ -322,8 +319,8 @@ func (bw *baseWorker) pollTask() {
 			}
 			bw.retrier.Failed()
 		} else {
-			if bw.pollerAutoScaler != nil {
-				if pErr := bw.pollerAutoScaler.CollectUsage(task); pErr != nil {
+			if bw.concurrencyAutoScaler != nil {
+				if pErr := bw.concurrencyAutoScaler.CollectPollerUsage(task); pErr != nil {
 					bw.logger.Sugar().Warnw("poller auto scaler collect usage error",
 						"error", pErr,
 						"task", task)
@@ -403,8 +400,8 @@ func (bw *baseWorker) Stop() {
 	}
 	close(bw.shutdownCh)
 	bw.limiterContextCancel()
-	if bw.pollerAutoScaler != nil {
-		bw.pollerAutoScaler.Stop()
+	if bw.concurrencyAutoScaler != nil {
+		bw.concurrencyAutoScaler.Stop()
 	}
 
 	if success := util.AwaitWaitGroup(&bw.shutdownWG, bw.options.shutdownTimeout); !success {

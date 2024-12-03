@@ -91,7 +91,7 @@ func (c *ConcurrencyAutoScaler) Stop() {
 }
 
 // CollectPollerWaitTime collects the poller wait time for auto scaling
-func (c *ConcurrencyAutoScaler) CollectPollerWaitTime(waitTimeInMs int64) {
+func (c *ConcurrencyAutoScaler) CollectPollerUsage(waitTimeInMs int64) {
 	c.pollerWaitTimeInMsLog2.Add(math.Log2(float64(waitTimeInMs+1)))
 }
 

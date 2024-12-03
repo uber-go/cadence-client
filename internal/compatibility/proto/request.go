@@ -88,6 +88,7 @@ func DiagnoseWorkflowExecutionRequest(t *shared.DiagnoseWorkflowExecutionRequest
 	return &apiv1.DiagnoseWorkflowExecutionRequest{
 		Domain:            t.GetDomain(),
 		WorkflowExecution: WorkflowExecution(t.GetWorkflowExecution()),
+		Identity:          t.GetIdentity(),
 	}
 }
 

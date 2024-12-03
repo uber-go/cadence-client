@@ -333,6 +333,10 @@ func (a workflowAPIthriftAdapter) DescribeWorkflowExecution(ctx context.Context,
 	response, err := a.service.DescribeWorkflowExecution(ctx, thrift.DescribeWorkflowExecutionRequest(request), opts...)
 	return proto.DescribeWorkflowExecutionResponse(response), proto.Error(err)
 }
+func (a workflowAPIthriftAdapter) DiagnoseWorkflowExecution(ctx context.Context, request *apiv1.DiagnoseWorkflowExecutionRequest, opts ...yarpc.CallOption) (*apiv1.DiagnoseWorkflowExecutionResponse, error) {
+	response, err := a.service.DiagnoseWorkflowExecution(ctx, thrift.DiagnoseWorkflowExecutionRequest(request), opts...)
+	return proto.DiagnoseWorkflowExecutionResponse(response), proto.Error(err)
+}
 func (a workflowAPIthriftAdapter) QueryWorkflow(ctx context.Context, request *apiv1.QueryWorkflowRequest, opts ...yarpc.CallOption) (*apiv1.QueryWorkflowResponse, error) {
 	response, err := a.service.QueryWorkflow(ctx, thrift.QueryWorkflowRequest(request), opts...)
 	return proto.QueryWorkflowResponse(response), proto.Error(err)

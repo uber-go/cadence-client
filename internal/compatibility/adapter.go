@@ -74,6 +74,11 @@ func (a thrift2protoAdapter) DescribeWorkflowExecution(ctx context.Context, requ
 	return thrift.DescribeWorkflowExecutionResponse(response), thrift.Error(err)
 }
 
+func (a thrift2protoAdapter) DiagnoseWorkflowExecution(ctx context.Context, request *shared.DiagnoseWorkflowExecutionRequest, opts ...yarpc.CallOption) (*shared.DiagnoseWorkflowExecutionResponse, error) {
+	response, err := a.workflow.DiagnoseWorkflowExecution(ctx, proto.DiagnoseWorkflowExecutionRequest(request), opts...)
+	return thrift.DiagnoseWorkflowExecutionResponse(response), thrift.Error(err)
+}
+
 func (a thrift2protoAdapter) GetClusterInfo(ctx context.Context, opts ...yarpc.CallOption) (*shared.ClusterInfo, error) {
 	response, err := a.workflow.GetClusterInfo(ctx, &apiv1.GetClusterInfoRequest{}, opts...)
 	return thrift.GetClusterInfoResponse(response), thrift.Error(err)

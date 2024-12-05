@@ -23,6 +23,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/marusama/semaphore/v2"
 )
@@ -45,14 +46,17 @@ func (p *resizablePermit) Acquire(ctx context.Context) error {
 	return nil
 }
 
+// Release release one permit
 func (p *resizablePermit) Release() {
 	p.sem.Release(1)
 }
 
+// Quota returns the maximum number of permits that can be acquired
 func (p *resizablePermit) Quota() int {
 	return p.sem.GetLimit()
 }
 
+// SetQuota sets the maximum number of permits that can be acquired
 func (p *resizablePermit) SetQuota(c int) {
 	p.sem.SetLimit(c)
 }
@@ -60,4 +64,54 @@ func (p *resizablePermit) SetQuota(c int) {
 // Count returns the number of permits available
 func (p *resizablePermit) Count() int {
 	return p.sem.GetCount()
+}
+
+// AcquireChan creates a PermitChannel that can be used to wait for a permit
+// After usage:
+// 1. avoid goroutine leak by calling permitChannel.Close()
+// 2. release permit by calling permit.Release()
+func (p *resizablePermit) AcquireChan(ctx context.Context) PermitChannel {
+	ctx, cancel := context.WithCancel(ctx)
+	pc := &permitChannel{
+		p:      p,
+		c:      make(chan struct{}),
+		ctx:    ctx,
+		cancel: cancel,
+		wg:     &sync.WaitGroup{},
+	}
+	pc.start()
+	return pc
+}
+
+type permitChannel struct {
+	p      Permit
+	c      chan struct{}
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     *sync.WaitGroup
+}
+
+func (ch *permitChannel) C() <-chan struct{} {
+	return ch.c
+}
+
+func (ch *permitChannel) start() {
+	ch.wg.Add(1)
+	go func() {
+		defer ch.wg.Done()
+		if err := ch.p.Acquire(ch.ctx); err != nil {
+			return
+		}
+		// avoid blocking on sending to the channel
+		select {
+		case ch.c <- struct{}{}:
+		case <-ch.ctx.Done(): // release if acquire is successful but fail to send to the channel
+			ch.p.Release()
+		}
+	}()
+}
+
+func (ch *permitChannel) Close() {
+	ch.cancel()
+	ch.wg.Wait()
 }

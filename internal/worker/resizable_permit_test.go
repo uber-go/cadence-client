@@ -99,7 +99,9 @@ func TestPermit_Simulation(t *testing.T) {
 			failures := atomic.NewInt32(0)
 			ctx, cancel := context.WithTimeout(context.Background(), tt.maxTestDuration)
 			defer cancel()
-			for i := 0; i < tt.goroutines; i++ {
+
+			aquireChan := tt.goroutines / 2
+			for i := 0; i < tt.goroutines-aquireChan; i++ {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
@@ -111,10 +113,25 @@ func TestPermit_Simulation(t *testing.T) {
 					permit.Release()
 				}()
 			}
+			for i := 0; i < aquireChan; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					permitChan := permit.AcquireChan(ctx)
+					select {
+					case <-permitChan.C():
+						time.Sleep(time.Duration(100+rand.Intn(50)) * time.Millisecond)
+						permit.Release()
+					case <-ctx.Done():
+						failures.Inc()
+					}
+					permitChan.Close()
+				}()
+			}
 
 			wg.Wait()
 			// sanity check
-			assert.Equal(t, 0, permit.Count())
+			assert.Equal(t, 0, permit.Count(), "all permit should be released")
 			assert.Equal(t, tt.capacity[len(tt.capacity)-1], permit.Quota())
 
 			// expect failures in range

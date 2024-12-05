@@ -170,12 +170,11 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 
 	concurrency := &worker.ConcurrencyLimit{
 		PollerPermit: worker.NewResizablePermit(options.pollerCount),
-		TaskPermit:   worker.NewChannelPermit(options.maxConcurrentTask),
+		TaskPermit:   worker.NewResizablePermit(options.maxConcurrentTask),
 	}
 
 	var pollerAS *pollerAutoScaler
 	if pollerOptions := options.pollerAutoScaler; pollerOptions.Enabled {
-		concurrency.PollerPermit = worker.NewResizablePermit(pollerOptions.InitCount)
 		pollerAS = newPollerScaler(
 			pollerOptions,
 			logger,
@@ -249,10 +248,14 @@ func (bw *baseWorker) runPoller() {
 	bw.metricsScope.Counter(metrics.PollerStartCounter).Inc(1)
 
 	for {
+		// permitChannel can be blocking without passing context because shutdownCh is used
+		permitChannel := bw.concurrency.PollerPermit.AcquireChan(context.Background())
 		select {
 		case <-bw.shutdownCh:
+			permitChannel.Close()
 			return
-		case <-bw.concurrency.TaskPermit.GetChan(): // don't poll unless there is a task permit
+		case <-permitChannel.C(): // don't poll unless there is a task permit
+			permitChannel.Close()
 			// TODO move to a centralized place inside the worker
 			// emit metrics on concurrent task permit quota and current task permit count
 			// NOTE task permit doesn't mean there is a task running, it still needs to poll until it gets a task to process

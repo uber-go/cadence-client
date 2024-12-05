@@ -23,19 +23,26 @@ package worker
 import "context"
 
 var _ Permit = (*resizablePermit)(nil)
-var _ ChannelPermit = (*channelPermit)(nil)
 
 // ConcurrencyLimit contains synchronization primitives for dynamically controlling the concurrencies in workers
 type ConcurrencyLimit struct {
-	PollerPermit Permit        // controls concurrency of pollers
-	TaskPermit   ChannelPermit // controls concurrency of task processing
+	PollerPermit Permit // controls concurrency of pollers
+	TaskPermit   Permit // controls concurrency of task processing
 }
 
 // Permit is an adaptive permit issuer to control concurrency
 type Permit interface {
 	Acquire(context.Context) error
+	AcquireChan(context.Context) PermitChannel
 	Count() int
 	Quota() int
 	Release()
 	SetQuota(int)
+}
+
+// PermitChannel is a channel that can be used to wait for a permit to be available
+// Remember to call Close() to avoid goroutine leak
+type PermitChannel interface {
+	C() <-chan struct{}
+	Close()
 }

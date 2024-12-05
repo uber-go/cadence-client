@@ -23,6 +23,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/marusama/semaphore/v2"
 )
@@ -60,4 +61,45 @@ func (p *resizablePermit) SetQuota(c int) {
 // Count returns the number of permits available
 func (p *resizablePermit) Count() int {
 	return p.sem.GetCount()
+}
+
+func NewPermitChannel(permit Permit) PermitChannel {
+	ctx, cancel := context.WithCancel(context.Background())
+	pc := &permitChannel{
+		p:      permit,
+		c:      make(chan struct{}),
+		ctx:    ctx,
+		cancel: cancel,
+		wg:     &sync.WaitGroup{},
+	}
+	pc.start()
+	return pc
+}
+
+type permitChannel struct {
+	p      Permit
+	c      chan struct{}
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     *sync.WaitGroup
+}
+
+func (p *permitChannel) C() <-chan struct{} {
+	return p.c
+}
+
+func (p *permitChannel) start() {
+	p.wg.Add(1)
+	go func() {
+		defer p.wg.Done()
+		if err := p.p.Acquire(p.ctx); err != nil {
+			return
+		}
+		p.c <- struct{}{}
+	}()
+}
+
+func (p *permitChannel) Close() {
+	p.cancel()
+	p.wg.Wait()
 }

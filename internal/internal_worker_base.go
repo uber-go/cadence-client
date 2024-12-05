@@ -142,10 +142,10 @@ type (
 		logger               *zap.Logger
 		metricsScope         tally.Scope
 
-		concurrency        *worker.ConcurrencyLimit
-		concurrencyAutoScaler   *worker.ConcurrencyAutoScaler
-		taskQueueCh        chan interface{}
-		sessionTokenBucket *sessionTokenBucket
+		concurrency           *worker.ConcurrencyLimit
+		concurrencyAutoScaler *worker.ConcurrencyAutoScaler
+		taskQueueCh           chan interface{}
+		sessionTokenBucket    *sessionTokenBucket
 	}
 
 	polledTask struct {
@@ -170,29 +170,34 @@ func newBaseWorker(options baseWorkerOptions, logger *zap.Logger, metricsScope t
 
 	concurrency := &worker.ConcurrencyLimit{
 		PollerPermit: worker.NewResizablePermit(options.pollerCount),
-		TaskPermit:   worker.NewChannelPermit(options.maxConcurrentTask),
+		TaskPermit:   worker.NewResizablePermit(options.maxConcurrentTask),
 	}
 
 	var concurrencyAS *worker.ConcurrencyAutoScaler
 	if pollerOptions := options.pollerAutoScaler; pollerOptions.Enabled {
-		concurrency.PollerPermit = worker.NewResizablePermit(pollerOptions.InitCount)
-		concurrencyAS = worker.NewConcurrencyAutoScaler(worker.ConcurrencyAutoScalerOptions{
+		concurrencyAS = worker.NewPollerAutoScaler(worker.ConcurrencyAutoScalerInput{
+			Concurrency:    concurrency,
+			Cooldown:       pollerOptions.Cooldown,
+			PollerMaxCount: pollerOptions.MaxCount,
+			PollerMinCount: pollerOptions.MinCount,
+			Logger:         logger,
+			Scope:          metricsScope,
 		})
 	}
 
 	bw := &baseWorker{
-		options:              options,
-		shutdownCh:           make(chan struct{}),
-		taskLimiter:          rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
-		retrier:              backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
-		logger:               logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
-		metricsScope:         tagScope(metricsScope, tagWorkerType, options.workerType),
-		concurrency:          concurrency,
+		options:               options,
+		shutdownCh:            make(chan struct{}),
+		taskLimiter:           rate.NewLimiter(rate.Limit(options.maxTaskPerSecond), 1),
+		retrier:               backoff.NewConcurrentRetrier(pollOperationRetryPolicy),
+		logger:                logger.With(zapcore.Field{Key: tagWorkerType, Type: zapcore.StringType, String: options.workerType}),
+		metricsScope:          tagScope(metricsScope, tagWorkerType, options.workerType),
+		concurrency:           concurrency,
 		concurrencyAutoScaler: concurrencyAS,
-		taskQueueCh:          make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
-		limiterContext:       ctx,
-		limiterContextCancel: cancel,
-		sessionTokenBucket:   sessionTokenBucket,
+		taskQueueCh:           make(chan interface{}), // no buffer, so poller only able to poll new task after previous is dispatched.
+		limiterContext:        ctx,
+		limiterContextCancel:  cancel,
+		sessionTokenBucket:    sessionTokenBucket,
 	}
 	if options.pollerRate > 0 {
 		bw.pollLimiter = rate.NewLimiter(rate.Limit(options.pollerRate), 1)
@@ -246,10 +251,13 @@ func (bw *baseWorker) runPoller() {
 	bw.metricsScope.Counter(metrics.PollerStartCounter).Inc(1)
 
 	for {
+		permitChannel := worker.NewPermitChannel(bw.concurrency.PollerPermit)
 		select {
 		case <-bw.shutdownCh:
+			permitChannel.Close()
 			return
-		case <-bw.concurrency.TaskPermit.GetChan(): // don't poll unless there is a task permit
+		case <-permitChannel.C(): // don't poll unless there is a task permit
+			permitChannel.Close()
 			// TODO move to a centralized place inside the worker
 			// emit metrics on concurrent task permit quota and current task permit count
 			// NOTE task permit doesn't mean there is a task running, it still needs to poll until it gets a task to process
@@ -320,11 +328,7 @@ func (bw *baseWorker) pollTask() {
 			bw.retrier.Failed()
 		} else {
 			if bw.concurrencyAutoScaler != nil {
-				if pErr := bw.concurrencyAutoScaler.CollectPollerUsage(task); pErr != nil {
-					bw.logger.Sugar().Warnw("poller auto scaler collect usage error",
-						"error", pErr,
-						"task", task)
-				}
+				bw.concurrencyAutoScaler.ProcessPollerHint(getAutoConfigHint(task))
 			}
 			bw.retrier.Succeeded()
 		}
@@ -415,4 +419,21 @@ func (bw *baseWorker) Stop() {
 		bw.options.userContextCancel()
 	}
 	return
+}
+
+func getAutoConfigHint(task interface{}) *shared.AutoConfigHint {
+	switch t := task.(type) {
+	case workflowTask:
+		if t.task == nil {
+			return nil
+		}
+		return t.task.AutoConfigHint
+	case activityTask:
+		if t.task == nil {
+			return nil
+		}
+		return t.task.AutoConfigHint
+	default:
+		return nil
+	}
 }

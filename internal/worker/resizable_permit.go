@@ -66,10 +66,10 @@ func (p *resizablePermit) Count() int {
 	return p.sem.GetCount()
 }
 
-// AcquireChan creates a PermitChannel that can be used to wait for a permit
-// After usage:
-// 1. avoid goroutine leak by calling permitChannel.Close()
-// 2. release permit by calling permit.Release()
+// AcquireChan returns a channel that could be used to wait for the permit and a close function when done
+// Notes:
+//  1. avoid goroutine leak by calling the done function
+//  2. if the read succeeded, release permit by calling permit.Release()
 func (p *resizablePermit) AcquireChan(ctx context.Context) (<-chan struct{}, func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	pc := &permitChannel{
@@ -85,6 +85,7 @@ func (p *resizablePermit) AcquireChan(ctx context.Context) (<-chan struct{}, fun
 	}
 }
 
+// permitChannel is an implementation to acquire a permit through channel
 type permitChannel struct {
 	p      Permit
 	c      chan struct{}

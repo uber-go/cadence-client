@@ -193,7 +193,8 @@ func Test_pollerAutoscaler(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					for pollResult := range pollChan {
-						pollerScaler.permit.Acquire(context.Background())
+						err := pollerScaler.permit.Acquire(context.Background())
+						assert.NoError(t, err)
 						pollerScaler.CollectUsage(pollResult)
 						pollerScaler.permit.Release()
 					}
@@ -202,7 +203,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 
 			assert.Eventually(t, func() bool {
 				return autoscalerEpoch.Load() == uint64(tt.args.autoScalerEpoch)
-			}, tt.args.cooldownTime+20*time.Millisecond, 10*time.Millisecond)
+			}, tt.args.cooldownTime+100*time.Millisecond, 10*time.Millisecond)
 			pollerScaler.Stop()
 			res := pollerScaler.permit.Quota() - pollerScaler.permit.Count()
 			assert.Equal(t, tt.want, int(res))

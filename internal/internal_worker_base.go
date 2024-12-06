@@ -248,14 +248,13 @@ func (bw *baseWorker) runPoller() {
 	bw.metricsScope.Counter(metrics.PollerStartCounter).Inc(1)
 
 	for {
-		// permitChannel can be blocking without passing context because shutdownCh is used
-		permitChannel := bw.concurrency.PollerPermit.AcquireChan(context.Background())
+		permitChannel, channelDone := bw.concurrency.TaskPermit.AcquireChan(bw.limiterContext)
 		select {
 		case <-bw.shutdownCh:
-			permitChannel.Close()
+			channelDone()
 			return
-		case <-permitChannel.C(): // don't poll unless there is a task permit
-			permitChannel.Close()
+		case <-permitChannel: // don't poll unless there is a task permit
+			channelDone()
 			// TODO move to a centralized place inside the worker
 			// emit metrics on concurrent task permit quota and current task permit count
 			// NOTE task permit doesn't mean there is a task running, it still needs to poll until it gets a task to process

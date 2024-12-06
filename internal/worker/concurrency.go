@@ -33,16 +33,9 @@ type ConcurrencyLimit struct {
 // Permit is an adaptive permit issuer to control concurrency
 type Permit interface {
 	Acquire(context.Context) error
-	AcquireChan(context.Context) PermitChannel
+	AcquireChan(context.Context) (channel <-chan struct{}, done func())
 	Count() int
 	Quota() int
 	Release()
 	SetQuota(int)
-}
-
-// PermitChannel is a channel that can be used to wait for a permit to be available
-// Remember to call Close() to avoid goroutine leak
-type PermitChannel interface {
-	C() <-chan struct{}
-	Close()
 }

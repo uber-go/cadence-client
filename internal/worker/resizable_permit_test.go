@@ -30,6 +30,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/atomic"
+	"go.uber.org/goleak"
 )
 
 func TestPermit_Simulation(t *testing.T) {
@@ -86,6 +87,7 @@ func TestPermit_Simulation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t)
 			wg := &sync.WaitGroup{}
 			permit := NewResizablePermit(tt.capacity[0])
 			wg.Add(1)
@@ -117,15 +119,15 @@ func TestPermit_Simulation(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					permitChan := permit.AcquireChan(ctx)
+					permitChan, done := permit.AcquireChan(ctx)
 					select {
-					case <-permitChan.C():
+					case <-permitChan:
 						time.Sleep(time.Duration(100+rand.Intn(50)) * time.Millisecond)
 						permit.Release()
 					case <-ctx.Done():
 						failures.Inc()
 					}
-					permitChan.Close()
+					done()
 				}()
 			}
 
@@ -141,4 +143,20 @@ func TestPermit_Simulation(t *testing.T) {
 			assert.LessOrEqual(t, int(failures.Load()), expectFailureMax)
 		})
 	}
+}
+
+func Test_Permit_AcquireChan(t *testing.T) {
+	permit := NewResizablePermit(2)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	permitChan, done := permit.AcquireChan(ctx)
+	select {
+	case <-permitChan:
+		assert.Equal(t, 2, permit.Quota())
+		assert.Equal(t, 1, permit.Count())
+	case <-ctx.Done():
+		t.Error("unexpected timeout")
+	}
+	done()
+	permit.Release()
 }

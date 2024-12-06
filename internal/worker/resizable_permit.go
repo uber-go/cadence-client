@@ -70,7 +70,7 @@ func (p *resizablePermit) Count() int {
 // After usage:
 // 1. avoid goroutine leak by calling permitChannel.Close()
 // 2. release permit by calling permit.Release()
-func (p *resizablePermit) AcquireChan(ctx context.Context) PermitChannel {
+func (p *resizablePermit) AcquireChan(ctx context.Context) (<-chan struct{}, func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	pc := &permitChannel{
 		p:      p,
@@ -79,8 +79,10 @@ func (p *resizablePermit) AcquireChan(ctx context.Context) PermitChannel {
 		cancel: cancel,
 		wg:     &sync.WaitGroup{},
 	}
-	pc.start()
-	return pc
+	pc.Start()
+	return pc.C(), func() {
+		pc.Close()
+	}
 }
 
 type permitChannel struct {
@@ -95,7 +97,7 @@ func (ch *permitChannel) C() <-chan struct{} {
 	return ch.c
 }
 
-func (ch *permitChannel) start() {
+func (ch *permitChannel) Start() {
 	ch.wg.Add(1)
 	go func() {
 		defer ch.wg.Done()

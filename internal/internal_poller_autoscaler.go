@@ -135,6 +135,11 @@ func (p *pollerAutoScaler) Start() {
 					p.permit.SetQuota(int(proposedResource))
 				}
 				p.pollerUsageEstimator.Reset()
+
+				// hooks
+				for i := range p.onAutoScale {
+					p.onAutoScale[i]()
+				}
 			}
 		}
 	}()

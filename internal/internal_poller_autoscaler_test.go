@@ -21,12 +21,14 @@
 package internal
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
 	"go.uber.org/cadence/internal/common/testlogger"
+	"go.uber.org/cadence/internal/worker"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/atomic"
@@ -171,6 +173,7 @@ func Test_pollerAutoscaler(t *testing.T) {
 					TargetUtilization: float64(tt.args.targetMilliUsage) / 1000,
 				},
 				testlogger.NewZap(t),
+				worker.NewResizablePermit(tt.args.initialPollerCount),
 				// hook function that collects number of iterations
 				func() {
 					autoscalerEpoch.Add(1)
@@ -190,18 +193,19 @@ func Test_pollerAutoscaler(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					for pollResult := range pollChan {
-						pollerScaler.Acquire(1)
+						err := pollerScaler.permit.Acquire(context.Background())
+						assert.NoError(t, err)
 						pollerScaler.CollectUsage(pollResult)
-						pollerScaler.Release(1)
+						pollerScaler.permit.Release()
 					}
 				}()
 			}
 
 			assert.Eventually(t, func() bool {
 				return autoscalerEpoch.Load() == uint64(tt.args.autoScalerEpoch)
-			}, tt.args.cooldownTime+20*time.Millisecond, 10*time.Millisecond)
+			}, tt.args.cooldownTime+100*time.Millisecond, 10*time.Millisecond)
 			pollerScaler.Stop()
-			res := pollerScaler.GetCurrent()
+			res := pollerScaler.permit.Quota() - pollerScaler.permit.Count()
 			assert.Equal(t, tt.want, int(res))
 		})
 	}

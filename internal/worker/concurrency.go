@@ -18,15 +18,24 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package autoscaler
+package worker
 
-// AutoScaler collects data and estimate usage
-type (
-	AutoScaler interface {
-		Estimator
-		// Start starts the autoscaler go routine that scales the ResourceUnit according to Estimator
-		Start()
-		// Stop stops the autoscaler if started or do nothing if not yet started
-		Stop()
-	}
-)
+import "context"
+
+var _ Permit = (*resizablePermit)(nil)
+
+// ConcurrencyLimit contains synchronization primitives for dynamically controlling the concurrencies in workers
+type ConcurrencyLimit struct {
+	PollerPermit Permit // controls concurrency of pollers
+	TaskPermit   Permit // controls concurrency of task processing
+}
+
+// Permit is an adaptive permit issuer to control concurrency
+type Permit interface {
+	Acquire(context.Context) error
+	AcquireChan(context.Context) (channel <-chan struct{}, done func())
+	Count() int
+	Quota() int
+	Release()
+	SetQuota(int)
+}

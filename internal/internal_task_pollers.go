@@ -291,7 +291,7 @@ func newWorkflowTaskPoller(
 	params workerExecutionParameters,
 ) *workflowTaskPoller {
 	/*
-	Explicit nil handling is needed here. Otherwise, poller.ldaTunnel would not return a nil result
+		Explicit nil handling is needed here. Otherwise, poller.ldaTunnel would not return a nil result
 	*/
 	var ldaTunnelInterface localDispatcher
 	if ldaTunnel != nil {

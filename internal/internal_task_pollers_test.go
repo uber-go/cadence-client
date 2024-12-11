@@ -46,6 +46,21 @@ const (
 	_testIdentity   = "test-worker"
 )
 
+func Test_newWorkflowTaskPoller(t *testing.T) {
+	t.Run("success with nil ldaTunnel", func(t *testing.T) {
+		poller := newWorkflowTaskPoller(
+			nil,
+			nil,
+			nil,
+			_testDomainName,
+			workerExecutionParameters{})
+		assert.NotNil(t, poller)
+		if poller.ldaTunnel != nil {
+			t.Error("unexpected not nil ldaTunnel")
+		}
+	})
+}
+
 func TestLocalActivityPanic(t *testing.T) {
 	// regression: panics in local activities should not terminate the process
 	s := WorkflowTestSuite{logger: testlogger.NewZap(t)}

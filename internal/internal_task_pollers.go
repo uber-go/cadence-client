@@ -290,6 +290,14 @@ func newWorkflowTaskPoller(
 	domain string,
 	params workerExecutionParameters,
 ) *workflowTaskPoller {
+	/*
+		Explicit nil handling is needed here. Otherwise, poller.ldaTunnel would not return a nil result
+	*/
+	var ldaTunnelInterface localDispatcher
+	if ldaTunnel != nil {
+		ldaTunnelInterface = ldaTunnel
+	}
+
 	return &workflowTaskPoller{
 		basePoller:                   basePoller{shutdownC: params.WorkerStopChannel},
 		service:                      service,
@@ -297,7 +305,7 @@ func newWorkflowTaskPoller(
 		taskListName:                 params.TaskList,
 		identity:                     params.Identity,
 		taskHandler:                  taskHandler,
-		ldaTunnel:                    ldaTunnel,
+		ldaTunnel:                    ldaTunnelInterface,
 		metricsScope:                 metrics.NewTaggedScope(params.MetricsScope),
 		logger:                       params.Logger,
 		stickyUUID:                   uuid.New(),

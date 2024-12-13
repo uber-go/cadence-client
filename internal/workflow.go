@@ -1849,9 +1849,6 @@ func convertRetryPolicy(retryPolicy *RetryPolicy) *s.RetryPolicy {
 	if retryPolicy == nil {
 		return nil
 	}
-	if retryPolicy.BackoffCoefficient == 0 {
-		retryPolicy.BackoffCoefficient = backoff.DefaultBackoffCoefficient
-	}
 	thriftRetryPolicy := s.RetryPolicy{
 		InitialIntervalInSeconds:    common.Int32Ptr(common.Int32Ceil(retryPolicy.InitialInterval.Seconds())),
 		MaximumIntervalInSeconds:    common.Int32Ptr(common.Int32Ceil(retryPolicy.MaximumInterval.Seconds())),
@@ -1859,6 +1856,9 @@ func convertRetryPolicy(retryPolicy *RetryPolicy) *s.RetryPolicy {
 		MaximumAttempts:             &retryPolicy.MaximumAttempts,
 		NonRetriableErrorReasons:    retryPolicy.NonRetriableErrorReasons,
 		ExpirationIntervalInSeconds: common.Int32Ptr(common.Int32Ceil(retryPolicy.ExpirationInterval.Seconds())),
+	}
+	if *thriftRetryPolicy.BackoffCoefficient == 0 {
+		thriftRetryPolicy.BackoffCoefficient = common.Float64Ptr(backoff.DefaultBackoffCoefficient)
 	}
 	return &thriftRetryPolicy
 }
